@@ -1,0 +1,1 @@
+请使用 Figma 或 Canva 制作 1200x630px 的 OG 图片，保存为 public/og-image.png

@@ -1,0 +1,4 @@
+请制作以下 favicon 文件并放入 public/ 目录（建议使用 Figma 或 RealFaviconGenerator）：
+- favicon.ico（32x32 多尺寸 ICO）
+- favicon-16x16.png（16x16 PNG）
+- apple-touch-icon.png（180x180 PNG）

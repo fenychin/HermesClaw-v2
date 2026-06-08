@@ -1,0 +1,361 @@
+// HermesClaw-v2 数据库 Schema
+// —— 本地开发使用 SQLite，生产环境可切换 PostgreSQL
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ============================================================
+// 用户认证（next-auth + PrismaAdapter）
+// ============================================================
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  role          String    @default("member")
+  createdAt     DateTime  @default(now())
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// 智能体
+// ============================================================
+model Agent {
+  id              String   @id
+  name            String
+  role            String
+  description     String
+  status          String   @default("idle")
+  source          String   @default("custom")
+  category        String   // JSON 数组
+  bindSkills      String   // JSON 数组
+  bindConnectors  String   // JSON 数组
+  memoryPermission String  @default("read")
+  harnessVersion  String   @default("v1.0.0")
+  canDo           String   // JSON 数组
+  cannotDo        String   // JSON 数组
+  statsJson       String   // JSON 对象
+  lastActive      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  runLogs         AgentLog[]
+}
+
+// 智能体运行日志
+// —— agentId 可空：Hermes 控制面对话 / 快捷任务等非绑定具体 Agent 的执行也须留日志
+//    source 标识来源：agent（绑定智能体）| hermes-chat（控制面对话）| quick-task（快捷任务）
+model AgentLog {
+  id        String   @id
+  agentId   String?
+  agent     Agent?   @relation(fields: [agentId], references: [id])
+  source    String   @default("agent")
+  taskName  String
+  status    String
+  duration  String
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([agentId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============================================================
+// 项目空间
+// ============================================================
+model Project {
+  id            String   @id
+  name          String
+  type          String
+  status        String   @default("active")
+  owner         String
+  relatedClient String?
+  country       String?
+  productLine   String?
+  activeAgents  String   // JSON 数组
+  riskPoints    String   // JSON 数组
+  nextActions   String   // JSON 数组
+  tags          String   // JSON 数组
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  memories      Memory[]
+
+  @@index([status])
+  @@index([type])
+}
+
+// ============================================================
+// 记忆（短/中/长期三级）
+// —— P2-⑧ 知识版本化：mid/long 记忆改动写新 revision 并 bump version，
+//    不原地覆盖；status 标识 active/archived，便于 KCL 追溯。
+// ============================================================
+model Memory {
+  id             String   @id
+  type           String   // short | mid | long
+  content        String
+  summary        String
+  source         String
+  relatedProject String?
+  relatedAgent   String?
+  confidence     Float    @default(0.8)
+  frozen         Boolean  @default(false)
+  tags           String   // JSON 数组
+  version        Int      @default(1)
+  status         String   @default("active") // active | archived
+  projectId      String?
+  project        Project? @relation(fields: [projectId], references: [id])
+  revisions      MemoryRevision[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([type])
+  @@index([frozen])
+  @@index([projectId])
+}
+
+// 记忆修订历史（知识变更日志 KCL 的载体）
+model MemoryRevision {
+  id         String   @id @default(cuid())
+  memoryId   String
+  memory     Memory   @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  version    Int
+  content    String
+  summary    String
+  confidence Float
+  editedBy   String   // 操作者：用户邮箱/名，或 "system"
+  reason     String?  // 变更原因（KCL）
+  createdAt  DateTime @default(now())
+}
+
+// ============================================================
+// 连接器配置
+// ============================================================
+model Connector {
+  id           String    @id
+  name         String
+  iconEmoji    String
+  description  String
+  status       String    @default("available")
+  category     String
+  lastSync     String?
+  permissions  String    // JSON 数组
+  usedByAgents String    // JSON 数组
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// ============================================================
+// 技能
+// ============================================================
+model Skill {
+  id           String   @id
+  name         String
+  description  String
+  version      String   @default("v1.0.0")
+  category     String
+  source       String   @default("custom")
+  status       String   @default("active")
+  inputSchema  String
+  outputSchema String
+  usedByAgents String   // JSON 数组
+  scenarios    String   // JSON 数组
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ============================================================
+// Harness 升级提案
+// ============================================================
+model HarnessProposal {
+  id               String    @id
+  proposalId       String    @unique
+  triggeredBy      String    @default("auto")
+  problemStatement String
+  evidence         String    // JSON 数组
+  targetComponent  String
+  proposedChange   String
+  riskLevel        String    @default("low")
+  // 自动化授权等级（AGENTS.md §4.7）：L4 审批 API 硬拒绝，L3 须二次确认
+  automationLevel  String    @default("L2")
+  status           String    @default("pending")
+  estimatedImpact  String
+  reviewedBy       String?
+  reviewedAt       String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============================================================
+// 对话历史
+// ============================================================
+model Conversation {
+  id        String               @id
+  title     String
+  projectId String?
+  messages  ConversationMessage[]
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@index([createdAt])
+}
+
+model ConversationMessage {
+  id             String       @id
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  role           String       // user | assistant
+  content        String
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// 审计日志（AGENTS.md 第四章 4.3 / 第五章：任何关键操作须可溯源）
+// —— 记录审批、删除、连接器授权、边界变更等高危/治理动作
+// ============================================================
+model AuditLog {
+  id         String   @id @default(cuid())
+  actor      String   // 操作者：用户邮箱/名，或 "system"
+  action     String   // 动作标识：approve.proposal | delete.agent | connector.connect ...
+  targetType String   // agent | connector | memory | project | proposal | inquiry ...
+  targetId   String
+  detail     String?
+  riskLevel  String?  // low | mid | high
+  createdAt  DateTime @default(now())
+}
+
+// ============================================================
+// 询盘（外贸入口 / 动态大盘）
+// ============================================================
+model Inquiry {
+  id          String   @id
+  fromCountry String
+  countryFlag String
+  companyName String
+  summary     String
+  priority    String   @default("mid") // high | mid | low
+  channel     String
+  receivedAt  DateTime
+  replied     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+// ============================================================
+// 市场情报
+// ============================================================
+model MarketIntelligence {
+  id              String   @id
+  type            String   // currency | tariff | competitor | market | logistics
+  title           String
+  summary         String
+  source          String
+  credibility     Float    @default(0.9)
+  impactLevel     String   @default("mid") // high | mid | low
+  suggestedAction String
+  publishedAt     DateTime
+  createdAt       DateTime @default(now())
+}
+
+// ============================================================
+// 报价（projectId 为软引用，不建外键以兼容悬挂引用）
+// ============================================================
+model Quotation {
+  id          String   @id
+  projectId   String
+  version     Int      @default(1)
+  totalAmount String   // 保留千分位字符串，与 types/trade.ts 一致
+  currency    String
+  status      String   @default("draft") // draft | sent | accepted | rejected
+  createdAt   DateTime @default(now())
+}
+
+// ============================================================
+// 进化日志（P1-⑤ 进化调度器：每次 Level 2 评估落一条，无论是否触发）
+// ============================================================
+model EvolutionLog {
+  id            String   @id @default(cuid())
+  triggeredBy   String   // auto | manual
+  evaluatedAt   DateTime @default(now())
+  triggered     Boolean  @default(false)
+  errorRate     Float    @default(0)
+  successRate   Float    @default(1)
+  totalLogs     Int      @default(0)
+  provider      String?  // anthropic | deepseek | null
+  model         String?
+  proposalId    String?  // 触发时生成的提案 proposalId
+  reason        String?  // 未触发时的说明
+  reportMd      String?  // AI 生成的 Markdown 评估报告
+  createdAt     DateTime @default(now())
+}
+
+// ============================================================
+// 工具注册表（P2-⑦ 受控工具接入：所有工具须注册，高危工具双审批）
+// ============================================================
+model ToolRegistry {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String
+  category    String   // connector | skill | system ...
+  scopes      String   // JSON 数组：权限范围
+  riskLevel   String   @default("low") // low | mid | high（high 须双审批）
+  enabled     Boolean  @default(true)
+  grants      ToolGrant[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 工具授权（短期 Token，≤ 1 小时有效期）
+model ToolGrant {
+  id          String       @id @default(cuid())
+  toolId      String
+  tool        ToolRegistry @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  agentId     String       // 被授权的智能体
+  scopes      String       // JSON 数组：实际授予的范围
+  token       String       @unique
+  expiresAt   DateTime
+  issuedBy    String       // 签发者
+  revoked     Boolean      @default(false)
+  // 高危工具双审批：需两个不同 actor 签名
+  approvedBy1 String?
+  approvedBy2 String?
+  createdAt   DateTime     @default(now())
+}

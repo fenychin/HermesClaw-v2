@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/harness/cron",
+      "schedule": "0 3 */3 * *"
+    },
+    {
+      "path": "/api/maintenance/cleanup",
+      "schedule": "0 3 * * 0"
+    }
+  ]
+}

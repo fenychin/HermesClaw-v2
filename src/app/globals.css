@@ -1,26 +1,138 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@custom-variant dark (&:is(.dark *));
+
+/*
+  HermesClaw-v2 深色主题色板
+  —— 全站强制深色：:root 与 .dark 同值，避免首屏闪白与门户(portal)层脱离 .dark 作用域时丢色。
+  —— shadcn 语义 token 直接落品牌 hex；无对应 token 的弱提示/辅助蓝/成功/警告等作为自定义品牌变量补充。
+  —— 所有 --color-* 经下方 @theme inline 注册为 Tailwind 工具类（如 bg-sidebar / text-hint / text-success）。
+*/
+:root,
+.dark {
+  /* —— 基础语义色 —— */
+  --background: #0b0b0c;            /* 页面主背景 */
+  --foreground: #f5f5f7;           /* 一级文字 */
+  --card: #18181b;                 /* 卡片背景 */
+  --card-foreground: #f5f5f7;
+  --popover: #202024;              /* 浮层背景 */
+  --popover-foreground: #f5f5f7;
+  --primary: #7c5cff;              /* 品牌主色 */
+  --primary-foreground: #f5f5f7;
+  --secondary: #202024;            /* 次级按钮 */
+  --secondary-foreground: #f5f5f7;
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;     /* 二级文字 */
+  --accent: #24242a;               /* hover 背景 */
+  --accent-foreground: #f5f5f7;
+  --destructive: #ff6b6b;          /* 风险色 */
+  --destructive-foreground: #f5f5f7;
+  --border: #2a2a31;               /* 分隔线 */
+  --input: #2a2a31;
+  --ring: #7c5cff;                 /* 焦点环 = 品牌主色 */
+  --radius: 0.875rem;              /* PRD 大圆角基准 */
+
+  /* —— 图表色（Recharts，对应 chart-1..5）—— */
+  --chart-1: #7c5cff;              /* 主色 */
+  --chart-2: #4da3ff;              /* 辅助蓝 */
+  --chart-3: #37c99a;              /* 成功 */
+  --chart-4: #f0a43b;              /* 警告 */
+  --chart-5: #ff6b6b;              /* 风险 */
+
+  /* —— 侧边栏 —— */
+  --sidebar: #111112;              /* 侧边栏背景 */
+  --sidebar-foreground: #f5f5f7;
+  --sidebar-primary: #7c5cff;
+  --sidebar-primary-foreground: #f5f5f7;
+  --sidebar-accent: #24242a;       /* 侧栏 hover */
+  --sidebar-accent-foreground: #f5f5f7;
+  --sidebar-border: #2a2a31;
+  --sidebar-ring: #7c5cff;
+
+  /* —— HermesClaw 自定义品牌色（shadcn 无对应语义 token）—— */
+  --hint: #71717a;                 /* 弱提示文字 */
+  --brand: #7c5cff;                /* 品牌主色（别名） */
+  --brand-primary: #7c5cff;        /* 品牌主色（全局命令面板/Toast 引用） */
+  --brand-blue: #4da3ff;           /* 品牌辅助蓝 */
+  --success: #37c99a;              /* 成功色 */
+  --warning: #f0a43b;              /* 警告色 */
+  --danger: #ff6b6b;               /* 风险色（别名） */
+  --overlay: #202024;              /* 命令面板等浮层背景 */
+  --hover: #24242a;                /* 列表项 hover 背景 */
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /* 字体（变量由 src/app/layout.tsx 的 next/font 注入） */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-geist-sans);
+
+  /* 基础语义 token */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* 圆角梯度（基于 --radius） */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+
+  /* 图表 */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* 侧边栏 */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* HermesClaw 自定义品牌 token */
+  --color-hint: var(--hint);
+  --color-brand: var(--brand);
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-blue: var(--brand-blue);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-overlay: var(--overlay);
+  --color-hover: var(--hover);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }
