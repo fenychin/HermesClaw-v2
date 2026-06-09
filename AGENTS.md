@@ -148,6 +148,34 @@ estimated_impact: |
 
 ## 第四章：六大核心组件规范
 
+### 4.0 技能规范（Claude Code Skills 标准）
+
+> ⚠️ **重要声明**：本项目中所有"技能（Skill）"均指 **Claude Code Skills**（遵循 [Agent Skills](https://agentskills.io) 开放标准），
+> **不是**传统意义上的"功能模块"或"微服务"。每个 Skill 都是一个可通过 `/skill-name` 调用的 Claude Code 扩展，
+> 其格式为 YAML frontmatter + Markdown 正文。
+
+- **规范文档**：<https://code.claude.com/docs/zh-CN/skills>
+- **文件格式**：`SKILL.md` = YAML frontmatter（`---` 包裹）+ Markdown 正文
+- **存放位置**：`.claude/skills/<skill-name>/SKILL.md`
+- **命令名称**：目录名即为 `/` 后的调用名（如 `.claude/skills/ft-inquiry-sorter/SKILL.md` → `/ft-inquiry-sorter`）
+- **必选字段**：`description`（Claude 据此自动判定何时加载该 Skill）
+- **任务边界映射**：
+  - Skill 正文 `## 能力清单 (can_do)` → Agent 的 `can_do` 列表
+  - Skill 正文 `## 约束条件 (cannot_do)` → Agent 的 `cannot_do` 列表
+  - Skill 正文 `## 所需工具 / 连接器` → 工具需求声明
+- **数据库镜像**：Prisma `Skill` 表为 Claude Code Skills 的数据库投影：
+  - `inputSchema` 存储 `{ role, capabilities, commandName, allowedTools }`
+  - `outputSchema` 存储 `{ constraints, disableModelInvocation }`
+  - `scenarios` 存储所需工具/连接器列表
+  - `category` 存储 `foreign-trade:{角色名}`
+- **种子脚本**：`prisma/seed-skills.ts` 负责扫描 `.claude/skills/ft-*/SKILL.md`，解析 YAML frontmatter 与 Markdown 正文，幂等同步至 Prisma `Skill` 表
+- **命名约定**：
+  - 外贸行业技能模板统一以 `ft-` 前缀命名，位于 `.claude/skills/ft-*/` 目录下
+  - 未来新增行业须先在本文档登记前缀（如 `fin-` 金融、`med-` 医疗），未经登记的前缀不会被 `seed-skills.ts` 识别
+- **allowed-tools 与 ToolRegistry 的关系**：SKILL.md frontmatter 中的 `allowed-tools` 声明的是 **Claude Code 原生工具**（如 `Read`、`Grep`、`WebFetch`），由 IDE 层管理权限；业务连接器（如 Gmail、CRM）走 Prisma `ToolRegistry` + `ToolGrant` 管理体系（§4.3）。两者是**不同层次的工具体系**，不可混用
+- **数据库映射函数**：`toSkillDbRecord(tmpl)`（`prisma/seed-skills.ts`）是 Claude Code Skills 文件 ↔ Prisma `Skill` 表的**唯一映射桥梁**，`seed-skills.ts` 和 `seed.ts` 均通过此函数写入，禁止在调用方重复序列化逻辑
+- **种子脚本审计豁免**：`prisma/seed-*.ts` 作为开发工具，**豁免 §4.3 审计日志（AuditLog）写入要求**。种子数据填充不视为"系统运行操作"，无需记录审计轨迹。此豁免仅适用于本地开发环境，生产环境的数据变更仍须通过受控 API 执行并记录审计日志
+
 ### 4.1 任务边界（Task Boundary）
 
 - **必须声明**：每个 Agent 的 `can_do` 和 `cannot_do` 列表

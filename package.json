@@ -9,6 +9,7 @@
     "lint": "eslint",
     "seed:logs": "tsx prisma/seed-logs.ts",
     "seed:trade": "tsx prisma/seed-trade.ts",
+    "seed:skills": "tsx prisma/seed-skills.ts",
     "seed:tools": "tsx prisma/seed-tools.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",

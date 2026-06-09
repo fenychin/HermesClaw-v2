@@ -96,6 +96,7 @@ src/
 - 路由分组 `(workspace)` 不影响 URL，仅用于共享布局。
 - 信息架构（一级 / 二级导航）以 `src/config/navigation.ts` 为**唯一数据源**，新增模块在此登记，勿在多处硬编码。
 - 后端逻辑放 `app/api/<resource>/route.ts`；复杂业务逻辑后续下沉至 `src/lib/server/*`，Route Handler 只做 I/O 与校验。
+- **技能（Skill）**遵循 Claude Code Skills 规范（[Agent Skills](https://agentskills.io) 开放标准），存放于 `.claude/skills/<name>/SKILL.md`（详见 [AGENTS.md §4.0](./AGENTS.md#40-技能规范claude-code-skills-标准)）。**项目中的"Skill"均指此格式，非传统功能模块。**
 
 ---
 
