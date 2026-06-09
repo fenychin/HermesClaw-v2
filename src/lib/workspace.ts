@@ -6,6 +6,7 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 
 // ==============================
 // WorkspaceRole 枚举 & 权限矩阵
@@ -53,74 +54,83 @@ export function hasMinRole(role: WorkspaceRole, minRole: WorkspaceRole): boolean
 }
 
 // ==============================
-// 会话 / Header 解析
+// 会话解析（内部函数，复用 session）
 // ==============================
 
-/** 从当前会话或请求头解析 workspaceId */
-export async function getWorkspaceId(request?: Request): Promise<string> {
-  // 优先从请求头获取（中间件注入）
+interface ResolvedSession {
+  userId: string;
+  role: string;
+}
+
+async function resolveSession(): Promise<ResolvedSession | null> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return null;
+    return { userId: session.user.id, role: session.user.role };
+  } catch (err) {
+    logger.warn("[workspace] auth() 解析失败，回退为未登录状态", {
+      error: err instanceof Error ? err.message : "未知错误",
+    });
+    return null;
+  }
+}
+
+/** 从 session + 请求头解析 workspaceId */
+async function resolveWorkspaceId(
+  session: ResolvedSession | null,
+  request?: Request,
+): Promise<string> {
+  // 优先从请求头获取
   if (request) {
     const headerWs = request.headers.get("x-workspace-id");
     if (headerWs) return headerWs;
   }
 
-  // 从 session 获取（用户最后活跃的 workspace）
-  try {
-    const session = await auth();
-    if (session?.user?.id) {
-      // 查找用户所属的第一个 workspace
+  // 从 session 查找用户所属的第一个 workspace
+  if (session) {
+    try {
       const membership = await prisma.workspaceMember.findFirst({
-        where: { userId: session.user.id },
+        where: { userId: session.userId },
         orderBy: { workspaceId: "asc" },
       });
       if (membership) return membership.workspaceId;
+    } catch (err) {
+      logger.warn("[workspace] 查询 WorkspaceMember 失败，回退默认 workspace", {
+        error: err instanceof Error ? err.message : "未知错误",
+        userId: session.userId,
+      });
     }
-  } catch {
-    // 静默回退
   }
 
-  // 最终回退到默认 workspace
   return "default";
 }
 
+// ==============================
+// 公共 API
+// ==============================
+
 /** 获取当前用户在当前 workspace 中的角色 */
 export async function getCurrentRole(request?: Request): Promise<WorkspaceRole> {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) return "VIEWER";
+  const session = await resolveSession();
+  if (!session) return "VIEWER";
 
-    const workspaceId = await getWorkspaceId(request);
+  try {
+    const workspaceId = await resolveWorkspaceId(session, request);
     const membership = await prisma.workspaceMember.findUnique({
       where: {
         workspaceId_userId: {
           workspaceId,
-          userId: session.user.id,
+          userId: session.userId,
         },
       },
     });
     return (membership?.role as WorkspaceRole) ?? "VIEWER";
-  } catch {
-    return "VIEWER";
-  }
-}
-
-/** 获取当前用户在当前 workspace 中的成员信息 */
-export async function getCurrentMembership(request?: Request) {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) return null;
-
-    const workspaceId = await getWorkspaceId(request);
-    return await prisma.workspaceMember.findUnique({
-      where: {
-        workspaceId_userId: {
-          workspaceId,
-          userId: session.user.id,
-        },
-      },
+  } catch (err) {
+    logger.warn("[workspace] 查询用户角色失败，降级为 VIEWER", {
+      error: err instanceof Error ? err.message : "未知错误",
+      userId: session.userId,
     });
-  } catch {
-    return null;
+    return "VIEWER";
   }
 }
 
@@ -134,12 +144,50 @@ export interface WorkspaceContext {
   userId?: string;
 }
 
-/** 从请求构建 workspace 上下文（供 Route Handler 使用） */
+/**
+ * 从请求构建 workspace 上下文（供 Route Handler 使用）
+ * —— 仅调用 auth() 一次，session 复用传入子函数
+ */
 export async function buildWorkspaceContext(request: Request): Promise<WorkspaceContext> {
-  const workspaceId = await getWorkspaceId(request);
-  const role = await getCurrentRole(request);
-  const session = await auth().catch(() => null);
-  return { workspaceId, role, userId: session?.user?.id };
+  const session = await resolveSession();
+  const workspaceId = await resolveWorkspaceId(session, request);
+
+  let role: WorkspaceRole = "VIEWER";
+  if (session) {
+    try {
+      const membership = await prisma.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId,
+            userId: session.userId,
+          },
+        },
+      });
+      role = (membership?.role as WorkspaceRole) ?? "VIEWER";
+    } catch (err) {
+      logger.warn("[workspace] buildWorkspaceContext 查询角色失败", {
+        error: err instanceof Error ? err.message : "未知错误",
+        userId: session.userId,
+        workspaceId,
+      });
+    }
+  }
+
+  // 默认 workspace 存在性校验
+  if (workspaceId === "default") {
+    try {
+      const ws = await prisma.workspace.findUnique({ where: { id: "default" } });
+      if (!ws) {
+        logger.error("[workspace] 默认 Workspace 不存在，数据库未初始化");
+      }
+    } catch (err) {
+      logger.warn("[workspace] 默认 Workspace 查询失败", {
+        error: err instanceof Error ? err.message : "未知错误",
+      });
+    }
+  }
+
+  return { workspaceId, role, userId: session?.userId };
 }
 
 // ==============================
@@ -164,9 +212,6 @@ export class ForbiddenError extends Error {
 
 /**
  * 断言当前用户满足最低角色要求，否则抛 ForbiddenError。
- * 用法：
- *   const ctx = await buildWorkspaceContext(request)
- *   requireRole(ctx.role, "MEMBER")  // VIEWER 将被拒绝
  */
 export function requireRole(role: WorkspaceRole, minRole: WorkspaceRole): void {
   if (!hasMinRole(role, minRole)) {
@@ -188,4 +233,22 @@ export function requireHarnessAdmin(role: WorkspaceRole): void {
   if (!canModifyHarness(role)) {
     throw new ForbiddenError("仅 ADMIN 或 OWNER 可修改 Harness 配置");
   }
+}
+
+/**
+ * RBAC 门禁便捷封装：检查角色 → 不满足则返回 403 Response，满足返回 null。
+ * 消除重复的 try { requireRole } catch { return errorResponse } 模式。
+ */
+export function guardRole(
+  role: WorkspaceRole,
+  minRole: WorkspaceRole,
+  message?: string,
+): Response | null {
+  if (!hasMinRole(role, minRole)) {
+    return Response.json(
+      { success: false, error: message ?? `需要 ${minRole} 或更高权限` },
+      { status: 403 },
+    );
+  }
+  return null;
 }

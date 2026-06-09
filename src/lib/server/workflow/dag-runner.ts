@@ -275,6 +275,7 @@ export async function runWorkflow(
           targetId: nodeId,
           detail: `节点「${nodeName}」输出被校验层拦截：${guard.reason}`,
           riskLevel: 'mid',
+          workspaceId: "default",
         })
       }
     }
@@ -315,6 +316,7 @@ export async function runWorkflow(
         targetId: nodeId,
         detail: `工作流「${def.name}」节点「${nodeName}」执行失败：${result.error ?? '未知错误'}`,
         riskLevel: 'high',
+        workspaceId: "default",
       })
 
       // 节点失败 → 触发 Harness 降级评估（fire-and-forget，不阻断主流程）
@@ -346,6 +348,7 @@ export async function runWorkflow(
               : '状态变更'
         }`,
         riskLevel: 'low',
+        workspaceId: "default",
       })
     }
   }
@@ -396,6 +399,7 @@ export async function runWorkflow(
         targetId: node.id,
         detail: `工作流「${def.name}」因引擎致命错误终止：${errorMsg}`,
         riskLevel: 'high',
+        workspaceId: "default",
       })
     }
   }
@@ -433,6 +437,7 @@ export async function runWorkflow(
       finalStatus === 'completed' ? '执行完成' : '执行失败'
     }（runId=${runId}，共 ${nodes.length} 个节点）`,
     riskLevel: finalStatus === 'completed' ? 'low' : 'high',
+    workspaceId: "default",
   })
 
   logger.info(`[dag-runner] WorkflowRun ${runId} 结束，终态：${finalStatus}`, {

@@ -411,6 +411,7 @@ export async function generateWorkflow(
     targetId: created.id,
     detail: auditDetail,
     riskLevel: "low",
+    workspaceId: "default",
   })
 
   logger.info("WorkflowGenerator 生成成功", {

@@ -11,7 +11,7 @@
  * 用法：pnpm exec tsx scripts/inject-test-logs.ts
  */
 import 'dotenv/config'
-import { PrismaClient } from '../src/generated/prisma/client'
+import { PrismaClient } from '../src/generated/prisma-new/client'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 
 const adapter = new PrismaBetterSqlite3({

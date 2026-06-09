@@ -10,13 +10,14 @@ import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { ToolGrantSchema, validateBody } from "@/lib/validators"
-import { buildWorkspaceContext } from "@/lib/workspace"
+import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 export const runtime = "nodejs"
 
 export async function POST(request: Request) {
   try {
     const ctx = await buildWorkspaceContext(request)
+    requireWritable(ctx.role)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, ToolGrantSchema)
     if (parsed instanceof Response) return parsed

@@ -9,7 +9,7 @@ import { successResponse, errorResponse } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import {
   buildWorkspaceContext,
-  requireRole,
+  guardRole,
   type WorkspaceRole,
   WORKSPACE_ROLES,
 } from "@/lib/workspace"
@@ -77,11 +77,8 @@ export async function POST(request: Request) {
     const ctx = await buildWorkspaceContext(request)
 
     // RBAC：仅 ADMIN/OWNER 可邀请
-    try {
-      requireRole(ctx.role, "ADMIN")
-    } catch {
-      return errorResponse("权限不足，仅管理员可邀请成员", 403)
-    }
+    const inviteGuard = guardRole(ctx.role, "ADMIN", "权限不足，仅管理员可邀请成员")
+    if (inviteGuard) return inviteGuard
 
     const body = await request.json()
     const parsed = InviteMemberSchema.safeParse(body)
@@ -161,11 +158,8 @@ export async function PATCH(request: Request) {
     const ctx = await buildWorkspaceContext(request)
 
     // RBAC：仅 ADMIN/OWNER 可变更角色
-    try {
-      requireRole(ctx.role, "ADMIN")
-    } catch {
-      return errorResponse("权限不足，仅管理员可变更角色", 403)
-    }
+    const changeGuard = guardRole(ctx.role, "ADMIN", "权限不足，仅管理员可变更角色")
+    if (changeGuard) return changeGuard
 
     const body = await request.json()
     const parsed = ChangeRoleSchema.safeParse(body)
@@ -232,11 +226,8 @@ export async function DELETE(request: Request) {
     const ctx = await buildWorkspaceContext(request)
 
     // RBAC：仅 ADMIN/OWNER 可移除成员
-    try {
-      requireRole(ctx.role, "ADMIN")
-    } catch {
-      return errorResponse("权限不足，仅管理员可移除成员", 403)
-    }
+    const removeGuard = guardRole(ctx.role, "ADMIN", "权限不足，仅管理员可移除成员")
+    if (removeGuard) return removeGuard
 
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get("userId")

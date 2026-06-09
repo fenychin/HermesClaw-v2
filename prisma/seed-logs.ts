@@ -8,7 +8,7 @@
  * 用法：pnpm seed:logs   （或 pnpm exec tsx prisma/seed-logs.ts）
  */
 import 'dotenv/config'
-import { PrismaClient } from '../src/generated/prisma/client'
+import { PrismaClient } from '../src/generated/prisma-new/client'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 
 const adapter = new PrismaBetterSqlite3({

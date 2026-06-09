@@ -9,7 +9,7 @@ import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { checkConfirmQuery, checkConfirmValue } from "@/lib/server/guardrail"
 import { shouldVersion, snapshotRevision } from "@/lib/server/memory-version"
 import { MemoryUpdateSchema, validateBody } from "@/lib/validators"
-import { buildWorkspaceContext } from "@/lib/workspace"
+import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 /** 序列化 Memory，将 JSON 字符串字段反序列化 */
 function serializeMemory(memory: Record<string, unknown>) {
@@ -130,6 +130,7 @@ export async function DELETE(
   try {
     const { id } = await params
     const ctx = await buildWorkspaceContext(request)
+    requireWritable(ctx.role)
 
     const existing = await prisma.memory.findUnique({ where: { id } })
     if (!existing) {

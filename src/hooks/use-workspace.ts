@@ -22,7 +22,7 @@ export interface WorkspaceInfo {
   createdAt: string;
 }
 
-export interface WorkspaceMembersResponse {
+export interface WorkspaceData {
   workspace: WorkspaceInfo;
   members: WorkspaceMember[];
 }
@@ -31,12 +31,12 @@ export interface WorkspaceMembersResponse {
 // API 调用
 // ==============================
 
-async function fetchWorkspaceMembers(): Promise<WorkspaceMembersResponse> {
+async function fetchWorkspaceData(): Promise<WorkspaceData> {
   const res = await fetch("/api/workspace/members");
   if (!res.ok) throw new Error("获取成员列表失败");
   const json = await res.json();
   if (!json.success) throw new Error(json.error ?? "未知错误");
-  return json.data as WorkspaceMembersResponse;
+  return json.data as WorkspaceData;
 }
 
 async function inviteMember(email: string, role: string) {
@@ -74,47 +74,22 @@ async function removeMember(userId: string) {
 // TanStack Query Hooks
 // ==============================
 
-/** 获取当前 workspace 信息 */
-export function useCurrentWorkspace() {
+/**
+ * 统一的 workspace 数据 Hook
+ * —— 合并 useCurrentWorkspace / useWorkspaceMembers / useWorkspaceRole 三个查询
+ *    共享同一 queryKey 与 queryFn，由 React Query 自动去重
+ */
+export function useWorkspaceData() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["workspace"],
-    queryFn: fetchWorkspaceMembers,
+    queryFn: fetchWorkspaceData,
     staleTime: 60_000,
   });
   return {
     workspace: data?.workspace ?? null,
-    isLoading,
-    error,
-  };
-}
-
-/** 获取 workspace 成员列表 */
-export function useWorkspaceMembers() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["workspace"],
-    queryFn: fetchWorkspaceMembers,
-    staleTime: 60_000,
-  });
-  return {
-    members: data?.members ?? [],
-    workspace: data?.workspace ?? null,
-    isLoading,
-    error,
-  };
-}
-
-/** 获取当前用户在 workspace 中的角色 */
-export function useWorkspaceRole() {
-  const { data, isLoading } = useQuery({
-    queryKey: ["workspace"],
-    queryFn: fetchWorkspaceMembers,
-    staleTime: 60_000,
-  });
-  // 从 session 推断当前角色（需要额外 API 或从 /api/auth/session 获取）
-  // 此处返回全部成员数据，调用方自行过滤当前用户
-  return {
     members: data?.members ?? [],
     isLoading,
+    error,
   };
 }
 

@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
+import { useSession } from "next-auth/react";
 import {
-  useWorkspaceMembers,
+  useWorkspaceData,
   useInviteMember,
   useChangeMemberRole,
   useRemoveMember,
   type WorkspaceMember,
 } from "@/hooks/use-workspace";
 import type { WorkspaceRole } from "@/lib/workspace";
-import { WORKSPACE_ROLES, isAdmin } from "@/lib/workspace";
+import { isAdmin } from "@/lib/workspace";
 import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -293,17 +294,21 @@ function MembersSkeleton() {
 // ==============================
 
 export default function TeamPage() {
-  const { members, workspace, isLoading } = useWorkspaceMembers();
+  const { data: session } = useSession();
+  const { members, workspace, isLoading } = useWorkspaceData();
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [changeRoleTarget, setChangeRoleTarget] = useState<WorkspaceMember | null>(null);
   const [removeTarget, setRemoveTarget] = useState<WorkspaceMember | null>(null);
 
-  // 当前用户的角色——从 session API 推断（members 列表中第一个匹配当前登录用户）
-  // 简化处理：首版假设当前用户为第一个 OWNER 或 ADMIN
-  const currentRole: WorkspaceRole = members.length > 0
-    ? (members[0].role as WorkspaceRole)
-    : "VIEWER";
+  // 当前用户的角色——通过 session email 精确匹配成员列表
+  const currentMember = useMemo(
+    () => members.find((m) => m.email === session?.user?.email),
+    [members, session?.user?.email],
+  );
+  const currentRole: WorkspaceRole = (currentMember?.role as WorkspaceRole) ?? "VIEWER";
+  const isCurrentUser = (member: WorkspaceMember) =>
+    member.email === session?.user?.email;
   const canManage = isAdmin(currentRole);
 
   return (
@@ -377,6 +382,9 @@ export default function TeamPage() {
                       <div className="flex flex-col">
                         <span className="text-sm font-medium text-foreground">
                           {member.name}
+                          {isCurrentUser(member) && (
+                            <span className="ml-1.5 text-[10px] text-muted-foreground font-normal">(你)</span>
+                          )}
                         </span>
                         <span className="text-xs text-muted-foreground">{member.email}</span>
                       </div>
@@ -387,9 +395,9 @@ export default function TeamPage() {
                     {canManage && (
                       <TableCell className="text-right">
                         {/* OWNER 不可操作，当前用户自身不可操作 */}
-                        {member.role !== "OWNER" && (
+                        {member.role !== "OWNER" && !isCurrentUser(member) && (
                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
+                            <DropdownMenuTrigger>
                               <Button variant="ghost" size="icon-sm">
                                 <MoreVertical className="size-4" />
                               </Button>

@@ -8,7 +8,7 @@ import {
 } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { AgentCreateSchema, validateBody } from "@/lib/validators"
-import { buildWorkspaceContext } from "@/lib/workspace"
+import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 /**
  * 智能体序列化：将数据库 JSON 字符串字段反序列化为对象/数组
@@ -44,6 +44,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const ctx = await buildWorkspaceContext(request)
+    requireWritable(ctx.role)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, AgentCreateSchema)
     if (parsed instanceof Response) return parsed

@@ -5,7 +5,7 @@ import {
   errorResponse,
 } from "@/lib/api-utils"
 import { ConversationMessageSchema, validateBody } from "@/lib/validators"
-import { buildWorkspaceContext } from "@/lib/workspace"
+import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 /** POST /api/conversations/[id]/messages —— 向对话追加消息 */
 export async function POST(
@@ -15,6 +15,7 @@ export async function POST(
   try {
     const { id: conversationId } = await params
     const ctx = await buildWorkspaceContext(request)
+    requireWritable(ctx.role)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, ConversationMessageSchema)
     if (parsed instanceof Response) return parsed

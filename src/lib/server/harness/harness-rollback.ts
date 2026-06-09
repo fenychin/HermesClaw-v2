@@ -138,7 +138,7 @@ export async function rollbackHarnessProposal(
   //    先读取 proposal 获取 previousSnapshot
   const proposal = await prisma.harnessProposal.findUnique({
     where: { id: proposalId },
-    select: { id: true, proposalId: true, status: true, previousSnapshot: true },
+    select: { id: true, proposalId: true, status: true, previousSnapshot: true, workspaceId: true },
   })
 
   if (!proposal) {
@@ -213,6 +213,7 @@ export async function rollbackHarnessProposal(
           targetId: proposalId,
           detail: `${hepId} · 回滚 Agent ${snapshot.agentId} 至快照版本 ${snapshot.harnessVersion}`,
           riskLevel: "high",
+          workspaceId: proposal.workspaceId,
         },
       })
     })

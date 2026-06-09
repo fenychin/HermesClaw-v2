@@ -10,7 +10,7 @@ import { logger } from "@/lib/logger"
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { createEmailConnector } from "@/lib/server/connectors/email/email-connector"
-import { buildWorkspaceContext } from "@/lib/workspace"
+import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 export const runtime = "nodejs"
 
@@ -37,6 +37,7 @@ const SendEmailRequestSchema = z.object({
 /** POST /api/connectors/email/send */
 export async function POST(request: Request) {
   const ctx = await buildWorkspaceContext(request)
+  requireWritable(ctx.role)
   const actor = await actorFromSession()
 
   // 解析并校验请求体

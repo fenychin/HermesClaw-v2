@@ -8,7 +8,7 @@ import {
 } from "@/lib/api-utils"
 import { writeAuditLog } from "@/lib/server/audit"
 import { checkConfirmQuery } from "@/lib/server/guardrail"
-import { buildWorkspaceContext } from "@/lib/workspace"
+import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 /** 序列化 Project，将 JSON 字符串字段反序列化 */
 function serializeProject(project: Record<string, unknown>) {
@@ -99,6 +99,7 @@ export async function DELETE(
   try {
     const { id } = await params
     const ctx = await buildWorkspaceContext(request)
+    requireWritable(ctx.role)
 
     const existing = await prisma.project.findUnique({ where: { id } })
     if (!existing) {

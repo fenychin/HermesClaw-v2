@@ -20,7 +20,7 @@ import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { getGovernanceClause } from "@/lib/server/agents-md"
 import { rateLimit } from "@/lib/rate-limit"
 import { AgentExecuteSchema, validateBody } from "@/lib/validators"
-import { buildWorkspaceContext } from "@/lib/workspace"
+import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -44,6 +44,7 @@ export async function POST(
     }
 
     const ctx = await buildWorkspaceContext(request)
+    requireWritable(ctx.role)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, AgentExecuteSchema)
     if (parsed instanceof Response) return parsed

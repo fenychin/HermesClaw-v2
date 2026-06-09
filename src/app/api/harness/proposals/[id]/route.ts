@@ -9,7 +9,7 @@ import { writeAuditLog } from "@/lib/server/audit"
 import { checkConfirmQuery, checkAutomationGate } from "@/lib/server/guardrail"
 import { resolveAutomationLevel } from "@/types"
 import { HarnessProposalUpdateSchema, validateBody } from "@/lib/validators"
-import { buildWorkspaceContext } from "@/lib/workspace"
+import { buildWorkspaceContext, requireHarnessAdmin } from "@/lib/workspace"
 
 /** 序列化 HarnessProposal，将 JSON 字符串字段反序列化 */
 function serializeProposal(proposal: Record<string, unknown>) {
@@ -52,6 +52,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const ctx = await buildWorkspaceContext(request)
+    requireHarnessAdmin(ctx.role)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, HarnessProposalUpdateSchema)
     if (parsed instanceof Response) return parsed
@@ -139,6 +140,7 @@ export async function DELETE(
   try {
     const { id } = await params
     const ctx = await buildWorkspaceContext(request)
+    requireHarnessAdmin(ctx.role)
 
     const existing = await prisma.harnessProposal.findUnique({ where: { id } })
     if (!existing) {

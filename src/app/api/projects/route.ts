@@ -7,7 +7,7 @@ import {
   errorResponse,
 } from "@/lib/api-utils"
 import { ProjectCreateSchema, validateBody } from "@/lib/validators"
-import { buildWorkspaceContext } from "@/lib/workspace"
+import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 /** 序列化 Project，将 JSON 字符串字段反序列化 */
 function serializeProject(project: Record<string, unknown>) {
@@ -45,6 +45,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const ctx = await buildWorkspaceContext(request)
+    requireWritable(ctx.role)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, ProjectCreateSchema)
     if (parsed instanceof Response) return parsed

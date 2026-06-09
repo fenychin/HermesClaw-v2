@@ -5,7 +5,7 @@ import {
   errorResponse,
 } from "@/lib/api-utils"
 import { ConversationCreateSchema, validateBody } from "@/lib/validators"
-import { buildWorkspaceContext } from "@/lib/workspace"
+import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 /** GET /api/conversations —— 获取对话列表 */
 export async function GET(request: Request) {
@@ -30,6 +30,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const ctx = await buildWorkspaceContext(request)
+    requireWritable(ctx.role)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, ConversationCreateSchema)
     if (parsed instanceof Response) return parsed

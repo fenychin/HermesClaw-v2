@@ -10,13 +10,14 @@ import { successResponse, errorResponse } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { createEmailConnector } from "@/lib/server/connectors/email/email-connector"
 import { parseInquiriesFromEmails } from "@/lib/server/connectors/email/inquiry-parser"
-import { buildWorkspaceContext } from "@/lib/workspace"
+import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 export const runtime = "nodejs"
 
 /** POST /api/connectors/email/sync */
 export async function POST(request: Request) {
   const ctx = await buildWorkspaceContext(request)
+  requireWritable(ctx.role)
   const actor = await actorFromSession()
   const connector = createEmailConnector()
 

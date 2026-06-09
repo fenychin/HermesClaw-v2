@@ -1,9 +1,9 @@
 # AGENTS.md — HermesClaw-v2 项目最高规则文档
 
-> **版本**: v2.5.0-alpha  
+> **版本**: v2.6.0-alpha  
 > **项目**: HermesClaw-v2（空间项目）  
 > **状态**: 🟢 生效中  
-> **最后更新**: 2026-06-09
+> **最后更新**: 2026-06-10
 
 ***
 
@@ -412,6 +412,63 @@ draft（AI 生成，待审核）→ active（人工激活，可执行）→ arch
 - JSON 解析复用 `parseJsonLoose`（`src/lib/harness-llm.ts`，已 export）
 - 新 Agent 应优先使用此共享层，避免重复实现
 
+### 4.11 多租户 Workspace 与 RBAC
+
+> 本节定义多租户工作空间模型、细粒度 RBAC 权限体系及数据隔离约定。
+
+**数据模型**（Prisma）：
+
+| 模型 | 关键字段 | 说明 |
+|------|---------|------|
+| `Workspace` | `id`, `name`, `plan` | 工作空间（租户），`plan` 取值 `free` / `pro` / `enterprise` |
+| `WorkspaceMember` | `workspaceId`, `userId`, `role` | 成员关系，复合主键 `(workspaceId, userId)`，级联删除 |
+
+**角色体系**（`WorkspaceRole`，TEXT 列存）：
+
+| 角色 | 优先级 | 写权限 | 审批 L3 | 修改 Harness | 管理成员 |
+|------|--------|--------|---------|-------------|---------|
+| `OWNER` | 4 | ✅ | ✅ | ✅ | ✅ |
+| `ADMIN` | 3 | ✅ | ✅ | ✅ | ✅ |
+| `MEMBER` | 2 | ✅ | ✅ | ❌ | ❌ |
+| `VIEWER` | 1 | ❌ | ❌ | ❌ | ❌ |
+
+**数据隔离规则**：
+
+- **Prisma 查询层强制隔离**：所有 `findMany` / `findFirst` / `create` / `count` 必须带 `workspaceId` 过滤，**禁止依赖应用层过滤**
+- **向后兼容**：系统初始化时创建 `id='default'` 的默认 Workspace，所有现有数据自动归属，现有用户自动授予 `OWNER` 角色
+- **AuditLog 强制 workspaceId**：`WriteAuditLogInput.workspaceId` 为**必填字段**（TypeScript 编译期强制），禁止绕过 `writeAuditLog()` 直接调用 `prisma.auditLog.create()`
+- **审计日志直接写入事务的场景**（如 `harness-rollback.ts`）也必须显式写入 `workspaceId` 字段，从事务上下文中的 proposal 记录派生
+
+**RBAC 门禁体系**（`src/lib/workspace.ts`）：
+
+| 函数 | 用途 | 行为 |
+|------|------|------|
+| `buildWorkspaceContext(request)` | 构建请求上下文 | 返回 `{ workspaceId, role, userId }`，仅调用 `auth()` 一次 |
+| `requireWritable(role)` | 写保护 | VIEWER 抛出 `ForbiddenError` |
+| `requireRole(role, minRole)` | 最低角色检查 | 不满足抛出 `ForbiddenError` |
+| `requireHarnessAdmin(role)` | Harness 修改保护 | 非 ADMIN/OWNER 抛出 `ForbiddenError` |
+| `guardRole(role, minRole, msg?)` | RBAC 门禁便捷封装 | 不满足返回 `Response(403)`，满足返回 `null` |
+
+**RBAC 接入约定**：
+
+- 所有 POST/PATCH/DELETE API 路由**必须**在 handler 开头调用 `const ctx = await buildWorkspaceContext(request)` 后立即执行 `requireWritable(ctx.role)`
+- Harness 审批/回滚路由使用 `requireHarnessAdmin(ctx.role)`（仅 ADMIN/OWNER）
+- Workspace 成员管理路由使用 `guardRole()` 便捷封装（直接返回 403 Response）
+- **禁止**在应用层做 `if (role !== 'VIEWER')` 等裸判断——必须通过上述门禁函数统一校验
+
+**Session 约定**：
+
+- Auth.js v5 JWT 中携带 `workspaceId`（标记当前活跃 workspace），由 JWT callback 注入
+- `getWorkspaceId(request)` 解析优先级：`x-workspace-id` 请求头 → session 中的 workspaceId → 默认 `"default"`
+- `buildWorkspaceContext()` 内对默认 workspace 做存在性校验，不存在时记录 error 日志
+
+**Middleware（Edge Runtime）**：
+
+- 写操作（POST/PUT/PATCH/DELETE）要求有效 session token，无 token 返回 401
+- 系统路由（`/api/maintenance/`、`/api/harness/cron`）免 session 检查
+- 粗粒度 VIEWER 角色拦截（从 JWT payload 解码 `role` 字段）
+- 细粒度 RBAC 由 Route Handler 层执行（`requireWritable` 等）
+
 ***
 
 ## 附录：版本历史
@@ -424,6 +481,7 @@ draft（AI 生成，待审核）→ active（人工激活，可执行）→ arch
 | v2.3.0-alpha | 2026-06-09 | 新增 §4.8 OpenClaw SSE 实时事件管道：事件发射器、SSE 端点、客户端 Hook、共享 SSE 解析器，替换 mock 轮询模式为事件驱动架构 |
 | v2.4.0-alpha | 2026-06-09 | 新增 §4.9 Harness 提案一键回滚机制；§4.7 补充 `resolveAutomationLevel` 与 `checkAutomationGate` 共享门禁函数；新增 `previousSnapshot` 字段契约与 `rolled-back` 状态 |
 | v2.5.0-alpha | 2026-06-09 | 新增 §4.10 WorkflowGenerator Agent（AI 驱动 DAG 生成引擎）；新增 `src/lib/server/agents/` 目录约定；新增 `src/lib/server/llm-provider.ts` 共享 LLM 工具层；Workflow 模型新增 `draft` 状态；新增 `/api/workflows/generate` 端点 |
+| v2.6.0-alpha | 2026-06-10 | 新增 §4.11 多租户 Workspace 与 RBAC：Workspace / WorkspaceMember 模型，OWNER/ADMIN/MEMBER/VIEWER 四级角色，Prisma 查询层强制数据隔离，`buildWorkspaceContext` + RBAC 门禁函数，Edge Middleware 写保护，`guardRole` 便捷封装，默认 Workspace 向后兼容策略 |
 
 ***
 
