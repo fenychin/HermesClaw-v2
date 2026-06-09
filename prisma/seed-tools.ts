@@ -28,6 +28,7 @@ const TOOLS: {
   { name: 'fx.rates', description: '获取实时汇率', category: 'data', scopes: ['rates'], riskLevel: 'low' },
   { name: 'payment.charge', description: '发起付款 / 收款（资金调度）', category: 'api', scopes: ['payments'], riskLevel: 'high' },
   { name: 'memory.write', description: '写入组织记忆', category: 'system', scopes: ['write'], riskLevel: 'mid' },
+  { name: 'email-imap-smtp', description: 'Email 连接器（IMAP 收信 + SMTP 发信），用于外贸询盘邮件处理', category: 'connector', scopes: ['read', 'send'], riskLevel: 'mid' },
 ]
 
 async function main() {
