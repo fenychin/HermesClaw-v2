@@ -1,6 +1,6 @@
 # AGENTS.md — HermesClaw-v2 项目最高规则文档
 
-> **版本**: v2.3.0-alpha  
+> **版本**: v2.5.0-alpha  
 > **项目**: HermesClaw-v2（空间项目）  
 > **状态**: 🟢 生效中  
 > **最后更新**: 2026-06-09
@@ -218,6 +218,8 @@ cannot_do:
 - **L4 不可绕过**：任何带密码、带 Token、带二次确认的「自动批准 L4」均属违规——L4 的语义是*禁止自动*，而非*提高自动门槛*。审批 API 对 L4 动作的 `approve` 必须硬拒绝（403）。
 - **L3 强制二次确认**：审批 API 缺少显式确认时返回 409，前端弹确认对话框，复用 4.5 高危操作护栏机制。
 - **派生规则**：未显式标注 `automationLevel` 的 Harness 提案，按 `riskLevel` 派生（high→L3 / mid→L2 / low→L1）。
+- **统一解析**：`resolveAutomationLevel(automationLevel, riskLevel)` 封装了「显式标注优先，否则派生」的逻辑（`src/types/harness.ts`），供 Route Handler / guardrail / harness-eval 等所有调用方复用。
+- **统一门禁**：`checkAutomationGate({ automationLevel, riskLevel, confirmed, actionName })`（`src/lib/server/guardrail.ts`）封装了 L4 硬拒绝（403）、L3 二次确认拦截（409）的完整判定链，供 approve / reject / rollback 等治理路由复用，避免在多处重复 L4/L3 检查逻辑。
 - 授权分级本身的变更须经 HEP 流程（见第七章）。
 
 ### 4.8 OpenClaw SSE 实时事件管道
@@ -274,6 +276,47 @@ UI 组件（状态指示色）
 - 事件 payload 不得包含敏感操作细节（L4 动作的执行参数不应直接推送到浏览器）
 - 全局 pub/sub 基于内存 Map，适用于单进程开发环境；生产环境须替换为 Redis Pub/Sub 或等价的分布式方案
 
+### 4.9 Harness 提案一键回滚机制
+
+> 本节定义已批准提案的回滚流程，遵循 §4.5 安全护栏 + §4.7 授权分级。
+
+**回滚触发条件**：
+
+- 人工手动发起（`POST /api/harness/proposals/[id]/rollback`）
+- 必须携带有效的 `x-approval-token` 请求头
+
+**回滚快照（`previousSnapshot`）**：
+
+- 存储在 `HarnessProposal` 模型的 `previousSnapshot` 字段（JSON 字符串）
+- 包含变更前 Agent 的完整任务边界与工具访问状态：
+
+  ```json
+  { "agentId", "canDo", "cannotDo", "bindConnectors", "bindSkills", "harnessVersion", "snapshotAt" }
+  ```
+
+- 提案被批准时写入快照（由 approve 流程负责）；回滚时从快照恢复
+
+**回滚执行流程**：
+
+1. 校验 `x-approval-token` → 401
+2. 频率限制（单提案 60s 冷却 + 全局每分钟 ≤ 3 次）→ 429
+3. 自动化授权门禁（`checkAutomationGate`：L4 → 403，L3 缺确认 → 409）
+4. L3 `confirmationToken` 须与预期值匹配（环境变量 `HARNESS_L3_CONFIRMATION_TOKEN`，默认 `"确认回滚"`）
+5. Prisma 事务：Agent 字段恢复 + 提案状态更新为 `rolled-back` + AuditLog（riskLevel=high）
+6. 事务成功后：写入 AgentLog + 异步触发 Harness 降级评估
+
+**约束**：
+
+- 仅 `status === 'approved'` 的提案可回滚
+- 回滚全程在 Prisma 事务中完成，任一步骤失败即整体回滚
+- 审计日志在事务内写入（高风险操作的审计绝不可丢失，事务失败则回滚整体操作）
+- 回滚后自动异步触发 `runHarnessEvaluation('auto')`，将变更纳入 72h 评估窗口
+
+**核心实现**：
+
+- 回滚逻辑：`src/lib/server/harness/harness-rollback.ts`（`rollbackHarnessProposal`）
+- API 端点：`src/app/api/harness/proposals/[id]/rollback/route.ts`
+
 ***
 
 ## 第五章：禁止行为清单（Anti-Patterns）
@@ -310,6 +353,37 @@ UI 组件（状态指示色）
 - 每次版本更新须在文档顶部更新版本号和日期
 - 本文档须对所有 Agent 可读，是 Agent 启动时加载的第一份上下文
 
+### 4.10 WorkflowGenerator Agent（AI 驱动 DAG 生成）
+
+> 本节定义首个内置 AI Agent —— WorkflowGenerator —— 的模块约定与约束。
+
+**目录**：`src/lib/server/agents/` — AI 驱动的业务 Agent 模块目录，每个 Agent 为独立文件（如 `workflow-generator.ts`）。
+
+**WorkflowGenerator 职责**：
+- 接收用户**自然语言意图** + **行业上下文**，调用 LLM 将意图解析为结构化 DAG 工作流
+- 输出 Schema：`{ nodes: WorkflowNode[], edges: WorkflowEdge[], metadata: { industry, generatedBy, version } }`
+- 生成结果写入 `Workflow` 表，状态为 `draft`（不可直接执行）
+
+**约束**：
+- **不可直接执行**：生成的工作流 `status = 'draft'`，需人工 Review 节点配置和自动化授权等级后，手动激活为 `active` 方可执行（符合 §4.7 L3 约束）
+- **DAG 结构校验**：生成阶段即执行 Kahn 环路检测、孤立节点检测，在入库前拦截非法 DAG（与 §2.3 运行时检测互补）
+- **输出安全扫描**：LLM 生成的节点名称/描述经 `guardOutput()` 扫描（§5 #6），敏感声明不阻断但记录审计
+- **审计日志**：每次生成写入 `AuditLog(action='workflow.generate')`，记录 Provider、节点数、敏感声明告警等溯源信息（§5 #3）
+- **Provider 复用**：LLM 调用走 `src/lib/server/llm-provider.ts` 共享工具层，不自行实现 Provider 选择逻辑
+
+**API 端点**：`POST /api/workflows/generate`（见 CLAUDE.md 或 API 文档）
+
+**Workflow 状态流转**：
+```
+draft（AI 生成，待审核）→ active（人工激活，可执行）→ archived（归档）
+```
+
+**共享 LLM 工具层**：`src/lib/server/llm-provider.ts`
+- 提供 `resolveLlmProvider()` — 统一的 Provider 选择（HARNESS_LLM_PROVIDER → Anthropic → DeepSeek 回退）
+- 提供 `callAnthropicText()` / `callDeepSeekJson()` — 标准化的 LLM 调用模板
+- JSON 解析复用 `parseJsonLoose`（`src/lib/harness-llm.ts`，已 export）
+- 新 Agent 应优先使用此共享层，避免重复实现
+
 ***
 
 ## 附录：版本历史
@@ -319,7 +393,9 @@ UI 组件（状态指示色）
 | v2.0.0-alpha | 2026-06-06 | 初始版本，确立动态 Harness 自演化架构与 AI-First 最高规则 |
 | v2.1.0-alpha | 2026-06-07 | HEP-004：新增 §4.7 L1-L4 自动化授权分级，L4 绝对禁止自动、L3 强制人工确认 |
 | v2.2.0-alpha | 2026-06-09 | 新增 §2.3 DAG 工作流引擎：轻量级拓扑分层并行调度、条件分支安全约束、子流程嵌套上限、输出校验层集成、Harness 降级自触发
-| v2.3.0-alpha | 2026-06-09 | 新增 §4.8 OpenClaw SSE 实时事件管道：事件发射器、SSE 端点、客户端 Hook、共享 SSE 解析器，替换 mock 轮询模式为事件驱动架构
+| v2.3.0-alpha | 2026-06-09 | 新增 §4.8 OpenClaw SSE 实时事件管道：事件发射器、SSE 端点、客户端 Hook、共享 SSE 解析器，替换 mock 轮询模式为事件驱动架构 |
+| v2.4.0-alpha | 2026-06-09 | 新增 §4.9 Harness 提案一键回滚机制；§4.7 补充 `resolveAutomationLevel` 与 `checkAutomationGate` 共享门禁函数；新增 `previousSnapshot` 字段契约与 `rolled-back` 状态 |
+| v2.5.0-alpha | 2026-06-09 | 新增 §4.10 WorkflowGenerator Agent（AI 驱动 DAG 生成引擎）；新增 `src/lib/server/agents/` 目录约定；新增 `src/lib/server/llm-provider.ts` 共享 LLM 工具层；Workflow 模型新增 `draft` 状态；新增 `/api/workflows/generate` 端点 |
 
 ***
 

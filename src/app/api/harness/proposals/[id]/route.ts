@@ -6,9 +6,8 @@ import {
   errorResponse,
 } from "@/lib/api-utils"
 import { writeAuditLog } from "@/lib/server/audit"
-import { checkConfirmQuery } from "@/lib/server/guardrail"
-import { automationLevelFromRisk } from "@/types"
-import type { AutomationLevel, RiskLevel } from "@/types"
+import { checkConfirmQuery, checkAutomationGate } from "@/lib/server/guardrail"
+import { resolveAutomationLevel } from "@/types"
 import { HarnessProposalUpdateSchema, validateBody } from "@/lib/validators"
 
 /** 序列化 HarnessProposal，将 JSON 字符串字段反序列化 */
@@ -68,30 +67,20 @@ export async function PATCH(
       }
 
       // 自动化授权分级拦截（AGENTS.md §4.7）—— 仅对 approve 生效，reject 永远放行
-      const automationLevel: AutomationLevel =
-        (existing.automationLevel as AutomationLevel | null) ??
-        automationLevelFromRisk(existing.riskLevel as RiskLevel)
-
       if (body.action === "approve") {
-        // L4：绝对禁止自动，审批通道亦不得放行（任何密码 / Token 均不放行）
-        if (automationLevel === "L4") {
-          return errorResponse(
-            "L4 操作绝对禁止自动执行，须由人工在源业务系统发起，审批通道不予放行",
-            403,
-          )
-        }
-        // L3：高风险，须显式二次确认（body.confirm===true），缺失则 409
-        if (automationLevel === "L3" && body.confirm !== true) {
-          return Response.json(
-            {
-              success: false,
-              error: "L3 高风险操作，确认批准后将立即生效且无法撤销，请二次确认",
-              requiresConfirmation: true,
-            },
-            { status: 409 },
-          )
-        }
+        const gateResult = await checkAutomationGate({
+          automationLevel: existing.automationLevel,
+          riskLevel: existing.riskLevel,
+          confirmed: body.confirm === true,
+          actionName: "批准",
+        })
+        if (!gateResult.ok) return gateResult.response
       }
+
+      const automationLevel = resolveAutomationLevel(
+        existing.automationLevel,
+        existing.riskLevel as "low" | "mid" | "high",
+      )
 
       const data = {
         status: body.action === "approve" ? "approved" : "rejected",

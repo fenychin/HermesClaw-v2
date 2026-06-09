@@ -215,6 +215,7 @@ model HarnessProposal {
   estimatedImpact  String
   reviewedBy       String?
   reviewedAt       String?
+  previousSnapshot String?   // JSON：变更前关联 Agent 的任务边界与工具访问快照，用于一键回滚
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

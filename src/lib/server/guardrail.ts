@@ -9,6 +9,8 @@
  *（职责单一，便于在不同路由复用）。
  */
 import { actorFromSession } from "@/lib/server/audit"
+import { resolveAutomationLevel } from "@/types"
+import type { RiskLevel } from "@/types"
 
 export interface GuardrailPass {
   ok: true
@@ -17,18 +19,18 @@ export interface GuardrailPass {
 }
 export interface GuardrailBlock {
   ok: false
-  /** 直接返回给客户端的 409 响应 */
+  /** 直接返回给客户端的响应（409 / 403） */
   response: Response
 }
 export type GuardrailResult = GuardrailPass | GuardrailBlock
 
 /** 构造 409 需确认响应 */
-function blocked(message: string): GuardrailBlock {
+function blocked(message: string, status = 409): GuardrailBlock {
   return {
     ok: false,
     response: Response.json(
-      { success: false, error: message, requiresConfirmation: true },
-      { status: 409 },
+      { success: false, error: message, requiresConfirmation: status === 409 ? true : undefined },
+      { status },
     ),
   }
 }
@@ -58,5 +60,57 @@ export async function checkConfirmValue(
   if (confirm !== true) {
     return blocked(message)
   }
+  return { ok: true, actor: await actorFromSession() }
+}
+
+// ==============================
+// 自动化授权分级门禁（AGENTS.md §4.7）
+// ==============================
+
+export interface AutomationGateInput {
+  /** 提案显式标注的自动化等级（可能为 null） */
+  automationLevel: string | null | undefined
+  /** 提案的风险等级（用于派生 automationLevel） */
+  riskLevel: string
+  /** 调用方已校验通过的确认标记（L3 需为 true） */
+  confirmed: boolean
+  /** 动作名称，用于错误消息（如 "批准"、"回滚"） */
+  actionName: string
+}
+
+/**
+ * 自动化授权分级拦截（AGENTS.md §4.7）
+ * —— 统一 L4/L3 门禁逻辑，供 approve / reject / rollback 等治理路由复用。
+ *
+ * - L4：硬拒绝 403（绝对禁止自动，审批通道亦不得放行）
+ * - L3：未确认时返回 409 + requiresConfirmation:true
+ * - L2/L1：放行
+ *
+ * @returns GuardrailBlock（需拦截）| GuardrailPass（放行，附 actor）
+ */
+export async function checkAutomationGate(
+  input: AutomationGateInput,
+): Promise<GuardrailResult> {
+  const level = resolveAutomationLevel(
+    input.automationLevel,
+    input.riskLevel as RiskLevel,
+  )
+
+  // L4：绝对禁止自动，审批通道亦不得放行
+  if (level === "L4") {
+    return blocked(
+      `L4 级别操作绝对禁止通过审批 API ${input.actionName}，须由人工在源业务系统手动处理`,
+      403,
+    )
+  }
+
+  // L3：高风险，须显式二次确认
+  if (level === "L3" && !input.confirmed) {
+    return blocked(
+      `L3 高风险操作，确认${input.actionName}后将立即生效且无法撤销，请二次确认`,
+      409,
+    )
+  }
+
   return { ok: true, actor: await actorFromSession() }
 }

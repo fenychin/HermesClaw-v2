@@ -25,6 +25,21 @@ export function automationLevelFromRisk(risk: RiskLevel): AutomationLevel {
   return 'L1'
 }
 
+/**
+ * 解析自动化授权等级：显式标注优先，否则由 riskLevel 派生。
+ * —— 统一 automationLevel ?? automationLevelFromRisk(riskLevel) 的样板代码。
+ *    供 Route Handler / guardrail / harness-eval 等复用。
+ */
+export function resolveAutomationLevel(
+  automationLevel: string | null | undefined,
+  riskLevel: RiskLevel,
+): AutomationLevel {
+  if (automationLevel === 'L1' || automationLevel === 'L2' || automationLevel === 'L3' || automationLevel === 'L4') {
+    return automationLevel
+  }
+  return automationLevelFromRisk(riskLevel)
+}
+
 /** Agent 业务动作 + 其自动化授权等级 */
 export interface AgentAction {
   id: string

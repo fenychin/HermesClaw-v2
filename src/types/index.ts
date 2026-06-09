@@ -56,7 +56,7 @@ export type {
   EvolutionLogEntry,
   TargetComponent,
 } from './harness'
-export { TRADE_ACTIONS, automationLevelFromRisk } from './harness'
+export { TRADE_ACTIONS, automationLevelFromRisk, resolveAutomationLevel } from './harness'
 
 // ---- Trade 外贸 ----
 export type {
