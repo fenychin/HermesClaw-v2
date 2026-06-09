@@ -15,6 +15,12 @@ export type {
   Project,
   ProjectType,
   ProjectStatus,
+  ProjectSpace,
+  ProjectSkill,
+  ProjectConnection,
+  ProjectInstruction,
+  ProjectFile,
+  ProjectContext,
 } from './project'
 
 // ---- Memory 记忆 ----
@@ -48,6 +54,7 @@ export type {
   HarnessStatus,
   HarnessEvaluateResult,
   EvolutionLogEntry,
+  TargetComponent,
 } from './harness'
 export { TRADE_ACTIONS, automationLevelFromRisk } from './harness'
 

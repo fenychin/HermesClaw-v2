@@ -16,6 +16,8 @@ import {
   Mic,
   ImageIcon,
   Video,
+  // 设置子导航图标
+  ShieldCheck,
 } from "lucide-react";
 
 /** 单个导航项 */
@@ -56,3 +58,9 @@ export const brainNav: NavItem[] = [
   { href: "/brain/images", label: "图像", icon: ImageIcon, description: "产品图、营销与品牌素材" },
   { href: "/brain/videos", label: "视频", icon: Video, description: "讲解、产品与数字人口播素材" },
 ];
+
+/** 设置子导航（PRD 10.9：Harness 审批独立页面入口） */
+export const settingsNav: NavItem[] = [
+  { href: "/settings/harness", label: "Harness 审批", icon: ShieldCheck, description: "动态 Harness 升级提案审批中心" },
+];
+

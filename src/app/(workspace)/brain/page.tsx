@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
 import {
-  Brain,
   Zap,
   Layers,
   Puzzle,
@@ -130,7 +129,7 @@ export default function BrainOverviewPage() {
     [connectors]
   );
   const pendingProposals = useMemo(
-    () => harnessProposals.filter((p) => p.status === "pending"),
+    () => (harnessProposals || []).filter((p) => p.status === "pending"),
     [harnessProposals]
   );
 
@@ -258,7 +257,6 @@ export default function BrainOverviewPage() {
     <PageTransition>
     <div className="space-y-6">
       <PageHeader
-        icon={Brain}
         title="智慧大脑"
         description="Hermes 控制面"
       />
@@ -377,14 +375,14 @@ export default function BrainOverviewPage() {
                   >
                     <span
                       className={
-                        p.riskLevel === "high"
+                        p.proposedChange.riskLevel === "high"
                           ? "text-danger"
-                          : p.riskLevel === "mid"
+                          : p.proposedChange.riskLevel === "mid"
                             ? "text-warning"
                             : "text-success"
                       }
                     >
-                      [{p.riskLevel === "high" ? "高" : p.riskLevel === "mid" ? "中" : "低"}风险]
+                      [{p.proposedChange.riskLevel === "high" ? "高" : p.proposedChange.riskLevel === "mid" ? "中" : "低"}风险]
                     </span>{" "}
                     {p.proposalId}
                   </div>

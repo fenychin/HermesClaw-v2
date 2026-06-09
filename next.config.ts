@@ -11,6 +11,16 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
 
+  // ★ 将 Prisma / BetterSqlite3 从 Turbopack 打包中排除，使用原生 Node require
+  //    —— 避免 Windows 上 Turbopack 创建 junction 点失败导致数百条 HMR 错误
+  //    —— 参考：https://github.com/vercel/next.js/issues/63446
+  serverExternalPackages: [
+    "@prisma/client",
+    "@prisma/adapter-better-sqlite3",
+    "better-sqlite3",
+    "bcryptjs",
+  ],
+
   // 安全响应头（生产安全加固）
   async headers() {
     return [

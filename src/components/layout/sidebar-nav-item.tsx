@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { NavItem } from "@/config/navigation";
 
@@ -27,26 +26,21 @@ export function SidebarNavItem({
       href={item.href}
       title={item.description ?? item.label}
       className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-        "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground",
-        isActive && "bg-sidebar-accent text-sidebar-foreground",
-        collapsed && "justify-center px-2",
+        "flex items-center gap-3 rounded-xl px-3 h-10 text-sm font-medium transition-all duration-150",
+        "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+        isActive && "bg-accent text-foreground",
+        collapsed && "justify-center px-0",
       )}
     >
-      <Icon className="size-4 shrink-0" />
-      <AnimatePresence mode="wait">
-        {!collapsed && (
-          <motion.span
-            initial={{ opacity: 0, width: 0 }}
-            animate={{ opacity: 1, width: "auto" }}
-            exit={{ opacity: 0, width: 0 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
-            className="truncate overflow-hidden whitespace-nowrap"
-          >
-            {item.label}
-          </motion.span>
+      <Icon className="size-[18px] shrink-0" />
+      <span
+        className={cn(
+          "truncate overflow-hidden whitespace-nowrap transition-all duration-150 ease-in-out inline-block",
+          collapsed ? "opacity-0 w-0" : "opacity-100 w-auto"
         )}
-      </AnimatePresence>
+      >
+        {item.label}
+      </span>
     </Link>
   );
 }

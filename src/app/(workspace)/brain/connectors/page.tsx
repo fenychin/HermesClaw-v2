@@ -10,6 +10,7 @@ import {
   Clock,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
+import { EmptyState } from "@/components/common/empty-state";
 import { PageTransition } from "@/components/common/PageTransition";
 import { ConnectorCard } from "@/components/common/connector-card";
 import { StatusBadge } from "@/components/common/status-badge";
@@ -272,7 +273,6 @@ export default function ConnectorsPage() {
     <PageTransition>
     <div className="space-y-6">
       <PageHeader
-        icon={Plug}
         title="连接器"
         description="邮件、IM、CRM、ERP、文档与 API 的统一接入授权管理"
       />
@@ -327,9 +327,11 @@ export default function ConnectorsPage() {
 
       {/* 卡片网格 */}
       {filtered.length === 0 ? (
-        <div className="text-muted-foreground py-16 text-center text-sm">
-          未找到匹配的连接器
-        </div>
+        <EmptyState
+          icon={Plug}
+          title="未找到匹配的连接器"
+          description="尝试调整分类筛选或输入其他搜索词"
+        />
       ) : (
         <div className="grid grid-cols-3 gap-4">
           {filtered.map((connector) => (

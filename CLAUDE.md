@@ -58,6 +58,8 @@ src/
     globals.css             # ★ 颜色系统单一落点（Tailwind v4 @theme inline）
     api/                    # 后端 Route Handlers（全栈）
       health/route.ts       #   GET 健康检查
+      openclaw/events/
+        route.ts            #   GET SSE 实时事件流（text/event-stream）
     (workspace)/            # 工作台路由组：共享左侧导航外壳
       layout.tsx            #   AppShell 包裹
       foreign-trade/        #   外贸
@@ -78,8 +80,14 @@ src/
     site.ts                 # 站点级常量
   lib/
     utils.ts                # cn() 等工具函数
+    sse-parser.ts           # 通用 SSE 流解析器（parseSSEStream）
+    server/                 # 服务端逻辑
+      adapters/openclaw/
+        event-emitter.ts    # SSE 事件广播（全局 pub/sub）
+        mock.ts             # Mock 模式（含事件发射集成）
   stores/                   # Zustand stores（ui-store 等）
   hooks/                    # 自定义 hooks
+    use-openclaw-stream.ts  # OpenClaw SSE 事件流订阅 Hook
   types/                    # 全局 TS 类型
 ```
 

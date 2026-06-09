@@ -4,7 +4,10 @@
  */
 
 export type RiskLevel = 'low' | 'mid' | 'high'
-export type ProposalStatus = 'pending' | 'approved' | 'rejected'
+export type ProposalStatus = 'pending' | 'approved' | 'rejected' | 'rolled-back'
+
+/** Harness 目标组件（AGENTS.md §4.1-§4.6） */
+export type TargetComponent = '任务边界' | '上下文供给' | '工具接入' | '反馈闭环' | '安全护栏'
 
 /**
  * 自动化授权分级（AGENTS.md §4.7）
@@ -59,18 +62,22 @@ export const TRADE_ACTIONS: AgentAction[] = [
 
 export interface HarnessProposal {
   id: string
-  proposalId: string
+  proposalId: string           // HEP-{timestamp}
   triggeredBy: 'auto' | 'manual'
+  triggerReason: string
   problemStatement: string
   evidence: string[]
-  targetComponent: string
-  proposedChange: string
-  riskLevel: RiskLevel
-  /** 自动化授权等级（§4.7）；审批拦截据此决定 L3 二次确认 / L4 硬拒绝 */
-  automationLevel: AutomationLevel
-  requiresApproval: true
-  status: ProposalStatus
+  proposedChange: {
+    targetComponent: TargetComponent
+    description: string
+    riskLevel: RiskLevel
+    automationLevel: AutomationLevel
+  }
+  requiresHumanApproval: true
   estimatedImpact: string
+  affectedAgents: string[]
+  rollbackPlan: string
+  status: ProposalStatus
   createdAt: string
   reviewedBy?: string
   reviewedAt?: string

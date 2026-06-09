@@ -378,7 +378,7 @@ export function AgentCreateModal({
                     type="button"
                     onClick={() => setIndustry(ind.key)}
                     className={cn(
-                      "border-border bg-card flex flex-col items-center gap-2 rounded-2xl border p-5 text-center transition-all",
+                      "border-border bg-card flex flex-col items-center gap-2 rounded-card border p-5 text-center transition-all",
                       "hover:bg-accent/50",
                       isSelected && "border-brand ring-1 ring-brand/30 bg-brand/5",
                     )}
@@ -414,7 +414,7 @@ export function AgentCreateModal({
                     type="button"
                     onClick={() => setTemplateKey(tpl.key)}
                     className={cn(
-                      "border-border bg-card flex flex-col items-center gap-2 rounded-2xl border p-4 text-center transition-all",
+                      "border-border bg-card flex flex-col items-center gap-2 rounded-card border p-5 text-center transition-all",
                       "hover:bg-accent/50",
                       isSelected && "border-brand ring-1 ring-brand/30 bg-brand/5",
                     )}
@@ -822,7 +822,7 @@ export function AgentCreateModal({
                       ? `例如：${selectedTemplate.name} v1`
                       : "输入智能体名称"
                   }
-                  className="border-border bg-popover text-foreground placeholder:text-hint focus:ring-ring w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                  className="border-border bg-popover text-foreground placeholder:text-hint focus:ring-ring w-full rounded-input border px-3 py-2 text-sm focus:outline-none focus:ring-2"
                   autoFocus
                 />
               </div>

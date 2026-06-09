@@ -1,9 +1,9 @@
 # AGENTS.md — HermesClaw-v2 项目最高规则文档
 
-> **版本**: v2.1.0-alpha  
+> **版本**: v2.3.0-alpha  
 > **项目**: HermesClaw-v2（空间项目）  
 > **状态**: 🟢 生效中  
-> **最后更新**: 2026-06-07
+> **最后更新**: 2026-06-09
 
 ***
 
@@ -68,6 +68,30 @@ HermesClaw-v2 **明确拒绝静态 Harness 设计**。
 | 规则迭代 | 版本发布才能生效 | 经过审批后实时生效 |
 | 失败响应 | 报错后等待人工处理 | 自动触发降级策略 + 上报 |
 | 进化机制 | 无 | 内置自我评估 + 升级提案 |
+
+### 2.3 DAG 工作流引擎
+
+HermesClaw-v2 内置轻量级 DAG（有向无环图）任务调度引擎，位于 `src/lib/server/workflow/`，用于编排多步骤工作流。
+
+**设计原则**：
+- **纯编排**：引擎仅负责拓扑排序、分层并行调度、条件分支路由和 handler 分派，不直接依赖 Prisma
+- **审计注入**：所有状态扭转、审计日志、AgentLog 写入通过 `DagEngineHooks` 回调由 dag-runner 注入，引擎自身不写日志
+- **失败不扩散**：节点失败后其直接下游被自动跳过（skipped），非失败分支的独立节点继续执行
+- **可插拔 handler**：节点按 `kind`（task | condition | subworkflow | noop）派发到 handler 注册表，task 类节点由调用方注册真实执行器
+
+**约束**：
+- **无日志禁止静默执行**：每个节点的 start / finish 至少写入一条 `AgentLog(source='workflow')` + 一条 `AuditLog`
+- **条件分支安全**：仅支持 `ctx.variables.<key> === <value>` 字符串字面比对，**禁止 eval 任意表达式**
+- **子流程嵌套上限**：默认 `maxDepth = 5`，防无限递归
+- **环路检测**：Kahn 拓扑排序阶段检测循环依赖，拒绝执行并记录审计
+- **输出校验**：节点输出经 `guardOutput()` 拦截敏感声明（如「已发送邮件」），拦截不阻断但记录审计
+- **Harness 降级**：任一节点 failed 自动异步触发 `runHarnessEvaluation('auto')`，纳入 72h 评估窗口
+- **节点状态机**：`pending → running → completed | failed | skipped`；失败节点的下游自动划为 skipped
+
+**存储模型**（Prisma）：
+- `Workflow`：工作流定义，`nodes` / `edges` 以 JSON 字符串列存图
+- `WorkflowRun`：一次运行的整体状态（pending → running → completed | failed）
+- `WorkflowNodeRun`：单节点运行记录，承载结构化输入/输出/错误
 
 ***
 
@@ -196,6 +220,60 @@ cannot_do:
 - **派生规则**：未显式标注 `automationLevel` 的 Harness 提案，按 `riskLevel` 派生（high→L3 / mid→L2 / low→L1）。
 - 授权分级本身的变更须经 HEP 流程（见第七章）。
 
+### 4.8 OpenClaw SSE 实时事件管道
+
+> 本节定义 OpenClaw 执行层与 Web 工作台之间的实时事件回传机制，基于 Server-Sent Events（SSE）。
+
+**架构**：
+
+```
+OpenClaw 执行层（mock / 真实 API）
+  ↓ emitOpenClawEvent(agentId, event)
+event-emitter.ts（全局 pub/sub — 单进程内存广播）
+  ↓ enqueue SSE frame → 匹配的 subscriber
+/api/openclaw/events（ReadableStream + text/event-stream）
+  ↓ 客户端 fetch → parseSSEStream()
+useOpenClawStream Hook → Zustand ui-store.agentExecutionStates
+  ↓ 响应式订阅（selector）
+UI 组件（状态指示色）
+```
+
+**事件类型规范**（`OpenClawEvent.type`）：
+
+| 事件 | 含义 | 状态映射 |
+|------|------|----------|
+| `task:started` | 任务开始执行 | `executing` |
+| `task:progress` | 任务执行中（含进度） | `executing` |
+| `task:completed` | 任务执行成功 | `succeeded` |
+| `task:failed` | 任务执行失败 | `failed` |
+| `task:cancelled` | 任务被取消 | `cancelled` |
+| `connector:connected` / `connector:disconnected` / `connector:error` | 连接器状态变更 | — |
+| `heartbeat` | 连接保活（30s 间隔） | — |
+
+**事件广播**：
+- 服务端通过 `emitOpenClawEvent(agentId, event)` 推送至所有匹配的 SSE 订阅者，位于 `src/lib/server/adapters/openclaw/event-emitter.ts`
+- 支持按 `agentId` / `workflowRunId` 过滤订阅
+
+**客户端订阅**：
+- `useOpenClawStream({ agentId })` Hook（`src/hooks/use-openclaw-stream.ts`）自动连接 `/api/openclaw/events` 并更新 Zustand `agentExecutionStates`
+- 断开自动重连（默认 3s 间隔）
+- 通用 SSE 流解析器 `parseSSEStream()` 位于 `src/lib/sse-parser.ts`，供所有 SSE 端点复用
+
+**状态指示色**（遵守 CLAUDE.md 颜色系统）：
+
+| 状态 | CSS 工具类 | 颜色 token |
+|------|-----------|------------|
+| `executing` | `text-warning` | `--warning` (#F0A43B) |
+| `succeeded` | `text-success` | `--success` (#37C99A) |
+| `failed` | `text-danger` | `--danger` (#FF6B6B) |
+| `idle` / `cancelled` | `text-muted-foreground` | `--muted-foreground` (#A1A1AA) |
+
+**约束**：
+- 任何任务执行（含 Mock 模式）必须在 `task:started` / `task:completed`（或 `task:failed`）事件前后写入 `writeAgentLog`，不得形成无日志的执行路径（§5 #3）
+- SSE 端点须接入频率限制（`rateLimit`），单 IP 每分钟最多 5 个连接
+- 事件 payload 不得包含敏感操作细节（L4 动作的执行参数不应直接推送到浏览器）
+- 全局 pub/sub 基于内存 Map，适用于单进程开发环境；生产环境须替换为 Redis Pub/Sub 或等价的分布式方案
+
 ***
 
 ## 第五章：禁止行为清单（Anti-Patterns）
@@ -240,6 +318,8 @@ cannot_do:
 |------|------|----------|
 | v2.0.0-alpha | 2026-06-06 | 初始版本，确立动态 Harness 自演化架构与 AI-First 最高规则 |
 | v2.1.0-alpha | 2026-06-07 | HEP-004：新增 §4.7 L1-L4 自动化授权分级，L4 绝对禁止自动、L3 强制人工确认 |
+| v2.2.0-alpha | 2026-06-09 | 新增 §2.3 DAG 工作流引擎：轻量级拓扑分层并行调度、条件分支安全约束、子流程嵌套上限、输出校验层集成、Harness 降级自触发
+| v2.3.0-alpha | 2026-06-09 | 新增 §4.8 OpenClaw SSE 实时事件管道：事件发射器、SSE 端点、客户端 Hook、共享 SSE 解析器，替换 mock 轮询模式为事件驱动架构
 
 ***
 

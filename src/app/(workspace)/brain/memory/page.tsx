@@ -3,6 +3,7 @@
 import { useMemo, useEffect } from "react";
 import { Layers, Lock, Archive, Trash2, Snowflake, ArrowUp, AlertCircle, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
+import { EmptyState } from "@/components/common/empty-state";
 import { PageTransition } from "@/components/common/PageTransition";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useMemoryStore } from "@/stores/memory-store";
@@ -196,7 +197,6 @@ export default function MemoryPage() {
       <PageTransition>
         <div className="space-y-6">
           <PageHeader
-            icon={Layers}
             title="记忆系统"
             description="短/中/长期三级记忆体系：实时会话 → 项目沉淀 → 企业知识"
           />
@@ -216,7 +216,6 @@ export default function MemoryPage() {
       <PageTransition>
         <div className="space-y-6">
           <PageHeader
-            icon={Layers}
             title="记忆系统"
             description="短/中/长期三级记忆体系：实时会话 → 项目沉淀 → 企业知识"
           />
@@ -244,7 +243,6 @@ export default function MemoryPage() {
     <PageTransition>
     <div className="space-y-6">
       <PageHeader
-        icon={Layers}
         title="记忆系统"
         description="短/中/长期三级记忆体系：实时会话 → 项目沉淀 → 企业知识"
       />
@@ -267,9 +265,11 @@ export default function MemoryPage() {
         {tabs.map((tab) => (
           <TabsContent key={tab.value} value={tab.value} className="mt-4">
             {memoriesByTab[tab.value].length === 0 ? (
-              <div className="text-muted-foreground py-16 text-center text-sm">
-                暂无{TIER_LABEL[tab.value]}
-              </div>
+              <EmptyState
+                icon={Layers}
+                title={`暂无${TIER_LABEL[tab.value]}`}
+                description="随对话积累，系统将自动汇总和沉淀对应记忆"
+              />
             ) : (
               <div className="grid grid-cols-2 gap-4">
                 {memoriesByTab[tab.value].map((memory) => (

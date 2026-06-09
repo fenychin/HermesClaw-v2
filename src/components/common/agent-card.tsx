@@ -55,7 +55,7 @@ export function AgentCard({ agent, selected, onClick }: AgentCardProps) {
       type="button"
       onClick={onClick}
       className={cn(
-        "bg-card w-full rounded-2xl border p-4 text-left transition-all",
+        "bg-card w-full rounded-card border p-5 text-left transition-all",
         "hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
         selected
           ? "border-brand ring-1 ring-brand/30"

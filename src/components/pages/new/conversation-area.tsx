@@ -92,7 +92,7 @@ export function ConversationArea({
                   "px-4 py-3 text-sm leading-relaxed break-words max-w-[80%]",
                   isUser
                     ? "bg-violet-600 text-white rounded-2xl rounded-tr-sm ml-auto"
-                    : "bg-[#18181B] border border-[#2A2A31] rounded-2xl rounded-tl-sm text-foreground",
+                    : "bg-card border border-border rounded-2xl rounded-tl-sm text-foreground",
                 )}
               >
                 {isUser ? (
@@ -121,7 +121,7 @@ export function ConversationArea({
             </div>
 
             {/* 流式气泡 + 光标 */}
-            <div className="bg-[#18181B] border border-[#2A2A31] rounded-2xl rounded-tl-sm px-4 py-3 text-sm leading-relaxed text-foreground max-w-[80%]">
+            <div className="bg-card border border-border rounded-2xl rounded-tl-sm px-4 py-3 text-sm leading-relaxed text-foreground max-w-[80%]">
               <MarkdownRenderer content={streamingContent} />
               <span className="inline-block w-0.5 h-4 bg-violet-400 animate-pulse ml-0.5 align-text-bottom" />
             </div>

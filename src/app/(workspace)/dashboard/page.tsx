@@ -1,782 +1,307 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import dynamic from "next/dynamic";
-import { useQuery } from "@tanstack/react-query";
-import { useTradeStore } from "@/stores/trade-store";
-import { apiClient } from "@/lib/api-client";
+import { useState, useEffect } from "react";
 import {
-  Sparkles,
-  Globe,
-  RadarIcon,
-  AlertTriangle,
-  TrendingUp,
-  Circle,
-  Send,
-  RotateCcw,
-  Bot,
+  MessageSquare,
+  Users,
+  ClipboardList,
+  Target,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 import { PageTransition } from "@/components/common/PageTransition";
-import { SkeletonCard } from "@/components/common/skeleton-card";
+import { PageHeader } from "@/components/common/page-header";
+import { StatCard } from "@/components/common/stat-card";
 import { cn } from "@/lib/utils";
-import type { ImpactLevel } from "@/types";
-
-/** 询盘雷达图：recharts 动态导入，减少首屏 JS ~628KB */
-const InquiryRadar = dynamic(
-  () => import("@/components/pages/dashboard/inquiry-radar"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="bg-card rounded-2xl border border-border p-4">
-        <div className="flex h-[220px] items-center justify-center">
-          <SkeletonCard variant="card" />
-        </div>
-      </div>
-    ),
-  },
-);
 
 // ============================================================
-// 辅助函数
+// Mock 数据
 // ============================================================
 
-/** 固定参考时间（2026-06-06 14:00 UTC），避免 Date.now() 导致的服务端/客户端不一致 */
-const REFERENCE_TIME = new Date("2026-06-06T14:00:00Z").getTime();
-
-/** 将 ISO 时间戳转为相对时间文案（纯函数，固定参考时间，服务端/客户端一致） */
-function getRelativeTime(isoString: string): string {
-  const date = new Date(isoString).getTime();
-  const diffMs = REFERENCE_TIME - date;
-  const diffMinutes = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffMinutes < 1) return "刚刚";
-  if (diffMinutes < 60) return `${diffMinutes}分钟前`;
-  if (diffHours < 24) return `${diffHours}小时前`;
-  if (diffDays === 1) return "昨天";
-  if (diffDays < 7) return `${diffDays}天前`;
-  return new Date(isoString).toLocaleDateString("zh-CN", {
-    month: "short",
-    day: "numeric",
-  });
-}
-
-/** 将 credibility 0-1 转为星级字符串 */
-function credibilityStars(credibility: number): string {
-  const full = Math.round(credibility * 5);
-  return "★".repeat(full) + "☆".repeat(5 - full);
-}
-
-/** impactLevel → Badge variant 与颜色 */
-function impactBadge(level: ImpactLevel) {
-  switch (level) {
-    case "high":
-      return { variant: "destructive" as const, label: "高影响" };
-    case "mid":
-      return { variant: "secondary" as const, label: "中影响" };
-    case "low":
-      return { variant: "outline" as const, label: "低影响" };
-  }
-}
-
-/** 询盘优先度 → 颜色类名 */
-function priorityColor(priority: string) {
-  switch (priority) {
-    case "high":
-      return "text-danger";
-    case "mid":
-      return "text-warning";
-    case "low":
-      return "text-hint";
-  }
-}
-
-/** 情报类型 → 中文 */
-function intelligenceTypeLabel(type: string) {
-  const map: Record<string, string> = {
-    currency: "汇率",
-    tariff: "关税",
-    competitor: "竞品",
-    market: "市场",
-    logistics: "物流",
-  };
-  return map[type] ?? type;
-}
-
-// ============================================================
-// Mock 数据：询盘雷达 / 客户预警 / 市场监控
-// ============================================================
-
-/** 客户预警 */
-interface AlertItem {
-  type: "silence" | "unreplied" | "sample";
-  typeLabel: string;
-  typeIcon: string;
-  typeColor: string;
-  description: string;
-  customerName: string;
-  days: number;
-}
-const mockAlerts: AlertItem[] = [
-  // 高价值客户沉默超 7 天
-  {
-    type: "silence",
-    typeLabel: "高价值客户沉默",
-    typeIcon: "🔴",
-    typeColor: "text-danger",
-    description: "连续未回复邮件/消息超 7 天",
-    customerName: "BrightPath Outdoors Inc.",
-    days: 9,
-  },
-  {
-    type: "silence",
-    typeLabel: "高价值客户沉默",
-    typeIcon: "🔴",
-    typeColor: "text-danger",
-    description: "连续未回复邮件/消息超 7 天",
-    customerName: "Schmidt Präzisionstechnik GmbH",
-    days: 8,
-  },
-  {
-    type: "silence",
-    typeLabel: "高价值客户沉默",
-    typeIcon: "🔴",
-    typeColor: "text-danger",
-    description: "连续未回复邮件/消息超 7 天",
-    customerName: "Hackett Department Stores Ltd.",
-    days: 7,
-  },
-  // 报价未回复超 3 天
-  {
-    type: "unreplied",
-    typeLabel: "报价未回复",
-    typeIcon: "🟡",
-    typeColor: "text-warning",
-    description: "报价发出后超 3 天无回应",
-    customerName: "Maison Élégance SARL",
-    days: 4,
-  },
-  {
-    type: "unreplied",
-    typeLabel: "报价未回复",
-    typeIcon: "🟡",
-    typeColor: "text-warning",
-    description: "报价发出后超 3 天无回应",
-    customerName: "한국리빙 (Korea Living Co.)",
-    days: 3,
-  },
-  // 样品跟进无进展
-  {
-    type: "sample",
-    typeLabel: "样品跟进无进展",
-    typeIcon: "🟠",
-    typeColor: "text-[#F0A43B]",
-    description: "样品发出后客户未确认收到或反馈",
-    customerName: "株式会社 Sakura Living",
-    days: 5,
-  },
-];
-
-/** 市场监控 */
-interface MarketMonitorItem {
-  label: string;
-  value: string;
-  change?: string;
-  changeTone?: "up" | "down" | "neutral";
-  status?: string;
-  statusColor?: string;
-  hint?: string;
-}
-const mockMarketMonitor: MarketMonitorItem[] = [
-  {
-    label: "美元/人民币",
-    value: "7.23",
-    change: "↑ 0.02",
-    changeTone: "up",
-  },
-  {
-    label: "欧元/人民币",
-    value: "7.89",
-    change: "↓ 0.03",
-    changeTone: "down",
-  },
-  {
-    label: "深圳 → 洛杉矶",
-    value: "海运",
-    status: "正常",
-    statusColor: "bg-success",
-  },
-  {
-    label: "美国对华关税",
-    value: "关注变动",
-    status: "近期调整预警",
-    statusColor: "bg-warning",
-    hint: "LED 产品反补贴调查进行中",
-  },
-];
-
-// ============================================================
-// 子组件
-// ============================================================
-
-/** 筛选栏 */
-function FilterBar({
-  filter,
-  onFilterChange,
-  onReset,
-}: {
-  filter: { country: string; category: string; stage: string };
-  onFilterChange: (key: string, value: string) => void;
-  onReset: () => void;
-}) {
-  const selectClass =
-    "bg-card border border-border rounded-lg px-3 py-1.5 text-sm text-foreground outline-none focus:border-brand cursor-pointer appearance-none min-w-[120px]";
-
-  return (
-    <div className="flex items-center gap-2">
-      <div className="relative">
-        <select
-          className={selectClass}
-          value={filter.country}
-          onChange={(e) => onFilterChange("country", e.target.value)}
-        >
-          <option value="">全部国家</option>
-          <option value="美国">美国</option>
-          <option value="德国">德国</option>
-          <option value="日本">日本</option>
-          <option value="英国">英国</option>
-          <option value="法国">法国</option>
-          <option value="巴西">巴西</option>
-          <option value="阿联酋">阿联酋</option>
-        </select>
-      </div>
-      <div className="relative">
-        <select
-          className={selectClass}
-          value={filter.category}
-          onChange={(e) => onFilterChange("category", e.target.value)}
-        >
-          <option value="">全部品类</option>
-          <option value="户外灯具">户外灯具</option>
-          <option value="精密五金">精密五金</option>
-          <option value="家居收纳">家居收纳</option>
-          <option value="陶瓷餐具">陶瓷餐具</option>
-          <option value="智能家居">智能家居</option>
-        </select>
-      </div>
-      <div className="relative">
-        <select
-          className={selectClass}
-          value={filter.stage}
-          onChange={(e) => onFilterChange("stage", e.target.value)}
-        >
-          <option value="">全部阶段</option>
-          <option value="询盘">询盘阶段</option>
-          <option value="报价">报价阶段</option>
-          <option value="样品">样品阶段</option>
-          <option value="订单">订单阶段</option>
-          <option value="售后">售后阶段</option>
-        </select>
-      </div>
-      <Button variant="ghost" size="xs" onClick={onReset}>
-        <RotateCcw className="size-3" />
-        重置
-      </Button>
-    </div>
-  );
-}
-
-/** AI 晨报卡片 */
-function AiBriefingCard() {
-  return (
-    <div className="bg-card rounded-2xl border border-border p-5 flex-1">
-      <div className="flex items-start justify-between">
-        <div className="flex-1 space-y-3">
-          {/* 标题行 */}
-          <div className="flex items-center gap-2">
-            <div className="bg-brand/15 text-brand flex items-center gap-1.5 rounded-lg px-2.5 py-1">
-              <Sparkles className="size-3.5" />
-              <span className="text-xs font-medium">Hermes 晨报</span>
-            </div>
-          </div>
-
-          {/* 摘要 */}
-          <p className="text-foreground text-sm leading-relaxed">
-            今日美元兑人民币汇率突破 7.25，创年内新高，对出口型企业形成短期利好。欧盟对部分中国
-            LED 产品启动反补贴调查，涉及户外灯具品类，建议加速现有欧洲订单出货窗口期。Aqara
-            宣布 Q3 大规模进入欧洲智能照明市场，智能家居产品线需提前制定差异化竞争策略。
-          </p>
-
-          {/* 底部：时间 + 链接 */}
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-hint text-xs">2026-06-06 08:00 生成</span>
-            <Button variant="link" size="xs" className="text-brand-blue">
-              查看完整报告 →
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** 行业动态流卡片 */
-function IntelligenceCard({
-  intel,
-}: {
-  intel: import("@/types").MarketIntelligence;
-}) {
-  const badge = impactBadge(intel.impactLevel);
-
-  return (
-    <div className="bg-card rounded-xl border border-border p-4">
-      {/* 顶部：来源 + 可信度 + 影响等级 + 时间 */}
-      <div className="flex items-center gap-2 mb-2 flex-wrap">
-        <span className="text-hint text-xs bg-accent rounded px-1.5 py-0.5">
-          {intelligenceTypeLabel(intel.type)} · {intel.source}
-        </span>
-        <span className="text-brand text-xs font-medium">
-          {credibilityStars(intel.credibility)}
-        </span>
-        <Badge
-          variant={badge.variant}
-          className="text-[10px] px-1.5 py-0 h-4"
-        >
-          {badge.label}
-        </Badge>
-        <span className="text-hint text-xs ml-auto">
-          {getRelativeTime(intel.publishedAt)}
-        </span>
-      </div>
-
-      {/* 内容 */}
-      <h4 className="text-foreground font-medium text-sm mb-1">
-        {intel.title}
-      </h4>
-      <p className="text-muted-foreground text-sm line-clamp-2 mb-3">
-        {intel.summary}
-      </p>
-
-      {/* 底部：建议操作 + 按钮 */}
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-brand-blue text-xs flex-1 line-clamp-1">
-          💡 {intel.suggestedAction}
-        </span>
-        <Button variant="ghost" size="xs" className="shrink-0 text-brand-blue">
-          <Send className="size-3" />
-          派给智能体
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-/** 客户预警条目 */
-function AlertItemRow({ item }: { item: AlertItem }) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-2.5">
-      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-        <span className="text-sm shrink-0">{item.typeIcon}</span>
-        <div className="min-w-0">
-          <p className="text-muted-foreground text-xs">{item.description}</p>
-          <p className="text-foreground text-sm font-medium truncate">
-            {item.customerName}
-            <span className={cn("text-xs ml-1.5", item.typeColor)}>
-              {item.days}天
-            </span>
-          </p>
-        </div>
-      </div>
-      <Button variant="ghost" size="xs" className="text-brand-blue shrink-0">
-        立即跟进
-      </Button>
-    </div>
-  );
-}
-
-/** 市场监控条目 */
-function MarketMonitorRow({ item }: { item: MarketMonitorItem }) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-2.5">
-      <span className="text-muted-foreground text-sm">{item.label}</span>
-      <div className="flex items-center gap-2">
-        <span className="text-foreground text-sm font-medium">
-          {item.value}
-        </span>
-        {item.change && (
-          <span
-            className={cn(
-              "text-xs font-medium",
-              item.changeTone === "up" && "text-success",
-              item.changeTone === "down" && "text-danger",
-              item.changeTone === "neutral" && "text-hint"
-            )}
-          >
-            {item.change}
-          </span>
-        )}
-        {item.status && (
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Circle
-              className={cn(
-                "size-1.5 fill-current",
-                item.statusColor
-              )}
-            />
-            {item.status}
-          </span>
-        )}
-        {item.hint && (
-          <span className="text-warning text-xs">⚠ {item.hint}</span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** 智能体健康卡片所需的最小 Agent 形状 */
-interface AgentHealthItem {
+// 外贸动态流数据
+interface ActivityItem {
   id: string;
-  name: string;
-  status: string;
+  time: string;
+  content: string;
+  severity: "normal" | "important" | "urgent";
 }
 
-/**
- * 数字员工状态卡片
- * —— 从 /api/agents 读取真实智能体，按 running / idle / error 分类计数；
- *    存在 error 状态时列出名字并提供「立即检查」入口（→ /agents）。
- */
-function AgentHealthCard() {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["dashboard-agents-health"],
-    queryFn: () => apiClient.getAgents(),
-  });
+const mockActivities: ActivityItem[] = [
+  {
+    id: "act-1",
+    time: "10分钟前",
+    content: "智能客服已自动响应来自 BrightPath Outdoors 关于“LED 户外灯具”的新询盘并推送至跟进流程。",
+    severity: "important",
+  },
+  {
+    id: "act-2",
+    time: "1小时前",
+    content: "海关数据显示欧盟启动对部分中国 LED 灯具产品的反补贴调查，请相关项目注意规避风险。",
+    severity: "urgent",
+  },
+  {
+    id: "act-3",
+    time: "3小时前",
+    content: "外汇监测到美元兑人民币汇率升至 7.25，建议财务主管加速现有欧洲订单的结汇流程。",
+    severity: "normal",
+  },
+  {
+    id: "act-4",
+    time: "5小时前",
+    content: "智能体自动分析了 Schmidt 的竞品调价动态，并生成了最新对比报告，已同步至大脑知识库。",
+    severity: "normal",
+  },
+  {
+    id: "act-5",
+    time: "昨天",
+    content: "跟进中的重点客户“Maison Élégance SARL”的“高杆照明灯采购案”状态已变更为寄送样品。",
+    severity: "important",
+  },
+];
 
-  const agents = (data?.agents as AgentHealthItem[] | undefined) ?? [];
-  const running = agents.filter((a) => a.status === "running");
-  const idle = agents.filter((a) => a.status === "idle");
-  const errored = agents.filter((a) => a.status === "error");
+// 本周工作流执行概览图表数据
+const chartData = [
+  { name: "周一", 成功: 42, 失败: 2 },
+  { name: "周二", 成功: 38, 失败: 5 },
+  { name: "周三", 成功: 56, 失败: 1 },
+  { name: "周四", 成功: 48, 失败: 4 },
+  { name: "周五", 成功: 70, 失败: 3 },
+  { name: "周六", 成功: 28, 失败: 0 },
+  { name: "周日", 成功: 32, 失败: 2 },
+];
 
-  return (
-    <div className="bg-[#18181B] rounded-xl border border-[#2A2A31] p-4">
-      {/* 标题 */}
-      <div className="flex items-center gap-2 mb-3">
-        <Bot className="size-4 text-brand" />
-        <h3 className="text-foreground text-sm font-semibold">数字员工状态</h3>
-      </div>
-
-      {isLoading ? (
-        <p className="text-hint py-4 text-center text-xs">加载中…</p>
-      ) : isError ? (
-        <p className="text-danger py-4 text-center text-xs">
-          智能体状态加载失败
-        </p>
-      ) : (
-        <>
-          {/* 三类计数 */}
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="bg-success/5 rounded-lg py-2.5">
-              <p className="text-success text-xl font-semibold tabular-nums">
-                {running.length}
-              </p>
-              <p className="text-hint mt-0.5 text-[11px]">运行中</p>
-            </div>
-            <div className="bg-accent/40 rounded-lg py-2.5">
-              <p className="text-muted-foreground text-xl font-semibold tabular-nums">
-                {idle.length}
-              </p>
-              <p className="text-hint mt-0.5 text-[11px]">空闲</p>
-            </div>
-            <div className="bg-danger/5 rounded-lg py-2.5">
-              <p className="text-danger text-xl font-semibold tabular-nums">
-                {errored.length}
-              </p>
-              <p className="text-hint mt-0.5 text-[11px]">异常</p>
-            </div>
-          </div>
-
-          {/* 异常智能体列表 + 立即检查 */}
-          {errored.length > 0 && (
-            <div className="border-border mt-3 space-y-2 border-t pt-3">
-              {errored.map((agent) => (
-                <div
-                  key={agent.id}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <Circle className="text-danger size-1.5 shrink-0 fill-current" />
-                    <span className="text-foreground truncate text-xs">
-                      {agent.name}
-                    </span>
-                  </div>
-                  <Link
-                    href="/agents"
-                    className="text-brand-blue hover:bg-brand-blue/10 shrink-0 rounded px-2 py-0.5 text-[11px] font-medium transition-colors"
-                  >
-                    立即检查
-                  </Link>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
+// 右侧情报快讯数据
+interface IntelNews {
+  id: string;
+  title: string;
+  source: string;
+  time: string;
+  severity: "normal" | "important" | "urgent";
 }
 
+const mockIntelNews: IntelNews[] = [
+  {
+    id: "intel-1",
+    title: "美国西海岸港口谈判陷入僵局，下周或面临集装箱装卸停滞风险",
+    source: "航运界网",
+    time: "10分钟前",
+    severity: "urgent",
+  },
+  {
+    id: "intel-2",
+    title: "竞品 BrightPath 在亚马逊平台调低多款户外高杆灯价格 5% - 8%",
+    source: "竞品监测",
+    time: "30分钟前",
+    severity: "important",
+  },
+  {
+    id: "intel-3",
+    title: "人民币兑美元汇率中间价今天调贬 85 个基点，报 7.2340",
+    source: "外汇交易中心",
+    time: "1小时前",
+    severity: "normal",
+  },
+  {
+    id: "intel-4",
+    title: "欧盟对华 LED 户外照明产品展开的调查引起了多家华东大厂警惕",
+    source: "海关观察",
+    time: "2小时前",
+    severity: "important",
+  },
+  {
+    id: "intel-5",
+    title: "2026年5月份中欧班列累计开行 1720 列，货运量创新高",
+    source: "中国铁路",
+    time: "4小时前",
+    severity: "normal",
+  },
+];
+
 // ============================================================
-// 页面主体
+// 页面组件
 // ============================================================
 
-/** 动态大盘：行业情报与经营监测中心（PRD 10.3） */
 export default function DashboardPage() {
-  const intelligence = useTradeStore((s) => s.intelligence);
-  const inquiries = useTradeStore((s) => s.inquiries);
+  const [mounted, setMounted] = useState(false);
 
-  // 本地筛选状态
-  const [filter, setFilter] = useState({
-    country: "",
-    category: "",
-    stage: "",
-  });
-
-  const handleFilterChange = (key: string, value: string) => {
-    setFilter((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleReset = () => {
-    setFilter({ country: "", category: "", stage: "" });
-  };
-
-  // 取最新 5 条询盘
-  const latestInquiries = useMemo(
-    () =>
-      [...inquiries]
-        .sort(
-          (a, b) =>
-            new Date(b.receivedAt).getTime() -
-            new Date(a.receivedAt).getTime()
-        )
-        .slice(0, 5),
-    [inquiries]
-  );
-
-  // 按类型分组预警
-  const silenceAlerts = mockAlerts.filter((a) => a.type === "silence");
-  const unrepliedAlerts = mockAlerts.filter((a) => a.type === "unreplied");
-  const sampleAlerts = mockAlerts.filter((a) => a.type === "sample");
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
   return (
     <PageTransition>
-    <div className="space-y-5 p-6">
-      {/* ================================================================ */}
-      {/* 顶部区：AI 晨报 + 筛选 */}
-      {/* ================================================================ */}
-      <div className="flex items-start gap-5">
-        <AiBriefingCard />
-        <FilterBar
-          filter={filter}
-          onFilterChange={handleFilterChange}
-          onReset={handleReset}
+      <div className="p-6 space-y-6">
+        <PageHeader
+          title="动态大盘"
+          description="外贸动态经营与数据概览"
         />
-      </div>
 
-      {/* ================================================================ */}
-      {/* 四象限主体 */}
-      {/* ================================================================ */}
-      <div className="grid grid-cols-3 gap-5">
-        {/* ========================================================== */}
-        {/* 左上大块（col-span-2）：行业动态流 */}
-        {/* ========================================================== */}
-        <section className="col-span-2 space-y-4">
-          {/* 区块标题 */}
-          <div className="flex items-center gap-2">
-            <Globe className="size-4 text-brand" />
-            <h2 className="text-foreground text-base font-semibold">
-              行业动态
-            </h2>
-            <span className="text-hint text-xs">
-              {intelligence.length} 条最新情报
-            </span>
-          </div>
+        {/* 大左右结构容器 */}
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          
+          {/* 左主区 */}
+          <div className="flex-1 min-w-0 space-y-6 w-full">
+            
+            {/* 顶部指标行 - 4列网格 */}
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+              <StatCard
+                title="今日询盘数"
+                value={12}
+                change={{ value: 15, label: "较昨日" }}
+                icon={MessageSquare}
+              />
+              <StatCard
+                title="跟进客户数"
+                value={36}
+                change={{ value: 8, label: "较昨日" }}
+                icon={Users}
+              />
+              <StatCard
+                title="待办任务"
+                value={8}
+                change={{ value: -20, label: "较昨日" }}
+                icon={ClipboardList}
+              />
+              <StatCard
+                title="活跃项目"
+                value={4}
+                change={{ value: 25, label: "较上周" }}
+                icon={Target}
+              />
+            </div>
 
-          {/* 动态列表 */}
-          <div className="space-y-2">
-            {intelligence.map((intel, i) => (
-              <div key={intel.id}>
-                <IntelligenceCard intel={intel} />
-                {i < intelligence.length - 1 && (
-                  <Separator className="mt-2" />
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ========================================================== */}
-        {/* 右上小块（col-span-1）：询盘雷达 */}
-        {/* ========================================================== */}
-        <section className="col-span-1 space-y-4">
-          {/* 区块标题 */}
-          <div className="flex items-center gap-2">
-            <RadarIcon className="size-4 text-brand" />
-            <h2 className="text-foreground text-base font-semibold">
-              询盘来源
-            </h2>
-          </div>
-
-          {/* 雷达图卡片 */}
-          <div className="bg-card rounded-2xl border border-border p-4">
-            <InquiryRadar />
-          </div>
-
-          {/* 最新询盘列表 */}
-          <div className="bg-card rounded-2xl border border-border p-4">
-            <h3 className="text-foreground text-sm font-medium mb-3">
-              最新询盘
-            </h3>
-            <div className="space-y-2">
-              {latestInquiries.map((inq) => (
-                <div
-                  key={inq.id}
-                  className="flex items-center gap-2.5 py-1.5"
-                >
-                  <span className="text-base shrink-0">{inq.countryFlag}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-muted-foreground text-xs">
-                        {inq.fromCountry}
-                      </span>
-                      <span className="text-foreground text-xs font-medium truncate max-w-[120px]">
-                        {inq.companyName.length > 16
-                          ? inq.companyName.slice(0, 14) + "…"
-                          : inq.companyName}
-                      </span>
-                    </div>
+            {/* 主要内容区 - 2个核心卡片 */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              
+              {/* 卡片1: 外贸动态流 */}
+              <div className="bg-card rounded-2xl border border-border p-5 flex flex-col justify-between min-h-[300px]">
+                <div>
+                  <h3 className="text-foreground font-semibold text-base mb-4">外贸动态流</h3>
+                  <div className="divide-y divide-border/50">
+                    {mockActivities.map((item) => (
+                      <div key={item.id} className="py-3 first:pt-0 last:pb-0 flex items-start gap-4">
+                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-hint text-xs">{item.time}</span>
+                            <span
+                              className={cn(
+                                "text-[10px] font-medium px-2 py-0.5 rounded-full border",
+                                item.severity === "urgent" && "bg-danger/10 text-danger border-danger/20",
+                                item.severity === "important" && "bg-warning/10 text-warning border-warning/20",
+                                item.severity === "normal" && "bg-success/10 text-success border-success/20"
+                              )}
+                            >
+                              {item.severity === "urgent" && "紧急"}
+                              {item.severity === "important" && "重要"}
+                              {item.severity === "normal" && "普通"}
+                            </span>
+                          </div>
+                          <p className="text-foreground text-sm leading-relaxed">{item.content}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <Badge
-                    variant="outline"
+                </div>
+              </div>
+
+              {/* 卡片2: 本周工作流执行概览 */}
+              <div className="bg-card rounded-2xl border border-border p-5 flex flex-col justify-between min-h-[300px]">
+                <div>
+                  <h3 className="text-foreground font-semibold text-base mb-4">本周工作流执行概览</h3>
+                  {mounted ? (
+                    <div className="w-full h-[200px] mt-4">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#2A2A31" vertical={false} />
+                          <XAxis
+                            dataKey="name"
+                            stroke="#71717A"
+                            fontSize={11}
+                            tickLine={false}
+                            axisLine={false}
+                          />
+                          <YAxis
+                            stroke="#71717A"
+                            fontSize={11}
+                            tickLine={false}
+                            axisLine={false}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: "#18181B",
+                              border: "1px solid #2A2A31",
+                              borderRadius: "8px",
+                              color: "#F5F5F7",
+                            }}
+                          />
+                          <Bar name="成功" dataKey="成功" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
+                          <Bar name="失败" dataKey="失败" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-[200px] mt-4 flex items-center justify-center text-hint text-xs bg-accent/5 rounded-xl border border-border/30">
+                      图表加载中...
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* 右侧面板 */}
+          <div className="w-full lg:w-80 shrink-0 bg-card rounded-2xl border border-border p-5 h-fit space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-foreground font-semibold text-base">情报快讯</h3>
+              <Link href="#" className="text-brand-blue hover:underline text-xs flex items-center gap-1">
+                查看全部
+                <ExternalLink className="size-3" />
+              </Link>
+            </div>
+
+            {/* 情报卡片列表 */}
+            <div className="flex flex-col">
+              {mockIntelNews.map((item) => (
+                <div
+                  key={item.id}
+                  className="relative bg-card rounded-xl border border-border p-3 mb-2 last:mb-0 flex flex-col gap-1.5 transition-all hover:bg-hover hover:border-border/80"
+                >
+                  {/* 右上角重要性色点 */}
+                  <div
                     className={cn(
-                      "text-[10px] px-1.5 py-0 h-4 shrink-0",
-                      priorityColor(inq.priority)
+                      "absolute top-3.5 right-3.5 w-2 h-2 rounded-full",
+                      item.severity === "urgent" && "bg-danger",
+                      item.severity === "important" && "bg-warning",
+                      item.severity === "normal" && "bg-success"
                     )}
-                  >
-                    {inq.priority === "high"
-                      ? "高优先"
-                      : inq.priority === "mid"
-                        ? "中优先"
-                        : "低优先"}
-                  </Badge>
-                  <span className="text-hint text-[10px] shrink-0">
-                    {getRelativeTime(inq.receivedAt)}
-                  </span>
+                  />
+                  <h4 className="text-foreground text-sm font-medium pr-6 leading-snug">
+                    {item.title}
+                  </h4>
+                  <div className="flex items-center gap-2 text-hint text-xs">
+                    <span>{item.source}</span>
+                    <span>•</span>
+                    <span>{item.time}</span>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
-        </section>
 
-        {/* ========================================================== */}
-        {/* 左下中块（col-span-2）：客户预警 */}
-        {/* ========================================================== */}
-        <section className="col-span-2 space-y-4">
-          {/* 区块标题 */}
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="size-4 text-warning" />
-            <h2 className="text-foreground text-base font-semibold">
-              预警中心
-            </h2>
-            <span className="text-hint text-xs">
-              {mockAlerts.length} 条活跃预警
-            </span>
-          </div>
-
-          <div className="bg-card rounded-2xl border border-border p-5">
-            {/* 🔴 高价值客户沉默 */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm">🔴</span>
-                <span className="text-foreground text-sm font-medium">
-                  高价值客户沉默超 7 天
-                </span>
-                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-4">
-                  {silenceAlerts.length}条
-                </Badge>
-              </div>
-              {silenceAlerts.map((item, i) => (
-                <AlertItemRow key={`${item.type}-${i}`} item={item} />
-              ))}
-            </div>
-
-            <Separator className="my-2" />
-
-            {/* 🟡 报价未回复 */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm">🟡</span>
-                <span className="text-foreground text-sm font-medium">
-                  报价未回复超 3 天
-                </span>
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
-                  {unrepliedAlerts.length}条
-                </Badge>
-              </div>
-              {unrepliedAlerts.map((item, i) => (
-                <AlertItemRow key={`${item.type}-${i}`} item={item} />
-              ))}
-            </div>
-
-            <Separator className="my-2" />
-
-            {/* 🟠 样品跟进无进展 */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm">🟠</span>
-                <span className="text-foreground text-sm font-medium">
-                  样品跟进无进展
-                </span>
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-warning">
-                  {sampleAlerts.length}条
-                </Badge>
-              </div>
-              {sampleAlerts.map((item, i) => (
-                <AlertItemRow key={`${item.type}-${i}`} item={item} />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ========================================================== */}
-        {/* 右下小块（col-span-1）：市场监控 */}
-        {/* ========================================================== */}
-        <section className="col-span-1 space-y-4">
-          {/* 区块标题 */}
-          <div className="flex items-center gap-2">
-            <TrendingUp className="size-4 text-brand-blue" />
-            <h2 className="text-foreground text-base font-semibold">
-              市场监控
-            </h2>
-          </div>
-
-          <div className="bg-card rounded-2xl border border-border p-5">
-            <div className="divide-y divide-border">
-              {mockMarketMonitor.map((item, i) => (
-                <MarketMonitorRow key={i} item={item} />
-              ))}
-            </div>
-          </div>
-
-          {/* 数字员工状态（真实数据，来自 /api/agents） */}
-          <AgentHealthCard />
-        </section>
+        </div>
       </div>
-    </div>
     </PageTransition>
   );
 }

@@ -12,6 +12,22 @@ export interface Notification {
   createdAt: string;
 }
 
+/** OpenClaw 智能体执行状态快照 */
+export interface AgentExecutionState {
+  /** 智能体 ID */
+  agentId: string
+  /** 当前执行状态 */
+  status: 'idle' | 'executing' | 'succeeded' | 'failed' | 'cancelled'
+  /** 当前正在执行的任务名称 */
+  currentTask?: string
+  /** 执行进度（0-100），可选 */
+  progress?: number
+  /** 最近一次事件时间戳 */
+  lastEventAt?: string
+  /** 最近一次错误信息 */
+  lastError?: string
+}
+
 /**
  * 全局 UI 状态（纯客户端交互态）
  * —— 约定：Zustand 仅承载 UI / 客户端状态；服务端数据一律交由 TanStack Query 管理。
@@ -33,6 +49,10 @@ interface UiState {
   notifications: Notification[];
   /** 待审批 Harness 提案数量 */
   upgradeProposalCount: number;
+  /** 项目空间系统指令是否已保存（用于编辑器保存状态指示） */
+  projectSystemPromptSaved: boolean;
+  /** OpenClaw 智能体执行状态映射（agentId → 执行快照） */
+  agentExecutionStates: Record<string, AgentExecutionState>;
 
   // ---- 操作方法 ----
   /** 切换侧边栏折叠态 */
@@ -63,6 +83,12 @@ interface UiState {
   removeNotification: (id: string) => void;
   /** 设置升级提案计数 */
   setUpgradeProposalCount: (count: number) => void;
+  /** 设置项目系统指令保存状态 */
+  setProjectSystemPromptSaved: (saved: boolean) => void;
+  /** 更新指定智能体的执行状态（由 SSE 事件驱动） */
+  updateAgentExecutionState: (state: AgentExecutionState) => void;
+  /** 清除指定智能体的执行状态 */
+  clearAgentExecutionState: (agentId: string) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -74,6 +100,8 @@ export const useUiStore = create<UiState>((set) => ({
   activeRightPanel: null,
   notifications: [],
   upgradeProposalCount: 0,
+  projectSystemPromptSaved: false,
+  agentExecutionStates: {},
 
   toggleSidebar: () =>
     set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
@@ -124,4 +152,24 @@ export const useUiStore = create<UiState>((set) => ({
     })),
 
   setUpgradeProposalCount: (count) => set({ upgradeProposalCount: count }),
+
+  setProjectSystemPromptSaved: (saved) => set({ projectSystemPromptSaved: saved }),
+
+  updateAgentExecutionState: (execState) =>
+    set((state) => ({
+      agentExecutionStates: {
+        ...state.agentExecutionStates,
+        [execState.agentId]: {
+          ...state.agentExecutionStates[execState.agentId],
+          ...execState,
+        },
+      },
+    })),
+
+  clearAgentExecutionState: (agentId) =>
+    set((state) => {
+      const next = { ...state.agentExecutionStates }
+      delete next[agentId]
+      return { agentExecutionStates: next }
+    }),
 }));

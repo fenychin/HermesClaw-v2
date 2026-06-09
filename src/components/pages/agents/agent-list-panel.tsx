@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Search, Plus } from "lucide-react";
 import { useAgentStore } from "@/stores/agent-store";
 import { AgentCard } from "@/components/common/agent-card";
+import { PageHeader } from "@/components/common/page-header";
 import { cn } from "@/lib/utils";
 
 /** 分类筛选标签配置 */
@@ -74,6 +75,7 @@ export function AgentListPanel({ onCreateClick }: AgentListPanelProps) {
     <div className="flex h-full flex-col">
       {/* ======== 搜索输入框 ======== */}
       <div className="p-4 pb-2">
+        <PageHeader title="智能体中心" description="管理和配置数字员工" />
         <div className="relative">
           <Search className="text-hint absolute left-3 top-1/2 size-4 -translate-y-1/2" />
           <input

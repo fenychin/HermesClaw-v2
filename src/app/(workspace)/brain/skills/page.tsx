@@ -8,6 +8,7 @@ import {
   Play,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
+import { EmptyState } from "@/components/common/empty-state";
 import { PageTransition } from "@/components/common/PageTransition";
 import { StatusBadge } from "@/components/common/status-badge";
 import { useAgentStore } from "@/stores/agent-store";
@@ -220,7 +221,6 @@ export default function SkillsPage() {
     <PageTransition>
     <div className="space-y-6">
       <PageHeader
-        icon={Puzzle}
         title="技能库"
         description="行业 / 岗位 / 自定义技能，版本化、可测试、可绑定至智能体"
       />
@@ -264,9 +264,11 @@ export default function SkillsPage() {
           {selectedSkill ? (
             <SkillDetail skill={selectedSkill} />
           ) : (
-            <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-              请从左侧选择一个技能
-            </div>
+            <EmptyState
+              icon={Puzzle}
+              title="暂无选中技能"
+              description="请从左侧列表选择一个技能以查看详细规格及测试"
+            />
           )}
         </div>
       </div>

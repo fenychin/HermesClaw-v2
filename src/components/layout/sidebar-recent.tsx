@@ -141,26 +141,33 @@ export function SidebarRecent({
           setExpanded(!effectiveExpanded);
         }}
         className={cn(
-          "w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-          "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground",
-          isActive && "bg-sidebar-accent text-sidebar-foreground",
-          collapsed && "justify-center px-2",
+          "w-full flex items-center gap-3 rounded-xl px-3 h-10 text-sm font-medium transition-all duration-150",
+          "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+          isActive && "bg-accent text-foreground",
+          collapsed && "justify-center px-0",
         )}
         title={collapsed ? "最近" : undefined}
       >
-        <Clock className="size-4 shrink-0" />
-        {!collapsed && (
-          <>
-            <span className="truncate flex-1 text-left">最近</span>
-            <motion.span
-              animate={{ rotate: effectiveExpanded ? 180 : 0 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="shrink-0"
-            >
-              <ChevronDown className="size-3.5" />
-            </motion.span>
-          </>
-        )}
+        <Clock className="size-[18px] shrink-0" />
+        <span
+          className={cn(
+            "truncate flex-1 text-left transition-all duration-150 ease-in-out inline-block",
+            collapsed ? "opacity-0 w-0" : "opacity-100 w-auto"
+          )}
+        >
+          最近
+        </span>
+        <motion.span
+          animate={{
+            rotate: effectiveExpanded ? 180 : 0,
+            opacity: collapsed ? 0 : 1,
+            width: collapsed ? 0 : "auto",
+          }}
+          transition={{ duration: 0.15, ease: "easeOut" }}
+          className="shrink-0 overflow-hidden"
+        >
+          <ChevronDown className="size-3.5" />
+        </motion.span>
       </button>
 
       {/* 展开区域（仅非折叠态可展开） */}

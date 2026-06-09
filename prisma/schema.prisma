@@ -359,3 +359,56 @@ model ToolGrant {
   approvedBy2 String?
   createdAt   DateTime     @default(now())
 }
+
+// ============================================================
+// 工作流（DAG 编排）—— nodes/edges 以 JSON 字符串列存图（沿用 Agent.canDo 惯例）
+// ============================================================
+model Workflow {
+  id          String        @id
+  name        String
+  description String        @default("")
+  status      String        @default("active")   // active | archived
+  nodes       String                              // JSON: WorkflowNode[]
+  edges       String                              // JSON: WorkflowEdge[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  runs        WorkflowRun[]
+
+  @@index([status])
+}
+
+// 一次工作流运行（整体状态机：pending → running → completed | failed）
+model WorkflowRun {
+  id          String            @id
+  workflowId  String
+  workflow    Workflow          @relation(fields: [workflowId], references: [id])
+  status      String            @default("pending")   // pending | running | completed | failed
+  trigger     String            @default("manual")    // manual | auto | subworkflow
+  input       String            @default("{}")         // JSON: 运行入参
+  output      String?                                 // JSON: 终态输出汇总
+  error       String?                                 // 失败原因
+  parentRunId String?                                 // 子工作流回溯父运行
+  startedAt   DateTime          @default(now())
+  finishedAt  DateTime?
+  nodeRuns    WorkflowNodeRun[]
+
+  @@index([workflowId])
+  @@index([status])
+}
+
+// 单节点运行记录（与 AuditLog/AgentLog 互补，承载结构化 IO）
+model WorkflowNodeRun {
+  id         String       @id
+  runId      String
+  run        WorkflowRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  nodeId     String                                 // 对应 WorkflowNode.id
+  kind       String                                 // task | condition | subworkflow | noop
+  status     String       @default("pending")       // pending | running | completed | skipped | failed
+  output     String?                                // JSON: 节点输出
+  error      String?
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  @@index([runId])
+  @@index([status])
+}

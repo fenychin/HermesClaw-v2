@@ -117,13 +117,13 @@ export function MarkdownRenderer({ content }: { content: string }) {
           return (
             <div className="my-2 rounded-lg border border-border overflow-hidden">
               {/* 顶部栏：语言标签 */}
-              <div className="flex items-center justify-between bg-[#111112] px-3 py-1.5 border-b border-border">
+              <div className="flex items-center justify-between bg-sidebar px-3 py-1.5 border-b border-border">
                 <span className="text-[11px] text-hint font-mono">
                   {lang || "code"}
                 </span>
               </div>
               {/* 代码内容 */}
-              <pre className="bg-[#0B0B0C] overflow-x-auto">
+              <pre className="bg-background overflow-x-auto">
                 <code
                   className="block text-xs leading-relaxed px-3 py-2.5 font-mono text-foreground/85"
                   {...props}
@@ -142,7 +142,7 @@ export function MarkdownRenderer({ content }: { content: string }) {
           </div>
         ),
         thead: ({ children }) => (
-          <thead className="bg-[#111112] border-b border-border">
+          <thead className="bg-sidebar border-b border-border">
             {children}
           </thead>
         ),
@@ -157,7 +157,7 @@ export function MarkdownRenderer({ content }: { content: string }) {
           </td>
         ),
         tr: ({ children }) => (
-          <tr className="even:bg-[#0B0B0C]/40">{children}</tr>
+          <tr className="even:bg-background/40">{children}</tr>
         ),
       }}
     >

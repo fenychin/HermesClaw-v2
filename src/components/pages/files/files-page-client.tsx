@@ -45,6 +45,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/common/page-header";
+import { EmptyState } from "@/components/common/empty-state";
 import { cn } from "@/lib/utils";
 import type { FileItem, FileParseStatus, VectorIndexStatus } from "@/types";
 
@@ -791,13 +792,11 @@ export function FilesPageClient() {
           </div>
 
           {filteredFiles.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center">
-              <FileText className="text-hint size-12 mb-4 opacity-40" />
-              <p className="text-foreground text-sm font-medium">没有找到文件</p>
-              <p className="text-hint mt-1 text-xs">
-                尝试调整搜索条件或切换到其他分类
-              </p>
-            </div>
+            <EmptyState
+              icon={FileText}
+              title="没有找到文件"
+              description="尝试调整搜索条件或切换到其他分类"
+            />
           ) : viewMode === "table" ? (
             /* ===== 表格视图 ===== */
             <div className="border-border rounded-2xl border overflow-hidden">

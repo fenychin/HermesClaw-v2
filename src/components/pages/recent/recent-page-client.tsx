@@ -12,6 +12,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
+import { EmptyState } from "@/components/common/empty-state";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useTradeStore } from "@/stores/trade-store";
@@ -259,13 +260,13 @@ export function RecentPageClient() {
 
   // 动态混入：将 API 中的 pending 提案转为 upgrade 记录，与 mock 数据合并
   const allRecords = useMemo(() => {
-    const apiUpgradeRecords: RecentRecord[] = harnessProposals
+    const apiUpgradeRecords: RecentRecord[] = (harnessProposals || [])
       .filter((p) => p.status === "pending")
       .map((p) => ({
         id: p.id,
         type: "upgrade" as const,
         title: p.problemStatement,
-        source: `${p.triggeredBy === "auto" ? "自动触发" : "手动提交"} · ${p.targetComponent}`,
+        source: `${p.triggeredBy === 'auto' ? '自动触发' : '手动提交'} · ${p.proposedChange.targetComponent}`,
         timeGroup: "今天" as const,
         timestamp: p.createdAt,
         proposalId: p.proposalId,
@@ -301,9 +302,8 @@ export function RecentPageClient() {
     <div className="flex flex-col h-full p-6">
       {/* 页头 */}
       <PageHeader
-        icon={Clock}
         title="最近"
-        subtitle="继续你的工作"
+        description="继续你的工作"
       />
 
       {/* 筛选 Tabs */}
@@ -325,10 +325,16 @@ export function RecentPageClient() {
         ))}
       </div>
 
-      {/* 时间分组列表 */}
       <div className="flex-1 overflow-y-auto space-y-6">
-        {groupedRecords.map(({ group, items }) => (
-          <section key={group}>
+        {groupedRecords.length === 0 ? (
+          <EmptyState
+            icon={Clock}
+            title="暂无最近记录"
+            description="您的最近对话、任务、项目或文件记录将显示在这里。"
+          />
+        ) : (
+          groupedRecords.map(({ group, items }) => (
+            <section key={group}>
             {/* 分组标题 */}
             <h3 className="text-xs text-muted-foreground/60 font-medium mb-2 px-1 uppercase tracking-wide">
               {group}
@@ -406,7 +412,8 @@ export function RecentPageClient() {
               })}
             </div>
           </section>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

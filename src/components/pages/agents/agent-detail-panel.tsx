@@ -174,8 +174,7 @@ export function AgentDetailPanel() {
     agent.bindConnectors.includes(c.id),
   );
 
-  // 待审批 Harness 提案
-  const pendingProposals = harnessProposals.filter(
+  const pendingProposals = (harnessProposals || []).filter(
     (p) => p.status === "pending",
   );
 
@@ -654,13 +653,13 @@ export function AgentDetailPanel() {
                             <span className="text-brand font-mono text-xs font-semibold">
                               {proposal.proposalId}
                             </span>
-                            <RiskBadge level={proposal.riskLevel} />
+                            <RiskBadge level={proposal.proposedChange.riskLevel} />
                           </div>
                           <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
                             {proposal.problemStatement}
                           </p>
                           <p className="text-hint mt-1.5 text-xs">
-                            目标组件：{proposal.targetComponent}
+                            目标组件：{proposal.proposedChange.targetComponent}
                           </p>
                         </div>
                       </div>
