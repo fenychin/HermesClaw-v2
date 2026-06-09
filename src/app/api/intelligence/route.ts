@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 /** 序列化 MarketIntelligence，将 DateTime 转为 ISO 字符串 */
 function serializeIntelligence(intel: {
@@ -15,9 +16,11 @@ function serializeIntelligence(intel: {
 }
 
 /** GET /api/intelligence —— 获取市场情报列表（按发布时间倒序） */
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const intelligence = await prisma.marketIntelligence.findMany({
+      where: { workspaceId: ctx.workspaceId },
       orderBy: { publishedAt: "desc" },
     })
     return successResponse({ intelligence: intelligence.map(serializeIntelligence) })

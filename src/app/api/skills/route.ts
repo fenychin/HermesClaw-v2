@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import { parseJsonField, successResponse, errorResponse } from "@/lib/api-utils"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 /** 序列化 Skill，将 JSON 字符串字段反序列化为数组 */
 function serializeSkill(skill: Record<string, unknown>) {
@@ -12,9 +13,11 @@ function serializeSkill(skill: Record<string, unknown>) {
 }
 
 /** GET /api/skills —— 获取所有技能列表 */
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const skills = await prisma.skill.findMany({
+      where: { workspaceId: ctx.workspaceId },
       orderBy: { createdAt: "desc" },
     })
     return successResponse({

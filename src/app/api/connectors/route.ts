@@ -7,6 +7,7 @@ import {
   errorResponse,
 } from "@/lib/api-utils"
 import { ConnectorCreateSchema, validateBody } from "@/lib/validators"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 /** 序列化 Connector，将 JSON 字符串字段反序列化 */
 function serializeConnector(connector: Record<string, unknown>) {
@@ -18,9 +19,11 @@ function serializeConnector(connector: Record<string, unknown>) {
 }
 
 /** GET /api/connectors —— 获取所有连接器列表（CDN 缓存 60s，过期后可 revalidate 30s） */
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const connectors = await prisma.connector.findMany({
+      where: { workspaceId: ctx.workspaceId },
       orderBy: { createdAt: "desc" },
     })
 
@@ -46,6 +49,7 @@ export async function GET() {
 /** POST /api/connectors —— 创建新连接器 */
 export async function POST(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, ConnectorCreateSchema)
     if (parsed instanceof Response) return parsed
@@ -54,6 +58,7 @@ export async function POST(request: Request) {
     const connector = await prisma.connector.create({
       data: {
         id: crypto.randomUUID(),
+        workspaceId: ctx.workspaceId,
         name: body.name,
         iconEmoji: body.iconEmoji,
         description: body.description,

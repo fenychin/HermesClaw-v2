@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 /** 序列化 AuditLog，将 DateTime 转为 ISO 字符串 */
 function serializeAuditLog(log: { createdAt: Date } & Record<string, unknown>) {
@@ -13,6 +14,7 @@ function serializeAuditLog(log: { createdAt: Date } & Record<string, unknown>) {
 /** GET /api/audit?limit=100 —— 获取审计日志（按时间倒序，默认 100 条） */
 export async function GET(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const { searchParams } = new URL(request.url)
     const limitParam = Number(searchParams.get("limit"))
     const limit =
@@ -21,6 +23,7 @@ export async function GET(request: Request) {
         : 100
 
     const logs = await prisma.auditLog.findMany({
+      where: { workspaceId: ctx.workspaceId },
       orderBy: { createdAt: "desc" },
       take: limit,
     })

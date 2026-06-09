@@ -10,6 +10,7 @@ import { logger } from "@/lib/logger"
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { createEmailConnector } from "@/lib/server/connectors/email/email-connector"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 export const runtime = "nodejs"
 
@@ -35,6 +36,7 @@ const SendEmailRequestSchema = z.object({
 
 /** POST /api/connectors/email/send */
 export async function POST(request: Request) {
+  const ctx = await buildWorkspaceContext(request)
   const actor = await actorFromSession()
 
   // 解析并校验请求体
@@ -71,6 +73,7 @@ export async function POST(request: Request) {
     targetId: to,
     detail: `发送邮件至 ${to}，主题: ${subject.slice(0, 100)}`,
     riskLevel: "mid",
+    workspaceId: ctx.workspaceId,
   })
 
   const connector = createEmailConnector()
@@ -105,6 +108,7 @@ export async function POST(request: Request) {
         targetId: to,
         detail: `发送失败: ${result.error}`,
         riskLevel: "mid",
+        workspaceId: ctx.workspaceId,
       })
 
       return errorResponse(`邮件发送失败: ${result.error}`, 502)
@@ -135,6 +139,7 @@ export async function POST(request: Request) {
       targetId: to,
       detail: `发送异常: ${message}`,
       riskLevel: "high",
+      workspaceId: ctx.workspaceId,
     })
 
     return errorResponse(`邮件发送异常: ${message}`)

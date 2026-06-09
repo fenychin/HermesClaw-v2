@@ -8,6 +8,7 @@ import {
 } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { AgentCreateSchema, validateBody } from "@/lib/validators"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 /**
  * 智能体序列化：将数据库 JSON 字符串字段反序列化为对象/数组
@@ -24,10 +25,12 @@ function serializeAgent(agent: Record<string, unknown>) {
   }
 }
 
-/** GET /api/agents —— 获取所有智能体列表 */
-export async function GET() {
+/** GET /api/agents —— 获取当前 workspace 的智能体列表 */
+export async function GET(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const agents = await prisma.agent.findMany({
+      where: { workspaceId: ctx.workspaceId },
       orderBy: { createdAt: "desc" },
     })
     return successResponse({ agents: agents.map(serializeAgent) })
@@ -40,6 +43,7 @@ export async function GET() {
 /** POST /api/agents —— 创建新智能体 */
 export async function POST(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, AgentCreateSchema)
     if (parsed instanceof Response) return parsed
@@ -48,6 +52,7 @@ export async function POST(request: Request) {
     const agent = await prisma.agent.create({
       data: {
         id: crypto.randomUUID(),
+        workspaceId: ctx.workspaceId,
         name: body.name,
         role: body.role,
         description: body.description,
@@ -72,6 +77,7 @@ export async function POST(request: Request) {
       targetId: agent.id,
       detail: `${agent.name} · ${agent.role}`,
       riskLevel: "low",
+      workspaceId: ctx.workspaceId,
     })
 
     return successResponse({ agent: serializeAgent(agent as unknown as Record<string, unknown>) }, 201)

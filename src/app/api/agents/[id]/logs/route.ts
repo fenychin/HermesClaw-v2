@@ -12,17 +12,19 @@ import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { writeAgentLog } from "@/lib/server/agent-log"
 import { AgentLogCreateSchema, validateBody } from "@/lib/validators"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 /** 单次查询返回的日志条数上限 */
 const LOGS_LIMIT = 50
 
 /** GET /api/agents/[id]/logs —— 查询该智能体的运行日志（倒序，最多 50 条） */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params
+    const ctx = await buildWorkspaceContext(request)
 
     const agent = await prisma.agent.findUnique({ where: { id } })
     if (!agent) {
@@ -30,7 +32,7 @@ export async function GET(
     }
 
     const logs = await prisma.agentLog.findMany({
-      where: { agentId: id },
+      where: { agentId: id, workspaceId: ctx.workspaceId },
       orderBy: { createdAt: "desc" },
       take: LOGS_LIMIT,
     })

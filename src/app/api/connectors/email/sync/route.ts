@@ -10,11 +10,13 @@ import { successResponse, errorResponse } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { createEmailConnector } from "@/lib/server/connectors/email/email-connector"
 import { parseInquiriesFromEmails } from "@/lib/server/connectors/email/inquiry-parser"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 export const runtime = "nodejs"
 
 /** POST /api/connectors/email/sync */
-export async function POST() {
+export async function POST(request: Request) {
+  const ctx = await buildWorkspaceContext(request)
   const actor = await actorFromSession()
   const connector = createEmailConnector()
 
@@ -45,6 +47,7 @@ export async function POST() {
         await prisma.inquiry.create({
           data: {
             id: crypto.randomUUID(),
+            workspaceId: ctx.workspaceId,
             fromCountry: inquiry.fromCountry,
             countryFlag: inquiry.countryFlag,
             companyName: inquiry.companyName,
@@ -80,6 +83,7 @@ export async function POST() {
       targetId: `batch-${Date.now()}`,
       detail: `拉取 ${emails.length} 封，入库 ${synced} 条询盘`,
       riskLevel: "low",
+      workspaceId: ctx.workspaceId,
     })
 
     logger.info("Email sync: 完成", { fetched: emails.length, synced })
@@ -103,6 +107,7 @@ export async function POST() {
       targetId: `error-${Date.now()}`,
       detail: `同步失败: ${message}`,
       riskLevel: "mid",
+      workspaceId: ctx.workspaceId,
     })
 
     return errorResponse(`邮件同步失败: ${message}`)

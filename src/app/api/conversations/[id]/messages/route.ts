@@ -5,6 +5,7 @@ import {
   errorResponse,
 } from "@/lib/api-utils"
 import { ConversationMessageSchema, validateBody } from "@/lib/validators"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 /** POST /api/conversations/[id]/messages —— 向对话追加消息 */
 export async function POST(
@@ -13,6 +14,7 @@ export async function POST(
 ) {
   try {
     const { id: conversationId } = await params
+    const ctx = await buildWorkspaceContext(request)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, ConversationMessageSchema)
     if (parsed instanceof Response) return parsed
@@ -30,6 +32,7 @@ export async function POST(
     const message = await prisma.conversationMessage.create({
       data: {
         id: crypto.randomUUID(),
+        workspaceId: ctx.workspaceId,
         conversationId,
         role: body.role,
         content: body.content,

@@ -18,6 +18,7 @@ import {
   Video,
   // 设置子导航图标
   ShieldCheck,
+  Users,
 } from "lucide-react";
 
 /** 单个导航项 */
@@ -61,6 +62,7 @@ export const brainNav: NavItem[] = [
 
 /** 设置子导航（PRD 10.9：Harness 审批独立页面入口） */
 export const settingsNav: NavItem[] = [
+  { href: "/settings/team", label: "团队与权限", icon: Users, description: "成员、角色与访问控制" },
   { href: "/settings/harness", label: "Harness 审批", icon: ShieldCheck, description: "动态 Harness 升级提案审批中心" },
 ];
 

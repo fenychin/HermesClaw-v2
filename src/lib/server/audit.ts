@@ -22,6 +22,8 @@ export interface WriteAuditLogInput {
   targetId: string
   detail?: string
   riskLevel?: AuditRiskLevel
+  /** 工作空间 ID（多租户隔离） */
+  workspaceId: string
 }
 
 /**
@@ -50,6 +52,7 @@ export async function writeAuditLog(input: WriteAuditLogInput): Promise<void> {
         targetId: input.targetId,
         detail: input.detail ?? null,
         riskLevel: input.riskLevel ?? null,
+        workspaceId: input.workspaceId,
       },
     })
   } catch (error) {

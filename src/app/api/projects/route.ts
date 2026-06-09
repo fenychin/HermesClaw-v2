@@ -7,6 +7,7 @@ import {
   errorResponse,
 } from "@/lib/api-utils"
 import { ProjectCreateSchema, validateBody } from "@/lib/validators"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 /** 序列化 Project，将 JSON 字符串字段反序列化 */
 function serializeProject(project: Record<string, unknown>) {
@@ -19,10 +20,12 @@ function serializeProject(project: Record<string, unknown>) {
   }
 }
 
-/** GET /api/projects —— 获取所有项目列表 */
-export async function GET() {
+/** GET /api/projects —— 获取当前 workspace 的项目列表 */
+export async function GET(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const projects = await prisma.project.findMany({
+      where: { workspaceId: ctx.workspaceId },
       orderBy: { createdAt: "desc" },
       include: {
         _count: { select: { memories: true } },
@@ -41,6 +44,7 @@ export async function GET() {
 /** POST /api/projects —— 创建新项目 */
 export async function POST(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, ProjectCreateSchema)
     if (parsed instanceof Response) return parsed
@@ -49,6 +53,7 @@ export async function POST(request: Request) {
     const project = await prisma.project.create({
       data: {
         id: crypto.randomUUID(),
+        workspaceId: ctx.workspaceId,
         name: body.name,
         type: body.type,
         status: body.status,

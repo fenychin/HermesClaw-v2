@@ -13,6 +13,7 @@ import {
 } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { ToolCreateSchema, validateBody } from "@/lib/validators"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 export const runtime = "nodejs"
 
@@ -25,9 +26,11 @@ function serializeTool(tool: Record<string, unknown>) {
 }
 
 /** GET /api/tools —— 工具列表 */
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const tools = await prisma.toolRegistry.findMany({
+      where: { workspaceId: ctx.workspaceId },
       orderBy: { createdAt: "desc" },
     })
     return successResponse({
@@ -42,6 +45,7 @@ export async function GET() {
 /** POST /api/tools —— 注册新工具 */
 export async function POST(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, ToolCreateSchema)
     if (parsed instanceof Response) return parsed
@@ -55,6 +59,7 @@ export async function POST(request: Request) {
         scopes: stringifyJsonField(body.scopes),
         riskLevel: body.riskLevel,
         enabled: body.enabled,
+        workspaceId: ctx.workspaceId,
       },
     })
 
@@ -65,6 +70,7 @@ export async function POST(request: Request) {
       targetId: tool.id,
       detail: `${tool.name} · ${tool.riskLevel}`,
       riskLevel: tool.riskLevel === "high" ? "high" : "low",
+      workspaceId: ctx.workspaceId,
     })
 
     return successResponse(

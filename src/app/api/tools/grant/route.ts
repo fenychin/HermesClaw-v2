@@ -10,11 +10,13 @@ import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { ToolGrantSchema, validateBody } from "@/lib/validators"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 export const runtime = "nodejs"
 
 export async function POST(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, ToolGrantSchema)
     if (parsed instanceof Response) return parsed
@@ -41,6 +43,7 @@ export async function POST(request: Request) {
       targetId: body.toolId,
       detail: `授予 ${body.agentId}，有效至 ${result.grant?.expiresAt}`,
       riskLevel: "mid",
+      workspaceId: ctx.workspaceId,
     })
 
     return successResponse({ grant: result.grant }, 201)

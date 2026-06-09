@@ -21,7 +21,7 @@ import { Settings } from "lucide-react";
 
 const NAV_ITEMS = [
   { key: "company", label: "企业信息", icon: Building2 },
-  { key: "team", label: "团队与权限", icon: Users },
+  { key: "team", label: "团队与权限", icon: Users, isRoute: true },
   { key: "model-routing", label: "模型路由", icon: Cpu },
   { key: "connectors", label: "连接器授权", icon: Plug },
   { key: "harness", label: "Harness 审批", icon: GitBranch, isRoute: true },

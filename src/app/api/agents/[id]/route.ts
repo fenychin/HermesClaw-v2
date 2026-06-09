@@ -10,6 +10,7 @@ import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { writeAgentLog } from "@/lib/server/agent-log"
 import { checkConfirmQuery, checkConfirmValue } from "@/lib/server/guardrail"
 import { AgentUpdateSchema, validateBody } from "@/lib/validators"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 /** 序列化 Agent，将 JSON 字符串字段反序列化 */
 function serializeAgent(agent: Record<string, unknown>) {
@@ -57,6 +58,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
+    const ctx = await buildWorkspaceContext(request)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, AgentUpdateSchema)
     if (parsed instanceof Response) return parsed
@@ -124,6 +126,7 @@ export async function PATCH(
         targetId: id,
         detail: existing.name,
         riskLevel: "high",
+        workspaceId: ctx.workspaceId,
       })
     }
 

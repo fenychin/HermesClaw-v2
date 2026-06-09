@@ -8,6 +8,7 @@ import {
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { checkConfirmQuery } from "@/lib/server/guardrail"
 import { ConnectorUpdateSchema, validateBody } from "@/lib/validators"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 /** 序列化 Connector，将 JSON 字符串字段反序列化 */
 function serializeConnector(connector: Record<string, unknown>) {
@@ -90,6 +91,7 @@ export async function PATCH(
     // 审计：记录连接器授权状态变更（AGENTS.md 4.3 受控工具接入）
     if (body.status !== undefined) {
       const isConnect = body.status === "connected"
+      const ctx_ = await buildWorkspaceContext(request)
       await writeAuditLog({
         actor: await actorFromSession(),
         action: isConnect ? "connector.connect" : "connector.disconnect",
@@ -97,6 +99,7 @@ export async function PATCH(
         targetId: id,
         detail: existing.name,
         riskLevel: isConnect ? "mid" : "low",
+        workspaceId: ctx_.workspaceId,
       })
     }
 
@@ -116,6 +119,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+    const ctx = await buildWorkspaceContext(request)
 
     const existing = await prisma.connector.findUnique({ where: { id } })
     if (!existing) {
@@ -134,6 +138,7 @@ export async function DELETE(
       targetId: id,
       detail: existing.name,
       riskLevel: "high",
+      workspaceId: ctx.workspaceId,
     })
 
     return successResponse({ message: "连接器已删除" })

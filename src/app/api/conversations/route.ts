@@ -5,11 +5,14 @@ import {
   errorResponse,
 } from "@/lib/api-utils"
 import { ConversationCreateSchema, validateBody } from "@/lib/validators"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 /** GET /api/conversations —— 获取对话列表 */
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const conversations = await prisma.conversation.findMany({
+      where: { workspaceId: ctx.workspaceId },
       orderBy: { updatedAt: "desc" },
       include: {
         _count: { select: { messages: true } },
@@ -26,6 +29,7 @@ export async function GET() {
 /** POST /api/conversations —— 创建新对话 */
 export async function POST(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, ConversationCreateSchema)
     if (parsed instanceof Response) return parsed
@@ -34,12 +38,14 @@ export async function POST(request: Request) {
     const conversation = await prisma.conversation.create({
       data: {
         id: crypto.randomUUID(),
+        workspaceId: ctx.workspaceId,
         title: body.title,
         projectId: body.projectId,
         messages: body.initialMessage
           ? {
               create: {
                 id: crypto.randomUUID(),
+                workspaceId: ctx.workspaceId,
                 role: "user",
                 content: body.initialMessage,
               },
