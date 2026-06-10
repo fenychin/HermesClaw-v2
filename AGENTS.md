@@ -1,6 +1,6 @@
 # AGENTS.md — HermesClaw-v2 项目最高规则文档
 
-> **版本**: v2.6.0-alpha  
+> **版本**: v2.8.0-alpha  
 > **项目**: HermesClaw-v2（空间项目）  
 > **状态**: 🟢 生效中  
 > **最后更新**: 2026-06-10
@@ -244,10 +244,11 @@ cannot_do:
 | **L4** | 绝对禁止自动 | 系统永不自动执行；必须由人工在源业务系统发起，审批通道亦不得放行 |
 
 - **L4 不可绕过**：任何带密码、带 Token、带二次确认的「自动批准 L4」均属违规——L4 的语义是*禁止自动*，而非*提高自动门槛*。审批 API 对 L4 动作的 `approve` 必须硬拒绝（403）。
+- **L4 规范化拒绝体**：所有治理路由对 L4 动作的拒绝，统一返回 `{ success:false, error:'L4_FORBIDDEN', message:'L4 动作禁止系统自动审批，须在源业务系统人工发起' }`（HTTP 403）。该响应体由 `checkAutomationGate` 统一产出，**禁止在路由层旁路复制 L4 判定/自建拒绝体**（避免与共享门禁逻辑分叉）。
 - **L3 强制二次确认**：审批 API 缺少显式确认时返回 409，前端弹确认对话框，复用 4.5 高危操作护栏机制。
 - **派生规则**：未显式标注 `automationLevel` 的 Harness 提案，按 `riskLevel` 派生（high→L3 / mid→L2 / low→L1）。
 - **统一解析**：`resolveAutomationLevel(automationLevel, riskLevel)` 封装了「显式标注优先，否则派生」的逻辑（`src/types/harness.ts`），供 Route Handler / guardrail / harness-eval 等所有调用方复用。
-- **统一门禁**：`checkAutomationGate({ automationLevel, riskLevel, confirmed, actionName })`（`src/lib/server/guardrail.ts`）封装了 L4 硬拒绝（403）、L3 二次确认拦截（409）的完整判定链，供 approve / reject / rollback 等治理路由复用，避免在多处重复 L4/L3 检查逻辑。
+- **统一门禁**：`checkAutomationGate({ automationLevel, riskLevel, confirmed, actionName })`（`src/lib/server/guardrail.ts`）封装了 L4 硬拒绝（403）、L3 二次确认拦截（409）的完整判定链，供 approve / reject / rollback 等治理路由复用，避免在多处重复 L4/L3 检查逻辑。其返回结果（`GuardrailResult`）统一携带解析出的 `level` 字段，调用方据此审计/分支（如对 L4 写 `proposal.approve.l4_blocked` 审计），**无需自行重算 `resolveAutomationLevel`**。
 - 授权分级本身的变更须经 HEP 流程（见第七章）。
 
 ### 4.8 OpenClaw SSE 实时事件管道
@@ -422,6 +423,7 @@ draft（AI 生成，待审核）→ active（人工激活，可执行）→ arch
 |------|---------|------|
 | `Workspace` | `id`, `name`, `plan` | 工作空间（租户），`plan` 取值 `free` / `pro` / `enterprise` |
 | `WorkspaceMember` | `workspaceId`, `userId`, `role` | 成员关系，复合主键 `(workspaceId, userId)`，级联删除 |
+| `WorkspaceSettings` | `workspaceId`(PK), `defaultModel`, `taskProviderMap` | 模型路由配置：默认模型 + 各 taskType Provider 偏好（JSON），级联删除 |
 
 **角色体系**（`WorkspaceRole`，TEXT 列存）：
 
@@ -448,13 +450,23 @@ draft（AI 生成，待审核）→ active（人工激活，可执行）→ arch
 | `requireRole(role, minRole)` | 最低角色检查 | 不满足抛出 `ForbiddenError` |
 | `requireHarnessAdmin(role)` | Harness 修改保护 | 非 ADMIN/OWNER 抛出 `ForbiddenError` |
 | `guardRole(role, minRole, msg?)` | RBAC 门禁便捷封装 | 不满足返回 `Response(403)`，满足返回 `null` |
+| `withRBAC(handler, requiredRole)` | 统一 RBAC 包裹器（`src/lib/server/api-handler.ts`） | 构建 ctx → 校验 `requiredRole` → 不满足写 `AuditLog(action='RBAC_DENIED')` 并返回 403 → 满足则把已解析 ctx 注入 handler |
+
+**「审批 L3」语义澄清**（消除角色矩阵与接入约定的歧义）：
+
+- 角色矩阵中「审批 L3」一栏指 **L3 业务动作**（如发送报价单等 `TRADE_ACTIONS`），`MEMBER` 及以上可审批。
+- **Harness 升级提案**的审批/拒绝/回滚属于「修改 Harness」，仅 `ADMIN/OWNER` 可执行——以矩阵「修改 Harness」列为准。
 
 **RBAC 接入约定**：
 
-- 所有 POST/PATCH/DELETE API 路由**必须**在 handler 开头调用 `const ctx = await buildWorkspaceContext(request)` 后立即执行 `requireWritable(ctx.role)`
-- Harness 审批/回滚路由使用 `requireHarnessAdmin(ctx.role)`（仅 ADMIN/OWNER）
-- Workspace 成员管理路由使用 `guardRole()` 便捷封装（直接返回 403 Response）
-- **禁止**在应用层做 `if (role !== 'VIEWER')` 等裸判断——必须通过上述门禁函数统一校验
+- 所有 POST/PATCH/DELETE API 路由**必须**经 RBAC 门禁。两种等价接入方式（择一，勿混用于同一路由）：
+  - **包裹式（推荐新路由）**：`export const POST = withRBAC(async (req, ctx, routeCtx) => {...}, '<最低角色>')`——拒绝时自动写 `RBAC_DENIED` 审计并返回统一 403 体 `{ success:false, error:'RBAC_DENIED', message }`。
+  - **内联式（既有路由）**：handler 开头 `const ctx = await buildWorkspaceContext(request)` 后立即 `requireWritable(ctx.role)` / `requireHarnessAdmin(ctx.role)`。
+- Harness 审批/拒绝/回滚路由要求 `ADMIN`（`withRBAC(..., 'ADMIN')` 或 `requireHarnessAdmin`）。
+- 写操作通用最低角色为 `MEMBER`（即非 VIEWER）。
+- Workspace 成员管理路由使用 `guardRole()` 便捷封装（直接返回 403 Response）。
+- **禁止**在应用层做 `if (role !== 'VIEWER')` 等裸判断——必须通过上述门禁函数统一校验。
+- **审计动作枚举**：RBAC 拒绝写 `RBAC_DENIED`；提案治理写 `proposal.approve` / `proposal.reject` / `proposal.approve.l4_blocked`（L4 硬拦截留痕）；工作流执行写 `workflow.run`；策略路由写 `model.route`；模型路由配置变更写 `update.model-routing`。
 
 **Session 约定**：
 
@@ -469,6 +481,44 @@ draft（AI 生成，待审核）→ active（人工激活，可执行）→ arch
 - 粗粒度 VIEWER 角色拦截（从 JWT payload 解码 `role` 字段）
 - 细粒度 RBAC 由 Route Handler 层执行（`requireWritable` 等）
 
+### 4.12 策略路由（Model Router）
+
+> 本节定义 Harness 策略路由环境层——依据任务类型、风险等级、估算预算，决定单次 LLM 调用应使用的 Provider 与模型，并将决策留痕至审计日志。
+
+**核心模块**：`src/lib/server/model-router.ts` — 业务逻辑下沉，仅服务端调用（读取环境变量 + 数据库）。
+
+**路由上下文**（`ModelRouteContext`）：
+
+- `taskType`：`chat` | `workflow` | `analysis` | `generation`
+- `riskLevel`：`low` | `medium` | `high`（注意：审计日志用 `mid`，函数 `toAuditRiskLevel` 负责映射）
+- `estimatedTokens`：预估 token 数（供后续预算扩展）
+- `workspaceId`：多租户隔离定位
+
+**路由优先级**（`selectModel(ctx)`）：
+
+1. `riskLevel === 'high'` → 高能力模型（`claude-sonnet-4-6` / anthropic），绕过工作空间配置
+2. `taskType === 'workflow'` 且非 high → 成本优化模型（`deepseek-chat` / deepseek）
+3. 其余 → 读 `WorkspaceSettings` 的可配置默认模型 + per-taskType Provider 偏好（fallback `deepseek-chat`）
+
+**Provider 可用性降级**（§2.3 失败自动降级）：选中 Provider 的 API Key 缺失时，自动切换到另一可用 Provider（含模型映射），降级原因写入 audit detail。
+
+**约束**：
+
+- **禁止硬编码模型**：所有 LLM 调用方必须经 `selectModel()` 决策，不得自行写死 Provider/模型（§1.2 环境驱动）
+- **强制审计留痕**：每次路由决策必须写入 `AuditLog(action='model.route', targetType='model')`，`riskLevel` 继承上下文（§1.2 数据主权；无日志静默执行属违规）
+- **配置权限**：`WorkspaceSettings` 的修改仅限 OWNER/ADMIN（API `PATCH /api/workspace/settings` 经 `guardRole(ADMIN)` 门禁）
+- **配置读取失败安全降级**：`getWorkspaceModelSettings()` 读取失败不抛异常，降级返回缺省值并 warn
+
+**共享 LLM 工具层扩展**（`src/lib/server/llm-provider.ts`）：
+
+- 新增导出：`DEFAULT_ANTHROPIC_MODEL`、`DEFAULT_DEEPSEEK_MODEL`、`isProviderAvailable(provider)` — 统一 key 可用性判定，供 model-router 等复用
+- 新增导出：`openChatStream(options, onDelta)` — 共享流式调用，收敛 DeepSeek SSE 透传与 Anthropic `messages.stream` 为同一接口，供 chat / workflow-generator 等流式端点复用
+- 新增导出：`classifyUpstreamError(httpStatus)` — 上游错误码→友好降级信息，DeepSeek + Anthropic 对齐
+
+**管理 API**：`GET/PATCH /api/workspace/settings` — 仅 OWNER/ADMIN 可写，写时记录 `AuditLog(action='update.model-routing')`
+
+**UI**：`/settings?section=model-routing` — 默认模型下拉 + 4× taskType Provider 偏好下拉；非管理员只读（保存按钮禁用 + 警示条）。
+
 ***
 
 ## 附录：版本历史
@@ -482,6 +532,8 @@ draft（AI 生成，待审核）→ active（人工激活，可执行）→ arch
 | v2.4.0-alpha | 2026-06-09 | 新增 §4.9 Harness 提案一键回滚机制；§4.7 补充 `resolveAutomationLevel` 与 `checkAutomationGate` 共享门禁函数；新增 `previousSnapshot` 字段契约与 `rolled-back` 状态 |
 | v2.5.0-alpha | 2026-06-09 | 新增 §4.10 WorkflowGenerator Agent（AI 驱动 DAG 生成引擎）；新增 `src/lib/server/agents/` 目录约定；新增 `src/lib/server/llm-provider.ts` 共享 LLM 工具层；Workflow 模型新增 `draft` 状态；新增 `/api/workflows/generate` 端点 |
 | v2.6.0-alpha | 2026-06-10 | 新增 §4.11 多租户 Workspace 与 RBAC：Workspace / WorkspaceMember 模型，OWNER/ADMIN/MEMBER/VIEWER 四级角色，Prisma 查询层强制数据隔离，`buildWorkspaceContext` + RBAC 门禁函数，Edge Middleware 写保护，`guardRole` 便捷封装，默认 Workspace 向后兼容策略 |
+| v2.7.0-alpha | 2026-06-10 | RBAC 统一守卫 + L4/L3 治理加固：§4.11 新增 `withRBAC` 统一包裹器（`RBAC_DENIED` 审计）+ 审批角色澄清；§4.7 新增 L4 规范化拒绝体 `L4_FORBIDDEN` + `checkAutomationGate` 携带 `level` + 消除双重 L4 判定；§4.3 注册新审计动作 `proposal.approve`/`reject`/`l4_blocked`/`workflow.run`；新增 `AlertDialog` 组件；审批中心 L3 高风险接真实 approve API |
+| v2.8.0-alpha | 2026-06-10 | 新增 §4.12 策略路由（Model Router）：`selectModel()` 按 risk/taskType/WorkspaceSettings 路由 Provider 与模型，强制审计留痕，Provider 不可用自动降级；共享 LLM 层新增 `openChatStream`/`isProviderAvailable`/`classifyUpstreamError` 导出；新增 `WorkspaceSettings` + `/api/workspace/settings`；chat API 移除硬编 DeepSeek，全面接入策略路由；generator output 对齐至 `prisma-new` |
 
 ***
 

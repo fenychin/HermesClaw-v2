@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import type { HarnessProposal } from "@/types";
 import { PageHeader } from "@/components/common/page-header";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ProposalCard } from "./_components/proposal-card";
-import { ApproveConfirmDialog } from "./_components/approve-confirm-dialog";
+import { L3ApproveAlert } from "./_components/l3-approve-alert";
 import { ProposalDetailSheet } from "./_components/proposal-detail-sheet";
 import { useHarnessProposalStore } from "@/stores/harness-proposal-store";
 import {
@@ -45,11 +47,40 @@ export default function HarnessApprovalPage() {
   );
   const [detailOpen, setDetailOpen] = useState(false);
 
-  /* L3/L4 确认弹窗状态 */
+  /* L3 高风险二次确认弹窗状态 */
   const [confirmTarget, setConfirmTarget] = useState<HarnessProposal | null>(
     null,
   );
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  /* 真实 approve API 调用（TanStack Query 承载服务端状态，CLAUDE.md §7） */
+  const approveMutation = useMutation({
+    mutationFn: async (proposal: HarnessProposal) => {
+      const res = await fetch(
+        `/api/harness/proposals/${proposal.proposalId}/approve`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirmText: "确认执行" }),
+        },
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // L4 硬拒绝 / RBAC 拒绝 / L3 缺确认等
+        throw new Error(body.message ?? body.error ?? `审批失败 (${res.status})`);
+      }
+      return body;
+    },
+    onSuccess: (_data, proposal) => {
+      approveProposal(proposal.id, "当前用户");
+      toast.success(`提案 ${proposal.proposalId} 已批准`);
+      setConfirmOpen(false);
+      setConfirmTarget(null);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
 
   /* 统计数据 */
   const stats = useMemo(() => {
@@ -71,23 +102,25 @@ export default function HarnessApprovalPage() {
     setDetailOpen(true);
   }, []);
 
-  /* 批准流程：L3 需二次确认，L1/L2 直接通过 */
+  /* 批准流程：高风险（L3）须二次确认，其余直接通过 */
   const handleApprove = useCallback((proposal: HarnessProposal) => {
-    const level = proposal.proposedChange.automationLevel;
-    if (level === "L3" || level === "L4") {
-      /* L3/L4 弹出二次确认 */
+    /* riskLevel === 'high' 等价 L3 高风险，弹二次确认（AGENTS.md §4.7） */
+    if (proposal.proposedChange.riskLevel === "high") {
       setConfirmTarget(proposal);
       setConfirmOpen(true);
     } else {
-      /* L1/L2 直接批准 */
+      /* L1/L2 低/中风险直接批准 */
       approveProposal(proposal.id, "当前用户");
     }
   }, [approveProposal]);
 
-  /* 二次确认后执行批准 */
-  const handleConfirmApprove = useCallback((proposalId: string) => {
-    approveProposal(proposalId, "当前用户");
-  }, [approveProposal]);
+  /* 二次确认后执行真实 approve API */
+  const handleConfirmApprove = useCallback(
+    (proposal: HarnessProposal) => {
+      approveMutation.mutate(proposal);
+    },
+    [approveMutation],
+  );
 
   /* 拒绝 */
   const handleReject = useCallback((proposal: HarnessProposal) => {
@@ -296,12 +329,13 @@ export default function HarnessApprovalPage() {
         onReject={handleReject}
       />
 
-      {/* L3/L4 二次确认弹窗 */}
-      <ApproveConfirmDialog
+      {/* L3 高风险二次确认弹窗 */}
+      <L3ApproveAlert
         proposal={confirmTarget}
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         onConfirm={handleConfirmApprove}
+        isPending={approveMutation.isPending}
       />
     </div>
   );

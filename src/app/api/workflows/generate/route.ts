@@ -9,13 +9,13 @@
  *
  * 约束（AGENTS.md §4.7 L3）：生成的工作流不可直接执行
  */
-import { NextRequest } from "next/server"
 import { z } from "zod"
 import { generateWorkflow } from "@/lib/server/agents/workflow-generator"
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { validateBody } from "@/lib/validators"
 import { rateLimit } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
+import { withRBAC } from "@/lib/server/api-handler"
 
 export const runtime = "nodejs"
 // AI 调用可能稍慢
@@ -35,7 +35,7 @@ const WorkflowGenerateSchema = z.object({
  * 生成外贸行业 DAG 工作流，状态为 draft。
  * 生成后需人工在 Review 页面确认并手动激活，不可直接执行。
  */
-export async function POST(request: NextRequest) {
+export const POST = withRBAC(async (request: Request) => {
   try {
     // 频率限制：每分钟最多 5 次（AI 调用成本高）
     const ip =
@@ -70,4 +70,4 @@ export async function POST(request: NextRequest) {
     const message = error instanceof Error ? error.message : "未知错误"
     return errorResponse(`工作流生成失败：${message}`, 502)
   }
-}
+}, "MEMBER")
