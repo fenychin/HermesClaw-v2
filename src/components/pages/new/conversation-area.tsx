@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,13 @@ import {
   Puzzle,
   FolderPlus,
   Trash2,
+  Loader2,
+  CheckCircle2,
 } from "lucide-react";
 import type { Message } from "@/hooks/useChat";
 import { MarkdownRenderer } from "@/components/common/markdown-renderer";
+import { apiClient } from "@/lib/api-client";
+import { toast } from "sonner";
 
 interface ConversationAreaProps {
   /** 完整对话消息列表 */
@@ -36,10 +40,106 @@ export function ConversationArea({
 }: ConversationAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // 沉淀为技能 / 创建项目 — 异步状态
+  const [savingSkill, setSavingSkill] = useState(false);
+  const [skillSaved, setSkillSaved] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [projectCreated, setProjectCreated] = useState<string | null>(null);
+
   // 自动滚底
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingContent]);
+
+  /** 沉淀为技能：收集对话内容，创建技能记录 */
+  const handleSaveAsSkill = useCallback(async () => {
+    if (savingSkill || skillSaved) return;
+    setSavingSkill(true);
+    try {
+      // 提取对话中最后一条用户消息作为技能名
+      const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
+      const skillName = lastUserMsg
+        ? lastUserMsg.content.slice(0, 40).replace(/\n/g, " ")
+        : "对话沉淀技能";
+
+      // 收集所有 AI 回复作为技能描述/内容
+      const aiContent = messages
+        .filter((m) => m.role === "assistant")
+        .map((m) => m.content)
+        .join("\n\n---\n\n");
+
+      await apiClient.createSkill({
+        name: `对话沉淀: ${skillName}`,
+        description: aiContent.slice(0, 800) || "从对话中沉淀的技能",
+        category: "custom:对话沉淀",
+        inputSchema: JSON.stringify({
+          role: skillName,
+          capabilities: ["根据对话上下文执行对应任务", "复用已有对话中的经验"],
+          commandName: skillName.toLowerCase().replace(/\s+/g, "-").slice(0, 30),
+        }),
+        outputSchema: JSON.stringify({
+          constraints: ["信息不足时主动询问", "不得执行高风险操作"],
+          disableModelInvocation: false,
+        }),
+      });
+
+      setSkillSaved(true);
+      setTimeout(() => setSkillSaved(false), 3000);
+    } catch (err) {
+      toast.error("沉淀技能失败", {
+        description: err instanceof Error ? err.message : "请稍后重试",
+      });
+    } finally {
+      setSavingSkill(false);
+    }
+  }, [messages, savingSkill, skillSaved]);
+
+  /** 创建项目空间：从对话内容提取关键信息并创建项目 */
+  const handleCreateProject = useCallback(async () => {
+    if (creatingProject || projectCreated) return;
+    setCreatingProject(true);
+    try {
+      const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
+      const projectName = lastUserMsg
+        ? lastUserMsg.content.slice(0, 50).replace(/\n/g, " ")
+        : "新项目空间";
+
+      // 从 AI 回复中提取可能的下一步行动
+      const lastAiMsg = [...messages].reverse().find((m) => m.role === "assistant");
+      const nextActions = lastAiMsg
+        ? lastAiMsg.content
+            .split("\n")
+            .filter((line) => line.trim().startsWith("- ") || line.trim().startsWith("• "))
+            .slice(0, 5)
+            .map((line) => line.trim().replace(/^[-•]\s*/, ""))
+        : [];
+
+      const result = await apiClient.createProject({
+        name: projectName,
+        type: "customer",
+        owner: "当前用户",
+        nextActions,
+        tags: ["从对话创建"],
+      });
+
+      const createdId = (result.project as { id: string })?.id;
+      if (createdId) {
+        setProjectCreated(createdId);
+        // 延迟跳转到新项目空间
+        setTimeout(() => {
+          window.location.href = `/projects/${createdId}`;
+        }, 800);
+      }
+    } catch (err) {
+      toast.error("创建项目失败", {
+        description: err instanceof Error ? err.message : "请稍后重试，将跳转到项目列表",
+      });
+      // 降级：仍然跳转到项目列表
+      window.location.href = "/projects";
+    } finally {
+      setCreatingProject(false);
+    }
+  }, [messages, creatingProject, projectCreated]);
 
   // 空状态
   if (messages.length === 0 && !streamingContent) {
@@ -143,22 +243,34 @@ export function ConversationArea({
               variant="ghost"
               size="xs"
               className="text-muted-foreground hover:text-foreground text-xs gap-1.5 h-7"
-              onClick={() => console.log("沉淀为技能", messages)}
+              onClick={handleSaveAsSkill}
+              disabled={savingSkill}
             >
-              <Puzzle className="size-3.5" />
-              沉淀为技能
+              {savingSkill ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : skillSaved ? (
+                <CheckCircle2 className="size-3.5 text-success" />
+              ) : (
+                <Puzzle className="size-3.5" />
+              )}
+              {skillSaved ? "已沉淀" : "沉淀为技能"}
             </Button>
 
             <Button
               variant="ghost"
               size="xs"
               className="text-muted-foreground hover:text-foreground text-xs gap-1.5 h-7"
-              onClick={() => {
-                window.location.href = "/projects";
-              }}
+              onClick={handleCreateProject}
+              disabled={creatingProject}
             >
-              <FolderPlus className="size-3.5" />
-              创建项目空间
+              {creatingProject ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : projectCreated ? (
+                <CheckCircle2 className="size-3.5 text-success" />
+              ) : (
+                <FolderPlus className="size-3.5" />
+              )}
+              {projectCreated ? "已创建" : "创建项目空间"}
             </Button>
 
             <Button

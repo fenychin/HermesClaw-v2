@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { PageTransition } from "@/components/common/PageTransition";
 import { PageHeader } from "@/components/common/page-header";
 import { useWorkspaceData } from "@/hooks/use-workspace";
-import { isAdmin, type WorkspaceRole } from "@/lib/workspace";
+import { isAdmin, type WorkspaceRole } from "@/lib/workspace-roles";
 import {
   useModelRouting,
   useUpdateModelRouting,

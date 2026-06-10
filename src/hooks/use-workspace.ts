@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { WorkspaceRole } from "@/lib/workspace";
+import type { WorkspaceRole } from "@/lib/workspace-roles";
 
 // ==============================
 // 类型定义

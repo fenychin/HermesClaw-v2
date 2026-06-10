@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
@@ -13,6 +13,8 @@ import {
 import Link from "next/link";
 import { useProjectStore } from "@/stores/project-store";
 import { useTradeStore } from "@/stores/trade-store";
+import { apiClient } from "@/lib/api-client";
+import { relativeTime, classifyTimeGroup } from "@/lib/date-utils";
 import type { Inquiry } from "@/types";
 
 // ============================================================
@@ -21,7 +23,7 @@ import type { Inquiry } from "@/types";
 
 type RecentType = "conversation" | "task" | "project";
 
-interface RecentRecord {
+export interface RecentRecord {
   id: string;
   type: RecentType;
   title: string;
@@ -45,24 +47,6 @@ const TYPE_COLOR: Record<RecentType, string> = {
 // ============================================================
 // 构建混合最近记录（8 条）
 // ============================================================
-
-/** 相对时间格式化（中文） */
-function relativeTime(isoStr: string): string {
-  const now = Date.now();
-  const diffMs = now - new Date(isoStr).getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "刚刚";
-  if (diffMin < 60) return `${diffMin}分钟前`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}小时前`;
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay === 1) return "昨天";
-  if (diffDay < 7) return `${diffDay}天前`;
-  return new Date(isoStr).toLocaleDateString("zh-CN", {
-    month: "numeric",
-    day: "numeric",
-  });
-}
 
 /** 从 store 数据生成混合最近记录 */
 function buildRecentRecords(
@@ -116,8 +100,8 @@ function buildRecentRecords(
 // ============================================================
 
 interface RecentPanelProps {
-  /** 点击某条记录时的回调（新话题页用于填入输入框） */
-  onSelect?: (text: string) => void;
+  /** 点击某条记录时的回调（传递完整记录，调用方可按 type 分发处理） */
+  onSelect?: (record: RecentRecord) => void;
   /** 是否显示底部"查看全部"链接（/recent 页面自身不显示） */
   showViewAll?: boolean;
   /** 是否显示顶部标题行 */
@@ -137,12 +121,37 @@ export function RecentPanel({
   const storeProjects = useProjectStore((s) => s.projects);
   const inquiries = useTradeStore((s) => s.inquiries);
   const loadInquiries = useTradeStore((s) => s.loadInquiries);
+
+  // 从 API 加载真实对话列表
+  const [apiConversations, setApiConversations] = useState<RecentRecord[]>([]);
   useEffect(() => {
     loadInquiries();
+    // 异步加载真实对话
+    apiClient.getConversations().then((data) => {
+      const convs = (data as { conversations: Array<{ id: string; title: string; updatedAt: string }> }).conversations ?? [];
+      setApiConversations(
+        convs.map((c) => ({
+          id: c.id,
+          type: "conversation" as const,
+          title: c.title,
+          timestamp: c.updatedAt,
+          timeGroup: classifyTimeGroup(c.updatedAt),
+        })),
+      );
+    }).catch(() => { /* 对话列表加载失败不阻断面板 */ });
   }, [loadInquiries]);
+
   const recentRecords = useMemo(
-    () => buildRecentRecords(storeProjects, inquiries),
-    [storeProjects, inquiries],
+    () => {
+      const base = buildRecentRecords(storeProjects, inquiries);
+      // 合并 API 对话（去重：API 真实对话优先于询盘派生的"对话"）
+      const seen = new Set(apiConversations.map((c) => c.title));
+      const filtered = base.filter((r) => r.type !== "conversation" || !seen.has(r.title));
+      return [...apiConversations, ...filtered]
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 12);
+    },
+    [storeProjects, inquiries, apiConversations],
   );
 
   return (
@@ -177,7 +186,7 @@ export function RecentPanel({
                 delay: 0.08 + i * 0.03,
                 ease: "easeOut",
               }}
-              onClick={() => onSelect?.(record.title)}
+              onClick={() => onSelect?.(record)}
               className={cn(
                 "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg",
                 "hover:bg-accent transition-colors text-left",

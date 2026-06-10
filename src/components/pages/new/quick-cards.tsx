@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { TRADE_AGENT_PROMPTS } from "@/lib/system-prompts";
@@ -10,6 +11,8 @@ import {
   UserSearch,
   FolderPlus,
   Bot,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 /**
@@ -69,7 +72,6 @@ const QUICK_CARDS: ReadonlyArray<{
     label: "创建项目空间",
     desc: "为新客户或订单建立独立工作空间",
     color: "text-primary",
-    // 无专属角色：交给 Hermes 规划助手，走主动规划协议拆解步骤
     prompt: "请帮我为新客户或订单建立一个独立工作空间：",
   },
   {
@@ -97,46 +99,128 @@ interface QuickCardsProps {
  * 快捷任务卡片组
  * —— 水平排列 6 张，支持横向滚动，hover 微放大。
  *    点击后将预设 prompt 填入输入框并聚焦；外贸专项卡片附带专属角色 prompt。
+ *    左侧/右侧箭头在可滚动时出现，点击滑动一页。
  */
 export function QuickCards({ onSelect }: QuickCardsProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
   const handleClick = (prompt: string, systemPrompt?: string) => {
     onSelect?.(prompt, systemPrompt);
   };
 
+  /** 检查滚动边界，更新箭头显示状态 */
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 2);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateScrollState();
+    el.addEventListener("scroll", updateScrollState, { passive: true });
+    window.addEventListener("resize", updateScrollState);
+    return () => {
+      el.removeEventListener("scroll", updateScrollState);
+      window.removeEventListener("resize", updateScrollState);
+    };
+  }, [updateScrollState]);
+
+  /** 向左/右滚动一页（约 3 张卡片宽度） */
+  const scroll = (direction: "left" | "right") => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const cardWidth = 176; // min-w-[160px] + gap
+    const scrollAmount = cardWidth * 3;
+    el.scrollBy({
+      left: direction === "left" ? -scrollAmount : scrollAmount,
+      behavior: "smooth",
+    });
+  };
+
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-      {QUICK_CARDS.map((card, i) => (
-        <motion.button
-          key={card.key}
+    <div className="relative group/scroll">
+      {/* 左箭头 */}
+      {canScrollLeft && (
+        <button
           type="button"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            duration: 0.3,
-            delay: 0.15 + i * STAGGER_DELAY,
-            ease: "easeOut",
-          }}
-          onClick={() => handleClick(card.prompt, card.systemPrompt)}
+          onClick={() => scroll("left")}
           className={cn(
-            "min-w-[160px] bg-card rounded-xl border border-border p-3",
-            "cursor-pointer text-left",
-            "hover:scale-[1.02] hover:shadow-sm transition-transform",
+            "absolute left-0 top-1/2 -translate-y-1/2 z-10",
+            "size-8 rounded-full bg-card border border-border shadow-md",
+            "flex items-center justify-center",
+            "text-muted-foreground hover:text-foreground hover:bg-accent",
+            "transition-all opacity-0 group-hover/scroll:opacity-100",
+            "-ml-1",
           )}
+          aria-label="向左滚动"
         >
-          {/* 图标 */}
-          <card.icon className={cn("size-6", card.color)} />
+          <ChevronLeft className="size-4" />
+        </button>
+      )}
 
-          {/* 标题 */}
-          <p className="text-foreground text-xs font-medium mt-2">
-            {card.label}
-          </p>
+      {/* 卡片容器 */}
+      <div
+        ref={scrollRef}
+        className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scroll-smooth"
+        style={{ scrollbarWidth: "none" }}
+      >
+        {QUICK_CARDS.map((card, i) => (
+          <motion.button
+            key={card.key}
+            type="button"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.3,
+              delay: 0.15 + i * STAGGER_DELAY,
+              ease: "easeOut",
+            }}
+            onClick={() => handleClick(card.prompt, card.systemPrompt)}
+            className={cn(
+              "min-w-[160px] bg-card rounded-xl border border-border p-3 shrink-0",
+              "cursor-pointer text-left",
+              "hover:scale-[1.02] hover:shadow-sm transition-transform",
+            )}
+          >
+            {/* 图标 */}
+            <card.icon className={cn("size-6", card.color)} />
 
-          {/* 说明 */}
-          <p className="text-muted-foreground text-[11px] mt-1 line-clamp-2">
-            {card.desc}
-          </p>
-        </motion.button>
-      ))}
+            {/* 标题 */}
+            <p className="text-foreground text-xs font-medium mt-2">
+              {card.label}
+            </p>
+
+            {/* 说明 */}
+            <p className="text-muted-foreground text-[11px] mt-1 line-clamp-2">
+              {card.desc}
+            </p>
+          </motion.button>
+        ))}
+      </div>
+
+      {/* 右箭头 */}
+      {canScrollRight && (
+        <button
+          type="button"
+          onClick={() => scroll("right")}
+          className={cn(
+            "absolute right-0 top-1/2 -translate-y-1/2 z-10",
+            "size-8 rounded-full bg-card border border-border shadow-md",
+            "flex items-center justify-center",
+            "text-muted-foreground hover:text-foreground hover:bg-accent",
+            "transition-all opacity-0 group-hover/scroll:opacity-100",
+            "-mr-1",
+          )}
+          aria-label="向右滚动"
+        >
+          <ChevronRight className="size-4" />
+        </button>
+      )}
     </div>
   );
 }

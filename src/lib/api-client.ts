@@ -211,6 +211,19 @@ export const apiClient = {
   getSkills: () =>
     apiFetch<{ skills: unknown[] }>("/api/skills"),
 
+  createSkill: (data: {
+    name: string
+    description: string
+    category?: string
+    inputSchema?: string
+    outputSchema?: string
+    scenarios?: string
+  }) =>
+    apiFetch<{ skill: unknown }>("/api/skills", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   // ---- 连接器 ----
   getConnectors: () =>
     apiFetch<{ connectors: unknown[] }>("/api/connectors"),

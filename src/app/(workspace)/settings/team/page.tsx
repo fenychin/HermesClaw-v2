@@ -9,8 +9,8 @@ import {
   useRemoveMember,
   type WorkspaceMember,
 } from "@/hooks/use-workspace";
-import type { WorkspaceRole } from "@/lib/workspace";
-import { isAdmin } from "@/lib/workspace";
+import type { WorkspaceRole } from "@/lib/workspace-roles";
+import { isAdmin } from "@/lib/workspace-roles";
 import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

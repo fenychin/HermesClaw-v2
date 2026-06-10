@@ -11,15 +11,27 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
 
-  // ★ 将 Prisma / BetterSqlite3 从 Turbopack 打包中排除，使用原生 Node require
-  //    —— 避免 Windows 上 Turbopack 创建 junction 点失败导致数百条 HMR 错误
-  //    —— 参考：https://github.com/vercel/next.js/issues/63446
+  // ★ 将原生 Node 模块从 webpack 打包中排除（serverExternalPackages 对 webpack 与 Turbopack 均生效）
+  //    —— 避免 webpack 误将 better-sqlite3 / bcryptjs 打入客户端 bundle 导致 fs 等模块解析失败
   serverExternalPackages: [
     "@prisma/client",
     "@prisma/adapter-better-sqlite3",
     "better-sqlite3",
     "bcryptjs",
   ],
+
+  // ★ webpack 层显式 external 配置（与 serverExternalPackages 互补，确保 webpack 模式也不会误打包）
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // 服务端：将原生模块标记为 external，由 Node.js 原生 require 加载
+      config.externals = [
+        ...(Array.isArray(config.externals) ? config.externals : []),
+        "better-sqlite3",
+        "bcryptjs",
+      ];
+    }
+    return config;
+  },
 
   // 安全响应头（生产安全加固）
   async headers() {

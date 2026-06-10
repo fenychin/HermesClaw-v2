@@ -22,6 +22,9 @@ const SYSTEM_ROUTES = [
   "/api/harness/cron",
 ];
 
+/** 开发环境免认证路由（仅本地测试使用） */
+const DEV_BYPASS_ROUTES = ["/api/chat", "/api/task", "/api/conversations"];
+
 /** 写操作方法 */
 const WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
 
@@ -54,6 +57,14 @@ export function middleware(request: NextRequest) {
   }
   for (const prefix of SYSTEM_ROUTES) {
     if (pathname.startsWith(prefix)) return NextResponse.next();
+  }
+
+  // 开发环境免认证：DEV_BYPASS_AUTH=true 时放行 chat/task API
+  if (
+    process.env.DEV_BYPASS_AUTH === "true" &&
+    DEV_BYPASS_ROUTES.some((route) => pathname.startsWith(route))
+  ) {
+    return NextResponse.next();
   }
 
   // 写操作：要求有效 session，VIEWER 角色拦截

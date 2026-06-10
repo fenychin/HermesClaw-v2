@@ -16,10 +16,80 @@ import {
   Search,
   X,
   AlertCircle,
+  MicOff,
+  Globe,
+  Zap,
+  ChevronDown,
 } from "lucide-react";
 import { useAgentStore } from "@/stores/agent-store";
 import { useProjectStore } from "@/stores/project-store";
 import type { Agent, Project } from "@/types";
+import { toast } from "sonner";
+
+// ============================================================
+// 可选模型配置（Provider + 具体型号 → API modelId）
+// ============================================================
+
+export interface SelectableModel {
+  id: string;
+  provider: "anthropic" | "deepseek";
+  label: string;
+  version: string;
+  color: string;
+  modelId: string; // 传给 /api/chat 的实际模型名
+  available: boolean;
+}
+
+export const SELECTABLE_MODELS: SelectableModel[] = [
+  {
+    id: "deepseek-v4-pro",
+    provider: "deepseek",
+    label: "DeepSeek",
+    version: "V4 Pro",
+    color: "bg-success",
+    modelId: "deepseek-v4-pro",
+    available: true,
+  },
+  {
+    id: "deepseek-v4-flash",
+    provider: "deepseek",
+    label: "DeepSeek",
+    version: "V4 Flash",
+    color: "bg-success",
+    modelId: "deepseek-v4-flash",
+    available: true,
+  },
+  {
+    id: "claude-sonnet-4-6",
+    provider: "anthropic",
+    label: "Claude",
+    version: "Sonnet 4.6",
+    color: "bg-orange-400",
+    modelId: "claude-sonnet-4-6",
+    available: true,
+  },
+  {
+    id: "claude-haiku-4-5",
+    provider: "anthropic",
+    label: "Claude",
+    version: "Haiku 4.5",
+    color: "bg-orange-400",
+    modelId: "claude-haiku-4-5",
+    available: false,
+  },
+  {
+    id: "claude-opus-4-8",
+    provider: "anthropic",
+    label: "Claude",
+    version: "Opus 4.8",
+    color: "bg-orange-400",
+    modelId: "claude-opus-4-8",
+    available: false,
+  },
+];
+
+/** 默认选中的模型 */
+export const DEFAULT_MODEL_ID = "deepseek-v4-pro";
 
 /** 下拉弹窗类型 */
 type DropdownType = "agent" | "project" | null;
@@ -53,6 +123,10 @@ interface CommandBoxProps {
   error?: string | null;
   /** 外部触发聚焦（值变化时 focus textarea） */
   focusKey?: number;
+  /** 当前选中的模型 ID（如 "deepseek-v4-pro"） */
+  selectedModelId?: string;
+  /** 模型变更回调 */
+  onModelChange?: (modelId: string) => void;
 }
 
 /**
@@ -68,6 +142,8 @@ export function CommandBox({
   isStreaming = false,
   error = null,
   focusKey,
+  selectedModelId,
+  onModelChange,
 }: CommandBoxProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -78,6 +154,30 @@ export function CommandBox({
   const [activeDropdown, setActiveDropdown] = useState<DropdownType>(null);
   const [agentSearch, setAgentSearch] = useState("");
   const [projectSearch, setProjectSearch] = useState("");
+
+  // 语音录入状态
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+
+  // URL 粘贴弹窗
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [urlValue, setUrlValue] = useState("");
+  const urlInputRef = useRef<HTMLInputElement>(null);
+
+  // /命令 弹窗
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 可用技能命令列表（/ft-*）
+  const SLASH_COMMANDS = [
+    { name: "/ft-inquiry-grading", label: "询盘智能分级", desc: "A/B/C 三级评分询盘" },
+    { name: "/ft-outreach-email", label: "自动开发信生成", desc: "个性化外贸开发信草稿" },
+    { name: "/ft-customer-profiling", label: "客户画像分析", desc: "多渠道客户画像构建" },
+    { name: "/ft-cost-accounting", label: "成本核算", desc: "多贸易术语成本明细表" },
+    { name: "/ft-document-parsing", label: "单证解析", desc: "提单/发票/装箱单审核" },
+    { name: "/ft-follow-up-crm", label: "客户跟进管理", desc: "跟进提醒与话术建议" },
+    { name: "/ft-competitor-analysis", label: "竞品动态分析", desc: "目标市场画像与竞品格局" },
+  ];
 
   // ---- 自动调整 textarea 高度 ----
   const autoResize = useCallback(() => {
@@ -154,6 +254,122 @@ export function CommandBox({
     }
   };
 
+  // ---- 文件上传 ----
+  const handleFileUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const fileName = file.name;
+    const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+
+    // 尝试读取文本文件内容（检测后缀或 MIME 类型）
+    const textExtensions = [".txt", ".md", ".csv", ".json", ".xml", ".html", ".htm", ".log", ".yaml", ".yml", ".env", ".ts", ".tsx", ".js", ".jsx", ".py", ".java", ".css", ".sql"];
+    const isTextFile = textExtensions.some((ext) => fileName.toLowerCase().endsWith(ext)) ||
+      file.type.startsWith("text/") || file.type === "application/json";
+
+    if (isTextFile && file.size < 1024 * 1024) {
+      // 文本文件且 < 1MB：读取内容并附到输入框
+      try {
+        const content = await file.text();
+        const preview = content.slice(0, 3000);
+        const truncated = content.length > 3000 ? "\n…(内容已截断)" : "";
+        insertAtCursor(
+          `[📎 文件: ${fileName} (${sizeMB}MB)]\n\`\`\`\n${preview}${truncated}\n\`\`\`\n`,
+        );
+        toast.success(`已读取: ${fileName}`);
+      } catch {
+        insertAtCursor(`[📎 ${fileName} (${sizeMB}MB)]`);
+        toast.warning("无法读取文件内容，仅附文件名");
+      }
+    } else {
+      // 非文本或大文件：仅附文件名
+      insertAtCursor(`[📎 ${fileName} (${sizeMB}MB)]`);
+      toast.info("文件已附加", {
+        description: "大文件/二进制文件仅传递文件名引用",
+      });
+    }
+    e.target.value = "";
+  };
+
+  // ---- 语音录入 ----
+  const toggleRecording = async () => {
+    if (isRecording) {
+      mediaRecorderRef.current?.stop();
+      setIsRecording(false);
+      toast.info("语音录入已停止");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      const chunks: BlobPart[] = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        chunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        // 语音识别功能后置：当前版本仅记录
+        toast.info("语音录入完成", {
+          description: "语音转文字功能开发中，当前版本暂不可用",
+        });
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch {
+      toast.error("无法访问麦克风", {
+        description: "请检查浏览器麦克风权限设置",
+      });
+    }
+  };
+
+  // ---- URL 粘贴（含元数据抓取） ----
+  const [urlFetching, setUrlFetching] = useState(false);
+
+  const handleUrlPaste = async () => {
+    if (!urlValue.trim()) return;
+    let url = urlValue.trim();
+    if (!/^https?:\/\//i.test(url)) {
+      url = `https://${url}`;
+    }
+    setUrlFetching(true);
+    try {
+      // 尝试通过服务端代理抓取页面标题（避免 CORS）
+      const res = await fetch(`/api/fetch-meta?url=${encodeURIComponent(url)}`);
+      if (res.ok) {
+        const meta = await res.json() as { title?: string; description?: string };
+        if (meta.title) {
+          const desc = meta.description ? ` — ${meta.description.slice(0, 200)}` : "";
+          insertAtCursor(`[🌐 ${meta.title}${desc}](${url})`);
+        } else {
+          insertAtCursor(url);
+        }
+      } else {
+        insertAtCursor(url);
+      }
+    } catch {
+      // 网络错误时直接插入 URL
+      insertAtCursor(url);
+    } finally {
+      setUrlFetching(false);
+      setShowUrlInput(false);
+      setUrlValue("");
+    }
+  };
+
+  // ---- /命令 选择 ----
+  const handleSlashCommand = (command: string) => {
+    insertAtCursor(`${command} `);
+    setShowSlashMenu(false);
+  };
+
   // ---- 筛选列表（从 store 获取，支持 API 加载的数据） ----
   const storeAgents = useAgentStore((s) => s.agents);
   const storeProjects = useProjectStore((s) => s.projects);
@@ -221,29 +437,92 @@ export function CommandBox({
           {/* 上传附件 */}
           <button
             type="button"
+            onClick={handleFileUpload}
             className="text-hint hover:text-foreground hover:bg-accent rounded-lg p-1.5 transition-colors"
             title="上传附件"
           >
             <Paperclip className="size-4" />
           </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            onChange={handleFileChange}
+            className="hidden"
+            aria-hidden="true"
+          />
 
           {/* 语音输入 */}
           <button
             type="button"
-            className="text-hint hover:text-foreground hover:bg-accent rounded-lg p-1.5 transition-colors"
-            title="语音输入"
+            onClick={toggleRecording}
+            className={cn(
+              "rounded-lg p-1.5 transition-colors",
+              isRecording
+                ? "text-danger bg-danger/10 animate-pulse"
+                : "text-hint hover:text-foreground hover:bg-accent",
+            )}
+            title={isRecording ? "停止录音" : "语音输入"}
           >
-            <Mic className="size-4" />
+            {isRecording ? <MicOff className="size-4" /> : <Mic className="size-4" />}
           </button>
 
           {/* 粘贴 URL */}
-          <button
-            type="button"
-            className="text-hint hover:text-foreground hover:bg-accent rounded-lg p-1.5 transition-colors"
-            title="粘贴链接"
-          >
-            <Link className="size-4" />
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowUrlInput(!showUrlInput);
+                setShowSlashMenu(false);
+                setActiveDropdown(null);
+              }}
+              className={cn(
+                "rounded-lg p-1.5 transition-colors",
+                showUrlInput
+                  ? "text-primary bg-primary/10"
+                  : "text-hint hover:text-foreground hover:bg-accent",
+              )}
+              title="粘贴链接"
+            >
+              <Link className="size-4" />
+            </button>
+
+            {/* URL 输入弹窗 */}
+            <AnimatePresence>
+              {showUrlInput && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                  transition={{ duration: 0.15, ease: "easeOut" }}
+                  className="absolute bottom-full left-0 mb-2 w-72 bg-popover border border-border rounded-xl shadow-2xl z-50 overflow-hidden"
+                >
+                  <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
+                    <Globe className="size-3.5 text-hint shrink-0" />
+                    <input
+                      ref={urlInputRef}
+                      autoFocus
+                      value={urlValue}
+                      onChange={(e) => setUrlValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleUrlPaste();
+                        if (e.key === "Escape") setShowUrlInput(false);
+                      }}
+                      placeholder="粘贴或输入 URL…"
+                      className="flex-1 bg-transparent text-sm text-foreground placeholder:text-hint outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleUrlPaste}
+                      disabled={!urlValue.trim() || urlFetching}
+                      className="text-primary hover:text-primary/80 text-xs font-medium disabled:opacity-40 shrink-0"
+                    >
+                      {urlFetching ? "获取中…" : "插入"}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           {/* @ 智能体 */}
           <div className="relative">
@@ -417,40 +696,96 @@ export function CommandBox({
           </div>
 
           {/* / 命令 */}
-          <button
-            type="button"
-            className="text-hint hover:text-foreground hover:bg-accent rounded-lg p-1.5 transition-colors"
-            title="/ 命令"
-          >
-            <Slash className="size-4" />
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowSlashMenu(!showSlashMenu);
+                setShowUrlInput(false);
+                setActiveDropdown(null);
+              }}
+              className={cn(
+                "rounded-lg p-1.5 transition-colors",
+                showSlashMenu
+                  ? "text-primary bg-primary/10"
+                  : "text-hint hover:text-foreground hover:bg-accent",
+              )}
+              title="/ 命令"
+            >
+              <Slash className="size-4" />
+            </button>
+
+            {/* 技能命令下拉 */}
+            <AnimatePresence>
+              {showSlashMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                  transition={{ duration: 0.15, ease: "easeOut" }}
+                  className="absolute bottom-full right-0 mb-2 w-64 bg-popover border border-border rounded-xl shadow-2xl z-50 overflow-hidden"
+                >
+                  <div className="max-h-72 overflow-y-auto py-1">
+                    <p className="text-hint text-[10px] font-bold px-3 py-1.5 uppercase tracking-wider">
+                      技能命令
+                    </p>
+                    {SLASH_COMMANDS.map((cmd) => (
+                      <button
+                        key={cmd.name}
+                        type="button"
+                        onClick={() => handleSlashCommand(cmd.name)}
+                        className="w-full flex items-start gap-2.5 px-3 py-2.5 hover:bg-accent transition-colors text-left"
+                      >
+                        <Zap className="size-3.5 text-primary mt-0.5 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-foreground text-sm font-medium truncate">
+                            {cmd.name}
+                          </p>
+                          <p className="text-hint text-xs truncate leading-tight mt-0.5">
+                            {cmd.desc}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
-        {/* 右侧发送 / 停止按钮 */}
-        {isStreaming ? (
-          <Button
-            size="icon"
-            className="size-8 rounded-lg bg-danger hover:bg-danger/80 text-danger-foreground"
-            onClick={onStop}
-            title="停止生成"
-          >
-            <Square className="size-3.5 fill-current" />
-          </Button>
-        ) : (
-          <Button
-            size="icon"
-            className="size-8 rounded-lg bg-primary hover:bg-primary/80 text-primary-foreground"
-            disabled={!canSend}
-            onClick={() => onSubmit?.()}
-            title="发送"
-          >
-            {!value.trim() ? (
+        {/* 右侧：模型选择器 + 发送 / 停止按钮 */}
+        <div className="flex items-center gap-2">
+          {/* 模型选择器（紧凑行内下拉） */}
+          {onModelChange && selectedModelId && (
+            <ModelSelectorInline
+              value={selectedModelId}
+              onChange={onModelChange}
+              disabled={isStreaming}
+            />
+          )}
+
+          {isStreaming ? (
+            <Button
+              size="icon"
+              className="size-8 rounded-lg bg-danger hover:bg-danger/80 text-danger-foreground"
+              onClick={onStop}
+              title="停止生成"
+            >
+              <Square className="size-3.5 fill-current" />
+            </Button>
+          ) : (
+            <Button
+              size="icon"
+              className="size-8 rounded-lg bg-primary hover:bg-primary/80 text-primary-foreground"
+              disabled={!canSend}
+              onClick={() => onSubmit?.()}
+              title="发送"
+            >
               <ArrowUp className="size-4" />
-            ) : (
-              <ArrowUp className="size-4" />
-            )}
-          </Button>
-        )}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* 错误提示条 */}
@@ -469,6 +804,120 @@ export function CommandBox({
         )}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+// ============================================================
+// 行内模型选择器（Provider + 具体型号选择）
+// ============================================================
+
+interface ModelSelectorInlineProps {
+  value: string; // model ID (e.g. "deepseek-v4-pro")
+  onChange: (modelId: string) => void;
+  disabled?: boolean;
+}
+
+function ModelSelectorInline({ value, onChange, disabled }: ModelSelectorInlineProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const current = SELECTABLE_MODELS.find((m) => m.id === value) ?? SELECTABLE_MODELS[0];
+
+  // 按 Provider 分组
+  const groups = SELECTABLE_MODELS.reduce((acc, m) => {
+    if (!acc[m.provider]) acc[m.provider] = [];
+    acc[m.provider].push(m);
+    return acc;
+  }, {} as Record<string, SelectableModel[]>);
+
+  const providerLabels: Record<string, string> = {
+    anthropic: "Anthropic",
+    deepseek: "DeepSeek",
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs transition-colors",
+          "hover:bg-accent border border-border",
+          disabled && "opacity-50 cursor-not-allowed",
+        )}
+        title={`${current.label} ${current.version}`}
+      >
+        <span className={cn("size-2 rounded-full shrink-0", current.color)} />
+        <span className="text-muted-foreground font-medium">{current.label}</span>
+        <span className="text-hint text-[10px] hidden sm:inline">{current.version}</span>
+        <ChevronDown className={cn("size-3 text-hint transition-transform", open && "rotate-180")} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.96 }}
+            transition={{ duration: 0.12, ease: "easeOut" }}
+            className="absolute bottom-full right-0 mb-2 w-56 bg-popover border border-border rounded-xl shadow-2xl z-50 overflow-hidden"
+          >
+            <div className="py-1">
+              <p className="text-hint text-[10px] font-bold px-3 py-1.5 uppercase tracking-wider">
+                选择模型
+              </p>
+              {Object.entries(groups).map(([provider, models]) => (
+                <div key={provider} className="mb-1 last:mb-0">
+                  <p className="text-hint text-[9px] px-3 py-0.5 uppercase tracking-wider opacity-60">
+                    {providerLabels[provider] ?? provider}
+                  </p>
+                  {models.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      disabled={!m.available}
+                      onClick={() => {
+                        if (!m.available) return;
+                        onChange(m.id);
+                        setOpen(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2 text-left transition-colors",
+                        m.id === value ? "bg-accent" : "hover:bg-accent",
+                        !m.available && "opacity-40 cursor-not-allowed",
+                      )}
+                    >
+                      <span className={cn("size-2.5 rounded-full shrink-0", m.color)} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-foreground text-sm font-medium flex items-center gap-2">
+                          {m.version}
+                          {m.id === value && (
+                            <span className="text-success text-[9px] font-normal">✓ 当前</span>
+                          )}
+                        </p>
+                      </div>
+                      {!m.available && (
+                        <span className="text-hint text-[9px] shrink-0">需 API Key</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 

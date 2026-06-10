@@ -1,52 +1,85 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { Suspense, useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageTransition } from "@/components/common/PageTransition";
+import {
+  CommandBox,
+  SELECTABLE_MODELS,
+  DEFAULT_MODEL_ID,
+} from "@/components/pages/new/command-box";
+import { QuickCards } from "@/components/pages/new/quick-cards";
 import { ConversationArea } from "@/components/pages/new/conversation-area";
+import { SuggestionPanel } from "@/components/pages/new/suggestion-panel";
 import { useChat } from "@/hooks/useChat";
-import { NewPageInput } from "./_components/NewPageInput";
-import { NewPageQuickActions } from "./_components/NewPageQuickActions";
-import { NewModelSelector } from "./_components/NewModelSelector";
+
+const LS_MODEL_KEY = "hermes-selected-model";
+
+/** 从 localStorage 恢复上次选择的模型 ID，默认 deepseek-v4-pro */
+function loadSavedModel(): string {
+  try {
+    const saved = localStorage.getItem(LS_MODEL_KEY);
+    if (saved && SELECTABLE_MODELS.some((m) => m.id === saved && m.available)) {
+      return saved;
+    }
+  } catch { /* localStorage 不可用时忽略 */ }
+  return DEFAULT_MODEL_ID;
+}
 
 /**
- * 新话题页面（超级入口）
- * —— 重构为 Apple-style 的极简超级入口
- * —— 页面仅包含居中核心输入框和 2x2 的快捷操作网格，无 Banner、工作流大列表与右边栏建议
- * —— 模型选择器绝对定位在整个页面最左上角，与视口左边缘对齐，且移除了滚动条限制
+ * 新话题页面（超级入口）— PRD §10.2
+ * —— 两栏布局：对话与输入 | AI 建议与工作流
+ * —— 支持 ?load=conversationId 自动加载历史对话（从 /recent 跳转）
  */
 export default function NewTopicPage() {
-  // 对话状态（useChat hook 管理流式 API 交互）
+  return (
+    <Suspense fallback={null}>
+      <NewTopicPageInner />
+    </Suspense>
+  );
+}
+
+function NewTopicPageInner() {
   const {
     messages,
     isStreaming,
     streamingContent,
+    error,
     sendMessage,
+    stopStreaming,
     clearMessages,
+    loadConversation,
   } = useChat();
 
-  // 输入框文本值状态
+  // 从 /recent 点击跳转时通过 ?load=conversationId 自动加载历史对话
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const loadId = searchParams.get("load");
+    if (loadId) {
+      loadConversation(loadId);
+    }
+  }, [searchParams, loadConversation]);
+
   const [input, setInput] = useState("");
-  
-  // 选中的模型 ID（默认选中 Claude Sonnet 4.6）
-  const [selectedModelId, setSelectedModelId] = useState("claude-sonnet-4-6");
+  const [selectedModelId, setSelectedModelId] = useState<string>(loadSavedModel);
+  const [pendingSystemPrompt, setPendingSystemPrompt] = useState<string | undefined>(undefined);
 
-  // 由快捷卡片带入的专属 system prompt（外贸专项角色）；发送后清空
-  const [pendingSystemPrompt, setPendingSystemPrompt] = useState<
-    string | undefined
-  >(undefined);
+  const handleModelChange = useCallback((modelId: string) => {
+    setSelectedModelId(modelId);
+    try { localStorage.setItem(LS_MODEL_KEY, modelId); } catch { /* noop */ }
+  }, []);
 
-  // 是否已存在对话消息
   const hasMessages = messages.length > 0;
 
-  // 发送消息回调（携带专属 system prompt，若有）
   const handleSend = useCallback(() => {
     if (!input.trim() || isStreaming) return;
-    sendMessage(input.trim(), pendingSystemPrompt);
+    const model = SELECTABLE_MODELS.find((m) => m.id === selectedModelId);
+    const apiModelId = model?.modelId;
+    sendMessage(input.trim(), pendingSystemPrompt, apiModelId);
     setInput("");
     setPendingSystemPrompt(undefined);
-  }, [input, isStreaming, sendMessage, pendingSystemPrompt]);
+  }, [input, isStreaming, sendMessage, pendingSystemPrompt, selectedModelId]);
 
-  // 快捷卡片点击 → 填入输入框，记录专属 system prompt 并支持后续发送
   const handleQuickActionSelect = useCallback(
     (prompt: string, systemPrompt?: string) => {
       setInput(prompt);
@@ -55,59 +88,71 @@ export default function NewTopicPage() {
     [],
   );
 
+  const handleSuggestionSelect = useCallback((text: string) => {
+    setInput(text);
+  }, []);
+
+  const handleMentionAgent = useCallback(
+    (agentName: string) => {
+      setInput((prev) => {
+        const trimmed = prev.trimEnd();
+        return trimmed ? `${trimmed} @${agentName} ` : `@${agentName} `;
+      });
+    },
+    [],
+  );
+
   return (
     <PageTransition>
-      <div className="h-full flex flex-col px-6 md:px-8 overflow-hidden bg-background relative">
-        {/* 极简模型选择器：放置在整个页面最左上角，对齐视口左边缘 */}
-        {!hasMessages && (
-          <div className="absolute top-6 left-6 md:left-8">
-            <NewModelSelector
-              selectedId={selectedModelId}
-              onSelect={setSelectedModelId}
-              disabled={isStreaming}
-            />
-          </div>
-        )}
-
-        {!hasMessages ? (
-          // 空状态下：整页居中布局，20vh 顶部留白，内容区最大宽度 max-w-2xl
-          <div className="w-full max-w-2xl mx-auto flex flex-col justify-center min-h-full py-8">
-            {/* 顶部 20vh 留白 */}
-            <div className="h-[20vh] shrink-0" />
-            
-            {/* 核心输入框 */}
-            <NewPageInput
-              value={input}
-              onChange={setInput}
-              onSubmit={handleSend}
-              disabled={isStreaming}
-            />
-            
-            {/* 快捷卡片区 (输入框下方 mt-6) */}
-            <NewPageQuickActions onSelect={handleQuickActionSelect} />
-          </div>
-        ) : (
-          // 有消息时：展示流式对话区域，输入框放置于底部
-          <div className="w-full max-w-2xl mx-auto flex flex-col flex-1 min-h-0 py-6 space-y-4">
-            {/* 对话消息展示区域 */}
-            <ConversationArea
-              messages={messages}
-              isStreaming={isStreaming}
-              streamingContent={streamingContent}
-              onClearMessages={clearMessages}
-            />
-            
-            {/* 核心输入框 */}
-            <div className="shrink-0 pt-2">
-              <NewPageInput
-                value={input}
-                onChange={setInput}
-                onSubmit={handleSend}
-                disabled={isStreaming}
-              />
+      <div className="h-full flex bg-background">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+          {!hasMessages ? (
+            <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-8">
+              <div className="w-full max-w-2xl">
+                <CommandBox
+                  value={input}
+                  onChange={setInput}
+                  onSubmit={handleSend}
+                  isStreaming={isStreaming}
+                  error={error}
+                  selectedModelId={selectedModelId}
+                  onModelChange={handleModelChange}
+                />
+              </div>
+              <div className="w-full max-w-2xl mt-5">
+                <QuickCards onSelect={handleQuickActionSelect} />
+              </div>
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="flex-1 flex flex-col min-h-0 px-4 md:px-8">
+              <ConversationArea
+                messages={messages}
+                isStreaming={isStreaming}
+                streamingContent={streamingContent}
+                onClearMessages={clearMessages}
+              />
+              <div className="shrink-0 pb-4 max-w-2xl mx-auto w-full">
+                <CommandBox
+                  value={input}
+                  onChange={setInput}
+                  onSubmit={handleSend}
+                  onStop={stopStreaming}
+                  isStreaming={isStreaming}
+                  error={error}
+                  selectedModelId={selectedModelId}
+                  onModelChange={handleModelChange}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <aside className="w-64 xl:w-72 shrink-0 border-l border-border overflow-y-auto hidden xl:flex flex-col p-3">
+          <SuggestionPanel
+            onSelectSuggestion={handleSuggestionSelect}
+            onMentionAgent={handleMentionAgent}
+          />
+        </aside>
       </div>
     </PageTransition>
   );

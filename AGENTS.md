@@ -483,6 +483,17 @@ draft（AI 生成，待审核）→ active（人工激活，可执行）→ arch
 - 粗粒度 VIEWER 角色拦截（从 JWT payload 解码 `role` 字段）
 - 细粒度 RBAC 由 Route Handler 层执行（`requireWritable` 等）
 
+**客户端安全导入约定**：
+
+- 纯角色判定函数（`isAdmin` / `isWritable` / `canApproveL3` / `canModifyHarness` / `hasMinRole`）与 `WorkspaceRole` 类型已提取至 `src/lib/workspace-roles.ts`（零服务端依赖，不导入 prisma/auth/logger）。
+- 客户端组件（如 settings 页、"use client" hooks）**必须**从 `@/lib/workspace-roles` 导入角色判定函数，禁止从 `@/lib/workspace` 导入——后者依赖 prisma→better-sqlite3→fs 链，会触发 webpack 客户端打包失败。
+- `@/lib/workspace` 仍可重导出这些函数以保持服务端代码向后兼容，但客户端代码须走 `workspace-roles` 直接导入。
+
+**DEV_BYPASS_AUTH 开发免认证机制**：
+
+- `.env` 中设置 `DEV_BYPASS_AUTH=true` 时，Edge Middleware 对 `/api/chat`、`/api/task`、`/api/conversations` 路径放行写操作，无需 session token。
+- 此机制**仅限本地开发环境**，生产环境不得启用。被放行的路由仍需经过 Route Handler 层的 RBAC 门禁（若使用了 `withRBAC` 或内联 `requireWritable`，仍需有效 session）。
+
 ### 4.12 策略路由（Model Router）
 
 > 本节定义 Harness 策略路由环境层——依据任务类型、风险等级、估算预算，决定单次 LLM 调用应使用的 Provider 与模型，并将决策留痕至审计日志。
@@ -520,6 +531,13 @@ draft（AI 生成，待审核）→ active（人工激活，可执行）→ arch
 **管理 API**：`GET/PATCH /api/workspace/settings` — 仅 OWNER/ADMIN 可写，写时记录 `AuditLog(action='update.model-routing')`
 
 **UI**：`/settings?section=model-routing` — 默认模型下拉 + 4× taskType Provider 偏好下拉；非管理员只读（保存按钮禁用 + 警示条）。
+
+**前端模型选择器配置**：
+
+- `src/components/pages/new/command-box.tsx` 导出 `SELECTABLE_MODELS: SelectableModel[]` 常量——定义前端可选模型列表（Provider + 具体型号 → API modelId 映射），替代旧的 `AVAILABLE_MODELS` 常量。
+- 每条模型记录包含：`id`（唯一标识）、`provider`（anthropic|deepseek）、`label`（显示名）、`version`（型号版本，如「V4 Pro」「Sonnet 4.6」）、`color`（状态色标）、`modelId`（传给 `/api/chat` 的实际模型名）、`available`（是否可用）。
+- 默认模型为 `deepseek-v4-pro`（`DEFAULT_MODEL_ID` 常量）。
+- 页面通过 `localStorage`（键 `hermes-selected-model`）持久化用户选择，刷新或退出对话不丢失。
 
 ### 4.13 DAG Skill 节点执行器
 
@@ -570,6 +588,27 @@ draft（AI 生成，待审核）→ active（人工激活，可执行）→ arch
 - **置信度阈值**：LLM 输出 `confidence < 0.7` 时自动升格 riskLevel 为 `high` 并注入警示信息到输出 `_meta.warnings`，不阻断执行但要求下游/操作者进行人工审核（§4.5）
 - **AgentLog 风险标签**：Skill 节点执行结果通过 `NodeExecutionResult.riskLevel` 传递给 `onNodeFinish`，钩子据此写入 AgentLog 和 AuditLog 的 riskLevel
 
+### 4.14 工具端点和共享库
+
+> 本节记录本次 /new 板块重构引入的新端点与共享工具模块。
+
+**`/api/fetch-meta` — URL 元数据抓取**：
+
+- 服务端代理抓取目标 URL 的 `<title>` 与 `<meta name="description">`，避免浏览器端 CORS 限制。
+- GET 端点，参数 `?url=<encoded_url>`，仅允许 http/https 协议。
+- 已接入频率限制（单 IP 每分钟 ≤30 次），超频返回 429。
+- 5 秒超时保护（AbortController），抓取失败时返回 URL 本身作为 title，不阻断用户流程。
+
+**`src/lib/date-utils.ts` — 共享时间格式化**：
+
+- 导出 `classifyTimeGroup(iso)` / `relativeTime(iso)` / `formatTime(iso, group)` 三个函数，供 `recent-panel.tsx` 与 `recent-page-client.tsx` 共用。
+- 消除两个文件中重复的时间格式化逻辑。
+
+**`src/lib/sse-parser.ts` — SSE 流解析器**：
+
+- `parseSSEStream(reader, { onData, onDone })` 消费 ReadableStream，按行解析 SSE 格式并回调。
+- `useChat.ts` 的流式消息接收已接入此解析器，替换原有的手写 ReadableStream 读取样板。
+
 ***
 
 ## 附录：版本历史
@@ -586,6 +625,7 @@ draft（AI 生成，待审核）→ active（人工激活，可执行）→ arch
 | v2.7.0-alpha | 2026-06-10 | RBAC 统一守卫 + L4/L3 治理加固：§4.11 新增 `withRBAC` 统一包裹器（`RBAC_DENIED` 审计）+ 审批角色澄清；§4.7 新增 L4 规范化拒绝体 `L4_FORBIDDEN` + `checkAutomationGate` 携带 `level` + 消除双重 L4 判定；§4.3 注册新审计动作 `proposal.approve`/`reject`/`l4_blocked`/`workflow.run`；新增 `AlertDialog` 组件；审批中心 L3 高风险接真实 approve API |
 | v2.8.0-alpha | 2026-06-10 | 新增 §4.12 策略路由（Model Router）：`selectModel()` 按 risk/taskType/WorkspaceSettings 路由 Provider 与模型，强制审计留痕，Provider 不可用自动降级；共享 LLM 层新增 `openChatStream`/`isProviderAvailable`/`classifyUpstreamError` 导出；新增 `WorkspaceSettings` + `/api/workspace/settings`；chat API 移除硬编 DeepSeek，全面接入策略路由；generator output 对齐至 `prisma-new` |
 | v2.9.0-alpha | 2026-06-10 | 新增 §4.13 DAG Skill 节点执行器：`executeSkillNode()` 将 `kind='skill'` 节点通过 `selectModel()` 调用 LLM 真实执行（非 noop）；Skill 模型新增 `automationLevel` 字段（L1-L4 门禁）；AgentLog 新增 `riskLevel` 字段；L3 审批门禁查询含 workspaceId 隔离；置信度 < 0.7 自动升格 riskLevel；提取 `mapAutomationToLogRisk`/`mapAutomationToAuditRisk`/`mapAutomationToRouteRisk` 共享映射函数至 `src/types/harness.ts` |
+| v2.10.0-alpha | 2026-06-10 | §4.11 新增 `workspace-roles.ts` 分离约定 + `DEV_BYPASS_AUTH` 开发免认证机制 + `/api/conversations` 写操作审计豁免放行；§4.12 新增 `SELECTABLE_MODELS` 模型选择配置（Provider + 具体型号 → API modelId 映射）；§4.14 新增 `/api/fetch-meta` URL 元数据抓取端点 + `src/lib/date-utils.ts` 共享时间格式化工具；`hermes-suggestions.ts` 接入 `selectModel()` 策略路由；`useChat` SSE 流读取复用 `parseSSEStream`；`/api/skills` POST 补齐 AuditLog + 频率限制
 
 ***
 

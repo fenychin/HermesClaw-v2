@@ -2,56 +2,36 @@
  * 多租户 Workspace 工具集
  * —— 提供 workspaceId 解析、RBAC 门禁、权限判定
  * —— 在 Prisma 查询层强制数据隔离，不依赖应用层过滤
+ *
+ * ⚠️ 本文件导入 prisma / auth / logger，仅限服务端使用。
+ *    客户端组件如需使用角色/权限判定（isAdmin / WorkspaceRole 等），
+ *    请从 @/lib/workspace-roles 导入（纯函数，零服务端依赖）。
  */
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 
-// ==============================
-// WorkspaceRole 枚举 & 权限矩阵
-// ==============================
+// 本地引用 + 向外部重导出（保持向后兼容：其他模块仍可从 @/lib/workspace 导入这些）
+import {
+  WORKSPACE_ROLES,
+  isWritable,
+  canApproveL3,
+  canModifyHarness,
+  isAdmin,
+  hasMinRole,
+} from "@/lib/workspace-roles";
+import type { WorkspaceRole } from "@/lib/workspace-roles";
 
-/** 工作空间角色（TEXT 列存，SQLite 无原生 enum） */
-export const WORKSPACE_ROLES = ["OWNER", "ADMIN", "MEMBER", "VIEWER"] as const;
-export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number];
-
-/** 角色优先级数值（越大权限越高） */
-const ROLE_PRIORITY: Record<WorkspaceRole, number> = {
-  OWNER: 4,
-  ADMIN: 3,
-  MEMBER: 2,
-  VIEWER: 1,
+export {
+  WORKSPACE_ROLES,
+  isWritable,
+  canApproveL3,
+  canModifyHarness,
+  isAdmin,
+  hasMinRole,
 };
-
-// ==============================
-// 权限判定函数
-// ==============================
-
-/** 是否具有写权限（非 VIEWER） */
-export function isWritable(role: WorkspaceRole): boolean {
-  return role !== "VIEWER";
-}
-
-/** 是否可审批 L3 提案（至少 MEMBER） */
-export function canApproveL3(role: WorkspaceRole): boolean {
-  return ROLE_PRIORITY[role] >= ROLE_PRIORITY.MEMBER;
-}
-
-/** 是否可修改 Harness（仅 ADMIN/OWNER） */
-export function canModifyHarness(role: WorkspaceRole): boolean {
-  return role === "ADMIN" || role === "OWNER";
-}
-
-/** 是否为管理员（ADMIN/OWNER） */
-export function isAdmin(role: WorkspaceRole): boolean {
-  return role === "ADMIN" || role === "OWNER";
-}
-
-/** 检查角色是否满足最低要求 */
-export function hasMinRole(role: WorkspaceRole, minRole: WorkspaceRole): boolean {
-  return ROLE_PRIORITY[role] >= ROLE_PRIORITY[minRole];
-}
+export type { WorkspaceRole };
 
 // ==============================
 // 会话解析（内部函数，复用 session）

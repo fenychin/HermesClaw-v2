@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useRef } from "react";
 import { apiClient } from "@/lib/api-client";
+import { parseSSEStream } from "@/lib/sse-parser";
+import { toast } from "sonner";
 
 /** 单条对话消息 */
 export interface Message {
@@ -13,7 +15,7 @@ export interface Message {
 
 /**
  * 流式对话 Hook
- * —— 封装 POST /api/chat 的 SSE 流读取、状态管理和中断控制。
+ * —— 封装 POST /api/chat 的 SSE 流读取（复用共享 parseSSEStream）、状态管理和中断控制。
  *    对话完成后自动持久化到数据库。
  *
  * @returns
@@ -24,6 +26,7 @@ export interface Message {
  *  - sendMessage      发送一条用户消息并开始流式对话
  *  - stopStreaming    中断当前流式响应
  *  - clearMessages    清空对话历史
+ *  - loadConversation 从数据库加载历史对话
  */
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -41,7 +44,6 @@ export function useChat() {
   const persistConversation = useCallback(
     async (userContent: string, assistantContent: string) => {
       try {
-        // 若尚无对话 ID，创建新对话
         if (!conversationIdRef.current) {
           const title =
             userContent.length > 50
@@ -51,7 +53,6 @@ export function useChat() {
           conversationIdRef.current = result.conversation.id;
         }
 
-        // 写入用户消息和 AI 回复
         await apiClient.addMessage(
           conversationIdRef.current,
           "user",
@@ -63,15 +64,28 @@ export function useChat() {
           assistantContent,
         );
       } catch {
-        // 持久化失败不阻塞 UI
-        console.warn("对话持久化失败，将在下次对话时重试");
+        toast.error("对话保存失败", {
+          description: "网络异常，对话内容已暂存本地",
+        });
+        try {
+          const pending = JSON.parse(
+            localStorage.getItem("hermes-pending-conversations") || "[]",
+          );
+          pending.push({ userContent, assistantContent, time: Date.now() });
+          localStorage.setItem(
+            "hermes-pending-conversations",
+            JSON.stringify(pending.slice(-20)),
+          );
+        } catch {
+          // localStorage 不可用时静默降级
+        }
       }
     },
     [],
   );
 
   const sendMessage = useCallback(
-    async (content: string, systemPrompt?: string) => {
+    async (content: string, systemPrompt?: string, modelId?: string) => {
       if (!content.trim() || isStreaming) return;
 
       const userMessage: Message = {
@@ -98,6 +112,7 @@ export function useChat() {
               content: m.content,
             })),
             systemPrompt,
+            modelId,
           }),
           signal: abortControllerRef.current.signal,
         });
@@ -105,33 +120,19 @@ export function useChat() {
         if (!response.ok) throw new Error("请求失败");
         if (!response.body) throw new Error("响应流为空");
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
         let fullContent = "";
+        const reader = response.body.getReader();
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
-
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6);
-              if (data === "[DONE]") break;
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.text) {
-                  fullContent += parsed.text;
-                  setStreamingContent(fullContent);
-                }
-              } catch {
-                // 忽略解析失败的中间帧
-              }
+        // 复用共享 SSE 解析器（替换手写 ReadableStream 读取）
+        await parseSSEStream(reader, {
+          onData: (json) => {
+            const parsed = json as { text?: string };
+            if (parsed.text) {
+              fullContent += parsed.text;
+              setStreamingContent(fullContent);
             }
-          }
-        }
+          },
+        });
 
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -142,7 +143,7 @@ export function useChat() {
         setMessages((prev) => [...prev, assistantMessage]);
         setStreamingContent("");
 
-        // ---- 对话完成后持久化到数据库 ----
+        // 对话完成后持久化到数据库
         persistConversation(content.trim(), fullContent);
       } catch (err: unknown) {
         if (err instanceof Error && err.name !== "AbortError") {
@@ -164,8 +165,46 @@ export function useChat() {
     setMessages([]);
     setStreamingContent("");
     setError(null);
-    // 清空时开启新对话会话
     conversationIdRef.current = null;
+  }, []);
+
+  /**
+   * 从数据库加载历史对话（含重试）
+   * —— 用于 /recent → /new?load= 跳转恢复会话
+   */
+  const loadConversation = useCallback(async (conversationId: string) => {
+    setError(null);
+    const MAX_RETRIES = 2;
+    let lastErr: unknown;
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const data = await apiClient.getConversation(conversationId);
+        const conv = (data as { conversation: { id: string; messages: Array<{ id: string; role: string; content: string; createdAt: string }> } }).conversation;
+        if (!conv?.messages) return;
+
+        const loaded: Message[] = conv.messages.map((m) => ({
+          id: m.id,
+          role: m.role as "user" | "assistant",
+          content: m.content,
+          timestamp: new Date(m.createdAt),
+        }));
+        setMessages(loaded);
+        setStreamingContent("");
+        conversationIdRef.current = conv.id;
+        return; // 成功，退出
+      } catch (err) {
+        lastErr = err;
+        if (attempt < MAX_RETRIES) {
+          // 等待后重试
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
+    }
+
+    toast.error("加载对话失败", {
+      description: lastErr instanceof Error ? lastErr.message : "请稍后重试",
+    });
   }, []);
 
   return {
@@ -176,5 +215,6 @@ export function useChat() {
     sendMessage,
     stopStreaming,
     clearMessages,
+    loadConversation,
   };
 }

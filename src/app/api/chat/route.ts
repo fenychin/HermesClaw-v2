@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     const rawBody = await req.json();
     const parsed = validateBody(rawBody, ChatMessageSchema);
     if (parsed instanceof Response) return parsed;
-    const { messages, systemPrompt } = parsed;
+    const { messages, systemPrompt, modelId } = parsed;
 
     // 解析工作空间上下文（供路由配置读取 + 审计归属）
     const { workspaceId } = await buildWorkspaceContext(req);
@@ -62,6 +62,16 @@ export async function POST(req: NextRequest) {
       estimatedTokens,
       workspaceId,
     });
+
+    // 客户端模型偏好覆写（modelId 非空时映射到 Provider + Model）
+    if (modelId) {
+      const resolved = resolveClientModelId(modelId);
+      if (resolved) {
+        routing.provider = resolved.provider;
+        routing.model = resolved.model;
+        routing.reason += `；客户端指定模型: ${modelId}`;
+      }
+    }
 
     // 统一 SSE 流式管道：openChatStream 处理 Provider 差异，本文件只做 SSE 封帧 + 审计
     return sseChatStream({
@@ -114,6 +124,30 @@ export async function POST(req: NextRequest) {
 // ==============================
 // 统一 SSE 流式管道
 // ==============================
+
+/**
+ * 将客户端模型 ID 映射为 provider + model。
+ * —— 支持 Anthropic 模型（claude-*）→ anthropic Provider，
+ *    未识别的 ID 返回 null（由策略路由兜底）。
+ */
+function resolveClientModelId(
+  modelId: string,
+): { provider: "anthropic" | "deepseek"; model: string } | null {
+  const lower = modelId.toLowerCase().trim();
+
+  // Anthropic 系列：claude-*
+  if (lower.startsWith("claude-")) {
+    return { provider: "anthropic", model: modelId };
+  }
+
+  // DeepSeek 系列
+  if (lower.includes("deepseek")) {
+    return { provider: "deepseek", model: modelId };
+  }
+
+  // 未识别的模型 ID（如 gemini / gpt / minimax）：返回 null，走策略路由兜底
+  return null;
+}
 
 const SSE_HEADERS = {
   "Content-Type": "text/event-stream",

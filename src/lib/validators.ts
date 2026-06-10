@@ -211,11 +211,28 @@ export const ChatMessageSchema = z.object({
     .min(1)
     .max(50),
   systemPrompt: z.string().max(5000).optional(),
+  /** 客户端模型偏好（如 "claude-sonnet-4-6"），用于覆写策略路由的默认模型 */
+  modelId: z.string().max(100).optional(),
 });
 
 export const TaskExecuteSchema = z.object({
   taskType: z.string().min(1).max(50),
   input: z.string().min(1).max(5000),
+});
+
+// ==============================
+// 技能（"沉淀为技能"功能）
+// ==============================
+
+export const SkillCreateSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().min(1).max(1000),
+  version: z.string().max(20).optional(),
+  category: z.string().max(100).optional(),
+  inputSchema: z.string().max(5000).optional(),
+  outputSchema: z.string().max(5000).optional(),
+  scenarios: z.string().max(2000).optional(),
+  automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional(),
 });
 
 // ==============================
