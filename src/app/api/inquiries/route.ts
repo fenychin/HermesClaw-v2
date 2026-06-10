@@ -189,5 +189,6 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
     ...serializeInquiry(inquiry),
     workflowRunId: workflowResult?.runId ?? null,
     workflowStatus: workflowResult?.status ?? null,
+    workflowOutput: workflowResult?.output ?? null,
   })
 }, "MEMBER")

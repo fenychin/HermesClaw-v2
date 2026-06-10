@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Sparkles,
   Send,
@@ -8,6 +8,9 @@ import {
   Loader2,
   AlertCircle,
   ChevronDown,
+  Mail,
+  Copy,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -54,8 +57,210 @@ const COUNTRY_OPTIONS = [
 ];
 
 // ============================================================
+// 辅助函数：从工作流输出中提取开发信草稿
+// ============================================================
+
+interface DevLetterDraft {
+  subject: string
+  body: string
+}
+
+/**
+ * 从 workflowOutput 中提取 n4-email 节点生成的开发信草稿
+ * —— workflowOutput 是 nodeId → nodeResult 的映射表
+ */
+function extractDevLetter(workflowOutput: unknown): DevLetterDraft | null {
+  if (!workflowOutput || typeof workflowOutput !== "object") return null
+  const outputs = workflowOutput as Record<string, unknown>
+  // 安全守卫：对象键数异常（Array/Buffer 等）直接退出
+  if (Object.keys(outputs).length > 50) return null
+  // 遍历寻找产出包含 subject/body 的节点
+  for (const nodeResult of Object.values(outputs)) {
+    if (!nodeResult || typeof nodeResult !== "object") continue
+    const nr = nodeResult as Record<string, unknown>
+    // 尝试从 result 或根级获取 subject/body
+    const result = (typeof nr.result === "object" && nr.result) ? nr.result as Record<string, unknown> : nr
+    const subject = typeof result.subject === "string" ? result.subject : null
+    const body = typeof result.body === "string" ? result.body : null
+    if (subject && body) {
+      return { subject, body }
+    }
+  }
+  return null
+}
+
+// ============================================================
+// 辅助函数：从工作流输出中提取询盘分级信息
+// ============================================================
+
+interface GradeInfo {
+  grade: string
+  score: number
+  analysis: string
+  suggestedAction: string
+}
+
+function extractGradeInfo(workflowOutput: unknown): GradeInfo | null {
+  if (!workflowOutput || typeof workflowOutput !== "object") return null
+  const outputs = workflowOutput as Record<string, unknown>
+  // 安全守卫：对象键数异常（Array/Buffer 等）直接退出
+  if (Object.keys(outputs).length > 50) return null
+  for (const nodeResult of Object.values(outputs)) {
+    if (!nodeResult || typeof nodeResult !== "object") continue
+    const nr = nodeResult as Record<string, unknown>
+    const result = (typeof nr.result === "object" && nr.result) ? nr.result as Record<string, unknown> : nr
+    const grade = typeof result.grade === "string" ? result.grade : null
+    if (!grade) continue
+    const score = typeof result.score === "number" ? result.score :
+                  typeof result.score === "string" ? parseInt(result.score, 10) : 0
+    const analysis = typeof result.analysis === "string" ? result.analysis :
+                     typeof nr.summary === "string" ? nr.summary : ""
+    const suggestedAction = typeof result.suggestedAction === "string" ? result.suggestedAction :
+                            typeof result.suggested_action === "string" ? result.suggested_action : ""
+    return { grade, score, analysis, suggestedAction }
+  }
+  return null
+}
+
+// ============================================================
 // 组件
 // ============================================================
+
+// ============================================================
+// 子组件：询盘处理成功面板（含分级结果与开发信草稿回显）
+// ============================================================
+
+function InquirySuccessPanel({
+  priority,
+  workflowOutput,
+  workflowRunId,
+  onReset,
+}: {
+  priority: string
+  workflowOutput: unknown
+  workflowRunId: string | null
+  onReset: () => void
+}) {
+  const gradeInfo = useMemo(() => extractGradeInfo(workflowOutput), [workflowOutput])
+  const devLetter = useMemo(() => extractDevLetter(workflowOutput), [workflowOutput])
+  const [letterCopied, setLetterCopied] = useState(false)
+
+  // 分级结果颜色
+  const gradeConfig: Record<string, string> = {
+    A: "bg-success/10 border-success/30 text-success",
+    B: "bg-warning/10 border-warning/30 text-warning",
+    C: "bg-card border-border text-muted-foreground",
+  }
+  const gradeEmoji: Record<string, string> = { A: "🔥", B: "📌", C: "📋" }
+
+  const handleCopyLetter = async () => {
+    if (!devLetter) return
+    try {
+      await navigator.clipboard.writeText(
+        `Subject: ${devLetter.subject}\n\n${devLetter.body}`,
+      )
+      setLetterCopied(true)
+      setTimeout(() => setLetterCopied(false), 2000)
+    } catch {
+      // clipboard API 可能不可用
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* 创建成功提示 */}
+      <div className="flex items-center gap-2 bg-success/10 rounded-xl p-3">
+        <CheckCircle2 className="size-4 text-success shrink-0" />
+        <div>
+          <p className="text-success text-sm font-medium">
+            询盘已创建，AI 分级完成
+          </p>
+          <p className="text-muted-foreground text-xs mt-0.5">
+            优先级：{gradeEmoji[priority] ?? "📋"} {priority === "high" ? "高" : priority === "mid" ? "中" : "低"}
+            {workflowRunId && (
+              <> · {workflowRunId.slice(0, 8)}...</>
+            )}
+          </p>
+        </div>
+      </div>
+
+      {/* AI 分级详情 */}
+      {gradeInfo && (
+        <div className={cn("rounded-xl border p-3 text-xs", gradeConfig[gradeInfo.grade] ?? gradeConfig.C)}>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs uppercase tracking-wider opacity-70">分级详情</span>
+            <span className="font-bold text-sm">{gradeInfo.grade} 级 · {gradeInfo.score}/100</span>
+          </div>
+          {gradeInfo.analysis && (
+            <p className="text-xs leading-relaxed mb-2 opacity-90">{gradeInfo.analysis.slice(0, 200)}{gradeInfo.analysis.length > 200 ? "..." : ""}</p>
+          )}
+          {gradeInfo.suggestedAction && (
+            <div className="flex items-start gap-1.5">
+              <ChevronRight className="size-3 shrink-0 mt-0.5" />
+              <p className="text-xs font-medium">{gradeInfo.suggestedAction}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* A 级开发信草稿回显 */}
+      {devLetter && (
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          {/* 开发信头部 */}
+          <div className="flex items-center justify-between px-3 py-2 bg-accent/30">
+            <div className="flex items-center gap-1.5">
+              <Mail className="size-3.5 text-primary" />
+              <span className="text-xs font-medium text-foreground">A 级询盘 — 开发信草稿</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleCopyLetter}
+              className={cn(
+                "flex items-center gap-1 text-xs px-2 py-0.5 rounded-md transition-colors",
+                letterCopied
+                  ? "bg-success/10 text-success"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent",
+              )}
+            >
+              <Copy className="size-3" />
+              {letterCopied ? "已复制" : "复制"}
+            </button>
+          </div>
+          {/* 主题 */}
+          <div className="px-3 pt-2">
+            <p className="text-hint text-[10px] font-semibold uppercase tracking-wider mb-1">
+              邮件主题
+            </p>
+            <p className="text-foreground text-xs font-medium leading-snug">
+              {devLetter.subject}
+            </p>
+          </div>
+          {/* 正文 */}
+          <div className="px-3 py-2">
+            <p className="text-hint text-[10px] font-semibold uppercase tracking-wider mb-1">
+              邮件正文
+            </p>
+            <div className="text-foreground/90 text-xs leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
+              {devLetter.body}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 操作按钮 */}
+      <button
+        type="button"
+        onClick={onReset}
+        className={cn(
+          "w-full rounded-xl py-2 text-xs font-medium",
+          "bg-primary/10 text-primary hover:bg-primary/20 transition-colors",
+        )}
+      >
+        处理新询盘
+      </button>
+    </div>
+  )
+}
 
 export function InquiryQuickEntry() {
   const [form, setForm] = useState<InquiryFormData>({
@@ -181,32 +386,12 @@ export function InquiryQuickEntry() {
 
       {/* 成功态 */}
       {submit.status === "success" && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 bg-success/10 rounded-xl p-3">
-            <CheckCircle2 className="size-4 text-success shrink-0" />
-            <div>
-              <p className="text-success text-sm font-medium">
-                询盘已创建，AI 分级工作流已启动
-              </p>
-              <p className="text-muted-foreground text-xs mt-0.5">
-                优先级：{submit.data?.priority === "high" ? "🔥 高" : submit.data?.priority === "mid" ? "📌 中" : "📋 低"}
-                {submit.data?.workflowRunId && (
-                  <> · 运行 ID：{submit.data.workflowRunId.slice(0, 8)}...</>
-                )}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleReset}
-            className={cn(
-              "w-full rounded-xl py-2 text-xs font-medium",
-              "bg-primary/10 text-primary hover:bg-primary/20 transition-colors",
-            )}
-          >
-            处理新询盘
-          </button>
-        </div>
+        <InquirySuccessPanel
+          priority={submit.data?.priority ?? "mid"}
+          workflowOutput={submit.data?.workflowOutput ?? null}
+          workflowRunId={submit.data?.workflowRunId ?? null}
+          onReset={handleReset}
+        />
       )}
 
       {/* 错误态 */}

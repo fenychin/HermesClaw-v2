@@ -27,6 +27,26 @@ export function successResponse(data: unknown, status = 200) {
   return Response.json({ success: true, data }, { status })
 }
 
+/**
+ * 将记录中的 Date 字段统一转为 ISO 字符串
+ * —— 消除各 API 路由中重复的 serialize* 样板
+ * @param record  数据库查询结果（含 Date 字段）
+ * @param dateKeys 需要序列化的 Date 字段名列表
+ */
+export function serializeDates<T extends Record<string, unknown>>(
+  record: T,
+  dateKeys: string[],
+): T {
+  const result = { ...record }
+  for (const key of dateKeys) {
+    const val = result[key]
+    if (val instanceof Date) {
+      ;(result as Record<string, unknown>)[key] = val.toISOString()
+    }
+  }
+  return result
+}
+
 /** 统一错误响应 */
 export function errorResponse(message: string, status = 500) {
   return Response.json({ success: false, error: message }, { status })

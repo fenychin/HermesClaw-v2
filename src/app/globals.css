@@ -149,3 +149,17 @@
     @apply font-sans;
   }
 }
+
+/* ============================================================
+   全局隐藏滚动条 —— 保留滚动能力，移除白色滚动条视觉
+   Firefox → scrollbar-width:none
+   Webkit → ::-webkit-scrollbar display:none
+   ============================================================ */
+* {
+  scrollbar-width: none;           /* Firefox */
+  -ms-overflow-style: none;        /* IE/Edge Legacy */
+}
+
+*::-webkit-scrollbar {
+  display: none;                   /* Chrome / Safari / Edge */
+}

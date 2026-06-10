@@ -1,17 +1,36 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Play, CheckCircle2, Clock, AlertCircle, ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { Play, CheckCircle2, AlertCircle, ChevronDown, Loader2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MarkdownRenderer } from "@/components/common/markdown-renderer";
-import { useWorkflowExecutionStore } from "@/stores/workflow-execution-store";
-import { LetterPreview } from "./letter-preview";
+import { InputField } from "@/components/common/input-field";
 import type {
   Workflow,
-  WorkflowStep,
   WorkflowRunStatus,
-  WorkflowInput,
 } from "@/types/workflow";
+
+// ============================================================
+// 类型定义
+// ============================================================
+
+/** API 返回的工作流执行结果 */
+interface RunResult {
+  runId: string
+  status: string
+  output: Record<string, unknown> | null
+}
+
+/** 工作流输入值（key → value） */
+type InputValues = Record<string, string>
+
+/** 单个节点的结果 */
+interface NodeResult {
+  nodeId: string
+  nodeName: string
+  status: "completed" | "failed" | "skipped"
+  output: unknown
+}
 
 // ============================================================
 // 运行状态 Badge
@@ -49,7 +68,7 @@ function RunStatusBadge({ status }: { status: WorkflowRunStatus }) {
 }
 
 // ============================================================
-// 加载动画（三个跳动圆点）
+// 加载动画
 // ============================================================
 
 function ThinkingDots() {
@@ -62,413 +81,255 @@ function ThinkingDots() {
           style={{ animationDelay: `${i * 0.15}s` }}
         />
       ))}
-      <span className="text-hint text-xs ml-1">正在执行...</span>
+      <span className="text-hint text-xs ml-1">正在通过 AI 执行...</span>
     </div>
   );
 }
 
 // ============================================================
-// 单个步骤输入控件
+// 已完成节点结果卡片
 // ============================================================
 
-interface InputFieldProps {
-  input: WorkflowInput;
-  value: string;
-  onChange: (key: string, value: string) => void;
-}
+function NodeResultCard({ nodeResult }: { nodeResult: NodeResult }) {
+  const [expanded, setExpanded] = useState(false)
 
-function InputField({ input, value, onChange }: InputFieldProps) {
-  const baseClass = cn(
-    "w-full bg-background border border-border rounded-xl px-3 py-2",
-    "text-foreground text-sm placeholder:text-hint",
-    "focus:outline-none focus:border-primary/60 transition-colors",
-  );
-
-  if (input.type === "textarea") {
+  if (nodeResult.status === "skipped") {
     return (
-      <div className="space-y-1.5">
-        <label className="text-muted-foreground text-xs font-medium">
-          {input.label}
-          {input.required && <span className="text-danger ml-0.5">*</span>}
-        </label>
-        <textarea
-          rows={4}
-          placeholder={input.placeholder}
-          value={value}
-          onChange={(e) => onChange(input.key, e.target.value)}
-          className={cn(baseClass, "resize-none")}
-        />
+      <div className="bg-card/50 rounded-xl border border-border/60 p-3 mb-2 opacity-60">
+        <span className="text-hint text-xs">{nodeResult.nodeName} — 已跳过</span>
       </div>
-    );
+    )
   }
 
-  if (input.type === "select") {
+  if (nodeResult.status === "failed") {
     return (
-      <div className="space-y-1.5">
-        <label className="text-muted-foreground text-xs font-medium">
-          {input.label}
-          {input.required && <span className="text-danger ml-0.5">*</span>}
-        </label>
-        <div className="relative">
-          <select
-            value={value}
-            onChange={(e) => onChange(input.key, e.target.value)}
-            className={cn(baseClass, "appearance-none cursor-pointer pr-8")}
-          >
-            <option value="">请选择...</option>
-            {input.options?.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-hint pointer-events-none" />
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-1.5">
-      <label className="text-muted-foreground text-xs font-medium">
-        {input.label}
-        {input.required && <span className="text-danger ml-0.5">*</span>}
-      </label>
-      <input
-        type="text"
-        placeholder={input.placeholder}
-        value={value}
-        onChange={(e) => onChange(input.key, e.target.value)}
-        className={baseClass}
-      />
-    </div>
-  );
-}
-
-// ============================================================
-// 定制化已完成步骤卡片：AI 分析结果 (Inquiry Grade)
-// ============================================================
-
-function AiAnalysisCompletedCard({ step }: { step: WorkflowStep }) {
-  const gradeOut = step.outputs?.find(o => o.key === 'grade')?.value || 'A';
-  const scoreOut = step.outputs?.find(o => o.key === 'score')?.value || '87';
-  const analysisOut = step.outputs?.find(o => o.key === 'analysis')?.value || '';
-  const suggestedActionOut = step.outputs?.find(o => o.key === 'suggested_action')?.value || '';
-
-  let gradeClass = "bg-card border-border text-muted-foreground"; // C级或默认
-  if (gradeOut.includes('A')) gradeClass = "bg-success/10 border-success/30 text-success";
-  else if (gradeOut.includes('B')) gradeClass = "bg-warning/10 border-warning/30 text-warning";
-
-  return (
-    <div className="bg-card rounded-2xl border border-border p-4 mb-3">
-      <div className="flex items-center justify-between mb-4">
+      <div className="bg-card rounded-xl border border-danger/30 p-3 mb-2">
         <div className="flex items-center gap-2">
-          <CheckCircle2 className="size-4 text-success shrink-0" />
-          <span className="text-foreground text-sm font-medium">{step.title}</span>
+          <AlertCircle className="size-3.5 text-danger shrink-0" />
+          <span className="text-foreground text-xs font-medium">{nodeResult.nodeName}</span>
+          <span className="text-danger text-xs ml-auto">失败</span>
         </div>
-        {step.durationSec !== undefined && (
-          <span className="flex items-center gap-1 text-hint text-xs">
-            <Clock className="size-3" />
-            {step.durationSec}s
-          </span>
-        )}
-      </div>
-
-      <div className="flex gap-3 mb-4">
-        <div className={cn("px-3 py-1.5 rounded-lg border text-sm font-semibold flex items-center gap-1.5", gradeClass)}>
-          <span className="text-xs uppercase tracking-wider opacity-80">等级</span>
-          {gradeOut}级
-        </div>
-        <div className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm font-semibold flex items-center gap-1.5 text-foreground">
-          <span className="text-xs text-muted-foreground uppercase tracking-wider">评分</span>
-          {scoreOut}/100
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <div>
-          <p className="text-hint text-[10px] font-semibold uppercase tracking-wider mb-1.5">分析摘要</p>
-          <div className="bg-background rounded-xl p-4 leading-relaxed text-foreground text-sm border border-border/50">
-            <MarkdownRenderer content={analysisOut} />
-          </div>
-        </div>
-        <div>
-          <p className="text-hint text-[10px] font-semibold uppercase tracking-wider mb-1.5">建议动作</p>
-          <p className="text-sm text-brand-blue font-medium">{suggestedActionOut}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// 定制化已完成步骤卡片：分配动作 (Inquiry Grade)
-// ============================================================
-
-function AssignActionCompletedCard() {
-  return (
-    <div className="bg-card rounded-2xl border border-success/30 p-4 mb-3">
-      <div className="flex items-center gap-2 mb-2">
-        <CheckCircle2 className="size-4 text-success shrink-0" />
-        <span className="text-foreground text-sm font-medium">任务已创建</span>
-      </div>
-      <p className="text-muted-foreground text-xs ml-6">已按照您的选择分配跟进任务，系统已自动创建后续跟进计划。</p>
-    </div>
-  );
-}
-
-// ============================================================
-// 通用已完成步骤卡片
-// ============================================================
-
-interface StepCardProps {
-  step: WorkflowStep;
-}
-
-function CompletedStepCard({ step }: StepCardProps) {
-  return (
-    <div className="bg-card rounded-2xl border border-border p-4 mb-3">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <CheckCircle2 className="size-4 text-success shrink-0" />
-          <span className="text-foreground text-sm font-medium">{step.title}</span>
-        </div>
-        {step.durationSec !== undefined && (
-          <span className="flex items-center gap-1 text-hint text-xs">
-            <Clock className="size-3" />
-            {step.durationSec}s
-          </span>
-        )}
-      </div>
-
-      {step.inputs && step.inputs.length > 0 && (
-        <div className="mb-3 space-y-1.5">
-          <p className="text-hint text-[10px] font-semibold uppercase tracking-wider">
-            输入参数
+        {typeof nodeResult.output === "object" && nodeResult.output !== null && (
+          <p className="text-muted-foreground text-xs mt-1">
+            {(nodeResult.output as Record<string, unknown>).error as string ?? "未知错误"}
           </p>
-          {step.inputs.map((inp) => (
-            <div key={inp.key} className="flex items-start gap-2">
-              <span className="text-muted-foreground text-xs shrink-0 pt-0.5 min-w-[64px]">
-                {inp.label}
-              </span>
-              <span className="text-muted-foreground text-xs">—</span>
-              <span className="text-foreground text-xs">{inp.value || inp.placeholder || "（已填写）"}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {step.outputs && step.outputs.length > 0 && (
-        <div className="space-y-2">
-          {step.outputs
-            .filter((out) => out.value)
-            .map((out) => (
-              <div key={out.key}>
-                <p className="text-hint text-[10px] font-semibold uppercase tracking-wider mb-2">
-                  {out.label}
-                </p>
-                <div className="bg-background rounded-xl p-3 text-muted-foreground">
-                  {out.type === "markdown" && out.value ? (
-                    <MarkdownRenderer content={out.value} />
-                  ) : (
-                    <p className="text-sm">{out.value}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// 卡片渲染分发
-// ============================================================
-function getCompletedStepCard(step: WorkflowStep) {
-  if (step.id === 'ai-analysis') return <AiAnalysisCompletedCard key={step.id} step={step} />;
-  if (step.id === 'assign-action') return <AssignActionCompletedCard key={step.id} />;
-  if (step.id === 'review-edit') return null; // review-edit 步骤完成时，不显示通用已完成卡片
-  return <CompletedStepCard key={step.id} step={step} />;
-}
-
-// ============================================================
-// 执行中步骤卡片
-// ============================================================
-
-function RunningStepCard({ step }: StepCardProps) {
-  return (
-    <div className="bg-card rounded-2xl border border-primary/30 p-4 mb-3">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="size-4 rounded-full border-2 border-primary border-t-transparent animate-spin shrink-0" />
-        <span className="text-foreground text-sm font-medium">{step.title}</span>
-      </div>
-      <ThinkingDots />
-    </div>
-  );
-}
-
-// ============================================================
-// 底部用户输入区
-// ============================================================
-
-interface BottomInputZoneProps {
-  step: WorkflowStep;
-  onConfirm: (values: Record<string, string>) => void;
-}
-
-function BottomInputZone({ step, onConfirm }: BottomInputZoneProps) {
-  const [values, setValues] = useState<Record<string, string>>({});
-
-  if (!step.inputs || step.inputs.length === 0) return null;
-
-  const handleChange = (key: string, value: string) => {
-    setValues((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleConfirm = () => {
-    onConfirm(values);
-  };
-
-  return (
-    <div className="shrink-0 border-t border-border bg-card/50 p-4">
-      <p className="text-muted-foreground text-xs font-medium mb-3">
-        当前步骤需要您填写以下信息：
-      </p>
-      <div className="space-y-3 mb-4">
-        {step.inputs.map((inp) => (
-          <InputField
-            key={inp.key}
-            input={inp}
-            value={values[inp.key] ?? ""}
-            onChange={handleChange}
-          />
-        ))}
-      </div>
-      <button
-        type="button"
-        onClick={handleConfirm}
-        className={cn(
-          "w-full bg-primary text-white rounded-xl py-2 text-sm font-medium",
-          "hover:bg-primary/90 transition-colors active:scale-[0.99]",
         )}
-      >
-        确认执行
-      </button>
+      </div>
+    )
+  }
+
+  const output = nodeResult.output as Record<string, unknown> | null
+  const result = (output?.result as Record<string, unknown>) ?? output
+  const summary = output?.summary as string ?? ""
+  const confidence = output?.confidence as number | undefined
+  const meta = output?._meta as Record<string, unknown> | undefined
+
+  return (
+    <div className="bg-card rounded-xl border border-border p-3 mb-2">
+      <div className="flex items-center gap-2 mb-2">
+        <CheckCircle2 className="size-3.5 text-success shrink-0" />
+        <span className="text-foreground text-xs font-medium">{nodeResult.nodeName}</span>
+        <span className="text-hint text-[10px] ml-auto">
+          {meta?.duration ? `${meta.duration as string}` : ""}
+        </span>
+        {confidence !== undefined && (
+          <span
+            className={cn(
+              "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+              confidence >= 0.7 ? "bg-success/15 text-success" : "bg-warning/15 text-warning",
+            )}
+          >
+            {(confidence * 100).toFixed(0)}%
+          </span>
+        )}
+      </div>
+
+      {/* 摘要 */}
+      {summary && (
+        <p className="text-muted-foreground text-xs mb-1.5 leading-relaxed">{summary}</p>
+      )}
+
+      {/* 结构化结果（可展开） */}
+      {result && typeof result === "object" && Object.keys(result).length > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="text-primary text-[10px] hover:text-primary/80 transition-colors flex items-center gap-0.5"
+          >
+            <ChevronDown
+              className={cn("size-3 transition-transform", expanded && "rotate-180")}
+            />
+            详细输出
+          </button>
+          {expanded && (
+            <div className="mt-1.5 bg-background rounded-lg p-2.5 border border-border/50">
+              {result.body && typeof result.body === "string" ? (
+                <div className="text-foreground/85 text-xs whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">
+                  <MarkdownRenderer content={result.body} />
+                </div>
+              ) : (
+                <pre className="text-muted-foreground text-[11px] whitespace-pre-wrap">
+                  {JSON.stringify(result, null, 2)}
+                </pre>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
-  );
+  )
 }
 
 // ============================================================
-// WorkflowExecutor 主组件
+// WorkflowExecutor 主组件（真实后端驱动）
 // ============================================================
 
 interface WorkflowExecutorProps {
-  workflow: Workflow;
-  runStatus: WorkflowRunStatus;
-  onRun: () => void;
+  workflow: Workflow
+  runStatus: WorkflowRunStatus
+  /** 从 DB 加载的 DAG 节点列表（用于映射输出结果到用户可见标签） */
+  dagNodes: Array<{ id: string; name: string; kind: string }>
+  onRun: () => void
 }
 
 export function WorkflowExecutor({
   workflow,
   runStatus,
+  dagNodes,
   onRun,
 }: WorkflowExecutorProps) {
-  const { submitStepInput, completeStep, advanceToNextStep, goToStep } = useWorkflowExecutionStore();
+  // 收集所有步骤的输入值
+  const [inputValues, setInputValues] = useState<InputValues>({})
+  // 执行结果（来自 API）
+  const [runResult, setRunResult] = useState<RunResult | null>(null)
+  // 节点结果片段
+  const [nodeResults, setNodeResults] = useState<NodeResult[]>([])
+  // 执行状态
+  const [isExecuting, setIsExecuting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const runningStep = workflow.steps.find((s) => s.status === "running");
-  
-  const generateLetterStep = workflow.steps.find((s) => s.id === "generate-letter");
-  
-  // LetterPreview 状态
-  const [reviewBody, setReviewBody] = useState("");
-  const [isRegenerating, setIsRegenerating] = useState(false);
-  const initializedRef = useRef(false);
+  // 收集所有步骤的 inputs（展平）
+  const allInputs = workflow.steps.flatMap((step) =>
+    (step.inputs ?? []).map((inp) => ({ ...inp, stepId: step.id, stepTitle: step.title })),
+  )
 
-  // 初始化 reviewBody
-  useEffect(() => {
-    if (runningStep?.id === "review-edit" && !isRegenerating && !initializedRef.current) {
-      const bodyOut = generateLetterStep?.outputs?.find(o => o.key === "body")?.value || "";
-      setReviewBody(bodyOut);
-      initializedRef.current = true;
+  // 检查必填项是否已填
+  const requiredFilled = allInputs
+    .filter((inp) => inp.required)
+    .every((inp) => {
+      const val = inputValues[inp.key]
+      return val && val.trim().length > 0
+    })
+
+  // 更新输入值
+  const handleInputChange = (key: string, value: string) => {
+    setInputValues((prev) => ({ ...prev, [key]: value }))
+  }
+
+  // 构建 workfow run 输入（将步骤输入扁平化为 variables）
+  const buildWorkflowInput = (): Record<string, unknown> => {
+    const vars: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(inputValues)) {
+      // 跳过空值
+      if (value.trim().length > 0) {
+        vars[key] = value
+      }
     }
-  }, [runningStep?.id, generateLetterStep?.outputs, isRegenerating]);
+    return vars
+  }
 
-  // 处理底部表单确认提交
-  const handleStepConfirm = (values: Record<string, string>) => {
-    if (!runningStep) return;
-    const runningIdx = workflow.steps.findIndex((s) => s.id === runningStep.id);
-    if (runningIdx !== -1) {
-      submitStepInput(runningIdx, values);
-      completeStep(runningIdx, {}, 0.5); // 标记完成并记录 0.5s 耗时
-      advanceToNextStep();
-    }
-  };
+  // 执行工作流
+  const handleExecute = async () => {
+    if (!requiredFilled || isExecuting) return
 
-  const handleReviewConfirm = () => {
-    if (runningStep?.id === "review-edit") {
-      const runningIdx = workflow.steps.findIndex((s) => s.id === "review-edit");
-      submitStepInput(runningIdx, { edited_body: reviewBody });
-      completeStep(runningIdx, {}, 0.5);
-      advanceToNextStep();
-    }
-  };
+    setIsExecuting(true)
+    setError(null)
+    setRunResult(null)
+    setNodeResults([])
 
-  const handleRegenerate = () => {
-    setIsRegenerating(true);
-    setReviewBody("");
-    initializedRef.current = false;
-    const genIdx = workflow.steps.findIndex((s) => s.id === "generate-letter");
-    if (genIdx !== -1) {
-      goToStep(genIdx);
-    }
-  };
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60_000) // 60s 超时
 
-  // 监听无输入步骤的自动执行
-  useEffect(() => {
-    if (!runningStep) return;
-    const runningIdx = workflow.steps.findIndex((s) => s.id === runningStep.id);
-    
-    // inquiry-grade: AI 分析
-    if (runningStep.id === 'ai-analysis') {
-      const timer = setTimeout(() => {
-        completeStep(runningIdx, {
-          grade: 'A',
-          score: '87',
-          analysis: '客户明确说明产品规格需求，询盘数量具体（500pcs），有明确时间线（2周内），判断为高意向买家...',
-          suggested_action: '24小时内发送报价单并安排样品'
-        }, 1.5);
-        advanceToNextStep();
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-    
-    // dev-letter: AI 生成开发信
-    if (runningStep.id === 'generate-letter') {
-      const timer = setTimeout(() => {
-        setIsRegenerating(false);
-        const subject = "Premium Outdoor Folding Chairs – Certified & Ready for Q3 2025";
-        const body = `Dear Sarah,\n\nI hope this message finds you well. My name is [Your Name], and I'm reaching out from [Company Name], a leading manufacturer of outdoor folding furniture based in [City], China.\n\nHaving followed Outdoor World LLC's impressive growth in the North American market, I believe our **Aluminum Folding Chair Pro Series** could be an excellent fit for your Q3 lineup:\n\n- ✅ **ASTM F1561 & CA Prop 65 Certified** — Fully compliant for California retail\n- ✅ **10,000+ pcs capacity** — Stable production with 45-day FOB lead time\n- ✅ **Proven partnerships** — Currently serving 3 top-10 US outdoor retailers\n\nI'd love to send over our latest catalog and a **custom sample** for your evaluation.\n\nWould you have 15 minutes for a brief call this week?\n\nBest regards,\n[Your Name]\n[Title] | [Company] | [Contact]`;
-        setReviewBody(body);
+    try {
+      const input = buildWorkflowInput()
+      const res = await fetch(`/api/workflows/${workflow.id}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input }),
+        signal: controller.signal,
+      })
 
-        completeStep(runningIdx, {
-          subject,
-          body
-        }, 3.5);
-        advanceToNextStep();
-      }, 3500);
-      return () => clearTimeout(timer);
-    }
+      // 安全解析 JSON：非 JSON 响应时取原始文本作为错误消息
+      let json: { success?: boolean; error?: string; data?: RunResult }
+      try {
+        json = await res.json()
+      } catch {
+        const text = await res.text().catch(() => "（无法读取响应内容）")
+        throw new Error(text.slice(0, 300))
+      }
 
-    // 其他无输入步骤
-    if (!runningStep.inputs || runningStep.inputs.length === 0) {
-      const timer = setTimeout(() => {
-        completeStep(runningIdx, {}, 1.0);
-        advanceToNextStep();
-      }, 1000);
-      return () => clearTimeout(timer);
+      if (!res.ok || !json.success) {
+        throw new Error(json.error ?? "工作流执行失败")
+      }
+
+      const result: RunResult = json.data!
+      setRunResult(result)
+
+      // 将 DAG 节点输出映射为用户可见的节点结果卡片
+      if (result.output && typeof result.output === "object") {
+        const nodes: NodeResult[] = dagNodes.map((node) => {
+          const nodeOutput = (result.output as Record<string, unknown>)[node.id]
+          let status: NodeResult["status"] = "skipped"
+          if (nodeOutput) {
+            status = "completed"
+          }
+          return {
+            nodeId: node.id,
+            nodeName: node.name,
+            status,
+            output: nodeOutput ?? null,
+          }
+        })
+        setNodeResults(nodes)
+      }
+
+      // 通知父组件状态变更
+      onRun()
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setError("工作流执行超时，请稍后查看运行状态或重试")
+      } else {
+        setError(err instanceof Error ? err.message : "执行异常")
+      }
+    } finally {
+      clearTimeout(timeoutId)
+      setIsExecuting(false)
     }
-  }, [runningStep, workflow.steps, completeStep, advanceToNextStep]);
+  }
+
+  // 重置执行
+  const handleReset = () => {
+    setRunResult(null)
+    setNodeResults([])
+    setError(null)
+  }
+
+  // 已运行完成
+  const isCompleted = runResult?.status === "completed"
+  const currentStatus: WorkflowRunStatus =
+    isExecuting ? "running" : isCompleted ? "completed" : error ? "failed" : runStatus
+
+  // 按步骤分组渲染输入区
+  const groupedInputs = new Map<string, typeof allInputs>()
+  for (const inp of allInputs) {
+    const existing = groupedInputs.get(inp.stepId)
+    if (existing) {
+      existing.push(inp)
+    } else {
+      groupedInputs.set(inp.stepId, [inp])
+    }
+  }
 
   return (
     <div className="flex flex-col h-full min-w-0">
@@ -478,98 +339,148 @@ export function WorkflowExecutor({
           <h1 className="text-foreground text-sm font-semibold truncate">
             {workflow.title}
           </h1>
-          <RunStatusBadge status={runStatus} />
+          <RunStatusBadge status={currentStatus} />
         </div>
-        <button
-          type="button"
-          onClick={onRun}
-          disabled={runStatus === "running" || runStatus === "completed"}
-          className={cn(
-            "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium",
-            "bg-primary text-white transition-all",
-            runStatus === "running" || runStatus === "completed"
-              ? "opacity-50 cursor-not-allowed"
-              : "hover:bg-primary/90 active:scale-[0.97]",
-          )}
-        >
-          <Play className="size-3 fill-white" />
-          {runStatus === "running" ? "执行中..." : runStatus === "completed" ? "已完成" : "执行"}
-        </button>
+        {!isCompleted ? (
+          <button
+            type="button"
+            onClick={handleExecute}
+            disabled={!requiredFilled || isExecuting}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all",
+              requiredFilled && !isExecuting
+                ? "bg-primary text-white hover:bg-primary/90 active:scale-[0.97]"
+                : "bg-border/40 text-hint cursor-not-allowed",
+            )}
+          >
+            {isExecuting ? (
+              <>
+                <Loader2 className="size-3 animate-spin" />
+                执行中...
+              </>
+            ) : (
+              <>
+                <Play className="size-3 fill-white" />
+                执行
+              </>
+            )}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleReset}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+          >
+            <RefreshCw className="size-3" />
+            重新执行
+          </button>
+        )}
       </div>
 
-      {/* ---- 主内容区：步骤卡片列表 ---- */}
-      <div className="flex-1 overflow-y-auto p-5">
-        {runStatus === "idle" && (
-          <div className="flex flex-col items-center justify-center h-full text-center">
+      {/* ---- 主内容区 ---- */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        {/* 空闲态：显示输入表单 */}
+        {runStatus === "idle" && !isExecuting && !runResult && (
+          <>
+            {/* 工作流描述 */}
+            {workflow.description && (
+              <div className="bg-accent/20 rounded-xl p-3 mb-2">
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  {workflow.description}
+                </p>
+              </div>
+            )}
+
+            {/* 按步骤分组渲染输入 */}
+            {Array.from(groupedInputs.entries()).map(([stepId, inputs]) => {
+              const step = workflow.steps.find((s) => s.id === stepId)
+              const stepIdx = workflow.steps.findIndex((s) => s.id === stepId)
+              return (
+                <div key={stepId} className="bg-card rounded-2xl border border-border p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-hint text-[10px] font-semibold uppercase tracking-wider bg-accent/50 rounded-md px-1.5 py-0.5">
+                      步骤 {stepIdx + 1}
+                    </span>
+                    <span className="text-foreground text-sm font-medium">
+                      {step?.title ?? stepId}
+                    </span>
+                  </div>
+                  {step?.description && (
+                    <p className="text-hint text-xs mb-3">{step.description}</p>
+                  )}
+                  <div className="space-y-2.5">
+                    {inputs.map((inp) => (
+                      <InputField
+                        key={inp.key}
+                        input={inp}
+                        value={inputValues[inp.key] ?? ""}
+                        onChange={handleInputChange}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </>
+        )}
+
+        {/* 运行中态 */}
+        {isExecuting && (
+          <div className="flex flex-col items-center justify-center py-12">
             <div className="bg-primary/10 rounded-2xl p-4 mb-4">
-              <Play className="size-8 text-primary fill-primary/30" />
+              <Loader2 className="size-8 text-primary animate-spin" />
             </div>
-            <p className="text-foreground text-sm font-medium">点击「执行」开始运行</p>
-            <p className="text-hint text-xs mt-1 max-w-[260px] leading-relaxed">
-              工作流将逐步自动执行，部分步骤需要您提供输入
-            </p>
+            <p className="text-foreground text-sm font-medium">AI 正在执行工作流</p>
+            <p className="text-hint text-xs mt-1">正在调用 LLM 处理您的输入，请稍候...</p>
+            <ThinkingDots />
           </div>
         )}
 
-        {runStatus !== "idle" && (
-          <>
-            {workflow.steps
-              .filter((s) => s.status === "completed" || s.status === "failed")
-              .map((step) => {
-                if (step.status === "failed") {
-                  return (
-                    <div
-                      key={step.id}
-                      className="bg-card rounded-2xl border border-danger/30 p-4 mb-3"
-                    >
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="size-4 text-danger shrink-0" />
-                        <span className="text-foreground text-sm font-medium">
-                          {step.title}
-                        </span>
-                        <span className="text-danger text-xs ml-auto">执行失败</span>
-                      </div>
-                    </div>
-                  );
-                }
-                return getCompletedStepCard(step);
-              })}
+        {/* 错误态 */}
+        {error && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="bg-danger/10 rounded-2xl p-4 mb-4">
+              <AlertCircle className="size-8 text-danger" />
+            </div>
+            <p className="text-foreground text-sm font-medium">执行失败</p>
+            <p className="text-hint text-xs mt-1 max-w-xs text-center">{error}</p>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="mt-4 bg-primary/10 text-primary px-4 py-2 rounded-xl text-xs font-medium hover:bg-primary/20 transition-colors"
+            >
+              重试
+            </button>
+          </div>
+        )}
 
-            {runningStep && <RunningStepCard step={runningStep} />}
-            
-            {/* 成功状态/开发信完成预览 */}
-            {runStatus === "completed" && workflow.id === "dev-letter" && (
-              <LetterPreview
-                subject={generateLetterStep?.outputs?.find(o => o.key === "subject")?.value || ""}
-                body={reviewBody}
-                isCompleted={true}
-              />
-            )}
-          </>
+        {/* 完成态：显示每个节点的结果 */}
+        {isCompleted && nodeResults.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <CheckCircle2 className="size-4 text-success" />
+              <span className="text-foreground text-sm font-medium">执行完成</span>
+              <span className="text-hint text-xs">
+                · 运行 ID：{runResult?.runId.slice(0, 8)}...
+              </span>
+            </div>
+            {nodeResults.map((nr) => (
+              <NodeResultCard key={nr.nodeId} nodeResult={nr} />
+            ))}
+          </div>
+        )}
+
+        {/* 完成但无节点输出（后端可能只返回了空 output） */}
+        {isCompleted && nodeResults.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="bg-success/10 rounded-2xl p-4 mb-4">
+              <CheckCircle2 className="size-8 text-success" />
+            </div>
+            <p className="text-foreground text-sm font-medium">执行完成</p>
+            <p className="text-hint text-xs mt-1">工作流已成功完成，运行 ID：{runResult?.runId.slice(0, 8)}...</p>
+          </div>
         )}
       </div>
-
-      {/* ---- 底部用户输入区 ---- */}
-      {/* 针对 review-edit 使用特殊的 LetterPreview */}
-      {runningStep?.id === "review-edit" && (
-        <div className="shrink-0 border-t border-border bg-card/50 p-4">
-          <LetterPreview
-            subject={generateLetterStep?.outputs?.find(o => o.key === "subject")?.value || ""}
-            body={reviewBody}
-            onChangeBody={setReviewBody}
-            onConfirm={handleReviewConfirm}
-            onRegenerate={handleRegenerate}
-          />
-        </div>
-      )}
-
-      {/* 通用步骤输入 */}
-      {runningStep && runningStep.inputs && runningStep.inputs.length > 0 && runningStep.id !== "review-edit" && (
-        <BottomInputZone
-          step={runningStep}
-          onConfirm={handleStepConfirm}
-        />
-      )}
     </div>
   );
 }

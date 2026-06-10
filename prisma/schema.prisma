@@ -36,6 +36,7 @@ model Workspace {
   inquiries           Inquiry[]
   marketIntelligences MarketIntelligence[]
   quotations          Quotation[]
+  exchangeRates       ExchangeRate[]
   evolutionLogs       EvolutionLog[]
   toolRegistries      ToolRegistry[]
   toolGrants          ToolGrant[]
@@ -412,6 +413,23 @@ model MarketIntelligence {
   publishedAt     DateTime
   createdAt       DateTime @default(now())
 
+  @@index([workspaceId])
+}
+
+// ============================================================
+// 汇率监测（外贸首页汇率卡片数据源；由连接器/定时任务同步刷新）
+// ============================================================
+model ExchangeRate {
+  id          String   @id
+  workspaceId String   @default("default")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  pair        String   // 货币对，如 USD/CNY
+  value       Float    // 当前汇率
+  change24h   Float    @default(0) // 24h 变化百分比
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@unique([workspaceId, pair])
   @@index([workspaceId])
 }
 

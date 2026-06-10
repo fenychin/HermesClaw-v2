@@ -70,6 +70,7 @@ export const ModelName = {
   AuditLog: 'AuditLog',
   Inquiry: 'Inquiry',
   MarketIntelligence: 'MarketIntelligence',
+  ExchangeRate: 'ExchangeRate',
   Quotation: 'Quotation',
   EvolutionLog: 'EvolutionLog',
   ToolRegistry: 'ToolRegistry',
@@ -400,6 +401,19 @@ export const MarketIntelligenceScalarFieldEnum = {
 } as const
 
 export type MarketIntelligenceScalarFieldEnum = (typeof MarketIntelligenceScalarFieldEnum)[keyof typeof MarketIntelligenceScalarFieldEnum]
+
+
+export const ExchangeRateScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  pair: 'pair',
+  value: 'value',
+  change24h: 'change24h',
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type ExchangeRateScalarFieldEnum = (typeof ExchangeRateScalarFieldEnum)[keyof typeof ExchangeRateScalarFieldEnum]
 
 
 export const QuotationScalarFieldEnum = {

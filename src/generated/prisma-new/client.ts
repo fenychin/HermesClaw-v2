@@ -137,6 +137,11 @@ export type Inquiry = Prisma.InquiryModel
  */
 export type MarketIntelligence = Prisma.MarketIntelligenceModel
 /**
+ * Model ExchangeRate
+ * 
+ */
+export type ExchangeRate = Prisma.ExchangeRateModel
+/**
  * Model Quotation
  * 
  */

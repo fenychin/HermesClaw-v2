@@ -1243,3 +1243,20 @@ export const mockQuotations: Quotation[] = [
     createdAt: '2026-06-02T11:00:00Z',
   },
 ]
+
+// ============================================================
+// 汇率 ExchangeRates（外贸页汇率监测卡片种子数据）
+// ============================================================
+export interface ExchangeRateSeed {
+  id: string
+  pair: string
+  value: number
+  change24h: number
+}
+
+export const mockExchangeRates: ExchangeRateSeed[] = [
+  { id: 'rate-001', pair: 'USD/CNY', value: 7.2431, change24h: -0.08 },
+  { id: 'rate-002', pair: 'EUR/CNY', value: 7.8902, change24h: 0.12 },
+  { id: 'rate-003', pair: 'GBP/CNY', value: 9.2156, change24h: 0.05 },
+  { id: 'rate-004', pair: 'JPY/CNY', value: 0.0478, change24h: -0.23 },
+]

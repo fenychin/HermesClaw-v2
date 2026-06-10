@@ -403,6 +403,7 @@ export const ModelName = {
   AuditLog: 'AuditLog',
   Inquiry: 'Inquiry',
   MarketIntelligence: 'MarketIntelligence',
+  ExchangeRate: 'ExchangeRate',
   Quotation: 'Quotation',
   EvolutionLog: 'EvolutionLog',
   ToolRegistry: 'ToolRegistry',
@@ -425,7 +426,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "workspace" | "workspaceSettings" | "workspaceMember" | "user" | "account" | "session" | "agent" | "agentLog" | "project" | "memory" | "memoryRevision" | "connector" | "skill" | "harnessProposal" | "conversation" | "conversationMessage" | "auditLog" | "inquiry" | "marketIntelligence" | "quotation" | "evolutionLog" | "toolRegistry" | "toolGrant" | "workflow" | "workflowRun" | "workflowNodeRun"
+    modelProps: "workspace" | "workspaceSettings" | "workspaceMember" | "user" | "account" | "session" | "agent" | "agentLog" | "project" | "memory" | "memoryRevision" | "connector" | "skill" | "harnessProposal" | "conversation" | "conversationMessage" | "auditLog" | "inquiry" | "marketIntelligence" | "exchangeRate" | "quotation" | "evolutionLog" | "toolRegistry" | "toolGrant" | "workflow" | "workflowRun" | "workflowNodeRun"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1835,6 +1836,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    ExchangeRate: {
+      payload: Prisma.$ExchangeRatePayload<ExtArgs>
+      fields: Prisma.ExchangeRateFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ExchangeRateFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExchangeRatePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ExchangeRateFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExchangeRatePayload>
+        }
+        findFirst: {
+          args: Prisma.ExchangeRateFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExchangeRatePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ExchangeRateFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExchangeRatePayload>
+        }
+        findMany: {
+          args: Prisma.ExchangeRateFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExchangeRatePayload>[]
+        }
+        create: {
+          args: Prisma.ExchangeRateCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExchangeRatePayload>
+        }
+        createMany: {
+          args: Prisma.ExchangeRateCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ExchangeRateCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExchangeRatePayload>[]
+        }
+        delete: {
+          args: Prisma.ExchangeRateDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExchangeRatePayload>
+        }
+        update: {
+          args: Prisma.ExchangeRateUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExchangeRatePayload>
+        }
+        deleteMany: {
+          args: Prisma.ExchangeRateDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ExchangeRateUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ExchangeRateUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExchangeRatePayload>[]
+        }
+        upsert: {
+          args: Prisma.ExchangeRateUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExchangeRatePayload>
+        }
+        aggregate: {
+          args: Prisma.ExchangeRateAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateExchangeRate>
+        }
+        groupBy: {
+          args: Prisma.ExchangeRateGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ExchangeRateGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ExchangeRateCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ExchangeRateCountAggregateOutputType> | number
+        }
+      }
+    }
     Quotation: {
       payload: Prisma.$QuotationPayload<ExtArgs>
       fields: Prisma.QuotationFieldRefs
@@ -2699,6 +2774,19 @@ export const MarketIntelligenceScalarFieldEnum = {
 export type MarketIntelligenceScalarFieldEnum = (typeof MarketIntelligenceScalarFieldEnum)[keyof typeof MarketIntelligenceScalarFieldEnum]
 
 
+export const ExchangeRateScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  pair: 'pair',
+  value: 'value',
+  change24h: 'change24h',
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type ExchangeRateScalarFieldEnum = (typeof ExchangeRateScalarFieldEnum)[keyof typeof ExchangeRateScalarFieldEnum]
+
+
 export const QuotationScalarFieldEnum = {
   id: 'id',
   workspaceId: 'workspaceId',
@@ -3039,6 +3127,7 @@ export type GlobalOmitConfig = {
   auditLog?: Prisma.AuditLogOmit
   inquiry?: Prisma.InquiryOmit
   marketIntelligence?: Prisma.MarketIntelligenceOmit
+  exchangeRate?: Prisma.ExchangeRateOmit
   quotation?: Prisma.QuotationOmit
   evolutionLog?: Prisma.EvolutionLogOmit
   toolRegistry?: Prisma.ToolRegistryOmit

@@ -1,132 +1,254 @@
 "use client";
 
-import { useEffect, useMemo, useCallback, use } from "react";
-import { GitBranch } from "lucide-react";
+import { useState, useEffect, use } from "react";
+import { GitBranch, Loader2 } from "lucide-react";
 import { PageTransition } from "@/components/common/PageTransition";
 import { EmptyState } from "@/components/common/empty-state";
 import { WorkflowStepNav } from "../../_components/workflow-step-nav";
 import { WorkflowExecutor } from "../../_components/workflow-executor";
 import { WorkflowContextPanel } from "../../_components/workflow-context-panel";
 import { getWorkflowById } from "../../_data/workflow-details";
-import { useWorkflowExecutionStore } from "@/stores/workflow-execution-store";
 import type { Workflow, WorkflowRunStatus } from "@/types/workflow";
 
 // ============================================================
-// 页面主体（Client Component）
+// 从 DB Workflow 定义中提取步骤结构
 // ============================================================
 
-interface WorkflowDetailClientProps {
-  /** 从路由 params.id 解析出的初始工作流数据 */
-  initialWorkflow: Workflow;
+interface DbWorkflow {
+  id: string
+  name: string
+  description: string
+  nodes: Array<{ id: string; name: string; kind: string; config: Record<string, unknown> }>
+  edges: Array<{ from: string; to: string; when?: string }>
 }
 
 /**
- * 工作流详情页客户端交互层
- * —— 从 Zustand Store 读取动态状态，并与静态定义合并
+ * 将 DB 中的 DAG 节点映射到用户可见的步骤
+ * —— 每种 kind 生成一个步骤，按节点顺序排列
  */
-function WorkflowDetailClient({ initialWorkflow }: WorkflowDetailClientProps) {
-  const { workflowId, stepStates, startWorkflow, resetWorkflow } = useWorkflowExecutionStore();
+function mapNodesToSteps(nodes: DbWorkflow["nodes"]) {
+  return nodes
+    .filter((n) => n.kind !== "condition" && n.kind !== "noop") // 条件/noop 节点不显示为步骤
+    .map((n, i) => ({
+      id: `step-${n.id}`,
+      title: n.name,
+      description: "",
+      status: "pending" as const,
+      inputs: buildStepInputs(n, i),
+    }))
+}
 
-  // 初始化时，如果 store 中的 workflowId 不一致，则重置 store
-  useEffect(() => {
-    if (workflowId !== initialWorkflow.id) {
-      resetWorkflow();
-    }
-  }, [workflowId, initialWorkflow.id, resetWorkflow]);
-
-  // 将静态的工作流定义与 Store 中的动态执行状态合并
-  const mergedWorkflow = useMemo<Workflow>(() => {
-    if (!stepStates || stepStates.length === 0) {
-      return initialWorkflow;
-    }
-    
-    // 推导整体运行状态
-    let runStatus: WorkflowRunStatus = "idle";
-    const allCompleted = stepStates.every((s) => s.status === "completed");
-    const anyRunning = stepStates.some((s) => s.status === "running");
-    if (allCompleted) runStatus = "completed";
-    else if (anyRunning) runStatus = "running";
-
-    return {
-      ...initialWorkflow,
-      runStatus,
-      steps: initialWorkflow.steps.map((step, idx) => {
-        const state = stepStates[idx];
-        if (!state) return step;
-        return {
-          ...step,
-          status: state.status,
-          durationSec: state.durationSec,
-          // 如果需要将动态 output 放回 workflow definition，可以在这里合并
-          outputs: step.outputs?.map(out => ({
-             ...out,
-             value: state.outputs[out.key] || out.value // 用 store 中的值覆盖
-          }))
-        };
-      }),
-    };
-  }, [initialWorkflow, stepStates]);
-
-  const handleRun = useCallback(() => {
-    startWorkflow(initialWorkflow.id, initialWorkflow.steps.length);
-  }, [initialWorkflow.id, initialWorkflow.steps.length, startWorkflow]);
-
-  const handleRestart = useCallback(() => {
-    resetWorkflow();
-  }, [resetWorkflow]);
-
-  return (
-    <PageTransition>
-      {/* 三栏容器：全高、overflow 隐藏防双滚动条 */}
-      <div className="flex h-[calc(100vh-3rem)] w-full overflow-hidden bg-background">
-        {/* ============ 左栏：步骤导航 w-56 ============ */}
-        <WorkflowStepNav workflow={mergedWorkflow} onRestart={handleRestart} />
-
-        {/* ============ 中栏：工作流执行区 flex-1 ============ */}
-        <main className="flex-1 min-w-0 h-full overflow-hidden">
-          <WorkflowExecutor
-            workflow={mergedWorkflow}
-            runStatus={mergedWorkflow.runStatus || "idle"}
-            onRun={handleRun}
-          />
-        </main>
-
-        {/* ============ 右栏：上下文配置面板 w-64 ============ */}
-        <WorkflowContextPanel />
-      </div>
-    </PageTransition>
-  );
+/** 按节点类型构建步骤输入字段 */
+function buildStepInputs(
+  node: DbWorkflow["nodes"][number],
+  index: number,
+): Array<{
+  key: string
+  label: string
+  type: "text" | "textarea" | "select"
+  required: boolean
+  placeholder?: string
+  options?: Array<{ label: string; value: string }>
+}> {
+  if (node.kind === "skill") {
+    return [
+      {
+        key: `input_${node.id}_text`,
+        label: "输入内容",
+        type: "textarea" as const,
+        required: true,
+        placeholder: index === 0
+          ? "粘贴询盘邮件原文 / 客户需求描述..."
+          : "补充信息或调整指令...",
+      },
+    ]
+  }
+  // data-write / task 节点不需要用户输入
+  return []
 }
 
 // ============================================================
-// Next.js Page 入口（Server Component）
+// 客户端页面主体
 // ============================================================
 
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string }>
 }
 
-/**
- * 工作流详情页
- * —— 通过 params.id 从 mock 数据中匹配对应 Workflow；
- *    无匹配数据时显示 EmptyState
- */
 export default function WorkflowDetailPage({ params }: PageProps) {
-  const { id } = use(params);
-  const workflow = getWorkflowById(id);
+  const { id } = use(params)
+  const [dbWorkflow, setDbWorkflow] = useState<DbWorkflow | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
-  // 未匹配到对应工作流时，渲染空状态
-  if (!workflow) {
+  // 从 API 加载 DB 中的工作流定义
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setIsLoading(true)
+      setLoadError(null)
+      try {
+        const res = await fetch(`/api/workflows/${id}`)
+        if (!res.ok) {
+          if (res.status === 404) {
+            setDbWorkflow(null)
+            return
+          }
+          throw new Error("加载工作流失败")
+        }
+        const json = await res.json()
+        if (!json.success) throw new Error(json.error ?? "未知错误")
+        if (!cancelled) setDbWorkflow(json.data as DbWorkflow)
+      } catch (err) {
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : "加载失败")
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [id])
+
+  // 加载中状态
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          <span className="text-sm">加载工作流...</span>
+        </div>
+      </div>
+    )
+  }
+
+  // 加载失败
+  if (loadError) {
     return (
       <div className="flex h-full items-center justify-center">
         <EmptyState
           icon={GitBranch}
-          title="工作流不存在"
-          description={`未找到 ID 为「${id}」的工作流，请返回外贸工作台重新选择。`}
+          title="加载失败"
+          description={loadError}
         />
       </div>
-    );
+    )
   }
 
-  return <WorkflowDetailClient initialWorkflow={workflow} />;
+  // DB 中无此工作流定义 → 回退到静态 mock 数据（兼容旧数据）
+  if (!dbWorkflow) {
+    const staticWorkflow = getWorkflowById(id)
+    if (!staticWorkflow) {
+      return (
+        <div className="flex h-full items-center justify-center">
+          <EmptyState
+            icon={GitBranch}
+            title="工作流不存在"
+            description={`未找到 ID 为「${id}」的工作流，请返回外贸工作台重新选择。`}
+          />
+        </div>
+      )
+    }
+    // 使用静态 mock 数据（兼容：无 DB 记录的旧工作流）
+    return (
+      <StaticWorkflowPage workflow={staticWorkflow} />
+    )
+  }
+
+  // 使用 DB 工作流定义
+  return <DbWorkflowPage dbWorkflow={dbWorkflow} workflowId={id} />
+}
+
+// ============================================================
+// DB 驱动的工作流页面（真实后端执行）
+// ============================================================
+
+function DbWorkflowPage({
+  dbWorkflow,
+  workflowId,
+}: {
+  dbWorkflow: DbWorkflow
+  workflowId: string
+}) {
+  const [runStatus, setRunStatus] = useState<WorkflowRunStatus>("idle")
+  const dagNodes = dbWorkflow.nodes.filter((n) => n.kind !== "condition" && n.kind !== "noop")
+
+  // 将 DB 节点映射为 Workflow 类型（供 executor 使用）
+  const steps = mapNodesToSteps(dbWorkflow.nodes)
+  const workflow: Workflow = {
+    id: workflowId,
+    title: dbWorkflow.name,
+    description: dbWorkflow.description,
+    runStatus,
+    steps,
+  }
+
+  // 轮询：当 runStatus 为 running 时，超时 fallback（执行在 WorkflowExecutor 内部完成）
+  useEffect(() => {
+    if (runStatus === "running") {
+      // 给一个小延迟让 executor 内的 API 调用先完成
+      // executor 成功后会通过 onRun 回调通知
+      // 这里作为 fallback，3s 后自动重置
+      const timer = setTimeout(() => {
+        setRunStatus((prev) => (prev === "running" ? "idle" : prev))
+      }, 30000)
+      return () => clearTimeout(timer)
+    }
+  }, [runStatus])
+
+  // 暴露 setRunStatus 给子组件
+  const handleWorkflowComplete = () => {
+    setRunStatus("completed")
+  }
+
+  return (
+    <PageTransition>
+      <div className="flex h-[calc(100vh-3rem)] w-full overflow-hidden bg-background">
+        {/* 左栏：步骤导航 */}
+        <WorkflowStepNav workflow={workflow} onRestart={() => setRunStatus("idle")} />
+
+        {/* 中栏：工作流执行区 */}
+        <main className="flex-1 min-w-0 h-full overflow-hidden">
+          <WorkflowExecutor
+            workflow={workflow}
+            runStatus={runStatus}
+            dagNodes={dagNodes}
+            onRun={handleWorkflowComplete}
+          />
+        </main>
+
+        {/* 右栏：上下文配置面板 */}
+        <WorkflowContextPanel />
+      </div>
+    </PageTransition>
+  )
+}
+
+// ============================================================
+// 静态工作流页面（兼容无 DB 记录的旧工作流）
+// ============================================================
+
+function StaticWorkflowPage({ workflow }: { workflow: Workflow }) {
+  const [runStatus, setRunStatus] = useState<WorkflowRunStatus>("idle")
+
+  return (
+    <PageTransition>
+      <div className="flex h-[calc(100vh-3rem)] w-full overflow-hidden bg-background">
+        {/* 左栏 */}
+        <WorkflowStepNav workflow={workflow} onRestart={() => setRunStatus("idle")} />
+
+        {/* 中栏：使用真实 API 执行，传递空 DAG */}
+        <main className="flex-1 min-w-0 h-full overflow-hidden">
+          <WorkflowExecutor
+            workflow={workflow}
+            runStatus={runStatus}
+            dagNodes={[]}
+            onRun={() => setRunStatus("completed")}
+          />
+        </main>
+
+        {/* 右栏 */}
+        <WorkflowContextPanel />
+      </div>
+    </PageTransition>
+  )
 }

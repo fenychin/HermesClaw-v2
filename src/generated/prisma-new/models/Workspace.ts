@@ -189,6 +189,7 @@ export type WorkspaceWhereInput = {
   inquiries?: Prisma.InquiryListRelationFilter
   marketIntelligences?: Prisma.MarketIntelligenceListRelationFilter
   quotations?: Prisma.QuotationListRelationFilter
+  exchangeRates?: Prisma.ExchangeRateListRelationFilter
   evolutionLogs?: Prisma.EvolutionLogListRelationFilter
   toolRegistries?: Prisma.ToolRegistryListRelationFilter
   toolGrants?: Prisma.ToolGrantListRelationFilter
@@ -218,6 +219,7 @@ export type WorkspaceOrderByWithRelationInput = {
   inquiries?: Prisma.InquiryOrderByRelationAggregateInput
   marketIntelligences?: Prisma.MarketIntelligenceOrderByRelationAggregateInput
   quotations?: Prisma.QuotationOrderByRelationAggregateInput
+  exchangeRates?: Prisma.ExchangeRateOrderByRelationAggregateInput
   evolutionLogs?: Prisma.EvolutionLogOrderByRelationAggregateInput
   toolRegistries?: Prisma.ToolRegistryOrderByRelationAggregateInput
   toolGrants?: Prisma.ToolGrantOrderByRelationAggregateInput
@@ -250,6 +252,7 @@ export type WorkspaceWhereUniqueInput = Prisma.AtLeast<{
   inquiries?: Prisma.InquiryListRelationFilter
   marketIntelligences?: Prisma.MarketIntelligenceListRelationFilter
   quotations?: Prisma.QuotationListRelationFilter
+  exchangeRates?: Prisma.ExchangeRateListRelationFilter
   evolutionLogs?: Prisma.EvolutionLogListRelationFilter
   toolRegistries?: Prisma.ToolRegistryListRelationFilter
   toolGrants?: Prisma.ToolGrantListRelationFilter
@@ -299,6 +302,7 @@ export type WorkspaceCreateInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -328,6 +332,7 @@ export type WorkspaceUncheckedCreateInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -357,6 +362,7 @@ export type WorkspaceUpdateInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -386,6 +392,7 @@ export type WorkspaceUncheckedUpdateInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -660,6 +667,20 @@ export type WorkspaceUpdateOneRequiredWithoutMarketIntelligencesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.WorkspaceUpdateToOneWithWhereWithoutMarketIntelligencesInput, Prisma.WorkspaceUpdateWithoutMarketIntelligencesInput>, Prisma.WorkspaceUncheckedUpdateWithoutMarketIntelligencesInput>
 }
 
+export type WorkspaceCreateNestedOneWithoutExchangeRatesInput = {
+  create?: Prisma.XOR<Prisma.WorkspaceCreateWithoutExchangeRatesInput, Prisma.WorkspaceUncheckedCreateWithoutExchangeRatesInput>
+  connectOrCreate?: Prisma.WorkspaceCreateOrConnectWithoutExchangeRatesInput
+  connect?: Prisma.WorkspaceWhereUniqueInput
+}
+
+export type WorkspaceUpdateOneRequiredWithoutExchangeRatesNestedInput = {
+  create?: Prisma.XOR<Prisma.WorkspaceCreateWithoutExchangeRatesInput, Prisma.WorkspaceUncheckedCreateWithoutExchangeRatesInput>
+  connectOrCreate?: Prisma.WorkspaceCreateOrConnectWithoutExchangeRatesInput
+  upsert?: Prisma.WorkspaceUpsertWithoutExchangeRatesInput
+  connect?: Prisma.WorkspaceWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WorkspaceUpdateToOneWithWhereWithoutExchangeRatesInput, Prisma.WorkspaceUpdateWithoutExchangeRatesInput>, Prisma.WorkspaceUncheckedUpdateWithoutExchangeRatesInput>
+}
+
 export type WorkspaceCreateNestedOneWithoutQuotationsInput = {
   create?: Prisma.XOR<Prisma.WorkspaceCreateWithoutQuotationsInput, Prisma.WorkspaceUncheckedCreateWithoutQuotationsInput>
   connectOrCreate?: Prisma.WorkspaceCreateOrConnectWithoutQuotationsInput
@@ -778,6 +799,7 @@ export type WorkspaceCreateWithoutSettingsInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -806,6 +828,7 @@ export type WorkspaceUncheckedCreateWithoutSettingsInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -850,6 +873,7 @@ export type WorkspaceUpdateWithoutSettingsInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -878,6 +902,7 @@ export type WorkspaceUncheckedUpdateWithoutSettingsInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -905,6 +930,7 @@ export type WorkspaceCreateWithoutMembersInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -933,6 +959,7 @@ export type WorkspaceUncheckedCreateWithoutMembersInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -977,6 +1004,7 @@ export type WorkspaceUpdateWithoutMembersInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -1005,6 +1033,7 @@ export type WorkspaceUncheckedUpdateWithoutMembersInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -1033,6 +1062,7 @@ export type WorkspaceCreateWithoutAgentsInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -1061,6 +1091,7 @@ export type WorkspaceUncheckedCreateWithoutAgentsInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -1105,6 +1136,7 @@ export type WorkspaceUpdateWithoutAgentsInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -1133,6 +1165,7 @@ export type WorkspaceUncheckedUpdateWithoutAgentsInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -1161,6 +1194,7 @@ export type WorkspaceCreateWithoutAgentLogsInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -1189,6 +1223,7 @@ export type WorkspaceUncheckedCreateWithoutAgentLogsInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -1233,6 +1268,7 @@ export type WorkspaceUpdateWithoutAgentLogsInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -1261,6 +1297,7 @@ export type WorkspaceUncheckedUpdateWithoutAgentLogsInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -1289,6 +1326,7 @@ export type WorkspaceCreateWithoutProjectsInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -1317,6 +1355,7 @@ export type WorkspaceUncheckedCreateWithoutProjectsInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -1361,6 +1400,7 @@ export type WorkspaceUpdateWithoutProjectsInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -1389,6 +1429,7 @@ export type WorkspaceUncheckedUpdateWithoutProjectsInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -1417,6 +1458,7 @@ export type WorkspaceCreateWithoutMemoriesInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -1445,6 +1487,7 @@ export type WorkspaceUncheckedCreateWithoutMemoriesInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -1489,6 +1532,7 @@ export type WorkspaceUpdateWithoutMemoriesInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -1517,6 +1561,7 @@ export type WorkspaceUncheckedUpdateWithoutMemoriesInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -1545,6 +1590,7 @@ export type WorkspaceCreateWithoutMemoryRevisionsInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -1573,6 +1619,7 @@ export type WorkspaceUncheckedCreateWithoutMemoryRevisionsInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -1617,6 +1664,7 @@ export type WorkspaceUpdateWithoutMemoryRevisionsInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -1645,6 +1693,7 @@ export type WorkspaceUncheckedUpdateWithoutMemoryRevisionsInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -1673,6 +1722,7 @@ export type WorkspaceCreateWithoutConnectorsInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -1701,6 +1751,7 @@ export type WorkspaceUncheckedCreateWithoutConnectorsInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -1745,6 +1796,7 @@ export type WorkspaceUpdateWithoutConnectorsInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -1773,6 +1825,7 @@ export type WorkspaceUncheckedUpdateWithoutConnectorsInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -1801,6 +1854,7 @@ export type WorkspaceCreateWithoutSkillsInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -1829,6 +1883,7 @@ export type WorkspaceUncheckedCreateWithoutSkillsInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -1873,6 +1928,7 @@ export type WorkspaceUpdateWithoutSkillsInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -1901,6 +1957,7 @@ export type WorkspaceUncheckedUpdateWithoutSkillsInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -1929,6 +1986,7 @@ export type WorkspaceCreateWithoutHarnessProposalsInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -1957,6 +2015,7 @@ export type WorkspaceUncheckedCreateWithoutHarnessProposalsInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -2001,6 +2060,7 @@ export type WorkspaceUpdateWithoutHarnessProposalsInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -2029,6 +2089,7 @@ export type WorkspaceUncheckedUpdateWithoutHarnessProposalsInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -2057,6 +2118,7 @@ export type WorkspaceCreateWithoutConversationsInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -2085,6 +2147,7 @@ export type WorkspaceUncheckedCreateWithoutConversationsInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -2129,6 +2192,7 @@ export type WorkspaceUpdateWithoutConversationsInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -2157,6 +2221,7 @@ export type WorkspaceUncheckedUpdateWithoutConversationsInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -2185,6 +2250,7 @@ export type WorkspaceCreateWithoutConversationMessagesInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -2213,6 +2279,7 @@ export type WorkspaceUncheckedCreateWithoutConversationMessagesInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -2257,6 +2324,7 @@ export type WorkspaceUpdateWithoutConversationMessagesInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -2285,6 +2353,7 @@ export type WorkspaceUncheckedUpdateWithoutConversationMessagesInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -2313,6 +2382,7 @@ export type WorkspaceCreateWithoutAuditLogsInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -2341,6 +2411,7 @@ export type WorkspaceUncheckedCreateWithoutAuditLogsInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -2385,6 +2456,7 @@ export type WorkspaceUpdateWithoutAuditLogsInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -2413,6 +2485,7 @@ export type WorkspaceUncheckedUpdateWithoutAuditLogsInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -2441,6 +2514,7 @@ export type WorkspaceCreateWithoutInquiriesInput = {
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -2469,6 +2543,7 @@ export type WorkspaceUncheckedCreateWithoutInquiriesInput = {
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -2513,6 +2588,7 @@ export type WorkspaceUpdateWithoutInquiriesInput = {
   auditLogs?: Prisma.AuditLogUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -2541,6 +2617,7 @@ export type WorkspaceUncheckedUpdateWithoutInquiriesInput = {
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -2569,6 +2646,7 @@ export type WorkspaceCreateWithoutMarketIntelligencesInput = {
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutWorkspaceInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -2597,6 +2675,7 @@ export type WorkspaceUncheckedCreateWithoutMarketIntelligencesInput = {
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutWorkspaceInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -2641,6 +2720,7 @@ export type WorkspaceUpdateWithoutMarketIntelligencesInput = {
   auditLogs?: Prisma.AuditLogUpdateManyWithoutWorkspaceNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -2668,6 +2748,139 @@ export type WorkspaceUncheckedUpdateWithoutMarketIntelligencesInput = {
   conversationMessages?: Prisma.ConversationMessageUncheckedUpdateManyWithoutWorkspaceNestedInput
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
+  quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
+  evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
+  toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
+  toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
+}
+
+export type WorkspaceCreateWithoutExchangeRatesInput = {
+  id?: string
+  name: string
+  plan?: string
+  createdAt?: Date | string
+  members?: Prisma.WorkspaceMemberCreateNestedManyWithoutWorkspaceInput
+  agents?: Prisma.AgentCreateNestedManyWithoutWorkspaceInput
+  agentLogs?: Prisma.AgentLogCreateNestedManyWithoutWorkspaceInput
+  projects?: Prisma.ProjectCreateNestedManyWithoutWorkspaceInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutWorkspaceInput
+  memoryRevisions?: Prisma.MemoryRevisionCreateNestedManyWithoutWorkspaceInput
+  connectors?: Prisma.ConnectorCreateNestedManyWithoutWorkspaceInput
+  skills?: Prisma.SkillCreateNestedManyWithoutWorkspaceInput
+  harnessProposals?: Prisma.HarnessProposalCreateNestedManyWithoutWorkspaceInput
+  conversations?: Prisma.ConversationCreateNestedManyWithoutWorkspaceInput
+  conversationMessages?: Prisma.ConversationMessageCreateNestedManyWithoutWorkspaceInput
+  auditLogs?: Prisma.AuditLogCreateNestedManyWithoutWorkspaceInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
+  marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
+  quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
+  toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
+  toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
+  workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
+  workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
+  workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
+}
+
+export type WorkspaceUncheckedCreateWithoutExchangeRatesInput = {
+  id?: string
+  name: string
+  plan?: string
+  createdAt?: Date | string
+  members?: Prisma.WorkspaceMemberUncheckedCreateNestedManyWithoutWorkspaceInput
+  agents?: Prisma.AgentUncheckedCreateNestedManyWithoutWorkspaceInput
+  agentLogs?: Prisma.AgentLogUncheckedCreateNestedManyWithoutWorkspaceInput
+  projects?: Prisma.ProjectUncheckedCreateNestedManyWithoutWorkspaceInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutWorkspaceInput
+  memoryRevisions?: Prisma.MemoryRevisionUncheckedCreateNestedManyWithoutWorkspaceInput
+  connectors?: Prisma.ConnectorUncheckedCreateNestedManyWithoutWorkspaceInput
+  skills?: Prisma.SkillUncheckedCreateNestedManyWithoutWorkspaceInput
+  harnessProposals?: Prisma.HarnessProposalUncheckedCreateNestedManyWithoutWorkspaceInput
+  conversations?: Prisma.ConversationUncheckedCreateNestedManyWithoutWorkspaceInput
+  conversationMessages?: Prisma.ConversationMessageUncheckedCreateNestedManyWithoutWorkspaceInput
+  auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutWorkspaceInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
+  marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
+  quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
+  toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
+  toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
+  workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
+  workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
+}
+
+export type WorkspaceCreateOrConnectWithoutExchangeRatesInput = {
+  where: Prisma.WorkspaceWhereUniqueInput
+  create: Prisma.XOR<Prisma.WorkspaceCreateWithoutExchangeRatesInput, Prisma.WorkspaceUncheckedCreateWithoutExchangeRatesInput>
+}
+
+export type WorkspaceUpsertWithoutExchangeRatesInput = {
+  update: Prisma.XOR<Prisma.WorkspaceUpdateWithoutExchangeRatesInput, Prisma.WorkspaceUncheckedUpdateWithoutExchangeRatesInput>
+  create: Prisma.XOR<Prisma.WorkspaceCreateWithoutExchangeRatesInput, Prisma.WorkspaceUncheckedCreateWithoutExchangeRatesInput>
+  where?: Prisma.WorkspaceWhereInput
+}
+
+export type WorkspaceUpdateToOneWithWhereWithoutExchangeRatesInput = {
+  where?: Prisma.WorkspaceWhereInput
+  data: Prisma.XOR<Prisma.WorkspaceUpdateWithoutExchangeRatesInput, Prisma.WorkspaceUncheckedUpdateWithoutExchangeRatesInput>
+}
+
+export type WorkspaceUpdateWithoutExchangeRatesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  members?: Prisma.WorkspaceMemberUpdateManyWithoutWorkspaceNestedInput
+  agents?: Prisma.AgentUpdateManyWithoutWorkspaceNestedInput
+  agentLogs?: Prisma.AgentLogUpdateManyWithoutWorkspaceNestedInput
+  projects?: Prisma.ProjectUpdateManyWithoutWorkspaceNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutWorkspaceNestedInput
+  memoryRevisions?: Prisma.MemoryRevisionUpdateManyWithoutWorkspaceNestedInput
+  connectors?: Prisma.ConnectorUpdateManyWithoutWorkspaceNestedInput
+  skills?: Prisma.SkillUpdateManyWithoutWorkspaceNestedInput
+  harnessProposals?: Prisma.HarnessProposalUpdateManyWithoutWorkspaceNestedInput
+  conversations?: Prisma.ConversationUpdateManyWithoutWorkspaceNestedInput
+  conversationMessages?: Prisma.ConversationMessageUpdateManyWithoutWorkspaceNestedInput
+  auditLogs?: Prisma.AuditLogUpdateManyWithoutWorkspaceNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
+  marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
+  quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
+  toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
+  toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
+  workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
+  workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
+  workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
+}
+
+export type WorkspaceUncheckedUpdateWithoutExchangeRatesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  members?: Prisma.WorkspaceMemberUncheckedUpdateManyWithoutWorkspaceNestedInput
+  agents?: Prisma.AgentUncheckedUpdateManyWithoutWorkspaceNestedInput
+  agentLogs?: Prisma.AgentLogUncheckedUpdateManyWithoutWorkspaceNestedInput
+  projects?: Prisma.ProjectUncheckedUpdateManyWithoutWorkspaceNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+  memoryRevisions?: Prisma.MemoryRevisionUncheckedUpdateManyWithoutWorkspaceNestedInput
+  connectors?: Prisma.ConnectorUncheckedUpdateManyWithoutWorkspaceNestedInput
+  skills?: Prisma.SkillUncheckedUpdateManyWithoutWorkspaceNestedInput
+  harnessProposals?: Prisma.HarnessProposalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  conversations?: Prisma.ConversationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  conversationMessages?: Prisma.ConversationMessageUncheckedUpdateManyWithoutWorkspaceNestedInput
+  auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutWorkspaceNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
+  marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -2697,6 +2910,7 @@ export type WorkspaceCreateWithoutQuotationsInput = {
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutWorkspaceInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -2725,6 +2939,7 @@ export type WorkspaceUncheckedCreateWithoutQuotationsInput = {
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutWorkspaceInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -2769,6 +2984,7 @@ export type WorkspaceUpdateWithoutQuotationsInput = {
   auditLogs?: Prisma.AuditLogUpdateManyWithoutWorkspaceNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -2797,6 +3013,7 @@ export type WorkspaceUncheckedUpdateWithoutQuotationsInput = {
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -2826,6 +3043,7 @@ export type WorkspaceCreateWithoutEvolutionLogsInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
@@ -2854,6 +3072,7 @@ export type WorkspaceUncheckedCreateWithoutEvolutionLogsInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -2898,6 +3117,7 @@ export type WorkspaceUpdateWithoutEvolutionLogsInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
@@ -2926,6 +3146,7 @@ export type WorkspaceUncheckedUpdateWithoutEvolutionLogsInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -2954,6 +3175,7 @@ export type WorkspaceCreateWithoutToolRegistriesInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
@@ -2982,6 +3204,7 @@ export type WorkspaceUncheckedCreateWithoutToolRegistriesInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -3026,6 +3249,7 @@ export type WorkspaceUpdateWithoutToolRegistriesInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
@@ -3054,6 +3278,7 @@ export type WorkspaceUncheckedUpdateWithoutToolRegistriesInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -3082,6 +3307,7 @@ export type WorkspaceCreateWithoutToolGrantsInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
@@ -3110,6 +3336,7 @@ export type WorkspaceUncheckedCreateWithoutToolGrantsInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -3154,6 +3381,7 @@ export type WorkspaceUpdateWithoutToolGrantsInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
@@ -3182,6 +3410,7 @@ export type WorkspaceUncheckedUpdateWithoutToolGrantsInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -3210,6 +3439,7 @@ export type WorkspaceCreateWithoutWorkflowsInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -3238,6 +3468,7 @@ export type WorkspaceUncheckedCreateWithoutWorkflowsInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -3282,6 +3513,7 @@ export type WorkspaceUpdateWithoutWorkflowsInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -3310,6 +3542,7 @@ export type WorkspaceUncheckedUpdateWithoutWorkflowsInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -3338,6 +3571,7 @@ export type WorkspaceCreateWithoutWorkflowRunsInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -3366,6 +3600,7 @@ export type WorkspaceUncheckedCreateWithoutWorkflowRunsInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -3410,6 +3645,7 @@ export type WorkspaceUpdateWithoutWorkflowRunsInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -3438,6 +3674,7 @@ export type WorkspaceUncheckedUpdateWithoutWorkflowRunsInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -3466,6 +3703,7 @@ export type WorkspaceCreateWithoutWorkflowNodeRunsInput = {
   inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
@@ -3494,6 +3732,7 @@ export type WorkspaceUncheckedCreateWithoutWorkflowNodeRunsInput = {
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
   quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
   toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
@@ -3538,6 +3777,7 @@ export type WorkspaceUpdateWithoutWorkflowNodeRunsInput = {
   inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
@@ -3566,6 +3806,7 @@ export type WorkspaceUncheckedUpdateWithoutWorkflowNodeRunsInput = {
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
   marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
   quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
   evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
@@ -3595,6 +3836,7 @@ export type WorkspaceCountOutputType = {
   inquiries: number
   marketIntelligences: number
   quotations: number
+  exchangeRates: number
   evolutionLogs: number
   toolRegistries: number
   toolGrants: number
@@ -3619,6 +3861,7 @@ export type WorkspaceCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensi
   inquiries?: boolean | WorkspaceCountOutputTypeCountInquiriesArgs
   marketIntelligences?: boolean | WorkspaceCountOutputTypeCountMarketIntelligencesArgs
   quotations?: boolean | WorkspaceCountOutputTypeCountQuotationsArgs
+  exchangeRates?: boolean | WorkspaceCountOutputTypeCountExchangeRatesArgs
   evolutionLogs?: boolean | WorkspaceCountOutputTypeCountEvolutionLogsArgs
   toolRegistries?: boolean | WorkspaceCountOutputTypeCountToolRegistriesArgs
   toolGrants?: boolean | WorkspaceCountOutputTypeCountToolGrantsArgs
@@ -3745,6 +3988,13 @@ export type WorkspaceCountOutputTypeCountQuotationsArgs<ExtArgs extends runtime.
 /**
  * WorkspaceCountOutputType without action
  */
+export type WorkspaceCountOutputTypeCountExchangeRatesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ExchangeRateWhereInput
+}
+
+/**
+ * WorkspaceCountOutputType without action
+ */
 export type WorkspaceCountOutputTypeCountEvolutionLogsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.EvolutionLogWhereInput
 }
@@ -3805,6 +4055,7 @@ export type WorkspaceSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   inquiries?: boolean | Prisma.Workspace$inquiriesArgs<ExtArgs>
   marketIntelligences?: boolean | Prisma.Workspace$marketIntelligencesArgs<ExtArgs>
   quotations?: boolean | Prisma.Workspace$quotationsArgs<ExtArgs>
+  exchangeRates?: boolean | Prisma.Workspace$exchangeRatesArgs<ExtArgs>
   evolutionLogs?: boolean | Prisma.Workspace$evolutionLogsArgs<ExtArgs>
   toolRegistries?: boolean | Prisma.Workspace$toolRegistriesArgs<ExtArgs>
   toolGrants?: boolean | Prisma.Workspace$toolGrantsArgs<ExtArgs>
@@ -3853,6 +4104,7 @@ export type WorkspaceInclude<ExtArgs extends runtime.Types.Extensions.InternalAr
   inquiries?: boolean | Prisma.Workspace$inquiriesArgs<ExtArgs>
   marketIntelligences?: boolean | Prisma.Workspace$marketIntelligencesArgs<ExtArgs>
   quotations?: boolean | Prisma.Workspace$quotationsArgs<ExtArgs>
+  exchangeRates?: boolean | Prisma.Workspace$exchangeRatesArgs<ExtArgs>
   evolutionLogs?: boolean | Prisma.Workspace$evolutionLogsArgs<ExtArgs>
   toolRegistries?: boolean | Prisma.Workspace$toolRegistriesArgs<ExtArgs>
   toolGrants?: boolean | Prisma.Workspace$toolGrantsArgs<ExtArgs>
@@ -3883,6 +4135,7 @@ export type $WorkspacePayload<ExtArgs extends runtime.Types.Extensions.InternalA
     inquiries: Prisma.$InquiryPayload<ExtArgs>[]
     marketIntelligences: Prisma.$MarketIntelligencePayload<ExtArgs>[]
     quotations: Prisma.$QuotationPayload<ExtArgs>[]
+    exchangeRates: Prisma.$ExchangeRatePayload<ExtArgs>[]
     evolutionLogs: Prisma.$EvolutionLogPayload<ExtArgs>[]
     toolRegistries: Prisma.$ToolRegistryPayload<ExtArgs>[]
     toolGrants: Prisma.$ToolGrantPayload<ExtArgs>[]
@@ -4305,6 +4558,7 @@ export interface Prisma__WorkspaceClient<T, Null = never, ExtArgs extends runtim
   inquiries<T extends Prisma.Workspace$inquiriesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$inquiriesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InquiryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   marketIntelligences<T extends Prisma.Workspace$marketIntelligencesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$marketIntelligencesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketIntelligencePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   quotations<T extends Prisma.Workspace$quotationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$quotationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$QuotationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  exchangeRates<T extends Prisma.Workspace$exchangeRatesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$exchangeRatesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ExchangeRatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   evolutionLogs<T extends Prisma.Workspace$evolutionLogsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$evolutionLogsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$EvolutionLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   toolRegistries<T extends Prisma.Workspace$toolRegistriesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$toolRegistriesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ToolRegistryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   toolGrants<T extends Prisma.Workspace$toolGrantsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$toolGrantsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ToolGrantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -5093,6 +5347,30 @@ export type Workspace$quotationsArgs<ExtArgs extends runtime.Types.Extensions.In
   take?: number
   skip?: number
   distinct?: Prisma.QuotationScalarFieldEnum | Prisma.QuotationScalarFieldEnum[]
+}
+
+/**
+ * Workspace.exchangeRates
+ */
+export type Workspace$exchangeRatesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ExchangeRate
+   */
+  select?: Prisma.ExchangeRateSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ExchangeRate
+   */
+  omit?: Prisma.ExchangeRateOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ExchangeRateInclude<ExtArgs> | null
+  where?: Prisma.ExchangeRateWhereInput
+  orderBy?: Prisma.ExchangeRateOrderByWithRelationInput | Prisma.ExchangeRateOrderByWithRelationInput[]
+  cursor?: Prisma.ExchangeRateWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ExchangeRateScalarFieldEnum | Prisma.ExchangeRateScalarFieldEnum[]
 }
 
 /**
