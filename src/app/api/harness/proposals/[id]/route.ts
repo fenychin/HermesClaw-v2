@@ -5,7 +5,7 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { writeAuditLog } from "@/lib/server/audit"
+import { createAuditEntry, updateAuditEntry } from "@/lib/server/audit"
 import { checkConfirmQuery, checkAutomationGate } from "@/lib/server/guardrail"
 import { resolveAutomationLevel } from "@/types"
 import { HarnessProposalUpdateSchema, validateBody } from "@/lib/validators"
@@ -85,6 +85,27 @@ export async function PATCH(
         existing.riskLevel as "low" | "mid" | "high",
       )
 
+      // AGENTS.md §5 #3 禁止静默执行：执行前写入预记录审计
+      const entry = await createAuditEntry({
+        actor: body.reviewedBy ?? "system",
+        action: body.action === "approve" ? "approve.proposal" : "reject.proposal",
+        targetType: "proposal",
+        targetId: id,
+        detail: `${existing.proposalId} · ${automationLevel}`,
+        riskLevel: existing.riskLevel as "low" | "mid" | "high",
+        workspaceId: ctx.workspaceId,
+        automationLevel: (existing.automationLevel as "L1" | "L2" | "L3" | "L4") ?? undefined,
+        triggeredBy: "user",
+        contextSnapshot: {
+          proposalId: existing.proposalId,
+          previousStatus: existing.status,
+          action: body.action,
+          automationLevel: existing.automationLevel,
+          riskLevel: existing.riskLevel,
+          reviewer: body.reviewedBy ?? "system",
+        },
+      })
+
       const data = {
         status: body.action === "approve" ? "approved" : "rejected",
         reviewedBy: body.reviewedBy ?? "system",
@@ -96,15 +117,15 @@ export async function PATCH(
         data,
       })
 
-      // 审计：记录审批动作（AGENTS.md §4.7：授权分级须可溯源）
-      await writeAuditLog({
-        actor: data.reviewedBy,
-        action: body.action === "approve" ? "approve.proposal" : "reject.proposal",
-        targetType: "proposal",
-        targetId: id,
-        detail: `${existing.proposalId} · ${automationLevel}`,
-        riskLevel: existing.riskLevel as "low" | "mid" | "high",
-        workspaceId: ctx.workspaceId,
+      // 更新预记录为 success
+      await updateAuditEntry({
+        auditId: entry.auditId,
+        status: "success",
+        detail: `${existing.proposalId} · ${automationLevel} · ${body.action === "approve" ? "已批准" : "已拒绝"}`,
+        contextSnapshot: {
+          postStatus: data.status,
+          reviewedAt: data.reviewedAt,
+        },
       })
 
       return successResponse({
@@ -150,9 +171,8 @@ export async function DELETE(
     const guard = await checkConfirmQuery(request, "删除升级提案需二次确认")
     if (!guard.ok) return guard.response
 
-    await prisma.harnessProposal.delete({ where: { id } })
-
-    await writeAuditLog({
+    // AGENTS.md §5 #3 禁止静默执行：删除前写入预记录审计
+    const entry = await createAuditEntry({
       actor: guard.actor,
       action: "delete.proposal",
       targetType: "proposal",
@@ -160,6 +180,23 @@ export async function DELETE(
       detail: existing.proposalId,
       riskLevel: "mid",
       workspaceId: ctx.workspaceId,
+      automationLevel: "L3",
+      triggeredBy: "user",
+      contextSnapshot: {
+        proposalId: existing.proposalId,
+        status: existing.status,
+        automationLevel: existing.automationLevel,
+        riskLevel: existing.riskLevel,
+      },
+    })
+
+    await prisma.harnessProposal.delete({ where: { id } })
+
+    // 执行成功 → 更新预记录为 success
+    await updateAuditEntry({
+      auditId: entry.auditId,
+      status: "success",
+      detail: `已删除提案 ${existing.proposalId}`,
     })
 
     return successResponse({ message: "提案已删除" })

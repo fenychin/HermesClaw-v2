@@ -3,11 +3,13 @@
  *
  * —— 对应 AGENTS.md §4.3：连接器调用须全程留痕（AgentLog + AuditLog）。
  *    流程：IMAP 连接 → 拉取未读 → 解析询盘 → 写入 Inquiry 表 → 标记已读。
+ *
+ * —— AGENTS.md §5 #3 禁止静默执行：同步前写入预记录审计，同步后更新状态。
  */
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import { successResponse, errorResponse } from "@/lib/api-utils"
-import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
+import { createAuditEntry, updateAuditEntry, writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { createEmailConnector } from "@/lib/server/connectors/email/email-connector"
 import { parseInquiriesFromEmails } from "@/lib/server/connectors/email/inquiry-parser"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
@@ -19,6 +21,24 @@ export async function POST(request: Request) {
   const ctx = await buildWorkspaceContext(request)
   requireWritable(ctx.role)
   const actor = await actorFromSession()
+
+  // AGENTS.md §5 #3 禁止静默执行：同步前写入预记录审计
+  const preEntry = await createAuditEntry({
+    actor,
+    action: "connector.email.sync",
+    targetType: "inquiry",
+    targetId: `batch-${Date.now()}`,
+    detail: "开始邮件同步",
+    riskLevel: "low",
+    workspaceId: ctx.workspaceId,
+    automationLevel: "L2",
+    triggeredBy: "system",
+    contextSnapshot: {
+      connectorType: "email",
+      action: "sync",
+    },
+  })
+
   const connector = createEmailConnector()
 
   try {
@@ -27,6 +47,11 @@ export async function POST(request: Request) {
     logger.info("Email sync: 拉取完成", { count: emails.length, actor })
 
     if (emails.length === 0) {
+      await updateAuditEntry({
+        auditId: preEntry.auditId,
+        status: "success",
+        detail: "无新邮件",
+      })
       return successResponse({
         synced: 0,
         message: "无新邮件",
@@ -76,15 +101,17 @@ export async function POST(request: Request) {
       await connector.markSeen(uids)
     }
 
-    // ⑤ 审计日志（AGENTS.md §4.3：关键操作须可溯源）
-    await writeAuditLog({
-      actor,
-      action: "connector.email.sync",
-      targetType: "inquiry",
-      targetId: `batch-${Date.now()}`,
+    // ⑤ 同步成功 → 更新预记录为 success（AGENTS.md §4.3）
+    await updateAuditEntry({
+      auditId: preEntry.auditId,
+      status: "success",
       detail: `拉取 ${emails.length} 封，入库 ${synced} 条询盘`,
-      riskLevel: "low",
-      workspaceId: ctx.workspaceId,
+      contextSnapshot: {
+        fetched: emails.length,
+        synced,
+        skipped: emails.length - synced,
+        uids,
+      },
     })
 
     logger.info("Email sync: 完成", { fetched: emails.length, synced })
@@ -100,10 +127,15 @@ export async function POST(request: Request) {
       error instanceof Error ? error.message : "同步失败"
     logger.error("Email sync: 失败", { error: message })
 
-    // 失败也要留审计
+    // 同步失败 → 更新预记录为 failed + 补充失败日志
+    await updateAuditEntry({
+      auditId: preEntry.auditId,
+      status: "failed",
+      detail: `同步失败: ${message}`,
+    })
     await writeAuditLog({
       actor,
-      action: "connector.email.sync",
+      action: "connector.email.sync.failed",
       targetType: "inquiry",
       targetId: `error-${Date.now()}`,
       detail: `同步失败: ${message}`,

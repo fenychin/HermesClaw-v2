@@ -4,11 +4,13 @@
  * —— 对应 AGENTS.md §4.7 L2 授权等级：系统可自动执行，但必须写入 AuditLog。
  *    凭证从环境变量注入，生产环境 Token 有效期 ≤ 1 小时。
  *    请求体校验使用 Zod。
+ *
+ * —— AGENTS.md §5 #3 禁止静默执行：发送前写入预记录审计，发送后更新状态。
  */
 import { z } from "zod"
 import { logger } from "@/lib/logger"
 import { successResponse, errorResponse } from "@/lib/api-utils"
-import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
+import { createAuditEntry, updateAuditEntry, writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { createEmailConnector } from "@/lib/server/connectors/email/email-connector"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
@@ -66,8 +68,8 @@ export async function POST(request: Request) {
   const { to, subject, text, html, fromName, replyTo, attachments } =
     parsed.data
 
-  // L2 操作审计：执行前留痕（AGENTS.md §4.7）
-  await writeAuditLog({
+  // AGENTS.md §5 #3 禁止静默执行：发送前写入预记录审计
+  const preEntry = await createAuditEntry({
     actor,
     action: "connector.email.send",
     targetType: "email",
@@ -75,6 +77,15 @@ export async function POST(request: Request) {
     detail: `发送邮件至 ${to}，主题: ${subject.slice(0, 100)}`,
     riskLevel: "mid",
     workspaceId: ctx.workspaceId,
+    automationLevel: "L2",
+    triggeredBy: "user",
+    contextSnapshot: {
+      to,
+      subject: subject.slice(0, 100),
+      hasHtml: !!html,
+      hasAttachments: !!(attachments && attachments.length > 0),
+      replyTo: replyTo ?? null,
+    },
   })
 
   const connector = createEmailConnector()
@@ -101,7 +112,12 @@ export async function POST(request: Request) {
         error: result.error,
       })
 
-      // 失败审计
+      // 发送失败 → 更新预记录为 failed + 补充失败日志
+      await updateAuditEntry({
+        auditId: preEntry.auditId,
+        status: "failed",
+        detail: `发送失败: ${result.error}`,
+      })
       await writeAuditLog({
         actor,
         action: "connector.email.send.failed",
@@ -114,6 +130,17 @@ export async function POST(request: Request) {
 
       return errorResponse(`邮件发送失败: ${result.error}`, 502)
     }
+
+    // 发送成功 → 更新预记录为 success
+    await updateAuditEntry({
+      auditId: preEntry.auditId,
+      status: "success",
+      detail: `发送成功至 ${to}，messageId: ${result.messageId}`,
+      contextSnapshot: {
+        messageId: result.messageId,
+        sentAt: new Date().toISOString(),
+      },
+    })
 
     logger.info("Email send: 发送成功", {
       to,
@@ -133,6 +160,12 @@ export async function POST(request: Request) {
 
     logger.error("Email send: 异常", { error: message })
 
+    // 发送异常 → 更新预记录为 failed
+    await updateAuditEntry({
+      auditId: preEntry.auditId,
+      status: "failed",
+      detail: `发送异常: ${message}`,
+    })
     await writeAuditLog({
       actor,
       action: "connector.email.send.error",

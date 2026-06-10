@@ -5,7 +5,7 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
+import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
 import { checkConfirmQuery } from "@/lib/server/guardrail"
 import { ConnectorUpdateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
@@ -44,7 +44,7 @@ export async function GET(
   }
 }
 
-/** PATCH /api/connectors/[id] —— 更新连接状态（连接/断开） */
+/** PATCH /api/connectors/[id] —— 更新连接状态（连接/断开）（AGENTS.md §4.3 受控工具接入） */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -64,6 +64,7 @@ export async function PATCH(
     }
 
     const data: Record<string, unknown> = {}
+    const changes: string[] = []
 
     // 连接/断开状态变更
     if (body.status !== undefined) {
@@ -75,6 +76,7 @@ export async function PATCH(
         )
       }
       data.status = body.status
+      changes.push(`status: ${existing.status} → ${body.status}`)
 
       // 连接成功时更新 lastSync
       if (body.status === "connected") {
@@ -82,26 +84,79 @@ export async function PATCH(
       }
     }
 
-    if (body.name !== undefined) data.name = body.name
-    if (body.description !== undefined) data.description = body.description
+    if (body.name !== undefined) {
+      data.name = body.name
+      changes.push(`name: ${existing.name} → ${body.name}`)
+    }
+    if (body.description !== undefined) {
+      data.description = body.description
+      changes.push(`description 已更新`)
+    }
+
+    const actor = await actorFromSession()
+
+    // AGENTS.md §5 #3 禁止静默执行：连接器变更前写入预记录审计
+    const isConnect = body.status === "connected"
+    const isDisconnect = body.status === "disconnected"
+    const hasStatusChange = body.status !== undefined
+
+    const entry = hasStatusChange ? await createAuditEntry({
+      actor,
+      action: isConnect ? "connector.connect" : isDisconnect ? "connector.disconnect" : "connector.update",
+      targetType: "connector",
+      targetId: id,
+      detail: existing.name,
+      riskLevel: isConnect ? "mid" : isDisconnect ? "low" : "mid",
+      workspaceId: ctx.workspaceId,
+      automationLevel: "L2",
+      triggeredBy: "user",
+      contextSnapshot: {
+        connectorName: existing.name,
+        connectorType: existing.category,
+        previousStatus: existing.status,
+        newStatus: body.status,
+        changes,
+      },
+    }) : { auditId: `no-status-change-${Date.now()}`, ok: true }
 
     const connector = await prisma.connector.update({
       where: { id },
       data,
     })
 
-    // 审计：记录连接器授权状态变更（AGENTS.md 4.3 受控工具接入）
-    if (body.status !== undefined) {
-      const isConnect = body.status === "connected"
-      await writeAuditLog({
-        actor: await actorFromSession(),
-        action: isConnect ? "connector.connect" : "connector.disconnect",
+    // 执行成功 → 更新预记录状态
+    if (hasStatusChange) {
+      await updateAuditEntry({
+        auditId: entry.auditId,
+        status: "success",
+        detail: `${existing.name}：${changes.join("；")}`,
+        contextSnapshot: {
+          postStatus: connector.status,
+          connectorType: connector.category,
+          updatedAt: new Date().toISOString(),
+        },
+      })
+    }
+
+    // 非状态变更（仅 name/description）也留审计
+    if (!hasStatusChange && (body.name !== undefined || body.description !== undefined)) {
+      await createAuditEntry({
+        actor,
+        action: "connector.update",
         targetType: "connector",
         targetId: id,
-        detail: existing.name,
-        riskLevel: isConnect ? "mid" : "low",
+        detail: `${existing.name}：${changes.join("；")}`,
+        riskLevel: "low",
         workspaceId: ctx.workspaceId,
+        automationLevel: "L2",
+        triggeredBy: "user",
+        contextSnapshot: {
+          connectorName: existing.name,
+          connectorType: existing.category,
+          changes,
+        },
       })
+      // 直接标记 success（无异步操作）
     }
 
     return successResponse({
@@ -113,7 +168,7 @@ export async function PATCH(
   }
 }
 
-/** DELETE /api/connectors/[id] —— 删除连接器（高危，需 ?confirm=true） */
+/** DELETE /api/connectors/[id] —— 删除连接器（高危，需 ?confirm=true）（AGENTS.md §4.3） */
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -131,9 +186,8 @@ export async function DELETE(
     const guard = await checkConfirmQuery(request, "删除连接器需二次确认")
     if (!guard.ok) return guard.response
 
-    await prisma.connector.delete({ where: { id } })
-
-    await writeAuditLog({
+    // AGENTS.md §5 #3 禁止静默执行：删除前写入预记录审计
+    const entry = await createAuditEntry({
       actor: guard.actor,
       action: "delete.connector",
       targetType: "connector",
@@ -141,6 +195,24 @@ export async function DELETE(
       detail: existing.name,
       riskLevel: "high",
       workspaceId: ctx.workspaceId,
+      automationLevel: "L3",
+      triggeredBy: "user",
+      contextSnapshot: {
+        connectorName: existing.name,
+        connectorType: existing.category,
+        connectorStatus: existing.status,
+        permissions: existing.permissions,
+        usedByAgents: existing.usedByAgents,
+      },
+    })
+
+    await prisma.connector.delete({ where: { id } })
+
+    // 执行成功 → 更新预记录为 success
+    await updateAuditEntry({
+      auditId: entry.auditId,
+      status: "success",
+      detail: `已删除连接器 ${existing.name}（${existing.category}）`,
     })
 
     return successResponse({ message: "连接器已删除" })

@@ -6,6 +6,7 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
+import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { ConnectorCreateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
   }
 }
 
-/** POST /api/connectors —— 创建新连接器 */
+/** POST /api/connectors —— 创建新连接器（AGENTS.md §4.3：连接器变更须留审计） */
 export async function POST(request: Request) {
   try {
     const ctx = await buildWorkspaceContext(request)
@@ -69,6 +70,17 @@ export async function POST(request: Request) {
         permissions: stringifyJsonField(body.permissions),
         usedByAgents: stringifyJsonField(body.usedByAgents),
       },
+    })
+
+    // AGENTS.md §4.3 连接器变更审计：创建新连接器须留痕
+    await writeAuditLog({
+      actor: await actorFromSession(),
+      action: "connector.create",
+      targetType: "connector",
+      targetId: connector.id,
+      detail: `创建连接器 ${body.name}（${body.category}）`,
+      riskLevel: "mid",
+      workspaceId: ctx.workspaceId,
     })
 
     return successResponse(

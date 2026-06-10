@@ -205,6 +205,8 @@ export async function rollbackHarnessProposal(
       })
 
       // 3d. 审计日志（riskLevel = high，符合 AGENTS.md §4.5 高危操作门禁）
+      //     —— 事务内强一致性写入：审计丢失则整体回滚
+      //     —— AGENTS.md §1.2 数据主权：附带 contextSnapshot 供 §4.4 Level 2 评估
       await tx.auditLog.create({
         data: {
           actor: operatorId,
@@ -214,6 +216,21 @@ export async function rollbackHarnessProposal(
           detail: `${hepId} · 回滚 Agent ${snapshot.agentId} 至快照版本 ${snapshot.harnessVersion}`,
           riskLevel: "high",
           workspaceId: proposal.workspaceId,
+          automationLevel: "L3",
+          triggeredBy: "user",
+          status: "success",
+          contextSnapshot: {
+            hepId,
+            agentId: snapshot.agentId,
+            harnessVersion: snapshot.harnessVersion,
+            restoredCanDo: snapshot.canDo,
+            restoredCannotDo: snapshot.cannotDo,
+            restoredBindConnectors: snapshot.bindConnectors,
+            restoredBindSkills: snapshot.bindSkills,
+            snapshotAt: snapshot.snapshotAt,
+            operatorId,
+            rolledBackAt: now,
+          },
         },
       })
     })

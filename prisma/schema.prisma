@@ -354,18 +354,25 @@ model ConversationMessage {
 // —— workspaceId 用于多租户数据隔离
 // ============================================================
 model AuditLog {
-  id         String   @id @default(cuid())
-  workspaceId String  @default("default")
-  workspace  Workspace @relation(fields: [workspaceId], references: [id])
-  actor      String   // 操作者：用户邮箱/名，或 "system"
-  action     String   // 动作标识：approve.proposal | delete.agent | connector.connect ...
-  targetType String   // agent | connector | memory | project | proposal | inquiry ...
-  targetId   String
-  detail     String?
-  riskLevel  String?  // low | mid | high
-  createdAt  DateTime @default(now())
+  id              String   @id @default(cuid())
+  workspaceId     String   @default("default")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
+  actor           String   // 操作者：用户邮箱/名，或 "system"
+  action          String   // 动作标识：approve.proposal | delete.agent | connector.connect ...
+  targetType      String   // agent | connector | memory | project | proposal | inquiry ...
+  targetId        String
+  detail          String?
+  riskLevel       String?  // low | mid | high
+  // --- AGENTS.md §1.2 数据主权 / §4.4 Level 2 评估 新增字段 ---
+  contextSnapshot Json?    // 执行时的关键上下文快照（供 §4.4 Level 2 评估使用）
+  automationLevel String?  // L1 | L2 | L3 | L4（§4.7 自动化授权等级）
+  triggeredBy     String   @default("user") // user | system | cron
+  status          String   @default("pending") // pending | success | failed（预记录模式）
+  createdAt       DateTime @default(now())
 
   @@index([workspaceId])
+  @@index([status])
+  @@index([automationLevel])
 }
 
 // ============================================================
