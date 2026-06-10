@@ -6,6 +6,10 @@ import { withRBAC } from "@/lib/server/api-handler"
 import { validateBody, InquiryCreateSchema } from "@/lib/validators"
 import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
 import { ApiResponse } from "@/lib/server/api-response"
+import {
+  runWorkflow,
+  WorkflowNotFoundError,
+} from '@/lib/server/workflow/dag-runner'
 
 /** 序列化 Inquiry，将 DateTime 转为 ISO 字符串（匹配 types/trade.ts） */
 function serializeInquiry(inquiry: {
@@ -129,52 +133,61 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
     return ApiResponse.error("创建询盘失败", 500)
   }
 
-  // 4. 尝试触发询盘分级工作流（inquiry-grade），失败不阻断主流程
+  // 4. 执行询盘分级工作流（inquiry-grading），失败不阻断询盘创建
+  let workflowResult: { runId: string; status: string; output: unknown } | null = null
   try {
     const workflow = await prisma.workflow.findFirst({
-      where: { workspaceId: ctx.workspaceId, name: "inquiry-grade" },
+      where: { workspaceId: ctx.workspaceId, name: "inquiry-grading" },
     })
     if (workflow) {
-      await prisma.workflowRun.create({
-        data: {
-          id: crypto.randomUUID(),
-          workspaceId: ctx.workspaceId,
-          workflowId: workflow.id,
-          status: "pending",
-          trigger: "auto",
-          input: JSON.stringify({
-            inquiryId,
-            subject: body.subject,
-            content: body.content,
-            fromEmail: body.fromEmail,
-            countryCode: body.countryCode,
-          }),
-          startedAt: now,
-        },
+      workflowResult = await runWorkflow(workflow.id, {
+        inquiryId,
+        subject: body.subject,
+        content: body.content,
+        fromEmail: body.fromEmail,
+        countryCode: body.countryCode,
       })
-      logger.info("POST /api/inquiries: 已关联询盘分级工作流", {
+      logger.info("POST /api/inquiries: 询盘分级工作流已执行", {
         inquiryId,
         workflowId: workflow.id,
+        runId: workflowResult.runId,
+        status: workflowResult.status,
       })
     } else {
-      logger.warn("POST /api/inquiries: 未找到 inquiry-grade 工作流，跳过自动触发", {
+      logger.warn("POST /api/inquiries: 未找到 inquiry-grading 工作流，跳过自动触发", {
         inquiryId,
         workspaceId: ctx.workspaceId,
       })
     }
   } catch (wfError) {
-    logger.error("POST /api/inquiries: 触发分级工作流失败（询盘已创建）", {
-      inquiryId,
-      error: wfError instanceof Error ? wfError.message : "未知错误",
-    })
+    // 分类处理：WorkflowNotFoundError 为配置缺失，其余为运行时异常
+    if (wfError instanceof WorkflowNotFoundError) {
+      logger.warn("POST /api/inquiries: inquiry-grading 工作流未配置", {
+        error: wfError.message,
+      })
+    } else {
+      logger.error("POST /api/inquiries: 执行分级工作流失败（询盘已创建）", {
+        inquiryId,
+        error: wfError instanceof Error ? wfError.message : "未知错误",
+      })
+    }
   }
 
   // 5. 更新审计状态为成功
   await updateAuditEntry({
     auditId: auditEntry.auditId,
     status: "success",
-    contextSnapshot: { inquiryId, workflowTriggered: true },
+    contextSnapshot: {
+      inquiryId,
+      workflowTriggered: workflowResult !== null,
+      workflowRunId: workflowResult?.runId ?? null,
+      workflowStatus: workflowResult?.status ?? null,
+    },
   })
 
-  return ApiResponse.ok(serializeInquiry(inquiry))
+  return ApiResponse.ok({
+    ...serializeInquiry(inquiry),
+    workflowRunId: workflowResult?.runId ?? null,
+    workflowStatus: workflowResult?.status ?? null,
+  })
 }, "MEMBER")

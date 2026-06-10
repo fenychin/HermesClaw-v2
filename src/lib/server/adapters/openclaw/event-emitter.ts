@@ -18,6 +18,7 @@ export interface OpenClawEvent {
   /** 事件类型 */
   type: 'task:started' | 'task:progress' | 'task:completed' | 'task:failed' | 'task:cancelled'
        | 'connector:connected' | 'connector:disconnected' | 'connector:error'
+       | 'workflow:started' | 'workflow:completed' | 'workflow:failed'
        | 'heartbeat'
   /** 关联智能体 ID */
   agentId: string
@@ -156,4 +157,32 @@ export function sendHeartbeat(id: string): void {
   } catch {
     subscribers.delete(id)
   }
+}
+
+/**
+ * 发射工作流事件（便捷函数）
+ *
+ * —— 对 emitOpenClawEvent 的语义封装，agentId 固定为 'workflow'，
+ *    payload 自动注入 workflowRunId 以便 SSE 前端按 runId 过滤订阅。
+ *
+ * @param runId     工作流运行 ID（自动注入 payload.workflowRunId）
+ * @param type      事件类型（workflow:started | workflow:completed | workflow:failed）
+ * @param payload   附加负载（无需手动传 workflowRunId）
+ *
+ * @example
+ *   emitWorkflowEvent('run-001', 'workflow:completed', {
+ *     workflowId: 'wf-xxx',
+ *     workflowName: '询盘分级',
+ *     output: { ... },
+ *   })
+ */
+export function emitWorkflowEvent(
+  runId: string,
+  type: 'workflow:started' | 'workflow:completed' | 'workflow:failed',
+  payload: Record<string, unknown> = {},
+): void {
+  emitOpenClawEvent('workflow', {
+    type,
+    payload: { workflowRunId: runId, ...payload },
+  })
 }

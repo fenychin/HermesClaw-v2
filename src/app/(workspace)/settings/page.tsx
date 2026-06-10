@@ -23,10 +23,14 @@ import {
   ScrollText,
   Palette,
   CreditCard,
+  Mic,
+  ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConnectorsSettings } from "./_components/connectors-settings";
 import { EmptyState } from "@/components/common/empty-state";
+import { Badge } from "@/components/ui/badge";
+import { SectionTitle } from "@/components/common/section-title";
 import { Settings } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -47,7 +51,7 @@ function CompanySettings() {
         <h2 className="text-lg font-semibold text-foreground">企业信息</h2>
         <p className="text-sm text-muted-foreground mt-1">管理你的企业基本资料与品牌信息</p>
       </div>
-      
+
       <div className="space-y-6 bg-card border border-border rounded-2xl p-6">
         {/* 企业名称 */}
         <div className="space-y-1.5">
@@ -55,7 +59,8 @@ function CompanySettings() {
           <input
             type="text"
             defaultValue="赫尔墨斯外贸科技有限公司"
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-hint focus:outline-none focus:ring-2 focus:ring-ring/40 transition-colors"
+            placeholder="请输入企业名称"
           />
         </div>
 
@@ -63,10 +68,13 @@ function CompanySettings() {
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground">企业 Logo</label>
           <div className="flex gap-4 items-center">
-            <div className="size-16 shrink-0 bg-accent border border-border rounded-xl flex items-center justify-center text-xs text-hint">Logo</div>
-            <div className="flex-1 border border-dashed border-border rounded-xl p-4 flex items-center justify-center text-sm text-muted-foreground cursor-pointer hover:bg-accent/50 transition-colors">
-              点击或拖拽上传 Logo
+            <div className="size-16 shrink-0 bg-accent border border-border rounded-xl flex items-center justify-center text-xs text-hint">
+              Logo
             </div>
+            <label className="flex-1 border border-dashed border-border rounded-xl p-4 flex items-center justify-center text-sm text-muted-foreground cursor-pointer hover:bg-accent/50 transition-colors">
+              <input type="file" accept="image/*" className="hidden" />
+              点击或拖拽上传 Logo
+            </label>
           </div>
         </div>
 
@@ -75,11 +83,13 @@ function CompanySettings() {
           <label className="text-sm font-medium text-foreground">行业</label>
           <select
             defaultValue="foreign-trade"
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 transition-colors"
           >
             <option value="foreign-trade">外贸 / 跨境电商</option>
             <option value="manufacturing">制造业</option>
             <option value="tech">科技 / SaaS</option>
+            <option value="retail">零售 / 消费品</option>
+            <option value="logistics">物流 / 供应链</option>
           </select>
         </div>
 
@@ -88,23 +98,217 @@ function CompanySettings() {
           <label className="text-sm font-medium text-foreground">企业规模</label>
           <select
             defaultValue="20-50"
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 transition-colors"
           >
             <option value="1-10">1-10 人</option>
             <option value="10-20">10-20 人</option>
             <option value="20-50">20-50 人</option>
             <option value="50-200">50-200 人</option>
+            <option value="200+">200+ 人</option>
           </select>
+        </div>
+
+        {/* 联系邮箱 */}
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium text-foreground">联系邮箱</label>
+          <input
+            type="email"
+            defaultValue="admin@hermesclaw.com"
+            className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-hint focus:outline-none focus:ring-2 focus:ring-ring/40 transition-colors"
+            placeholder="请输入企业联系邮箱"
+          />
         </div>
       </div>
 
-      <div className="sticky bottom-0 bg-background pt-4 pb-4 flex justify-end mt-4">
+      {/* 保存按钮（disabled + 提示） */}
+      <div className="sticky bottom-0 bg-background pt-4 pb-4 flex items-center justify-end gap-3 mt-4">
+        <span className="text-xs text-hint flex items-center gap-1.5">
+          <span className="inline-block size-1.5 rounded-full bg-warning" />
+          保存功能即将上线
+        </span>
         <button
           type="button"
-          className="bg-primary text-white hover:bg-primary/90 px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+          disabled
+          className="bg-primary/50 text-white/60 px-5 py-2 rounded-xl text-sm font-medium cursor-not-allowed transition-colors"
         >
           保存更改
         </button>
+      </div>
+    </div>
+  );
+}
+
+function BrandSettings() {
+  return (
+    <div className="max-w-2xl pb-10">
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-foreground">品牌设置</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          管理品牌视觉与声音资产，统一数字员工的对外表达风格
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {/* 品牌色 */}
+        <div className="bg-card border border-border rounded-2xl p-5">
+          <SectionTitle
+            title="品牌色"
+            subtitle="定义主色、辅助色与场景色彩体系"
+            action={
+              <Badge variant="outline" className="text-hint text-[10px]">
+                规划中
+              </Badge>
+            }
+          />
+          <div className="mt-4">
+            <EmptyState
+              icon={Palette}
+              title="品牌色配置"
+              description="自定义品牌主色、辅助色，一键生成深色/浅色适配方案。该功能将在后续版本中上线。"
+            />
+          </div>
+        </div>
+
+        {/* 品牌声音 */}
+        <div className="bg-card border border-border rounded-2xl p-5">
+          <SectionTitle
+            title="品牌声音"
+            subtitle="设定品牌语调、风格与文案模板"
+            action={
+              <Badge variant="outline" className="text-hint text-[10px]">
+                规划中
+              </Badge>
+            }
+          />
+          <div className="mt-4">
+            <EmptyState
+              icon={Mic}
+              title="品牌声音配置"
+              description="定义品牌语调风格、专业术语库与多语种文案模板，确保 AI 输出的语气与品牌一致。该功能将在后续版本中上线。"
+            />
+          </div>
+        </div>
+
+        {/* 品牌素材 */}
+        <div className="bg-card border border-border rounded-2xl p-5">
+          <SectionTitle
+            title="品牌素材"
+            subtitle="管理品牌 Logo、字体、图像与视频模板"
+            action={
+              <Badge variant="outline" className="text-hint text-[10px]">
+                规划中
+              </Badge>
+            }
+          />
+          <div className="mt-4">
+            <EmptyState
+              icon={ImageIcon}
+              title="品牌素材管理"
+              description="集中管理品牌 Logo、字体、产品图模板、营销素材与视频封面模板。该功能将在后续版本中上线。"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BillingSettings() {
+  // Mock 用量数据
+  const usageItems = [
+    { label: "AI 对话次数", used: 1847, limit: 3000, unit: "次/月" },
+    { label: "智能体执行任务", used: 432, limit: 800, unit: "次/月" },
+    { label: "记忆存储", used: 2.4, limit: 10, unit: "GB" },
+    { label: "连接器调用", used: 1280, limit: 5000, unit: "次/月" },
+  ];
+
+  return (
+    <div className="max-w-2xl pb-10">
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-foreground">账单套餐</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          查看当前套餐与用量，管理订阅与账单
+        </p>
+      </div>
+
+      {/* 当前套餐卡片 */}
+      <div className="bg-card border border-brand/20 rounded-2xl p-5 mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-xl bg-brand/10 flex items-center justify-center">
+              <CreditCard className="size-5 text-brand" />
+            </div>
+            <div>
+              <p className="text-foreground text-sm font-semibold">专业版</p>
+              <p className="text-muted-foreground text-xs">¥299 / 月 · 3 个席位</p>
+            </div>
+          </div>
+          <Badge className="bg-success/10 text-success text-[10px]">当前套餐</Badge>
+        </div>
+        <p className="text-muted-foreground text-xs leading-relaxed">
+          包含基础 AI 对话、外贸行业技能、5 个智能体席位、50 条/月记忆存储。适合小型外贸团队日常使用。
+        </p>
+      </div>
+
+      {/* 用量明细 */}
+      <div className="bg-card border border-border rounded-2xl p-5 space-y-5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-foreground text-sm font-semibold">用量明细</h3>
+          <span className="text-muted-foreground text-xs">
+            结算周期：{(() => {
+              const now = new Date();
+              const start = new Date(now.getFullYear(), now.getMonth(), 1);
+              const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+              const fmt = (d: Date) =>
+                `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+              return `${fmt(start)} ~ ${fmt(end)}`;
+            })()}
+          </span>
+        </div>
+
+        {usageItems.map((item) => {
+          const pct = Math.min((item.used / item.limit) * 100, 100);
+          const isNearLimit = pct >= 80;
+          const isOverLimit = pct >= 100;
+
+          return (
+            <div key={item.label} className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-foreground">{item.label}</span>
+                <span className="text-xs text-muted-foreground">
+                  {item.used.toLocaleString("zh-CN")} / {item.limit.toLocaleString("zh-CN")}{" "}
+                  {item.unit}
+                </span>
+              </div>
+              <div className="h-2 bg-accent rounded-full overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all",
+                    isOverLimit
+                      ? "bg-danger"
+                      : isNearLimit
+                        ? "bg-warning"
+                        : "bg-brand",
+                  )}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 底部提示 */}
+      <div className="mt-5 bg-accent/50 border border-border rounded-xl p-4 flex items-center gap-3">
+        <div className="size-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
+          <span className="text-warning text-sm">⏳</span>
+        </div>
+        <div>
+          <p className="text-foreground text-sm font-medium">账单系统即将上线</p>
+          <p className="text-muted-foreground text-xs mt-0.5">
+            套餐升级、发票管理、支付方式等功能正在开发中，届时将通过站内信通知。
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -305,6 +509,10 @@ function SettingsPageContent() {
         return <ModelRoutingSettings />;
       case "company":
         return <CompanySettings />;
+      case "brand":
+        return <BrandSettings />;
+      case "billing":
+        return <BillingSettings />;
       default:
         return (
           <div className="flex h-full items-center justify-center py-20">

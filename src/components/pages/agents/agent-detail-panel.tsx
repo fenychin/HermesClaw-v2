@@ -20,6 +20,13 @@ import { useSkillStore } from "@/stores/skill-store";
 import { useConnectorStore } from "@/stores/connector-store";
 import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import {
+  getGradient,
+  SOURCE_META,
+  LOG_STATUS_META,
+  formatDate,
+  type AgentRunLog,
+} from "@/lib/agent-utils";
 import { EmptyState } from "@/components/common/empty-state";
 import { StatusBadge } from "@/components/common/status-badge";
 import { RiskBadge } from "@/components/common/risk-badge";
@@ -27,49 +34,7 @@ import { AutomationBadge } from "@/components/common/automation-badge";
 import { SkeletonCard } from "@/components/common/skeleton-card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TRADE_ACTIONS } from "@/types";
-import type { Agent, AutomationLevel } from "@/types";
-
-/** 智能体运行日志条目（来自 /api/agents/[id] 的 runLogs） */
-interface AgentRunLog {
-  id: string;
-  taskName: string;
-  status: string;
-  duration: string;
-  detail: string | null;
-  source: string;
-  createdAt: string;
-}
-
-/** 根据 agent.id 选择渐变色的头像背景（与 AgentCard 保持一致的算法） */
-const GRADIENT_PRESETS = [
-  "from-brand to-brand-blue",
-  "from-brand-blue to-success",
-  "from-success to-brand",
-  "from-warning to-danger",
-  "from-danger to-brand",
-  "from-brand to-warning",
-  "from-brand-blue to-warning",
-  "from-success to-brand-blue",
-];
-
-function getGradient(agentId: string): string {
-  let hash = 0;
-  for (let i = 0; i < agentId.length; i++) {
-    hash = agentId.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const index = Math.abs(hash) % GRADIENT_PRESETS.length;
-  return GRADIENT_PRESETS[index]!;
-}
-
-/** source → 显示标签与颜色 */
-const SOURCE_META: Record<
-  Agent["source"],
-  { label: string; className: string }
-> = {
-  builtin: { label: "内置", className: "bg-brand-blue/10 text-brand-blue" },
-  custom: { label: "自定义", className: "bg-brand/10 text-brand" },
-  industry: { label: "行业", className: "bg-success/10 text-success" },
-};
+import type { AutomationLevel } from "@/types";
 
 /** Harness 六大组件名称 */
 const HARNESS_COMPONENTS = [
@@ -88,26 +53,6 @@ const ACTION_GROUPS: { level: AutomationLevel; title: string }[] = [
   { level: "L3", title: "L3 需人工确认" },
   { level: "L4", title: "L4 绝对禁止" },
 ];
-
-/** 日志状态颜色映射（未命中的状态在渲染处回退为 warning） */
-const LOG_STATUS_META = {
-  success: { label: "成功", className: "text-success bg-success/10" },
-  error: { label: "失败", className: "text-danger bg-danger/10" },
-  running: { label: "执行中", className: "text-brand-blue bg-brand-blue/10" },
-  timeout: { label: "超时", className: "text-warning bg-warning/10" },
-  needs_human: { label: "待人工", className: "text-warning bg-warning/10" },
-};
-
-/** 格式化 ISO 日期为中文可读 */
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("zh-CN", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 /**
  * 智能体详情面板

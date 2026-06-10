@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { StatCard } from "@/components/common/stat-card";
 import { PageTransition } from "@/components/common/PageTransition";
 import { WorkflowCard } from "./_components/workflow-card";
+import { InquiryQuickEntry } from "./_components/inquiry-quick-entry";
 import { TRADE_WORKFLOWS } from "./_data/workflows";
 import {
   useDashboardStats,
@@ -228,8 +229,11 @@ export default function ForeignTradePage() {
             />
           </div>
 
+          {/* ---- 询盘快速入口 ---- */}
+          <InquiryQuickEntry />
+
           {/* ---- 常用工作流 ---- */}
-          <section>
+          <section className="mt-6">
             <p className="text-foreground font-medium mb-4">常用工作流</p>
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
               {TRADE_WORKFLOWS.map((wf) => (
