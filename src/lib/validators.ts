@@ -219,6 +219,30 @@ export const TaskExecuteSchema = z.object({
 });
 
 // ==============================
+// 外贸询盘
+// ==============================
+
+/** 询盘创建请求 Schema（对接真实业务写入链路） */
+export const InquiryCreateSchema = z.object({
+  fromEmail: z.string().email().max(200),
+  subject: z.string().min(1).max(500),
+  content: z.string().min(1).max(10000),
+  countryCode: z.string().min(2).max(3).optional().default("US"),
+});
+
+// ==============================
+// 外贸报价
+// ==============================
+
+/** 报价创建请求 Schema */
+export const QuotationCreateSchema = z.object({
+  inquiryId: z.string().min(1).max(100),
+  totalAmount: z.string().min(1).max(100),
+  currency: z.string().min(1).max(10).optional().default("USD"),
+  version: z.number().int().min(1).max(999).optional().default(1),
+});
+
+// ==============================
 // 校验工具函数
 // ==============================
 

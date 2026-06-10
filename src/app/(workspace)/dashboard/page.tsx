@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMounted } from "@/hooks/use-mounted";
 import {
   MessageSquare,
   Users,
@@ -21,10 +21,11 @@ import {
 import { PageTransition } from "@/components/common/PageTransition";
 import { PageHeader } from "@/components/common/page-header";
 import { StatCard } from "@/components/common/stat-card";
+import { useDashboardStats } from "@/hooks/use-dashboard-stats";
 import { cn } from "@/lib/utils";
 
 // ============================================================
-// Mock 数据
+// Mock 数据（活动流 & 情报快讯暂无对应 DB 表，保留占位）
 // ============================================================
 
 // 外贸动态流数据
@@ -39,7 +40,7 @@ const mockActivities: ActivityItem[] = [
   {
     id: "act-1",
     time: "10分钟前",
-    content: "智能客服已自动响应来自 BrightPath Outdoors 关于“LED 户外灯具”的新询盘并推送至跟进流程。",
+    content: `智能客服已自动响应来自 BrightPath Outdoors 关于"LED 户外灯具"的新询盘并推送至跟进流程。`,
     severity: "important",
   },
   {
@@ -63,20 +64,9 @@ const mockActivities: ActivityItem[] = [
   {
     id: "act-5",
     time: "昨天",
-    content: "跟进中的重点客户“Maison Élégance SARL”的“高杆照明灯采购案”状态已变更为寄送样品。",
+    content: `跟进中的重点客户"Maison Élégance SARL"的"高杆照明灯采购案"状态已变更为寄送样品。`,
     severity: "important",
   },
-];
-
-// 本周工作流执行概览图表数据
-const chartData = [
-  { name: "周一", 成功: 42, 失败: 2 },
-  { name: "周二", 成功: 38, 失败: 5 },
-  { name: "周三", 成功: 56, 失败: 1 },
-  { name: "周四", 成功: 48, 失败: 4 },
-  { name: "周五", 成功: 70, 失败: 3 },
-  { name: "周六", 成功: 28, 失败: 0 },
-  { name: "周日", 成功: 32, 失败: 2 },
 ];
 
 // 右侧情报快讯数据
@@ -131,12 +121,17 @@ const mockIntelNews: IntelNews[] = [
 // ============================================================
 
 export default function DashboardPage() {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true);
-  }, []);
+  // 大盘统计数据（TanStack Query，staleTime: 30s）
+  const { stats, isLoading } = useDashboardStats();
+
+  // 根据真实数据构建图表数据，fallback 为空数组
+  const chartData = stats?.weeklyWorkflowRuns?.map((d) => ({
+    name: d.day,
+    成功: d.success,
+    失败: d.failed,
+  })) ?? [];
 
   return (
     <PageTransition>
@@ -148,42 +143,46 @@ export default function DashboardPage() {
 
         {/* 大左右结构容器 */}
         <div className="flex flex-col lg:flex-row gap-6 items-start">
-          
+
           {/* 左主区 */}
           <div className="flex-1 min-w-0 space-y-6 w-full">
-            
-            {/* 顶部指标行 - 4列网格 */}
+
+            {/* 顶部指标行 - 4列网格：接入真实聚合数据 */}
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
               <StatCard
                 title="今日询盘数"
-                value={12}
-                change={{ value: 15, label: "较昨日" }}
+                value={stats?.todayInquiries ?? 0}
+                change={{
+                  value: stats?.todayInquiriesChange ?? 0,
+                  label: "较昨日",
+                }}
                 icon={MessageSquare}
+                isLoading={isLoading}
               />
               <StatCard
                 title="跟进客户数"
-                value={36}
-                change={{ value: 8, label: "较昨日" }}
+                value={stats?.followingCustomers ?? 0}
                 icon={Users}
+                isLoading={isLoading}
               />
               <StatCard
                 title="待办任务"
-                value={8}
-                change={{ value: -20, label: "较昨日" }}
+                value={stats?.pendingTasks ?? 0}
                 icon={ClipboardList}
+                isLoading={isLoading}
               />
               <StatCard
                 title="活跃项目"
-                value={4}
-                change={{ value: 25, label: "较上周" }}
+                value={stats?.activeProjects ?? 0}
                 icon={Target}
+                isLoading={isLoading}
               />
             </div>
 
             {/* 主要内容区 - 2个核心卡片 */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              
-              {/* 卡片1: 外贸动态流 */}
+
+              {/* 卡片1: 外贸动态流（暂保留 mock 占位） */}
               <div className="bg-card rounded-2xl border border-border p-5 flex flex-col justify-between min-h-[300px]">
                 <div>
                   <h3 className="text-foreground font-semibold text-base mb-4">外贸动态流</h3>
@@ -214,41 +213,47 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* 卡片2: 本周工作流执行概览 */}
+              {/* 卡片2: 本周工作流执行概览（接入真实聚合数据） */}
               <div className="bg-card rounded-2xl border border-border p-5 flex flex-col justify-between min-h-[300px]">
                 <div>
                   <h3 className="text-foreground font-semibold text-base mb-4">本周工作流执行概览</h3>
                   {mounted ? (
-                    <div className="w-full h-[200px] mt-4">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#2A2A31" vertical={false} />
-                          <XAxis
-                            dataKey="name"
-                            stroke="#71717A"
-                            fontSize={11}
-                            tickLine={false}
-                            axisLine={false}
-                          />
-                          <YAxis
-                            stroke="#71717A"
-                            fontSize={11}
-                            tickLine={false}
-                            axisLine={false}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "#18181B",
-                              border: "1px solid #2A2A31",
-                              borderRadius: "8px",
-                              color: "#F5F5F7",
-                            }}
-                          />
-                          <Bar name="成功" dataKey="成功" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
-                          <Bar name="失败" dataKey="失败" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
+                    chartData.length > 0 ? (
+                      <div className="w-full h-[200px] mt-4">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#2A2A31" vertical={false} />
+                            <XAxis
+                              dataKey="name"
+                              stroke="#71717A"
+                              fontSize={11}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <YAxis
+                              stroke="#71717A"
+                              fontSize={11}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: "#18181B",
+                                border: "1px solid #2A2A31",
+                                borderRadius: "8px",
+                                color: "#F5F5F7",
+                              }}
+                            />
+                            <Bar name="成功" dataKey="成功" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
+                            <Bar name="失败" dataKey="失败" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-[200px] mt-4 flex items-center justify-center text-hint text-xs bg-accent/5 rounded-xl border border-border/30">
+                        {isLoading ? "数据加载中..." : "本周暂无工作流执行数据"}
+                      </div>
+                    )
                   ) : (
                     <div className="h-[200px] mt-4 flex items-center justify-center text-hint text-xs bg-accent/5 rounded-xl border border-border/30">
                       图表加载中...
@@ -261,7 +266,7 @@ export default function DashboardPage() {
 
           </div>
 
-          {/* 右侧面板 */}
+          {/* 右侧面板（情报快讯暂保留 mock） */}
           <div className="w-full lg:w-80 shrink-0 bg-card rounded-2xl border border-border p-5 h-fit space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-foreground font-semibold text-base">情报快讯</h3>

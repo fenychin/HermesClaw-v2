@@ -17,34 +17,17 @@ import { StatCard } from "@/components/common/stat-card";
 import { PageTransition } from "@/components/common/PageTransition";
 import { WorkflowCard } from "./_components/workflow-card";
 import { TRADE_WORKFLOWS } from "./_data/workflows";
+import {
+  useDashboardStats,
+  useQuotations,
+  useInquiries,
+  computeMonthlyAmount,
+  countUrgentInquiries,
+} from "@/hooks/use-dashboard-stats";
 import { cn } from "@/lib/utils";
 
 // ============================================================
-// 经营概览 Mock 数据
-// ============================================================
-
-/** 今日询盘数据 */
-const INQUIRIES_TODAY = 14;
-/** 今日询盘较昨日变化（正数=增加） */
-const INQUIRIES_CHANGE = 3;
-
-/** 跟进中客户总数 */
-const FOLLOWING_CUSTOMERS = 47;
-/** 待回复消息数 */
-const PENDING_REPLIES = 5;
-
-/** 待处理任务总数 */
-const PENDING_TASKS = 9;
-/** 其中紧急数量 */
-const URGENT_TASKS = 2;
-
-/** 本月成交金额（美元） */
-const MONTHLY_AMOUNT = 128600;
-/** 较上月变化百分比（正数=增长） */
-const MONTHLY_CHANGE = 12.4;
-
-// ============================================================
-// 汇率 Mock 数据
+// 汇率 Mock 数据（暂无 DB 表，保留占位）
 // ============================================================
 interface ExchangeRate {
   pair: string;
@@ -58,7 +41,7 @@ const EXCHANGE_RATES: ExchangeRate[] = [
 ];
 
 // ============================================================
-// 风险提醒 Mock 数据
+// 风险提醒 Mock 数据（暂无 DB 表，保留占位）
 // ============================================================
 interface RiskItem {
   id: string;
@@ -130,7 +113,7 @@ function ExchangeRateCard({ rates }: { rates: ExchangeRate[] }) {
 // ============================================================
 // 子组件：单条风险提醒
 // ============================================================
-function RiskItem({ item }: { item: RiskItem }) {
+function RiskItemCard({ item }: { item: RiskItem }) {
   return (
     <div className="bg-destructive/10 rounded-xl p-3 mb-2">
       <div className="flex items-start gap-2">
@@ -176,6 +159,23 @@ function AIMorningReportCard() {
 // 页面主体
 // ============================================================
 export default function ForeignTradePage() {
+  // 大盘统计数据（TanStack Query，staleTime: 30s）
+  const { stats, isLoading: statsLoading } = useDashboardStats();
+  // 报价数据（用于计算本月成交金额）
+  const { quotations, isLoading: quotationsLoading } = useQuotations();
+  // 询盘数据（用于统计紧急任务数）
+  const { inquiries } = useInquiries();
+
+  const isLoading = statsLoading || quotationsLoading;
+
+  // 从真实数据计算指标
+  const todayInquiries = stats?.todayInquiries ?? 0;
+  const todayInquiriesChange = stats?.todayInquiriesChange ?? 0;
+  const followingCustomers = stats?.followingCustomers ?? 0;
+  const pendingTasks = stats?.pendingTasks ?? 0;
+  const urgentTasks = countUrgentInquiries(inquiries);
+  const monthlyAmount = computeMonthlyAmount(quotations);
+
   return (
     <PageTransition>
       {/* 外层容器：左主区 + 右侧面板 */}
@@ -190,38 +190,41 @@ export default function ForeignTradePage() {
             description="今日经营概览"
           />
 
-          {/* ---- 经营概览 StatCard 4列网格 ---- */}
+          {/* ---- 经营概览 StatCard 4列网格（接入真实聚合数据） ---- */}
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
             {/* 今日询盘 */}
             <StatCard
               title="今日询盘"
-              value={INQUIRIES_TODAY}
+              value={todayInquiries}
               icon={MessageSquare}
-              change={{ value: INQUIRIES_CHANGE, label: "较昨日" }}
+              change={{ value: todayInquiriesChange, label: "较昨日" }}
+              isLoading={isLoading}
             />
 
             {/* 跟进中客户 */}
             <StatCard
               title="跟进中客户"
-              value={FOLLOWING_CUSTOMERS}
+              value={followingCustomers}
               icon={Users}
-              description={`待回复 ${PENDING_REPLIES} 条`}
+              description={pendingTasks > 0 ? `待回复 ${pendingTasks} 条` : "全部已回复"}
+              isLoading={isLoading}
             />
 
             {/* 待处理任务 */}
             <StatCard
               title="待处理任务"
-              value={PENDING_TASKS}
+              value={pendingTasks}
               icon={ClipboardList}
-              description={`紧急 ${URGENT_TASKS} 项`}
+              description={urgentTasks > 0 ? `紧急 ${urgentTasks} 项` : "无紧急任务"}
+              isLoading={isLoading}
             />
 
             {/* 本月成交金额 */}
             <StatCard
               title="本月成交金额"
-              value={`$${(MONTHLY_AMOUNT / 1000).toFixed(1)}k`}
+              value={monthlyAmount > 0 ? `$${(monthlyAmount / 1000).toFixed(1)}k` : "$0"}
               icon={DollarSign}
-              change={{ value: MONTHLY_CHANGE, label: "较上月" }}
+              isLoading={isLoading}
             />
           </div>
 
@@ -263,7 +266,7 @@ export default function ForeignTradePage() {
           <div className="mt-4">
             <p className="text-muted-foreground text-xs font-medium mb-2">风险提醒</p>
             {RISK_ITEMS.map((item) => (
-              <RiskItem key={item.id} item={item} />
+              <RiskItemCard key={item.id} item={item} />
             ))}
           </div>
 
