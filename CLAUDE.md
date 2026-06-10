@@ -60,6 +60,8 @@ src/
       health/route.ts       #   GET 健康检查
       openclaw/events/
         route.ts            #   GET SSE 实时事件流（text/event-stream）
+      workspace/settings/
+        route.ts            #   GET/PATCH 模型路由配置
     (workspace)/            # 工作台路由组：共享左侧导航外壳
       layout.tsx            #   AppShell 包裹
       foreign-trade/        #   外贸
@@ -82,12 +84,16 @@ src/
     utils.ts                # cn() 等工具函数
     sse-parser.ts           # 通用 SSE 流解析器（parseSSEStream）
     server/                 # 服务端逻辑
+      llm-provider.ts       # 共享 LLM 工具层（Provider 选择 + 流式/非流式调用）
+      model-router.ts       # ★ 策略路由（selectModel）—— 按 risk/taskType/WS 配置决策 Provider
       adapters/openclaw/
         event-emitter.ts    # SSE 事件广播（全局 pub/sub）
         mock.ts             # Mock 模式（含事件发射集成）
   stores/                   # Zustand stores（ui-store 等）
   hooks/                    # 自定义 hooks
     use-openclaw-stream.ts  # OpenClaw SSE 事件流订阅 Hook
+    use-model-routing.ts    # 模型路由配置 Hook（TanStack Query + Mutation）
+    use-workspace.ts        # 工作空间数据 Hook
   types/                    # 全局 TS 类型
 ```
 
@@ -96,6 +102,7 @@ src/
 - 路由分组 `(workspace)` 不影响 URL，仅用于共享布局。
 - 信息架构（一级 / 二级导航）以 `src/config/navigation.ts` 为**唯一数据源**，新增模块在此登记，勿在多处硬编码。
 - 后端逻辑放 `app/api/<resource>/route.ts`；复杂业务逻辑后续下沉至 `src/lib/server/*`，Route Handler 只做 I/O 与校验。
+- **Prisma Client 生成路径**：`prisma/schema.prisma` 中 generator `output` 指向 `../src/generated/prisma-new`（全仓库唯一生成目标，**勿改回**过时的 `prisma` 目录）。运行 `pnpm exec prisma generate` 后客户端位于 `src/generated/prisma-new/`。
 - **技能（Skill）**遵循 Claude Code Skills 规范（[Agent Skills](https://agentskills.io) 开放标准），存放于 `.claude/skills/<name>/SKILL.md`（详见 [AGENTS.md §4.0](./AGENTS.md#40-技能规范claude-code-skills-标准)）。**项目中的"Skill"均指此格式，非传统功能模块。**
 
 ---

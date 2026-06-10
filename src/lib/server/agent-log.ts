@@ -21,6 +21,8 @@ export interface WriteAgentLogInput {
   /** 耗时文本，如 "1.2s" */
   duration: string
   detail?: string
+  /** 风险等级（AGENTS.md §4.4 闭环反馈 / §4.7 自动化授权）：low | medium | high */
+  riskLevel?: string
 }
 
 /**
@@ -37,6 +39,7 @@ export async function writeAgentLog(input: WriteAgentLogInput): Promise<void> {
         status: input.status,
         duration: input.duration,
         detail: input.detail ?? null,
+        riskLevel: input.riskLevel ?? null,
       },
     })
   } catch (error) {

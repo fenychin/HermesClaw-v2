@@ -5,12 +5,18 @@ import { writeAgentLog } from "@/lib/server/agent-log";
 import { getGovernanceClause } from "@/lib/server/agents-md";
 import { rateLimit } from "@/lib/rate-limit";
 import { ChatMessageSchema, validateBody } from "@/lib/validators";
+import { buildWorkspaceContext } from "@/lib/workspace";
+import { selectModel } from "@/lib/server/model-router";
+import { openChatStream } from "@/lib/server/llm-provider";
 
 export const runtime = "nodejs";
 
 /**
  * POST /api/chat
- * —— Hermes 智能控制面流式对话接口（SSE），底层使用 DeepSeek API。
+ * —— Hermes 智能控制面流式对话接口（SSE）。
+ *
+ * 模型不再硬编码：经策略路由 selectModel() 决策 Provider 与模型
+ * （AGENTS.md §1.2 环境驱动 + 数据主权），统一经共享流式层 openChatStream() 输出。
  *
  * 请求体：{ messages: { role, content }[], systemPrompt?: string }
  * 响应：  text/event-stream，每个 text_delta 以 data: { text } 推送，
@@ -36,164 +42,34 @@ export async function POST(req: NextRequest) {
     if (parsed instanceof Response) return parsed;
     const { messages, systemPrompt } = parsed;
 
-    const apiKey = process.env.DEEPSEEK_API_KEY;
-    if (!apiKey) {
-      void writeAgentLog({
-        source: "hermes-chat",
-        taskName: "Hermes 对话",
-        status: "error",
-        duration: elapsed(),
-        detail: "DeepSeek API Key 未配置",
-      });
-      return Response.json({ error: "DeepSeek API Key 未配置" }, { status: 500 });
-    }
+    // 解析工作空间上下文（供路由配置读取 + 审计归属）
+    const { workspaceId } = await buildWorkspaceContext(req);
 
     // 注入 AGENTS.md 治理条款（运行时加载，最高优先级）
     const governance = await getGovernanceClause();
     const baseSystem = systemPrompt || HERMES_SYSTEM_PROMPT;
+    const fullSystem = baseSystem + governance;
 
-    // 调用 DeepSeek Chat API（兼容 OpenAI 格式，支持 SSE 流式）
-    const deepseekRes = await fetch("https://api.deepseek.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        max_tokens: 2048,
-        temperature: 0.7,
-        stream: true,
-        messages: [
-          { role: "system", content: baseSystem + governance },
-          ...messages.map((m: { role: string; content: string }) => ({
-            role: m.role,
-            content: m.content,
-          })),
-        ],
-      }),
+    // 预估 token 数（粗略：约 4 字符 / token），供路由预算策略使用
+    const estimatedTokens = Math.ceil(
+      (fullSystem.length + messages.reduce((sum, m) => sum + m.content.length, 0)) / 4,
+    );
+
+    // 策略路由：对话为低风险 chat 任务，由 selectModel 决策 Provider/模型并留痕
+    const routing = await selectModel({
+      taskType: "chat",
+      riskLevel: "low",
+      estimatedTokens,
+      workspaceId,
     });
 
-    if (!deepseekRes.ok) {
-      const errBody = await deepseekRes.text();
-      logger.error('DeepSeek API 请求失败', { status: deepseekRes.status, body: errBody.slice(0, 500) });
-
-      void writeAgentLog({
-        source: "hermes-chat",
-        taskName: "Hermes 对话",
-        status: "error",
-        duration: elapsed(),
-        detail: `DeepSeek 请求失败 (${deepseekRes.status})`,
-      });
-
-      // 根据状态码返回友好的降级提示
-      if (deepseekRes.status === 401) {
-        return Response.json(
-          { error: "AI 服务密钥配置有误，请联系管理员" },
-          { status: 503 },
-        );
-      }
-      if (deepseekRes.status === 429) {
-        return Response.json(
-          { error: "AI 服务暂时繁忙，请 30 秒后重试" },
-          { status: 429 },
-        );
-      }
-      if (deepseekRes.status >= 500) {
-        return Response.json(
-          { error: "AI 上游服务故障，请稍后重试" },
-          { status: 503 },
-        );
-      }
-
-      return Response.json(
-        { error: `AI 服务请求失败 (${deepseekRes.status})` },
-        { status: 502 },
-      );
-    }
-
-    if (!deepseekRes.body) {
-      return Response.json({ error: "响应流为空" }, { status: 500 });
-    }
-
-    // 将 DeepSeek 的 SSE 流转换为统一格式
-    const reader = deepseekRes.body.getReader();
-    const decoder = new TextDecoder();
-
-    const readableStream = new ReadableStream({
-      async start(controller) {
-        const encoder = new TextEncoder();
-        let buffer = "";
-
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() ?? "";
-
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed || !trimmed.startsWith("data: ")) continue;
-
-              const data = trimmed.slice(6);
-              if (data === "[DONE]") {
-                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-                controller.close();
-                void writeAgentLog({
-                  source: "hermes-chat",
-                  taskName: "Hermes 对话",
-                  status: "success",
-                  duration: elapsed(),
-                });
-                return;
-              }
-
-              try {
-                const parsed = JSON.parse(data);
-                const content = parsed.choices?.[0]?.delta?.content;
-                if (content) {
-                  controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ text: content })}\n\n`),
-                  );
-                }
-              } catch {
-                // 跳过解析失败的中间帧
-              }
-            }
-          }
-
-          // 流正常结束，发送终止标记
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-          void writeAgentLog({
-            source: "hermes-chat",
-            taskName: "Hermes 对话",
-            status: "success",
-            duration: elapsed(),
-          });
-        } catch (err) {
-          logger.error('流式响应转换失败', { error: err instanceof Error ? err.message : '未知错误' });
-          void writeAgentLog({
-            source: "hermes-chat",
-            taskName: "Hermes 对话",
-            status: "error",
-            duration: elapsed(),
-            detail: "流式响应中断",
-          });
-          controller.error(err);
-        }
-      },
-    });
-
-    return new Response(readableStream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
+    // 统一 SSE 流式管道：openChatStream 处理 Provider 差异，本文件只做 SSE 封帧 + 审计
+    return sseChatStream({
+      provider: routing.provider,
+      model: routing.model,
+      system: fullSystem,
+      messages,
+      elapsed,
     });
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : "";
@@ -233,4 +109,88 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
+}
+
+// ==============================
+// 统一 SSE 流式管道
+// ==============================
+
+const SSE_HEADERS = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache",
+  Connection: "keep-alive",
+} as const;
+
+interface SseChatArgs {
+  provider: "anthropic" | "deepseek";
+  model: string;
+  system: string;
+  messages: { role: string; content: string }[];
+  elapsed: () => string;
+}
+
+/**
+ * SSE 流式封装：将 openChatStream 的文本增量封帧为 data: {text} 格式，
+ * 统一处理完成 / 错误审计与上游错误友好降级（DeepSeek + Anthropic 对齐）。
+ */
+function sseChatStream({ provider, model, system, messages, elapsed }: SseChatArgs) {
+  const encoder = new TextEncoder();
+
+  const readableStream = new ReadableStream({
+    async start(controller) {
+      try {
+        await openChatStream(
+          { provider, model, system, messages, maxTokens: 2048 },
+          (text) => {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ text })}\n\n`),
+            );
+          },
+        );
+
+        // 流正常结束，发送终止标记
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+        void writeAgentLog({
+          source: "hermes-chat",
+          taskName: "Hermes 对话",
+          status: "success",
+          duration: elapsed(),
+        });
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : "";
+
+        // 🟡 上游错误友好降级（DeepSeek + Anthropic 对齐）
+        // openChatStream 抛出时附带 classified: UpstreamErrorInfo
+        const classified = (err as { classified?: { status: number; message: string } }).classified;
+        if (classified) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ error: classified.message })}\n\n`),
+          );
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+          void writeAgentLog({
+            source: "hermes-chat",
+            taskName: "Hermes 对话",
+            status: "error",
+            duration: elapsed(),
+            detail: `上游错误 ${classified.status}: ${classified.message}`,
+          });
+          return;
+        }
+
+        logger.error('SSE 流式响应失败', { error: errMsg });
+        void writeAgentLog({
+          source: "hermes-chat",
+          taskName: "Hermes 对话",
+          status: "error",
+          duration: elapsed(),
+          detail: "流式响应中断",
+        });
+        controller.error(err);
+      }
+    },
+  });
+
+  return new Response(readableStream, { headers: SSE_HEADERS });
 }

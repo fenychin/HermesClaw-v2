@@ -3,7 +3,7 @@
 
 generator client {
   provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  output   = "../src/generated/prisma-new"
 }
 
 datasource db {
@@ -42,6 +42,21 @@ model Workspace {
   workflows           Workflow[]
   workflowRuns        WorkflowRun[]
   workflowNodeRuns    WorkflowNodeRun[]
+  settings            WorkspaceSettings?
+}
+
+// ============================================================
+// 工作空间设置（策略路由 / 模型路由配置）
+// —— 承载每个 Workspace 的默认模型与各 taskType 的 Provider 偏好
+// —— 由 OWNER/ADMIN 在 /settings 模型路由页配置，selectModel() 读取
+// ============================================================
+model WorkspaceSettings {
+  workspaceId     String    @id
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  defaultModel    String    @default("deepseek-chat") // 默认模型（可配置，路由 fallback）
+  taskProviderMap String    @default("{}")            // JSON：{chat|workflow|analysis|generation} -> 'anthropic'|'deepseek'
+  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime  @default(now())
 }
 
 model WorkspaceMember {
@@ -138,6 +153,9 @@ model AgentLog {
   status    String
   duration  String
   detail    String?
+  // 风险等级（AGENTS.md §4.4 闭环反馈 / §4.7 自动化授权）：low | medium | high
+  // Skill 节点执行时由 automationLevel 映射填充
+  riskLevel String?
   createdAt DateTime @default(now())
 
   @@index([workspaceId])
@@ -248,21 +266,23 @@ model Connector {
 // 技能
 // ============================================================
 model Skill {
-  id           String   @id
-  workspaceId  String   @default("default")
-  workspace    Workspace @relation(fields: [workspaceId], references: [id])
-  name         String
-  description  String
-  version      String   @default("v1.0.0")
-  category     String
-  source       String   @default("custom")
-  status       String   @default("active")
-  inputSchema  String
-  outputSchema String
-  usedByAgents String   // JSON 数组
-  scenarios    String   // JSON 数组
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String   @id
+  workspaceId     String   @default("default")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
+  name            String
+  description     String
+  version         String   @default("v1.0.0")
+  category        String
+  source          String   @default("custom")
+  status          String   @default("active")
+  inputSchema     String
+  outputSchema    String
+  usedByAgents    String   // JSON 数组
+  scenarios       String   // JSON 数组
+  // 自动化授权等级（AGENTS.md §4.7）：L1 全自动 / L2 建议执行留痕 / L3 需人工确认 / L4 绝对禁止自动
+  automationLevel String   @default("L2")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([workspaceId])
 }

@@ -47,6 +47,11 @@ export { Prisma }
  */
 export type Workspace = Prisma.WorkspaceModel
 /**
+ * Model WorkspaceSettings
+ * 
+ */
+export type WorkspaceSettings = Prisma.WorkspaceSettingsModel
+/**
  * Model WorkspaceMember
  * 
  */

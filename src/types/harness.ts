@@ -40,6 +40,72 @@ export function resolveAutomationLevel(
   return automationLevelFromRisk(riskLevel)
 }
 
+/** 审计日志风险等级 */
+export type AuditRiskLevel = 'low' | 'mid' | 'high'
+
+/**
+ * 将 AutomationLevel 映射为审计日志 riskLevel。
+ *
+ * 映射规则（AGENTS.md §4.7）：
+ *   L1 → low（全自动，低风险）
+ *   L2 → low（建议执行留痕，低风险）
+ *   L3 → medium（需人工确认，中风险）
+ *   L4 → high（绝对禁止自动，高风险）
+ *
+ * 供 dag-runner / guardrail / 所有 Skill 调用方复用，避免在各处重复 switch。
+ */
+export function mapAutomationToAuditRisk(level: AutomationLevel): AuditRiskLevel {
+  switch (level) {
+    case 'L1':
+    case 'L2':
+      return 'low'
+    case 'L3':
+      return 'mid' // audit 用 mid，与 AgentLog 的 medium 区分
+    case 'L4':
+      return 'high'
+    default:
+      return 'low'
+  }
+}
+
+/**
+ * 将 AutomationLevel 映射为 AgentLog riskLevel 字符串。
+ * —— 与 mapAutomationToAuditRisk 类似但返回 'medium' 而非 'mid'（AgentLog 无 mid 概念）。
+ */
+export function mapAutomationToLogRisk(level: AutomationLevel): string {
+  switch (level) {
+    case 'L1':
+    case 'L2':
+      return 'low'
+    case 'L3':
+      return 'medium'
+    case 'L4':
+      return 'high'
+    default:
+      return 'low'
+  }
+}
+
+/**
+ * 将 AutomationLevel 映射为 selectModel() 使用的路由风险等级。
+ *
+ * L1/L2 → low（成本优化模型）
+ * L3    → medium（工作空间默认模型）
+ * L4    → high（高能力模型）
+ *
+ * 返回值为 model-router RouteRiskLevel 的等效字符串，调用方自行类型断言。
+ */
+export function mapAutomationToRouteRisk(level: AutomationLevel): 'low' | 'medium' | 'high' {
+  switch (level) {
+    case 'L4':
+      return 'high'
+    case 'L3':
+      return 'medium'
+    default:
+      return 'low'
+  }
+}
+
 /** Agent 业务动作 + 其自动化授权等级 */
 export interface AgentAction {
   id: string

@@ -1,9 +1,19 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState, useRef, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { toast } from "sonner";
 import { PageTransition } from "@/components/common/PageTransition";
 import { PageHeader } from "@/components/common/page-header";
+import { useWorkspaceData } from "@/hooks/use-workspace";
+import { isAdmin, type WorkspaceRole } from "@/lib/workspace";
+import {
+  useModelRouting,
+  useUpdateModelRouting,
+  type TaskType,
+  type LlmProvider,
+} from "@/hooks/use-model-routing";
 import {
   Building2,
   Users,
@@ -100,61 +110,175 @@ function CompanySettings() {
   );
 }
 
+// 可选默认模型清单（与 model-router 常量保持一致）
+const MODEL_OPTIONS: { value: string; label: string; provider: string }[] = [
+  { value: "deepseek-chat", label: "DeepSeek Chat", provider: "DeepSeek（成本优化）" },
+  { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", provider: "Anthropic（高能力）" },
+];
+
+// taskType 列表与中文标签
+const TASK_TYPE_ITEMS: { key: TaskType; label: string; hint: string }[] = [
+  { key: "chat", label: "对话（chat）", hint: "Hermes 控制面实时对话" },
+  { key: "workflow", label: "工作流（workflow）", hint: "DAG 任务编排（默认成本优化）" },
+  { key: "analysis", label: "分析（analysis）", hint: "数据 / 询盘分析" },
+  { key: "generation", label: "生成（generation）", hint: "文案 / 素材生成" },
+];
+
+// Provider 下拉选项（空值 = 跟随默认模型自动推断）
+const PROVIDER_OPTIONS: { value: "" | LlmProvider; label: string }[] = [
+  { value: "", label: "自动（跟随默认模型）" },
+  { value: "anthropic", label: "Anthropic" },
+  { value: "deepseek", label: "DeepSeek" },
+];
+
 function ModelRoutingSettings() {
-  const models = [
-    { name: "Claude 3.5 Sonnet", provider: "Anthropic", latency: "低延迟", cost: "中等" },
-    { name: "GPT-4o", provider: "OpenAI", latency: "低延迟", cost: "中等" },
-    { name: "Gemini 1.5 Pro", provider: "Google", latency: "中延迟", cost: "高" },
-  ];
+  const { data: session } = useSession();
+  const { members } = useWorkspaceData();
+  const { settings, isLoading } = useModelRouting();
+  const updateMutation = useUpdateModelRouting();
+
+  // 当前用户角色——经 session email 匹配成员列表，仅 ADMIN/OWNER 可改
+  const currentRole: WorkspaceRole =
+    (members.find((m) => m.email === session?.user?.email)?.role as WorkspaceRole) ?? "VIEWER";
+  const canManage = isAdmin(currentRole);
+
+  // 本地表单态（首次服务端配置到达时初始化，后续由用户编辑驱动）
+  const [defaultModel, setDefaultModel] = useState("deepseek-chat");
+  const [taskProviderMap, setTaskProviderMap] = useState<
+    Partial<Record<TaskType, LlmProvider>>
+  >({});
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    if (settings && !initialized.current) {
+      initialized.current = true;
+      setDefaultModel(settings.defaultModel);
+      setTaskProviderMap(settings.taskProviderMap ?? {});
+    }
+  }, [settings]);
+
+  const handleProviderChange = (task: TaskType, value: string) => {
+    setTaskProviderMap((prev) => {
+      const next = { ...prev };
+      if (value === "") {
+        delete next[task];
+      } else {
+        next[task] = value as LlmProvider;
+      }
+      return next;
+    });
+  };
+
+  const handleSave = () => {
+    updateMutation.mutate(
+      { defaultModel, taskProviderMap },
+      {
+        onSuccess: () => toast.success("模型路由配置已保存"),
+        onError: (err) => toast.error(err instanceof Error ? err.message : "保存失败"),
+      },
+    );
+  };
 
   return (
     <div className="max-w-2xl pb-10">
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-foreground">模型路由</h2>
-        <p className="text-sm text-muted-foreground mt-1">配置默认的 AI 模型及其备用策略</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          配置默认模型与各任务类型的 Provider 偏好。高风险任务始终路由至高能力模型。
+        </p>
       </div>
 
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-sm font-medium text-foreground mb-3">当前激活模型</h3>
-          <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Cpu className="size-5 text-primary" />
-              <div>
-                <p className="text-sm font-medium text-primary">Claude 3.5 Sonnet</p>
-                <p className="text-xs text-primary/70">Anthropic</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <span className="bg-primary/20 text-primary text-[10px] px-2 py-0.5 rounded-full font-medium">低延迟</span>
-              <span className="bg-primary/20 text-primary text-[10px] px-2 py-0.5 rounded-full font-medium">中等费用</span>
-            </div>
-          </div>
-        </div>
+      {/* 路由规则说明 */}
+      <div className="mb-6 bg-card border border-border rounded-xl p-4 text-xs text-muted-foreground space-y-1.5">
+        <p className="flex items-center gap-2">
+          <span className="text-danger font-medium">高风险</span>
+          → claude-sonnet-4-6（高能力模型，不可在此关闭）
+        </p>
+        <p className="flex items-center gap-2">
+          <span className="text-warning font-medium">工作流</span>
+          → deepseek-chat（成本优化，非高风险时）
+        </p>
+        <p className="flex items-center gap-2">
+          <span className="text-success font-medium">其余</span>
+          → 下方默认模型与 Provider 偏好
+        </p>
+      </div>
 
-        <div>
-          <h3 className="text-sm font-medium text-foreground mb-3 mt-6">备用模型</h3>
+      {!canManage && (
+        <div className="mb-4 bg-warning/10 border border-warning/30 rounded-xl p-3 text-xs text-warning">
+          仅管理员（OWNER / ADMIN）可修改模型路由，当前为只读视图。
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="text-sm text-muted-foreground py-8">加载配置中…</div>
+      ) : (
+        <div className="space-y-6">
+          {/* 默认模型 */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground">默认模型</label>
+            <p className="text-xs text-muted-foreground">未命中高风险 / 工作流规则时使用</p>
+            <select
+              value={defaultModel}
+              onChange={(e) => setDefaultModel(e.target.value)}
+              disabled={!canManage}
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {MODEL_OPTIONS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label} — {m.provider}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 各 taskType Provider 偏好 */}
           <div className="space-y-3">
-            {models.map((m, i) => (
-              <div key={i} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
+            <h3 className="text-sm font-medium text-foreground">任务类型 Provider 偏好</h3>
+            {TASK_TYPE_ITEMS.map((item) => (
+              <div
+                key={item.key}
+                className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4"
+              >
+                <div className="flex items-center gap-3 min-w-0">
                   <div className="size-8 rounded-lg bg-accent flex items-center justify-center shrink-0">
                     <Cpu className="size-4 text-muted-foreground" />
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{m.name}</p>
-                    <p className="text-xs text-muted-foreground">{m.provider}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">{item.label}</p>
+                    <p className="text-xs text-muted-foreground truncate">{item.hint}</p>
                   </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <span className="bg-accent text-muted-foreground text-[10px] px-2 py-0.5 rounded-full font-medium">{m.latency}</span>
-                  <span className="bg-accent text-muted-foreground text-[10px] px-2 py-0.5 rounded-full font-medium">{m.cost}</span>
-                </div>
+                <select
+                  value={taskProviderMap[item.key] ?? ""}
+                  onChange={(e) => handleProviderChange(item.key, e.target.value)}
+                  disabled={!canManage}
+                  className="shrink-0 bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {PROVIDER_OPTIONS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             ))}
           </div>
+
+          {canManage && (
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={updateMutation.isPending}
+                className="bg-primary text-white hover:bg-primary/90 px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {updateMutation.isPending ? "保存中…" : "保存更改"}
+              </button>
+            </div>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

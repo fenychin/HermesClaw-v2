@@ -37,6 +37,7 @@ export type SkillMinAggregateOutputType = {
   outputSchema: string | null
   usedByAgents: string | null
   scenarios: string | null
+  automationLevel: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -54,6 +55,7 @@ export type SkillMaxAggregateOutputType = {
   outputSchema: string | null
   usedByAgents: string | null
   scenarios: string | null
+  automationLevel: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -71,6 +73,7 @@ export type SkillCountAggregateOutputType = {
   outputSchema: number
   usedByAgents: number
   scenarios: number
+  automationLevel: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -90,6 +93,7 @@ export type SkillMinAggregateInputType = {
   outputSchema?: true
   usedByAgents?: true
   scenarios?: true
+  automationLevel?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -107,6 +111,7 @@ export type SkillMaxAggregateInputType = {
   outputSchema?: true
   usedByAgents?: true
   scenarios?: true
+  automationLevel?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -124,6 +129,7 @@ export type SkillCountAggregateInputType = {
   outputSchema?: true
   usedByAgents?: true
   scenarios?: true
+  automationLevel?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -214,6 +220,7 @@ export type SkillGroupByOutputType = {
   outputSchema: string
   usedByAgents: string
   scenarios: string
+  automationLevel: string
   createdAt: Date
   updatedAt: Date
   _count: SkillCountAggregateOutputType | null
@@ -252,6 +259,7 @@ export type SkillWhereInput = {
   outputSchema?: Prisma.StringFilter<"Skill"> | string
   usedByAgents?: Prisma.StringFilter<"Skill"> | string
   scenarios?: Prisma.StringFilter<"Skill"> | string
+  automationLevel?: Prisma.StringFilter<"Skill"> | string
   createdAt?: Prisma.DateTimeFilter<"Skill"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Skill"> | Date | string
   workspace?: Prisma.XOR<Prisma.WorkspaceScalarRelationFilter, Prisma.WorkspaceWhereInput>
@@ -270,6 +278,7 @@ export type SkillOrderByWithRelationInput = {
   outputSchema?: Prisma.SortOrder
   usedByAgents?: Prisma.SortOrder
   scenarios?: Prisma.SortOrder
+  automationLevel?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   workspace?: Prisma.WorkspaceOrderByWithRelationInput
@@ -291,6 +300,7 @@ export type SkillWhereUniqueInput = Prisma.AtLeast<{
   outputSchema?: Prisma.StringFilter<"Skill"> | string
   usedByAgents?: Prisma.StringFilter<"Skill"> | string
   scenarios?: Prisma.StringFilter<"Skill"> | string
+  automationLevel?: Prisma.StringFilter<"Skill"> | string
   createdAt?: Prisma.DateTimeFilter<"Skill"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Skill"> | Date | string
   workspace?: Prisma.XOR<Prisma.WorkspaceScalarRelationFilter, Prisma.WorkspaceWhereInput>
@@ -309,6 +319,7 @@ export type SkillOrderByWithAggregationInput = {
   outputSchema?: Prisma.SortOrder
   usedByAgents?: Prisma.SortOrder
   scenarios?: Prisma.SortOrder
+  automationLevel?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.SkillCountOrderByAggregateInput
@@ -332,6 +343,7 @@ export type SkillScalarWhereWithAggregatesInput = {
   outputSchema?: Prisma.StringWithAggregatesFilter<"Skill"> | string
   usedByAgents?: Prisma.StringWithAggregatesFilter<"Skill"> | string
   scenarios?: Prisma.StringWithAggregatesFilter<"Skill"> | string
+  automationLevel?: Prisma.StringWithAggregatesFilter<"Skill"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Skill"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Skill"> | Date | string
 }
@@ -348,6 +360,7 @@ export type SkillCreateInput = {
   outputSchema: string
   usedByAgents: string
   scenarios: string
+  automationLevel?: string
   createdAt?: Date | string
   updatedAt?: Date | string
   workspace?: Prisma.WorkspaceCreateNestedOneWithoutSkillsInput
@@ -366,6 +379,7 @@ export type SkillUncheckedCreateInput = {
   outputSchema: string
   usedByAgents: string
   scenarios: string
+  automationLevel?: string
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -382,6 +396,7 @@ export type SkillUpdateInput = {
   outputSchema?: Prisma.StringFieldUpdateOperationsInput | string
   usedByAgents?: Prisma.StringFieldUpdateOperationsInput | string
   scenarios?: Prisma.StringFieldUpdateOperationsInput | string
+  automationLevel?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutSkillsNestedInput
@@ -400,6 +415,7 @@ export type SkillUncheckedUpdateInput = {
   outputSchema?: Prisma.StringFieldUpdateOperationsInput | string
   usedByAgents?: Prisma.StringFieldUpdateOperationsInput | string
   scenarios?: Prisma.StringFieldUpdateOperationsInput | string
+  automationLevel?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -417,6 +433,7 @@ export type SkillCreateManyInput = {
   outputSchema: string
   usedByAgents: string
   scenarios: string
+  automationLevel?: string
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -433,6 +450,7 @@ export type SkillUpdateManyMutationInput = {
   outputSchema?: Prisma.StringFieldUpdateOperationsInput | string
   usedByAgents?: Prisma.StringFieldUpdateOperationsInput | string
   scenarios?: Prisma.StringFieldUpdateOperationsInput | string
+  automationLevel?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -450,6 +468,7 @@ export type SkillUncheckedUpdateManyInput = {
   outputSchema?: Prisma.StringFieldUpdateOperationsInput | string
   usedByAgents?: Prisma.StringFieldUpdateOperationsInput | string
   scenarios?: Prisma.StringFieldUpdateOperationsInput | string
+  automationLevel?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -477,6 +496,7 @@ export type SkillCountOrderByAggregateInput = {
   outputSchema?: Prisma.SortOrder
   usedByAgents?: Prisma.SortOrder
   scenarios?: Prisma.SortOrder
+  automationLevel?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -494,6 +514,7 @@ export type SkillMaxOrderByAggregateInput = {
   outputSchema?: Prisma.SortOrder
   usedByAgents?: Prisma.SortOrder
   scenarios?: Prisma.SortOrder
+  automationLevel?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -511,6 +532,7 @@ export type SkillMinOrderByAggregateInput = {
   outputSchema?: Prisma.SortOrder
   usedByAgents?: Prisma.SortOrder
   scenarios?: Prisma.SortOrder
+  automationLevel?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -569,6 +591,7 @@ export type SkillCreateWithoutWorkspaceInput = {
   outputSchema: string
   usedByAgents: string
   scenarios: string
+  automationLevel?: string
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -585,6 +608,7 @@ export type SkillUncheckedCreateWithoutWorkspaceInput = {
   outputSchema: string
   usedByAgents: string
   scenarios: string
+  automationLevel?: string
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -630,6 +654,7 @@ export type SkillScalarWhereInput = {
   outputSchema?: Prisma.StringFilter<"Skill"> | string
   usedByAgents?: Prisma.StringFilter<"Skill"> | string
   scenarios?: Prisma.StringFilter<"Skill"> | string
+  automationLevel?: Prisma.StringFilter<"Skill"> | string
   createdAt?: Prisma.DateTimeFilter<"Skill"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Skill"> | Date | string
 }
@@ -646,6 +671,7 @@ export type SkillCreateManyWorkspaceInput = {
   outputSchema: string
   usedByAgents: string
   scenarios: string
+  automationLevel?: string
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -662,6 +688,7 @@ export type SkillUpdateWithoutWorkspaceInput = {
   outputSchema?: Prisma.StringFieldUpdateOperationsInput | string
   usedByAgents?: Prisma.StringFieldUpdateOperationsInput | string
   scenarios?: Prisma.StringFieldUpdateOperationsInput | string
+  automationLevel?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -678,6 +705,7 @@ export type SkillUncheckedUpdateWithoutWorkspaceInput = {
   outputSchema?: Prisma.StringFieldUpdateOperationsInput | string
   usedByAgents?: Prisma.StringFieldUpdateOperationsInput | string
   scenarios?: Prisma.StringFieldUpdateOperationsInput | string
+  automationLevel?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -694,6 +722,7 @@ export type SkillUncheckedUpdateManyWithoutWorkspaceInput = {
   outputSchema?: Prisma.StringFieldUpdateOperationsInput | string
   usedByAgents?: Prisma.StringFieldUpdateOperationsInput | string
   scenarios?: Prisma.StringFieldUpdateOperationsInput | string
+  automationLevel?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -713,6 +742,7 @@ export type SkillSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   outputSchema?: boolean
   usedByAgents?: boolean
   scenarios?: boolean
+  automationLevel?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
@@ -731,6 +761,7 @@ export type SkillSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   outputSchema?: boolean
   usedByAgents?: boolean
   scenarios?: boolean
+  automationLevel?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
@@ -749,6 +780,7 @@ export type SkillSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   outputSchema?: boolean
   usedByAgents?: boolean
   scenarios?: boolean
+  automationLevel?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
@@ -767,11 +799,12 @@ export type SkillSelectScalar = {
   outputSchema?: boolean
   usedByAgents?: boolean
   scenarios?: boolean
+  automationLevel?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type SkillOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "name" | "description" | "version" | "category" | "source" | "status" | "inputSchema" | "outputSchema" | "usedByAgents" | "scenarios" | "createdAt" | "updatedAt", ExtArgs["result"]["skill"]>
+export type SkillOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "name" | "description" | "version" | "category" | "source" | "status" | "inputSchema" | "outputSchema" | "usedByAgents" | "scenarios" | "automationLevel" | "createdAt" | "updatedAt", ExtArgs["result"]["skill"]>
 export type SkillInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
 }
@@ -800,6 +833,7 @@ export type $SkillPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     outputSchema: string
     usedByAgents: string
     scenarios: string
+    automationLevel: string
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["skill"]>
@@ -1238,6 +1272,7 @@ export interface SkillFieldRefs {
   readonly outputSchema: Prisma.FieldRef<"Skill", 'String'>
   readonly usedByAgents: Prisma.FieldRef<"Skill", 'String'>
   readonly scenarios: Prisma.FieldRef<"Skill", 'String'>
+  readonly automationLevel: Prisma.FieldRef<"Skill", 'String'>
   readonly createdAt: Prisma.FieldRef<"Skill", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Skill", 'DateTime'>
 }

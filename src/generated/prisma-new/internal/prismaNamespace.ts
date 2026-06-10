@@ -385,6 +385,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 export const ModelName = {
   Workspace: 'Workspace',
+  WorkspaceSettings: 'WorkspaceSettings',
   WorkspaceMember: 'WorkspaceMember',
   User: 'User',
   Account: 'Account',
@@ -424,7 +425,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "workspace" | "workspaceMember" | "user" | "account" | "session" | "agent" | "agentLog" | "project" | "memory" | "memoryRevision" | "connector" | "skill" | "harnessProposal" | "conversation" | "conversationMessage" | "auditLog" | "inquiry" | "marketIntelligence" | "quotation" | "evolutionLog" | "toolRegistry" | "toolGrant" | "workflow" | "workflowRun" | "workflowNodeRun"
+    modelProps: "workspace" | "workspaceSettings" | "workspaceMember" | "user" | "account" | "session" | "agent" | "agentLog" | "project" | "memory" | "memoryRevision" | "connector" | "skill" | "harnessProposal" | "conversation" | "conversationMessage" | "auditLog" | "inquiry" | "marketIntelligence" | "quotation" | "evolutionLog" | "toolRegistry" | "toolGrant" | "workflow" | "workflowRun" | "workflowNodeRun"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -499,6 +500,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.WorkspaceCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.WorkspaceCountAggregateOutputType> | number
+        }
+      }
+    }
+    WorkspaceSettings: {
+      payload: Prisma.$WorkspaceSettingsPayload<ExtArgs>
+      fields: Prisma.WorkspaceSettingsFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.WorkspaceSettingsFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkspaceSettingsPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.WorkspaceSettingsFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkspaceSettingsPayload>
+        }
+        findFirst: {
+          args: Prisma.WorkspaceSettingsFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkspaceSettingsPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.WorkspaceSettingsFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkspaceSettingsPayload>
+        }
+        findMany: {
+          args: Prisma.WorkspaceSettingsFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkspaceSettingsPayload>[]
+        }
+        create: {
+          args: Prisma.WorkspaceSettingsCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkspaceSettingsPayload>
+        }
+        createMany: {
+          args: Prisma.WorkspaceSettingsCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.WorkspaceSettingsCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkspaceSettingsPayload>[]
+        }
+        delete: {
+          args: Prisma.WorkspaceSettingsDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkspaceSettingsPayload>
+        }
+        update: {
+          args: Prisma.WorkspaceSettingsUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkspaceSettingsPayload>
+        }
+        deleteMany: {
+          args: Prisma.WorkspaceSettingsDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.WorkspaceSettingsUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.WorkspaceSettingsUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkspaceSettingsPayload>[]
+        }
+        upsert: {
+          args: Prisma.WorkspaceSettingsUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkspaceSettingsPayload>
+        }
+        aggregate: {
+          args: Prisma.WorkspaceSettingsAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateWorkspaceSettings>
+        }
+        groupBy: {
+          args: Prisma.WorkspaceSettingsGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WorkspaceSettingsGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.WorkspaceSettingsCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WorkspaceSettingsCountAggregateOutputType> | number
         }
       }
     }
@@ -2324,6 +2399,17 @@ export const WorkspaceScalarFieldEnum = {
 export type WorkspaceScalarFieldEnum = (typeof WorkspaceScalarFieldEnum)[keyof typeof WorkspaceScalarFieldEnum]
 
 
+export const WorkspaceSettingsScalarFieldEnum = {
+  workspaceId: 'workspaceId',
+  defaultModel: 'defaultModel',
+  taskProviderMap: 'taskProviderMap',
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type WorkspaceSettingsScalarFieldEnum = (typeof WorkspaceSettingsScalarFieldEnum)[keyof typeof WorkspaceSettingsScalarFieldEnum]
+
+
 export const WorkspaceMemberScalarFieldEnum = {
   workspaceId: 'workspaceId',
   userId: 'userId',
@@ -2408,6 +2494,7 @@ export const AgentLogScalarFieldEnum = {
   status: 'status',
   duration: 'duration',
   detail: 'detail',
+  riskLevel: 'riskLevel',
   createdAt: 'createdAt'
 } as const
 
@@ -2504,6 +2591,7 @@ export const SkillScalarFieldEnum = {
   outputSchema: 'outputSchema',
   usedByAgents: 'usedByAgents',
   scenarios: 'scenarios',
+  automationLevel: 'automationLevel',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -2890,6 +2978,7 @@ export type PrismaClientOptions = ({
 }
 export type GlobalOmitConfig = {
   workspace?: Prisma.WorkspaceOmit
+  workspaceSettings?: Prisma.WorkspaceSettingsOmit
   workspaceMember?: Prisma.WorkspaceMemberOmit
   user?: Prisma.UserOmit
   account?: Prisma.AccountOmit

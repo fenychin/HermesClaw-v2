@@ -52,6 +52,7 @@ export const AnyNull = runtime.AnyNull
 
 export const ModelName = {
   Workspace: 'Workspace',
+  WorkspaceSettings: 'WorkspaceSettings',
   WorkspaceMember: 'WorkspaceMember',
   User: 'User',
   Account: 'Account',
@@ -99,6 +100,17 @@ export const WorkspaceScalarFieldEnum = {
 } as const
 
 export type WorkspaceScalarFieldEnum = (typeof WorkspaceScalarFieldEnum)[keyof typeof WorkspaceScalarFieldEnum]
+
+
+export const WorkspaceSettingsScalarFieldEnum = {
+  workspaceId: 'workspaceId',
+  defaultModel: 'defaultModel',
+  taskProviderMap: 'taskProviderMap',
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type WorkspaceSettingsScalarFieldEnum = (typeof WorkspaceSettingsScalarFieldEnum)[keyof typeof WorkspaceSettingsScalarFieldEnum]
 
 
 export const WorkspaceMemberScalarFieldEnum = {
@@ -185,6 +197,7 @@ export const AgentLogScalarFieldEnum = {
   status: 'status',
   duration: 'duration',
   detail: 'detail',
+  riskLevel: 'riskLevel',
   createdAt: 'createdAt'
 } as const
 
@@ -281,6 +294,7 @@ export const SkillScalarFieldEnum = {
   outputSchema: 'outputSchema',
   usedByAgents: 'usedByAgents',
   scenarios: 'scenarios',
+  automationLevel: 'automationLevel',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const

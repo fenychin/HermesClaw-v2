@@ -56,7 +56,14 @@ export type {
   EvolutionLogEntry,
   TargetComponent,
 } from './harness'
-export { TRADE_ACTIONS, automationLevelFromRisk, resolveAutomationLevel } from './harness'
+export {
+  TRADE_ACTIONS,
+  automationLevelFromRisk,
+  resolveAutomationLevel,
+  mapAutomationToAuditRisk,
+  mapAutomationToLogRisk,
+  mapAutomationToRouteRisk,
+} from './harness'
 
 // ---- Trade 外贸 ----
 export type {

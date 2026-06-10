@@ -33,6 +33,7 @@ export type AgentLogMinAggregateOutputType = {
   status: string | null
   duration: string | null
   detail: string | null
+  riskLevel: string | null
   createdAt: Date | null
 }
 
@@ -45,6 +46,7 @@ export type AgentLogMaxAggregateOutputType = {
   status: string | null
   duration: string | null
   detail: string | null
+  riskLevel: string | null
   createdAt: Date | null
 }
 
@@ -57,6 +59,7 @@ export type AgentLogCountAggregateOutputType = {
   status: number
   duration: number
   detail: number
+  riskLevel: number
   createdAt: number
   _all: number
 }
@@ -71,6 +74,7 @@ export type AgentLogMinAggregateInputType = {
   status?: true
   duration?: true
   detail?: true
+  riskLevel?: true
   createdAt?: true
 }
 
@@ -83,6 +87,7 @@ export type AgentLogMaxAggregateInputType = {
   status?: true
   duration?: true
   detail?: true
+  riskLevel?: true
   createdAt?: true
 }
 
@@ -95,6 +100,7 @@ export type AgentLogCountAggregateInputType = {
   status?: true
   duration?: true
   detail?: true
+  riskLevel?: true
   createdAt?: true
   _all?: true
 }
@@ -180,6 +186,7 @@ export type AgentLogGroupByOutputType = {
   status: string
   duration: string
   detail: string | null
+  riskLevel: string | null
   createdAt: Date
   _count: AgentLogCountAggregateOutputType | null
   _min: AgentLogMinAggregateOutputType | null
@@ -213,6 +220,7 @@ export type AgentLogWhereInput = {
   status?: Prisma.StringFilter<"AgentLog"> | string
   duration?: Prisma.StringFilter<"AgentLog"> | string
   detail?: Prisma.StringNullableFilter<"AgentLog"> | string | null
+  riskLevel?: Prisma.StringNullableFilter<"AgentLog"> | string | null
   createdAt?: Prisma.DateTimeFilter<"AgentLog"> | Date | string
   workspace?: Prisma.XOR<Prisma.WorkspaceScalarRelationFilter, Prisma.WorkspaceWhereInput>
   agent?: Prisma.XOR<Prisma.AgentNullableScalarRelationFilter, Prisma.AgentWhereInput> | null
@@ -227,6 +235,7 @@ export type AgentLogOrderByWithRelationInput = {
   status?: Prisma.SortOrder
   duration?: Prisma.SortOrder
   detail?: Prisma.SortOrderInput | Prisma.SortOrder
+  riskLevel?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   workspace?: Prisma.WorkspaceOrderByWithRelationInput
   agent?: Prisma.AgentOrderByWithRelationInput
@@ -244,6 +253,7 @@ export type AgentLogWhereUniqueInput = Prisma.AtLeast<{
   status?: Prisma.StringFilter<"AgentLog"> | string
   duration?: Prisma.StringFilter<"AgentLog"> | string
   detail?: Prisma.StringNullableFilter<"AgentLog"> | string | null
+  riskLevel?: Prisma.StringNullableFilter<"AgentLog"> | string | null
   createdAt?: Prisma.DateTimeFilter<"AgentLog"> | Date | string
   workspace?: Prisma.XOR<Prisma.WorkspaceScalarRelationFilter, Prisma.WorkspaceWhereInput>
   agent?: Prisma.XOR<Prisma.AgentNullableScalarRelationFilter, Prisma.AgentWhereInput> | null
@@ -258,6 +268,7 @@ export type AgentLogOrderByWithAggregationInput = {
   status?: Prisma.SortOrder
   duration?: Prisma.SortOrder
   detail?: Prisma.SortOrderInput | Prisma.SortOrder
+  riskLevel?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.AgentLogCountOrderByAggregateInput
   _max?: Prisma.AgentLogMaxOrderByAggregateInput
@@ -276,6 +287,7 @@ export type AgentLogScalarWhereWithAggregatesInput = {
   status?: Prisma.StringWithAggregatesFilter<"AgentLog"> | string
   duration?: Prisma.StringWithAggregatesFilter<"AgentLog"> | string
   detail?: Prisma.StringNullableWithAggregatesFilter<"AgentLog"> | string | null
+  riskLevel?: Prisma.StringNullableWithAggregatesFilter<"AgentLog"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"AgentLog"> | Date | string
 }
 
@@ -286,6 +298,7 @@ export type AgentLogCreateInput = {
   status: string
   duration: string
   detail?: string | null
+  riskLevel?: string | null
   createdAt?: Date | string
   workspace?: Prisma.WorkspaceCreateNestedOneWithoutAgentLogsInput
   agent?: Prisma.AgentCreateNestedOneWithoutRunLogsInput
@@ -300,6 +313,7 @@ export type AgentLogUncheckedCreateInput = {
   status: string
   duration: string
   detail?: string | null
+  riskLevel?: string | null
   createdAt?: Date | string
 }
 
@@ -310,6 +324,7 @@ export type AgentLogUpdateInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   duration?: Prisma.StringFieldUpdateOperationsInput | string
   detail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  riskLevel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutAgentLogsNestedInput
   agent?: Prisma.AgentUpdateOneWithoutRunLogsNestedInput
@@ -324,6 +339,7 @@ export type AgentLogUncheckedUpdateInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   duration?: Prisma.StringFieldUpdateOperationsInput | string
   detail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  riskLevel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -336,6 +352,7 @@ export type AgentLogCreateManyInput = {
   status: string
   duration: string
   detail?: string | null
+  riskLevel?: string | null
   createdAt?: Date | string
 }
 
@@ -346,6 +363,7 @@ export type AgentLogUpdateManyMutationInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   duration?: Prisma.StringFieldUpdateOperationsInput | string
   detail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  riskLevel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -358,6 +376,7 @@ export type AgentLogUncheckedUpdateManyInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   duration?: Prisma.StringFieldUpdateOperationsInput | string
   detail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  riskLevel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -380,6 +399,7 @@ export type AgentLogCountOrderByAggregateInput = {
   status?: Prisma.SortOrder
   duration?: Prisma.SortOrder
   detail?: Prisma.SortOrder
+  riskLevel?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -392,6 +412,7 @@ export type AgentLogMaxOrderByAggregateInput = {
   status?: Prisma.SortOrder
   duration?: Prisma.SortOrder
   detail?: Prisma.SortOrder
+  riskLevel?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -404,6 +425,7 @@ export type AgentLogMinOrderByAggregateInput = {
   status?: Prisma.SortOrder
   duration?: Prisma.SortOrder
   detail?: Prisma.SortOrder
+  riskLevel?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -498,6 +520,7 @@ export type AgentLogCreateWithoutWorkspaceInput = {
   status: string
   duration: string
   detail?: string | null
+  riskLevel?: string | null
   createdAt?: Date | string
   agent?: Prisma.AgentCreateNestedOneWithoutRunLogsInput
 }
@@ -510,6 +533,7 @@ export type AgentLogUncheckedCreateWithoutWorkspaceInput = {
   status: string
   duration: string
   detail?: string | null
+  riskLevel?: string | null
   createdAt?: Date | string
 }
 
@@ -550,6 +574,7 @@ export type AgentLogScalarWhereInput = {
   status?: Prisma.StringFilter<"AgentLog"> | string
   duration?: Prisma.StringFilter<"AgentLog"> | string
   detail?: Prisma.StringNullableFilter<"AgentLog"> | string | null
+  riskLevel?: Prisma.StringNullableFilter<"AgentLog"> | string | null
   createdAt?: Prisma.DateTimeFilter<"AgentLog"> | Date | string
 }
 
@@ -560,6 +585,7 @@ export type AgentLogCreateWithoutAgentInput = {
   status: string
   duration: string
   detail?: string | null
+  riskLevel?: string | null
   createdAt?: Date | string
   workspace?: Prisma.WorkspaceCreateNestedOneWithoutAgentLogsInput
 }
@@ -572,6 +598,7 @@ export type AgentLogUncheckedCreateWithoutAgentInput = {
   status: string
   duration: string
   detail?: string | null
+  riskLevel?: string | null
   createdAt?: Date | string
 }
 
@@ -608,6 +635,7 @@ export type AgentLogCreateManyWorkspaceInput = {
   status: string
   duration: string
   detail?: string | null
+  riskLevel?: string | null
   createdAt?: Date | string
 }
 
@@ -618,6 +646,7 @@ export type AgentLogUpdateWithoutWorkspaceInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   duration?: Prisma.StringFieldUpdateOperationsInput | string
   detail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  riskLevel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   agent?: Prisma.AgentUpdateOneWithoutRunLogsNestedInput
 }
@@ -630,6 +659,7 @@ export type AgentLogUncheckedUpdateWithoutWorkspaceInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   duration?: Prisma.StringFieldUpdateOperationsInput | string
   detail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  riskLevel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -641,6 +671,7 @@ export type AgentLogUncheckedUpdateManyWithoutWorkspaceInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   duration?: Prisma.StringFieldUpdateOperationsInput | string
   detail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  riskLevel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -652,6 +683,7 @@ export type AgentLogCreateManyAgentInput = {
   status: string
   duration: string
   detail?: string | null
+  riskLevel?: string | null
   createdAt?: Date | string
 }
 
@@ -662,6 +694,7 @@ export type AgentLogUpdateWithoutAgentInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   duration?: Prisma.StringFieldUpdateOperationsInput | string
   detail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  riskLevel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutAgentLogsNestedInput
 }
@@ -674,6 +707,7 @@ export type AgentLogUncheckedUpdateWithoutAgentInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   duration?: Prisma.StringFieldUpdateOperationsInput | string
   detail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  riskLevel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -685,6 +719,7 @@ export type AgentLogUncheckedUpdateManyWithoutAgentInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   duration?: Prisma.StringFieldUpdateOperationsInput | string
   detail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  riskLevel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -699,6 +734,7 @@ export type AgentLogSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   status?: boolean
   duration?: boolean
   detail?: boolean
+  riskLevel?: boolean
   createdAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   agent?: boolean | Prisma.AgentLog$agentArgs<ExtArgs>
@@ -713,6 +749,7 @@ export type AgentLogSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   status?: boolean
   duration?: boolean
   detail?: boolean
+  riskLevel?: boolean
   createdAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   agent?: boolean | Prisma.AgentLog$agentArgs<ExtArgs>
@@ -727,6 +764,7 @@ export type AgentLogSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
   status?: boolean
   duration?: boolean
   detail?: boolean
+  riskLevel?: boolean
   createdAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   agent?: boolean | Prisma.AgentLog$agentArgs<ExtArgs>
@@ -741,10 +779,11 @@ export type AgentLogSelectScalar = {
   status?: boolean
   duration?: boolean
   detail?: boolean
+  riskLevel?: boolean
   createdAt?: boolean
 }
 
-export type AgentLogOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "agentId" | "source" | "taskName" | "status" | "duration" | "detail" | "createdAt", ExtArgs["result"]["agentLog"]>
+export type AgentLogOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "agentId" | "source" | "taskName" | "status" | "duration" | "detail" | "riskLevel" | "createdAt", ExtArgs["result"]["agentLog"]>
 export type AgentLogInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   agent?: boolean | Prisma.AgentLog$agentArgs<ExtArgs>
@@ -773,6 +812,7 @@ export type $AgentLogPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     status: string
     duration: string
     detail: string | null
+    riskLevel: string | null
     createdAt: Date
   }, ExtArgs["result"]["agentLog"]>
   composites: {}
@@ -1207,6 +1247,7 @@ export interface AgentLogFieldRefs {
   readonly status: Prisma.FieldRef<"AgentLog", 'String'>
   readonly duration: Prisma.FieldRef<"AgentLog", 'String'>
   readonly detail: Prisma.FieldRef<"AgentLog", 'String'>
+  readonly riskLevel: Prisma.FieldRef<"AgentLog", 'String'>
   readonly createdAt: Prisma.FieldRef<"AgentLog", 'DateTime'>
 }
     

@@ -45,8 +45,21 @@ export interface AnthropicTextOptions {
 
 // ---- Provider 选择 ----
 
-const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
-const DEFAULT_DEEPSEEK_MODEL = "deepseek-chat"
+export const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
+export const DEFAULT_DEEPSEEK_MODEL = "deepseek-chat"
+
+/** DeepSeek Chat API 端点（OpenAI 兼容） */
+const DEEPSEEK_CHAT_URL = "https://api.deepseek.com/v1/chat/completions"
+
+/**
+ * 某个 Provider 的 API Key 是否已配置。
+ * 统一 key 可用性判定，供 resolveLlmProvider / model-router 等复用，
+ * 避免在多处重复 process.env 检查。
+ */
+export function isProviderAvailable(provider: LlmProvider): boolean {
+  if (provider === "anthropic") return Boolean(process.env.ANTHROPIC_API_KEY?.trim())
+  return Boolean(process.env.DEEPSEEK_API_KEY?.trim())
+}
 
 /**
  * 统一 LLM Provider 选择逻辑（与 harness-llm.ts 策略一致）
@@ -61,8 +74,8 @@ export function resolveLlmProvider(
   preferredModel?: string,
 ): LlmProviderSelection {
   const override = process.env.HARNESS_LLM_PROVIDER?.toLowerCase().trim()
-  const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY?.trim())
-  const hasDeepSeek = Boolean(process.env.DEEPSEEK_API_KEY?.trim())
+  const hasAnthropic = isProviderAvailable("anthropic")
+  const hasDeepSeek = isProviderAvailable("deepseek")
 
   if (override === "deepseek") {
     if (!hasDeepSeek) {
@@ -110,7 +123,7 @@ export async function callDeepSeekJson(
     throw new Error("DEEPSEEK_API_KEY 未配置")
   }
 
-  const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
+  const res = await fetch(DEEPSEEK_CHAT_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -175,4 +188,204 @@ export async function callAnthropicText(
   }
 
   return textBlock.text
+}
+
+// ---- 上游错误映射 ----
+
+/** 上游 API 错误码 → 友好 HTTP 状态码与信息 */
+export interface UpstreamErrorInfo {
+  status: number
+  message: string
+}
+
+/** DeepSeek / OpenAI 兼容上游错误分类（路由层复用，与 Anthropic 对齐友好降级） */
+export function classifyUpstreamError(httpStatus: number): UpstreamErrorInfo {
+  if (httpStatus === 401) {
+    return { status: 503, message: "AI 服务密钥配置有误，请联系管理员" }
+  }
+  if (httpStatus === 429) {
+    return { status: 429, message: "AI 服务暂时繁忙，请 30 秒后重试" }
+  }
+  if (httpStatus >= 500) {
+    return { status: 503, message: "AI 上游服务故障，请稍后重试" }
+  }
+  return { status: 502, message: `AI 服务请求失败 (${httpStatus})` }
+}
+
+// ---- 共享流式调用 ----
+
+/** 流式对话消息 */
+export interface StreamMessage {
+  role: string
+  content: string
+}
+
+/** 流式调用参数 */
+export interface OpenChatStreamOptions {
+  /** Provider */
+  provider: LlmProvider
+  /** 模型 ID */
+  model: string
+  /** 系统提示词 */
+  system: string
+  /** 对话历史 */
+  messages: StreamMessage[]
+  /** 最大生成 token 数，默认 2048 */
+  maxTokens?: number
+}
+
+/** 文本增量回调：每收到一个 text delta 即调用 */
+export type TextDeltaCallback = (text: string) => void | Promise<void>
+
+/**
+ * 打开 LLM 流式对话，按 Provider 分流式分支，通过统一回调推送文本增量。
+ * —— 将 DeepSeek SSE 透传与 Anthropic messages.stream 收敛为同一接口，
+ *    供 chat / workflow-generator / 后续流式端点复用，避免重复绕过共享层。
+ *
+ * @throws 上游错误时抛出（包含 UpstreamErrorInfo 的 detail）
+ */
+export async function openChatStream(
+  options: OpenChatStreamOptions,
+  onDelta: TextDeltaCallback,
+): Promise<void> {
+  const { provider, model, system, messages, maxTokens = 2048 } = options
+
+  if (provider === "anthropic") {
+    await streamAnthropicShared({ model, system, messages, maxTokens, onDelta })
+    return
+  }
+
+  await streamDeepSeekShared({ model, system, messages, maxTokens, onDelta })
+}
+
+// ---- DeepSeek 共享流式（SSE 透传） ----
+
+interface DeepSeekStreamArgs {
+  model: string
+  system: string
+  messages: StreamMessage[]
+  maxTokens: number
+  onDelta: TextDeltaCallback
+}
+
+async function streamDeepSeekShared({
+  model,
+  system,
+  messages,
+  maxTokens,
+  onDelta,
+}: DeepSeekStreamArgs): Promise<void> {
+  const apiKey = process.env.DEEPSEEK_API_KEY
+  if (!apiKey) {
+    throw new Error("DEEPSEEK_API_KEY 未配置")
+  }
+
+  const res = await fetch(DEEPSEEK_CHAT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: maxTokens,
+      temperature: 0.7,
+      stream: true,
+      messages: [
+        { role: "system", content: system },
+        ...messages.map((m) => ({ role: m.role, content: m.content })),
+      ],
+    }),
+  })
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "")
+    const classified = classifyUpstreamError(res.status)
+    throw Object.assign(new Error(`${classified.message} (${res.status})`), {
+      upstreamStatus: res.status,
+      upstreamBody: errBody.slice(0, 500),
+      classified,
+    })
+  }
+
+  if (!res.body) {
+    throw new Error("DeepSeek 响应流为空")
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      const chunk = decoder.decode(value, { stream: true })
+      const lines = chunk.split("\n")
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed || !trimmed.startsWith("data: ")) continue
+
+        const data = trimmed.slice(6)
+        if (data === "[DONE]") return
+
+        try {
+          const parsed = JSON.parse(data)
+          const content = parsed.choices?.[0]?.delta?.content
+          if (content) await onDelta(content)
+        } catch {
+          // 跳过解析失败的中间帧
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
+
+// ---- Anthropic 共享流式（SDK messages.stream） ----
+
+interface AnthropicStreamArgs {
+  model: string
+  system: string
+  messages: StreamMessage[]
+  maxTokens: number
+  onDelta: TextDeltaCallback
+}
+
+async function streamAnthropicShared({
+  model,
+  system,
+  messages,
+  maxTokens,
+  onDelta,
+}: AnthropicStreamArgs): Promise<void> {
+  if (!isProviderAvailable("anthropic")) {
+    throw new Error("ANTHROPIC_API_KEY 未配置")
+  }
+
+  // Anthropic 仅接受 user / assistant 角色，system 单独传参
+  const anthropicMessages = messages
+    .filter((m) => m.role === "user" || m.role === "assistant")
+    .map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    }))
+
+  const stream = anthropic.messages.stream({
+    model,
+    max_tokens: maxTokens,
+    system,
+    messages: anthropicMessages,
+  })
+
+  for await (const event of stream) {
+    if (
+      event.type === "content_block_delta" &&
+      event.delta.type === "text_delta" &&
+      event.delta.text
+    ) {
+      await onDelta(event.delta.text)
+    }
+  }
 }

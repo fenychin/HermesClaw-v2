@@ -5,8 +5,8 @@
 
 // ---- 节点与边的种类 ----
 
-/** 节点种类：task（自定义任务）、condition（条件分支）、subworkflow（子流程嵌套）、noop（占位） */
-export type WorkflowNodeKind = 'task' | 'condition' | 'subworkflow' | 'noop'
+/** 节点种类：task（自定义任务）、condition（条件分支）、subworkflow（子流程嵌套）、skill（技能调用）、noop（占位） */
+export type WorkflowNodeKind = 'task' | 'condition' | 'subworkflow' | 'skill' | 'noop'
 
 /** 单节点执行状态 */
 export type NodeStatus = 'pending' | 'running' | 'completed' | 'skipped' | 'failed'
@@ -66,6 +66,8 @@ export interface WorkflowRunContext {
   actor: string
   /** 子流程嵌套深度（根 = 0） */
   depth: number
+  /** 工作空间 ID（多租户隔离 + Skill 路由审计） */
+  workspaceId: string
 }
 
 // ---- 节点执行 ----
@@ -79,6 +81,8 @@ export interface NodeExecutionResult {
   branch?: string
   /** 失败原因 */
   error?: string
+  /** Skill 节点执行时的审计风险等级（low / medium / high），由 Skill.automationLevel 映射 */
+  riskLevel?: string
 }
 
 /** 节点执行器：接收节点定义与运行时上下文，返回执行结果 */
