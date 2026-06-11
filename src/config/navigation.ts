@@ -10,7 +10,9 @@ import {
   Clock,
   Settings,
   // 智慧大脑二级图标
-  Layers,
+  Zap,
+  Database,
+  Archive,
   Puzzle,
   Plug,
   Mic,
@@ -52,7 +54,9 @@ export const bottomNav: NavItem[] = [
 
 /** 智慧大脑二级导航（PRD 9.2） */
 export const brainNav: NavItem[] = [
-  { href: "/brain/memory", label: "记忆系统", icon: Layers, description: "短/中/长期三级记忆体系" },
+  { href: "/brain/short-memory", label: "短期记忆", icon: Zap, description: "实时会话上下文与临时任务状态，可清理、可合并" },
+  { href: "/brain/mid-memory", label: "中期记忆", icon: Database, description: "项目级与客户级沉淀、阶段性策略，可升级为长期记忆" },
+  { href: "/brain/long-memory", label: "长期记忆", icon: Archive, description: "企业 SOP、产品知识与组织级经验库" },
   { href: "/brain/skills", label: "技能 Skill", icon: Puzzle, description: "行业 / 岗位 / 自定义技能与版本管理" },
   { href: "/brain/connectors", label: "连接器 MCP", icon: Plug, description: "邮箱、CRM、ERP 等连接器授权" },
   { href: "/brain/voice", label: "语音库", icon: Mic, description: "品牌声音与多语种语音资产" },

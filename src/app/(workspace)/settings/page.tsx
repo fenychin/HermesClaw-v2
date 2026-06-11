@@ -25,13 +25,16 @@ import {
   CreditCard,
   Mic,
   ImageIcon,
+  ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConnectorsSettings } from "./_components/connectors-settings";
+import { AuditSettings } from "./_components/audit-settings";
 import { EmptyState } from "@/components/common/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { SectionTitle } from "@/components/common/section-title";
 import { Settings } from "lucide-react";
+import { MarkdownRenderer } from "@/components/common/markdown-renderer";
 
 const NAV_ITEMS = [
   { key: "company", label: "企业信息", icon: Building2 },
@@ -40,6 +43,7 @@ const NAV_ITEMS = [
   { key: "connectors", label: "连接器授权", icon: Plug },
   { key: "harness", label: "Harness 审批", icon: GitBranch, isRoute: true },
   { key: "audit", label: "审计日志", icon: ScrollText },
+  { key: "agents-rules", label: "AGENTS 规则", icon: ShieldAlert },
   { key: "brand", label: "品牌设置", icon: Palette },
   { key: "billing", label: "账单套餐", icon: CreditCard },
 ];
@@ -487,6 +491,51 @@ function ModelRoutingSettings() {
   );
 }
 
+function AgentsRulesSettings() {
+  const [content, setContent] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/agents-md")
+      .then((r) => r.json())
+      .then((data) => setContent(data?.data?.content ?? null))
+      .catch((e) => setError(e instanceof Error ? e.message : "加载失败"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="max-w-3xl pb-10">
+      <div className="mb-6 flex items-center gap-3">
+        <div className="size-9 shrink-0 bg-danger/10 flex items-center justify-center rounded-xl">
+          <ShieldAlert className="size-5 text-danger" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">AGENTS 规则查看</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            HermesClaw-v2 最高行为准则（AGENTS.md）— 所有 Agent 与子系统的最终裁决依据
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-warning/5 border border-warning/20 rounded-xl px-4 py-3 mb-6 flex items-start gap-2.5 text-xs text-warning">
+        <ShieldAlert className="size-3.5 mt-0.5 shrink-0" />
+        <span>本文档为只读视图。任何变更须通过 HEP 提案流程（第七章）并经人工审批后生效。</span>
+      </div>
+
+      <div className="bg-card border border-border rounded-2xl p-6 overflow-auto max-h-[calc(100vh-260px)]">
+        {loading && (
+          <p className="text-sm text-muted-foreground animate-pulse">加载 AGENTS.md 中…</p>
+        )}
+        {error && (
+          <p className="text-sm text-danger">加载失败：{error}</p>
+        )}
+        {content && <MarkdownRenderer content={content} />}
+      </div>
+    </div>
+  );
+}
+
 function SettingsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -509,6 +558,10 @@ function SettingsPageContent() {
         return <ModelRoutingSettings />;
       case "company":
         return <CompanySettings />;
+      case "audit":
+        return <AuditSettings />;
+      case "agents-rules":
+        return <AgentsRulesSettings />;
       case "brand":
         return <BrandSettings />;
       case "billing":

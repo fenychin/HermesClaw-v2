@@ -197,7 +197,7 @@ export default function BrainOverviewPage() {
       title: "记忆系统",
       icon: Layers,
       color: "#4DA3FF",
-      href: "/brain/memory",
+      href: "/brain/short-memory",
       stats: [
         { label: "短期", value: String(shortCount) },
         { label: "中期", value: String(midCount) },
