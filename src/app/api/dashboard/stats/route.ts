@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import { successResponse, errorResponse } from "@/lib/api-utils"
-import { buildWorkspaceContext } from "@/lib/workspace"
+import { type WorkspaceContext } from "@/lib/workspace"
+import { withRBAC } from "@/lib/server/api-handler"
 
 /** 大盘统计数据结构 */
 interface DashboardStats {
@@ -15,6 +16,8 @@ interface DashboardStats {
   pendingTasks: number
   /** 活跃项目数 */
   activeProjects: number
+  /** 紧急待办数（高优先级 + 未回复询盘） */
+  urgentCount: number
   /** 本周工作流执行概览（按天聚合成功/失败数） */
   weeklyWorkflowRuns: WeeklyWorkflowDay[]
 }
@@ -45,10 +48,9 @@ function startOfWeek(date: Date): Date {
 /** 周一至周日中文标签 */
 const DAY_LABELS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
-/** GET /api/dashboard/stats —— 大盘统计数据聚合 */
-export async function GET(request: Request) {
+/** GET /api/dashboard/stats —— 大盘统计数据聚合（RBAC: VIEWER） */
+export const GET = withRBAC(async (request: Request, ctx: WorkspaceContext) => {
   try {
-    const ctx = await buildWorkspaceContext(request)
     const now = new Date()
     const todayStart = startOfDay(now)
     const yesterdayStart = new Date(todayStart.getTime() - 86400000)
@@ -60,6 +62,7 @@ export async function GET(request: Request) {
       yesterdayCount,
       allInquiries,
       pendingCount,
+      urgentCount,
       activeProjectCount,
       weekWorkflowRuns,
     ] = await Promise.all([
@@ -82,10 +85,18 @@ export async function GET(request: Request) {
         where: { workspaceId: ctx.workspaceId },
         select: { companyName: true },
       }),
-      // 待处理任务（未回复询盘）
+      // 待处理任务（OPEN + IN_PROGRESS 状态的 Task 实体）
+      prisma.task.count({
+        where: {
+          workspaceId: ctx.workspaceId,
+          status: { in: ["OPEN", "IN_PROGRESS"] },
+        },
+      }),
+      // 紧急待办（高优先级 + 未回复）
       prisma.inquiry.count({
         where: {
           workspaceId: ctx.workspaceId,
+          priority: "high",
           replied: false,
         },
       }),
@@ -139,6 +150,7 @@ export async function GET(request: Request) {
       todayInquiriesChange,
       followingCustomers: uniqueCompanies.size,
       pendingTasks: pendingCount,
+      urgentCount,
       activeProjects: activeProjectCount,
       weeklyWorkflowRuns: weeklyData,
     }
@@ -150,4 +162,4 @@ export async function GET(request: Request) {
     })
     return errorResponse("服务器内部错误")
   }
-}
+}, "VIEWER")

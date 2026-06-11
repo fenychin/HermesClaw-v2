@@ -1,9 +1,9 @@
 # AGENTS.md — HermesClaw-v2 项目最高规则文档
 
-> **版本**: v2.9.0-alpha  
+> **版本**: v2.13.0-alpha  
 > **项目**: HermesClaw-v2（空间项目）  
 > **状态**: 🟢 生效中  
-> **最后更新**: 2026-06-10
+> **最后更新**: 2026-06-11
 
 ***
 
@@ -468,7 +468,7 @@ draft（AI 生成，待审核）→ active（人工激活，可执行）→ arch
 - 写操作通用最低角色为 `MEMBER`（即非 VIEWER）。
 - Workspace 成员管理路由使用 `guardRole()` 便捷封装（直接返回 403 Response）。
 - **禁止**在应用层做 `if (role !== 'VIEWER')` 等裸判断——必须通过上述门禁函数统一校验。
-- **审计动作枚举**：RBAC 拒绝写 `RBAC_DENIED`；提案治理写 `proposal.approve` / `proposal.reject` / `proposal.approve.l4_blocked`（L4 硬拦截留痕）；工作流执行写 `workflow.run`；策略路由写 `model.route`；模型路由配置变更写 `update.model-routing`；询盘创建写 `inquiry.create`；报价创建写 `quotation.create`。
+- **审计动作枚举**：RBAC 拒绝写 `RBAC_DENIED`；提案治理写 `proposal.approve` / `proposal.reject` / `proposal.approve.l4_blocked`（L4 硬拦截留痕）；工作流执行写 `workflow.run`；策略路由写 `model.route`；模型路由配置变更写 `update.model-routing`；询盘创建写 `inquiry.create`；报价创建写 `quotation.create`；大盘活动流读取写 `dashboard.feed.read`。
 
 **Session 约定**：
 
@@ -609,6 +609,145 @@ draft（AI 生成，待审核）→ active（人工激活，可执行）→ arch
 - `parseSSEStream(reader, { onData, onDone })` 消费 ReadableStream，按行解析 SSE 格式并回调。
 - `useChat.ts` 的流式消息接收已接入此解析器，替换原有的手写 ReadableStream 读取样板。
 
+**`src/components/ui/select.tsx` — Select 下拉组件**：
+
+- 基于 `@base-ui/react/select` 的 shadcn 风格封装，禁用态由 base-ui 原生支持。
+- 导出 `Select` / `SelectTrigger` / `SelectValue` / `SelectContent` / `SelectList` / `SelectItem`。
+- 样式遵循 CLAUDE.md 颜色系统（`bg-card`、`bg-popover`、`border-border`、`text-foreground`、ring 焦点态）。
+- 接入约定：触发 `onValueChange` 时回调值可能为 `null`（base-ui 语义），调用方须做 `null ?? fallback` 处理。
+
+**`src/hooks/use-query-factory.ts` — 查询工厂筛选支持**：
+
+- `createQueryListHook<T>` 生成的 hook 现支持 `useList(params?: QueryParams)` 传参。
+- `QueryParams = Record<string, string | undefined>` — 键值对映射，跳过 `undefined` 和空字符串值。
+- 导出 `buildUrl(baseUrl, params)` — 将参数序列化为 URL query string 的共享函数，供所有数据层复用。
+- 参数自动纳入 TanStack Query `queryKey`（`[...queryKey, params]`），确保不同筛选条件缓存隔离。
+
+### 4.15 Dashboard 动态大盘数据管道
+
+> 本节记录 Dashboard（动态大盘）页面的 API 端点、客户端 Hooks 及共享类型，对应 PRD 10.3。
+
+**API 端点**：
+
+| 端点 | 方法 | RBAC | 说明 |
+|------|------|------|------|
+| `/api/dashboard/stats` | GET | `VIEWER`（`withRBAC`） | 大盘 KPI 聚合：今日询盘/变化量/客户数/待办/紧急待办/活跃项目/周工作流 |
+| `/api/dashboard/activity-feed` | GET | `VIEWER`（`withRBAC`） | 合并活动流：MarketIntelligence + AgentLog 按时间戳倒序，返回统一 `FeedItem` 列表。Query: `?limit=N`（默认 20，最大 100）。读写审计 `dashboard.feed.read`（riskLevel: low） |
+
+**客户端 Hooks**（TanStack Query，`staleTime: 60s`）：
+
+| Hook | 文件 | queryKey | 返回 |
+|------|------|----------|------|
+| `useDashboardStats()` | `src/hooks/use-dashboard-stats.ts` | `['dashboard-stats', workspaceId]` | `{ stats: DashboardStats \| null, isLoading, error }` |
+| `useActivityFeed(limit?)` | `src/hooks/use-activity-feed.ts` | `['activity-feed', limit]` | `{ feed: FeedItem[], isLoading, error }` |
+
+**共享类型**（`src/types/dashboard.ts`）：
+
+| 类型 | 说明 |
+|------|------|
+| `FeedItem` | 活动流统一条目：`{ id, type, title, summary, timestamp, meta }`，服务端和客户端共享导入 |
+| `ActivitySeverity` | `"urgent" \| "important" \| "normal"` — 活动流展示用严重程度 |
+| `mapImpactToSeverity(level)` | `ImpactLevel → ActivitySeverity` 映射（high→urgent, mid→important, low→normal） |
+| `mapRiskToSeverity(risk)` | `AgentLog.riskLevel → ActivitySeverity` 映射（high→urgent, medium→important） |
+
+**`DashboardStats` 字段扩展**：
+
+- 新增 `urgentCount: number` — 紧急待办数（`Inquiry.priority = 'high'` 且 `replied = false`），供待办任务卡片的紧急提示使用。
+
+**共享组件**：
+
+| 组件 | 文件 | 说明 |
+|------|------|------|
+| `SkeletonList` | `src/components/common/skeleton-list.tsx` | 骨架列表占位：`<SkeletonList count={N}>{(i) => <Skeleton ... />}</SkeletonList>` |
+
+**数据流**：
+
+```
+Prisma（MarketIntelligence / AgentLog / Inquiry / Project / WorkflowRun）
+  ↓ workspaceId 过滤（§4.11 隔离）
+API Route（withRBAC(VIEWER) + AuditLog）
+  ↓ TanStack Query（staleTime: 30s-60s）
+Client Hook（useDashboardStats / useActivityFeed / useIntelligence / useExchangeRates）
+  ↓ React 组件
+Dashboard UI（StatCard / 自定义卡片 / SkeletonList 加载态 / 空状态提示）
+```
+
+**约束**：
+
+- Dashboard 所有 GET API 路由均使用 `withRBAC(VIEWER)` 统一门禁，确保 workspace 数据隔离与认证一致性。
+- `FeedItem` 类型定义在 `src/types/dashboard.ts`，禁止在服务端和客户端分别定义。
+- 活动流读取每次均写入 `AuditLog(action='dashboard.feed.read')`（§4.3 可溯源）。
+- `urgentCount` 统计遵循 Prisma 查询层 `workspaceId` 过滤，禁止应用层过滤。
+
+**API 查询参数扩展**（v2.12 新增）：
+
+| 端点 | 新增参数 | 类型 | 说明 |
+|------|---------|------|------|
+| `GET /api/inquiries` | `fromCountry` | `string?` | 按国家代码筛选（如 `US`），Prisma where 层转为大写匹配 |
+| `GET /api/inquiries` | `stage` | `string?` | 按阶段筛选：`new`→`replied: false`、`replied`→`replied: true`、`closed`→待 Prisma `Inquiry.status` 字段迁移后启用 |
+| `GET /api/intelligence` | `impactLevel` | `string?` | 按影响力筛选（`high` / `mid` / `low`），Prisma where 层直接匹配 |
+
+**Dashboard 筛选栏**（v2.12 新增）：
+
+- `DashboardFilterBar` 组件（`src/app/(workspace)/dashboard/_components/dashboard-filter-bar.tsx`）提供三个筛选维度：
+  - **国家**：动态下拉，选项来源于 `useInquiries()` 的去重 `fromCountry` 值
+  - **阶段**：固定选项 `all` / `new` / `replied` / `closed`
+  - **影响力**：固定选项 `all` / `high` / `medium` / `low`
+- **URL-driven 模式**：筛选值通过 `useSearchParams` 读写 URL，`router.replace()` 无刷新更新（`scroll: false`）
+- **Suspense 边界**：`DashboardPage` 以 `<Suspense>` 包裹 `DashboardContent`，满足 Next.js App Router `useSearchParams()` 的边界要求
+- **filter-to-API 映射约定**：
+  - UI `"medium"` → API `"mid"`（影响力等级；在 `DashboardContent` 内转换后传入 `useIntelligence`）
+  - 哨兵值 `"all"` 不发送给 API（删除 URL param / 跳过 queryKey）
+  - `"closed"` 已作为 URL param 发送，但 API 暂不执行过滤（待 Prisma schema 迁移）
+- **审计**：筛选变更为纯客户端 GET 操作，不写 `AuditLog`（符合 §5 #3 仅写操作需审计的原则）。后续可按需注册 `dashboard.filter.apply` 审计枚举用于使用频率追踪。
+
+**Dashboard 沉默预警管道**（v2.13 新增）：
+
+- `GET /api/dashboard/silence-alerts`：查找超 7 天未回复询盘，按 `fromCountry` 分组，取前 5 最严重沉默地区（`withRBAC(VIEWER)`）。
+- 审计枚举：`dashboard.silence-alerts.read`（riskLevel: low）— 读数据溯源。
+- `useSilenceAlerts` Hook（`src/hooks/use-silence-alerts.ts`）：queryKey `['silence-alerts', workspaceId]`，staleTime: 5min。
+- 类型 `SilenceAlert`：`{ country, countryFlag, silenceDays, count, sampleCompany }`。
+
+**Task 域实体**（v2.13 新增）：
+
+- Prisma `Task` 模型：状态 `OPEN | IN_PROGRESS | DONE | CANCELLED`，优先级 `LOW | MEDIUM | HIGH | URGENT`，来源 `intelligence | manual | inquiry`。
+- API 端点：
+  - `GET /api/tasks`：列表查询（VIEWER+），支持 `status`/`priority`/`source` 筛选。
+  - `POST /api/tasks`：创建（MEMBER+），审计 `task.create`（L2, low）。
+  - `PATCH /api/tasks/[id]`：更新状态/优先级（MEMBER+），审计 `task.update`（L2, low）。
+  - `DELETE /api/tasks/[id]`：软删除（设置 `CANCELLED`，MEMBER+），审计 `task.cancel`（L2, low）。
+- Hooks（`src/hooks/use-tasks.ts`）：`useTasks`, `useCreateTask`, `useUpdateTask`, `useCancelTask`。
+- 类型 `TaskItem`, `TaskStatus`, `TaskPriority`, `CreateTaskInput`, `UpdateTaskInput`。
+
+**情报→任务分发**（v2.13 新增）：
+
+- `CreateTaskDialog` 组件（`src/app/(workspace)/dashboard/_components/create-task-dialog.tsx`）：
+  - 标题预填（`suggestedAction` 兜底 `title`），优先级从 `impactLevel` 映射（high→URGENT, mid→HIGH, low→MEDIUM）。
+  - 客户端 RBAC：`useCurrentWorkspaceRole()` 检查，VIEWER 禁用按钮 + tooltip「需要成员权限」。
+  - `useCreateTask` mutation，成功后 toast 通知 + 自动 invalidate `['tasks']` 缓存。
+
+**AI 晨报管道**（v2.13 新增）：
+
+- Prisma `Report` 模型：类型 `MORNING | EVENING | WEEKLY`，`content`（Markdown），`dataSnapshot`（JSON 生成快照）。
+- API 端点：
+  - `GET /api/reports`：列表查询（VIEWER+），审计 `dashboard.reports.read`（low）。
+  - `POST /api/reports/generate`：LLM 生成晨报（MEMBER+），审计 `report.generate`（L2, low）。
+- LLM 调用链：`selectModel({ taskType: 'analysis', riskLevel: 'low' })` → `callAnthropicText()` / `callDeepSeekText()`（纯文本，非 JSON 模式）。
+- 内容质量校验（§4.5）：自由文本生成以长度 ≥50 字为代理置信度指标，低于阈值写入 `qualityWarning` 至 `dataSnapshot` 并 logger.warn。
+- AgentLog：`source: 'morning-brief'`，每次生成写入成功/失败记录（含 duration）。
+- Hooks（`src/hooks/use-reports.ts`）：`useReports`, `useGenerateReport`。
+- UI：Dashboard 顶部通栏"今日晨报"卡片（截断 150 字 + 展开/收起，VIEWER 禁用生成按钮）。
+
+**共享工具函数**（v2.13 新增）：
+
+- `src/lib/country-utils.ts`：导出 `countryCodeToFlag(code)` — ISO 两位国家代码→国旗 emoji，供 inquiries / silence-alerts 等路由复用。
+- `src/hooks/use-workspace-role.ts`：导出 `useCurrentWorkspaceRole()` — 组合 `useSession` + `useWorkspaceData`，返回 `{ role, isViewer, isMember, isAdmin, isOwner, canWrite, canApproveL3 }`，消除重复的 `members.find()` 模式。
+
+**Prisma 客户端路径**（v2.13 更新）：
+
+- 当前生成目标：`src/generated/prisma-v2/`，导入路径 `@/generated/prisma-v2/client`。
+- 迁移历史：`prisma-new` → `prisma-client` → `prisma-v2`（Windows 锁文件问题驱动）。
+
 ***
 
 ## 附录：版本历史
@@ -626,6 +765,9 @@ draft（AI 生成，待审核）→ active（人工激活，可执行）→ arch
 | v2.8.0-alpha | 2026-06-10 | 新增 §4.12 策略路由（Model Router）：`selectModel()` 按 risk/taskType/WorkspaceSettings 路由 Provider 与模型，强制审计留痕，Provider 不可用自动降级；共享 LLM 层新增 `openChatStream`/`isProviderAvailable`/`classifyUpstreamError` 导出；新增 `WorkspaceSettings` + `/api/workspace/settings`；chat API 移除硬编 DeepSeek，全面接入策略路由；generator output 对齐至 `prisma-new` |
 | v2.9.0-alpha | 2026-06-10 | 新增 §4.13 DAG Skill 节点执行器：`executeSkillNode()` 将 `kind='skill'` 节点通过 `selectModel()` 调用 LLM 真实执行（非 noop）；Skill 模型新增 `automationLevel` 字段（L1-L4 门禁）；AgentLog 新增 `riskLevel` 字段；L3 审批门禁查询含 workspaceId 隔离；置信度 < 0.7 自动升格 riskLevel；提取 `mapAutomationToLogRisk`/`mapAutomationToAuditRisk`/`mapAutomationToRouteRisk` 共享映射函数至 `src/types/harness.ts` |
 | v2.10.0-alpha | 2026-06-10 | §4.11 新增 `workspace-roles.ts` 分离约定 + `DEV_BYPASS_AUTH` 开发免认证机制 + `/api/conversations` 写操作审计豁免放行；§4.12 新增 `SELECTABLE_MODELS` 模型选择配置（Provider + 具体型号 → API modelId 映射）；§4.14 新增 `/api/fetch-meta` URL 元数据抓取端点 + `src/lib/date-utils.ts` 共享时间格式化工具；`hermes-suggestions.ts` 接入 `selectModel()` 策略路由；`useChat` SSE 流读取复用 `parseSSEStream`；`/api/skills` POST 补齐 AuditLog + 频率限制
+| v2.11.0-alpha | 2026-06-11 | 新增 §4.15 Dashboard 动态大盘数据管道：`/api/dashboard/stats` + `/api/dashboard/activity-feed` 端点（`withRBAC(VIEWER)`），`useActivityFeed` Hook，`FeedItem` / `ActivitySeverity` 共享类型（`src/types/dashboard.ts`），`SkeletonList` 通用骨架组件；`DashboardStats` 扩展 `urgentCount` 字段；审计枚举新增 `dashboard.feed.read`；stats 路由从内联 RBAC 迁移至 `withRBAC` 统一包裹；汇率监测迷你卡片接入 `useExchangeRates` 真实数据 |
+| v2.12.0-alpha | 2026-06-11 | §4.14 新增 `src/components/ui/select.tsx` 基于 `@base-ui/react/select` 的 shadcn 风格 Select 组件 + 查询工厂 `buildUrl` 导出 + `QueryParams` 类型；§4.15 新增 API 查询参数扩展（`/api/inquiries` 支持 `fromCountry`/`stage`，`/api/intelligence` 支持 `impactLevel`）+ `DashboardFilterBar` URL-driven 筛选栏（国家/阶段/影响力三维筛选 + Suspense 边界模式 + filter-to-API 映射约定） |
+| v2.13.0-alpha | 2026-06-11 | §4.15 新增 Task 域实体（Prisma 模型 + CRUD API + `useTasks` Hooks）+ 情报→任务分发（`CreateTaskDialog` 组件 + `impactLevel→TaskPriority` 映射）+ Dashboard 沉默预警管道（`/api/dashboard/silence-alerts` + `useSilenceAlerts`）+ AI 晨报管道（Report 模型 + `/api/reports/generate` LLM 调用 + 内容质量校验）+ 共享工具函数（`country-utils.ts`、`useCurrentWorkspaceRole` Hook）+ Prisma 客户端路径迁移至 `prisma-v2` + 响应格式统一（报表模块切换至 `ApiResponse`） |
 
 ***
 

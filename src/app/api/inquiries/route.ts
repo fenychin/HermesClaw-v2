@@ -6,6 +6,7 @@ import { withRBAC } from "@/lib/server/api-handler"
 import { validateBody, InquiryCreateSchema } from "@/lib/validators"
 import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
 import { ApiResponse } from "@/lib/server/api-response"
+import { countryCodeToFlag } from "@/lib/country-utils"
 import {
   runWorkflow,
   WorkflowNotFoundError,
@@ -24,22 +25,6 @@ function serializeInquiry(inquiry: {
 }
 
 /**
- * ISO 两位国家代码 → 国旗 emoji
- * 例: "US" → 🇺🇸, "CN" → 🇨🇳
- */
-function countryCodeToFlag(code: string): string {
-  if (code.length !== 2) return "🌐"
-  try {
-    const codePoints = [...code.toUpperCase()].map(
-      (c) => 0x1f1e6 + c.charCodeAt(0) - 65,
-    )
-    return String.fromCodePoint(...codePoints)
-  } catch {
-    return "🌐"
-  }
-}
-
-/**
  * 从邮箱地址提取域名作为公司名兜底
  * 例: "buyer@brightpath.com" → "brightpath.com"
  */
@@ -51,12 +36,28 @@ function extractCompanyHint(email: string): string {
   }
 }
 
-/** GET /api/inquiries —— 获取询盘列表（按接收时间倒序） */
+/** GET /api/inquiries —— 获取询盘列表（按接收时间倒序）
+ * —— 查询参数：fromCountry（国家代码）, stage（new/replied/closed）
+ * —— ALWAYS 包含 workspaceId（AGENTS.md §4.11）
+ */
 export async function GET(request: Request) {
   try {
     const ctx = await buildWorkspaceContext(request)
+    const url = new URL(request.url)
+    const fromCountry = url.searchParams.get("fromCountry") || undefined
+    const stage = url.searchParams.get("stage") || undefined
+
+    // 构建 Prisma where 条件：workspaceId 强制隔离 + 可选筛选
+    const where: Record<string, unknown> = { workspaceId: ctx.workspaceId }
+    if (fromCountry) where.fromCountry = fromCountry.toUpperCase()
+    if (stage === "new") where.replied = false
+    if (stage === "replied") where.replied = true
+    // TODO: stage=closed 需 Inquiry.status 字段（当前模型仅有 replied 布尔）
+    //       Prisma schema 迁移：为 Inquiry 模型新增 status String @default("open")，枚举 open/closed
+    //       迁移后此处改为: if (stage === "closed") where.status = "closed"
+
     const inquiries = await prisma.inquiry.findMany({
-      where: { workspaceId: ctx.workspaceId },
+      where,
       orderBy: { receivedAt: "desc" },
     })
     return successResponse({ inquiries: inquiries.map(serializeInquiry) })

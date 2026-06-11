@@ -12,7 +12,7 @@
  * 配套 actorFromSession() 从登录会话解析操作者标识。
  */
 import { prisma } from "@/lib/prisma"
-import type { Prisma } from "@/generated/prisma-new/client"
+import type { Prisma } from "@/generated/prisma-v2/client"
 import { auth } from "@/lib/auth"
 
 // ==============================

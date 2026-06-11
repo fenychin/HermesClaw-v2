@@ -1,0 +1,125 @@
+"use client"
+
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { buildUrl, type QueryParams } from "@/hooks/use-query-factory"
+
+// ==============================
+// 类型定义
+// ==============================
+
+/** 报告类型 */
+export type ReportType = "MORNING" | "EVENING" | "WEEKLY"
+
+/** 报告条目（API 序列化后） */
+export interface ReportItem {
+  id: string
+  workspaceId: string
+  type: ReportType
+  /** LLM 生成的 Markdown 内容 */
+  content: string
+  /** 生成时间（ISO 字符串） */
+  generatedAt: string
+  /** 生成时使用的数据快照（JSON 字符串） */
+  dataSnapshot: string
+  createdAt: string
+}
+
+/** 生成报告返回 */
+export interface GenerateReportResult {
+  id: string
+  type: ReportType
+  content: string
+  generatedAt: string
+}
+
+/** 报告列表 API 响应 */
+interface ReportListResponse {
+  reports: ReportItem[]
+}
+
+// ==============================
+// API 调用
+// ==============================
+
+/** 获取报告列表 */
+async function fetchReports(
+  type?: ReportType,
+  limit = 5,
+): Promise<ReportItem[]> {
+  const params: QueryParams = {}
+  if (type) params.type = type
+  if (limit) params.limit = String(limit)
+
+  const url = buildUrl(
+    "/api/reports",
+    Object.keys(params).length > 0 ? params : undefined,
+  )
+  const res = await fetch(url)
+  if (!res.ok) throw new Error("获取报告列表失败")
+  const json = (await res.json()) as ReportListResponse & {
+    success: boolean
+    error?: string
+  }
+  if (!json.success) throw new Error(json.error ?? "未知错误")
+  return json.reports
+}
+
+/** 触发生成报告 */
+async function generateReport(): Promise<GenerateReportResult> {
+  const res = await fetch("/api/reports/generate", { method: "POST" })
+  const json = (await res.json()) as {
+    success: boolean
+    data: GenerateReportResult
+    error?: string
+  }
+  if (!res.ok || !json.success)
+    throw new Error(json.error ?? "生成报告失败")
+  return json.data
+}
+
+// ==============================
+// TanStack Query Hooks
+// ==============================
+
+const REPORTS_KEY = ["reports"] as const
+
+/**
+ * 报告列表 Hook
+ * —— queryKey: ['reports', workspaceId, type, limit]
+ * —— staleTime: 5min（报告内容静态，无需频繁刷新）
+ */
+export function useReports(
+  type?: ReportType,
+  limit = 5,
+  workspaceId = "default",
+) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: [...REPORTS_KEY, workspaceId, type ?? "all", limit],
+    queryFn: () => fetchReports(type, limit),
+    staleTime: 300_000,
+  })
+
+  return {
+    reports: data ?? [],
+    /** 最新一条报告 */
+    latest: data?.[0] ?? null,
+    isLoading,
+    error,
+  }
+}
+
+/**
+ * 生成报告 Mutation Hook
+ * —— 成功后自动刷新报告列表缓存
+ * —— mutationFn 内不调用 Date.now()，避免 React purity 规则
+ */
+export function useGenerateReport(workspaceId = "default") {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: generateReport,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...REPORTS_KEY, workspaceId] })
+    },
+  })
+}

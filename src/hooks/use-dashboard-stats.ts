@@ -1,6 +1,7 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
+import { buildUrl } from "@/hooks/use-query-factory"
 
 // ==============================
 // 类型定义
@@ -19,6 +20,8 @@ export interface DashboardStats {
   todayInquiriesChange: number
   followingCustomers: number
   pendingTasks: number
+  /** 紧急待办数（高优先级 + 未回复询盘） */
+  urgentCount: number
   activeProjects: number
   weeklyWorkflowRuns: WeeklyWorkflowDay[]
 }
@@ -69,9 +72,19 @@ async function fetchQuotations(): Promise<QuotationItem[]> {
   return json.data.quotations as QuotationItem[]
 }
 
+/** 询盘 API 筛选参数 */
+export interface InquiryFilters {
+  fromCountry?: string
+  stage?: string
+}
+
 /** 获取询盘列表 */
-async function fetchInquiries(): Promise<InquiryItem[]> {
-  const res = await fetch("/api/inquiries")
+async function fetchInquiries(filters?: InquiryFilters): Promise<InquiryItem[]> {
+  const params: Record<string, string | undefined> = {}
+  if (filters?.fromCountry) params.fromCountry = filters.fromCountry
+  if (filters?.stage && filters.stage !== "all") params.stage = filters.stage
+  const url = buildUrl("/api/inquiries", Object.keys(params).length > 0 ? params : undefined)
+  const res = await fetch(url)
   if (!res.ok) throw new Error("获取询盘列表失败")
   const json = await res.json()
   if (!json.success) throw new Error(json.error ?? "未知错误")
@@ -124,16 +137,35 @@ export function useQuotations() {
  * 询盘列表 Hook
  * —— 提供原始询盘数据供页面自定义筛选与聚合
  * —— staleTime: 60s
+ * —— opts.limit: 客户端截断条数（undefined = 全部返回）
+ * —— opts.workspaceId: 用于 queryKey 缓存隔离，默认 "default"
+ * —— opts.fromCountry / opts.stage: 服务端 Prisma where 筛选
  */
-export function useInquiries() {
+export function useInquiries(opts?: {
+  limit?: number
+  workspaceId?: string
+  fromCountry?: string
+  stage?: string
+}) {
+  const workspaceId = opts?.workspaceId ?? "default"
+  const filters: InquiryFilters = {}
+  if (opts?.fromCountry) filters.fromCountry = opts.fromCountry
+  if (opts?.stage && opts.stage !== "all") filters.stage = opts.stage
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ["inquiries"],
-    queryFn: fetchInquiries,
+    queryKey: ["inquiries", workspaceId, filters],
+    queryFn: () => fetchInquiries(
+      Object.keys(filters).length > 0 ? filters : undefined,
+    ),
     staleTime: 60_000,
   })
 
+  const all = data ?? []
+  const inquiries = opts?.limit && opts.limit > 0 ? all.slice(0, opts.limit) : all
+
   return {
-    inquiries: data ?? [],
+    inquiries,
+    allInquiries: all,
     isLoading,
     error,
   }

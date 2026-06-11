@@ -3,7 +3,7 @@
 
 generator client {
   provider = "prisma-client"
-  output   = "../src/generated/prisma-new"
+  output   = "../src/generated/prisma-v2"
 }
 
 datasource db {
@@ -43,6 +43,8 @@ model Workspace {
   workflows           Workflow[]
   workflowRuns        WorkflowRun[]
   workflowNodeRuns    WorkflowNodeRun[]
+  tasks               Task[]
+  reports             Report[]
   settings            WorkspaceSettings?
 }
 
@@ -574,4 +576,45 @@ model WorkflowNodeRun {
   @@index([workspaceId])
   @@index([runId])
   @@index([status])
+}
+
+// ============================================================
+// 任务（任务域实体：智能体待办 / 人工创建 / 询盘衍生）
+// —— 状态流：OPEN → IN_PROGRESS → DONE；任意状态可设为 CANCELLED（软删除）
+// —— source 标识创建来源：intelligence | manual | inquiry
+// ============================================================
+model Task {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id])
+  title         String
+  description   String?
+  status        String    @default("OPEN")              // OPEN | IN_PROGRESS | DONE | CANCELLED
+  priority      String    @default("MEDIUM")            // LOW | MEDIUM | HIGH | URGENT
+  source        String?                                 // intelligence | manual | inquiry
+  relatedType   String?                                 // source entity type
+  relatedId     String?                                 // source entity id
+  dueAt         DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, createdAt])
+}
+
+// ============================================================
+// AI 报告（晨报 / 晚报 / 周报）
+// —— LLM 生成的内容快照，含生成时使用的数据快照 dataSnapshot
+// ============================================================
+model Report {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace @relation(fields: [workspaceId], references: [id])
+  type         String    @default("MORNING")  // MORNING | EVENING | WEEKLY
+  content      String                         // LLM 生成的 markdown 摘要
+  generatedAt  DateTime  @default(now())
+  dataSnapshot String                         // JSON：生成时使用的数据快照
+  createdAt    DateTime  @default(now())
+
+  @@index([workspaceId, generatedAt])
 }

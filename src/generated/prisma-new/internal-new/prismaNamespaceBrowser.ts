@@ -77,7 +77,8 @@ export const ModelName = {
   ToolGrant: 'ToolGrant',
   Workflow: 'Workflow',
   WorkflowRun: 'WorkflowRun',
-  WorkflowNodeRun: 'WorkflowNodeRun'
+  WorkflowNodeRun: 'WorkflowNodeRun',
+  Task: 'Task'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -530,6 +531,24 @@ export const WorkflowNodeRunScalarFieldEnum = {
 } as const
 
 export type WorkflowNodeRunScalarFieldEnum = (typeof WorkflowNodeRunScalarFieldEnum)[keyof typeof WorkflowNodeRunScalarFieldEnum]
+
+
+export const TaskScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  title: 'title',
+  description: 'description',
+  status: 'status',
+  priority: 'priority',
+  source: 'source',
+  relatedType: 'relatedType',
+  relatedId: 'relatedId',
+  dueAt: 'dueAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TaskScalarFieldEnum = (typeof TaskScalarFieldEnum)[keyof typeof TaskScalarFieldEnum]
 
 
 export const SortOrder = {

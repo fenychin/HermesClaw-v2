@@ -196,6 +196,8 @@ export type WorkspaceWhereInput = {
   workflows?: Prisma.WorkflowListRelationFilter
   workflowRuns?: Prisma.WorkflowRunListRelationFilter
   workflowNodeRuns?: Prisma.WorkflowNodeRunListRelationFilter
+  tasks?: Prisma.TaskListRelationFilter
+  reports?: Prisma.ReportListRelationFilter
   settings?: Prisma.XOR<Prisma.WorkspaceSettingsNullableScalarRelationFilter, Prisma.WorkspaceSettingsWhereInput> | null
 }
 
@@ -226,6 +228,8 @@ export type WorkspaceOrderByWithRelationInput = {
   workflows?: Prisma.WorkflowOrderByRelationAggregateInput
   workflowRuns?: Prisma.WorkflowRunOrderByRelationAggregateInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunOrderByRelationAggregateInput
+  tasks?: Prisma.TaskOrderByRelationAggregateInput
+  reports?: Prisma.ReportOrderByRelationAggregateInput
   settings?: Prisma.WorkspaceSettingsOrderByWithRelationInput
 }
 
@@ -259,6 +263,8 @@ export type WorkspaceWhereUniqueInput = Prisma.AtLeast<{
   workflows?: Prisma.WorkflowListRelationFilter
   workflowRuns?: Prisma.WorkflowRunListRelationFilter
   workflowNodeRuns?: Prisma.WorkflowNodeRunListRelationFilter
+  tasks?: Prisma.TaskListRelationFilter
+  reports?: Prisma.ReportListRelationFilter
   settings?: Prisma.XOR<Prisma.WorkspaceSettingsNullableScalarRelationFilter, Prisma.WorkspaceSettingsWhereInput> | null
 }, "id">
 
@@ -309,6 +315,8 @@ export type WorkspaceCreateInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -339,6 +347,8 @@ export type WorkspaceUncheckedCreateInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -369,6 +379,8 @@ export type WorkspaceUpdateInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -399,6 +411,8 @@ export type WorkspaceUncheckedUpdateInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -779,6 +793,34 @@ export type WorkspaceUpdateOneRequiredWithoutWorkflowNodeRunsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.WorkspaceUpdateToOneWithWhereWithoutWorkflowNodeRunsInput, Prisma.WorkspaceUpdateWithoutWorkflowNodeRunsInput>, Prisma.WorkspaceUncheckedUpdateWithoutWorkflowNodeRunsInput>
 }
 
+export type WorkspaceCreateNestedOneWithoutTasksInput = {
+  create?: Prisma.XOR<Prisma.WorkspaceCreateWithoutTasksInput, Prisma.WorkspaceUncheckedCreateWithoutTasksInput>
+  connectOrCreate?: Prisma.WorkspaceCreateOrConnectWithoutTasksInput
+  connect?: Prisma.WorkspaceWhereUniqueInput
+}
+
+export type WorkspaceUpdateOneRequiredWithoutTasksNestedInput = {
+  create?: Prisma.XOR<Prisma.WorkspaceCreateWithoutTasksInput, Prisma.WorkspaceUncheckedCreateWithoutTasksInput>
+  connectOrCreate?: Prisma.WorkspaceCreateOrConnectWithoutTasksInput
+  upsert?: Prisma.WorkspaceUpsertWithoutTasksInput
+  connect?: Prisma.WorkspaceWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WorkspaceUpdateToOneWithWhereWithoutTasksInput, Prisma.WorkspaceUpdateWithoutTasksInput>, Prisma.WorkspaceUncheckedUpdateWithoutTasksInput>
+}
+
+export type WorkspaceCreateNestedOneWithoutReportsInput = {
+  create?: Prisma.XOR<Prisma.WorkspaceCreateWithoutReportsInput, Prisma.WorkspaceUncheckedCreateWithoutReportsInput>
+  connectOrCreate?: Prisma.WorkspaceCreateOrConnectWithoutReportsInput
+  connect?: Prisma.WorkspaceWhereUniqueInput
+}
+
+export type WorkspaceUpdateOneRequiredWithoutReportsNestedInput = {
+  create?: Prisma.XOR<Prisma.WorkspaceCreateWithoutReportsInput, Prisma.WorkspaceUncheckedCreateWithoutReportsInput>
+  connectOrCreate?: Prisma.WorkspaceCreateOrConnectWithoutReportsInput
+  upsert?: Prisma.WorkspaceUpsertWithoutReportsInput
+  connect?: Prisma.WorkspaceWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WorkspaceUpdateToOneWithWhereWithoutReportsInput, Prisma.WorkspaceUpdateWithoutReportsInput>, Prisma.WorkspaceUncheckedUpdateWithoutReportsInput>
+}
+
 export type WorkspaceCreateWithoutSettingsInput = {
   id?: string
   name: string
@@ -806,6 +848,8 @@ export type WorkspaceCreateWithoutSettingsInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutSettingsInput = {
@@ -835,6 +879,8 @@ export type WorkspaceUncheckedCreateWithoutSettingsInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutSettingsInput = {
@@ -880,6 +926,8 @@ export type WorkspaceUpdateWithoutSettingsInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutSettingsInput = {
@@ -909,6 +957,8 @@ export type WorkspaceUncheckedUpdateWithoutSettingsInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutMembersInput = {
@@ -937,6 +987,8 @@ export type WorkspaceCreateWithoutMembersInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -966,6 +1018,8 @@ export type WorkspaceUncheckedCreateWithoutMembersInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -1011,6 +1065,8 @@ export type WorkspaceUpdateWithoutMembersInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -1040,6 +1096,8 @@ export type WorkspaceUncheckedUpdateWithoutMembersInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -1069,6 +1127,8 @@ export type WorkspaceCreateWithoutAgentsInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -1098,6 +1158,8 @@ export type WorkspaceUncheckedCreateWithoutAgentsInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -1143,6 +1205,8 @@ export type WorkspaceUpdateWithoutAgentsInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -1172,6 +1236,8 @@ export type WorkspaceUncheckedUpdateWithoutAgentsInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -1201,6 +1267,8 @@ export type WorkspaceCreateWithoutAgentLogsInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -1230,6 +1298,8 @@ export type WorkspaceUncheckedCreateWithoutAgentLogsInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -1275,6 +1345,8 @@ export type WorkspaceUpdateWithoutAgentLogsInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -1304,6 +1376,8 @@ export type WorkspaceUncheckedUpdateWithoutAgentLogsInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -1333,6 +1407,8 @@ export type WorkspaceCreateWithoutProjectsInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -1362,6 +1438,8 @@ export type WorkspaceUncheckedCreateWithoutProjectsInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -1407,6 +1485,8 @@ export type WorkspaceUpdateWithoutProjectsInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -1436,6 +1516,8 @@ export type WorkspaceUncheckedUpdateWithoutProjectsInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -1465,6 +1547,8 @@ export type WorkspaceCreateWithoutMemoriesInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -1494,6 +1578,8 @@ export type WorkspaceUncheckedCreateWithoutMemoriesInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -1539,6 +1625,8 @@ export type WorkspaceUpdateWithoutMemoriesInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -1568,6 +1656,8 @@ export type WorkspaceUncheckedUpdateWithoutMemoriesInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -1597,6 +1687,8 @@ export type WorkspaceCreateWithoutMemoryRevisionsInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -1626,6 +1718,8 @@ export type WorkspaceUncheckedCreateWithoutMemoryRevisionsInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -1671,6 +1765,8 @@ export type WorkspaceUpdateWithoutMemoryRevisionsInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -1700,6 +1796,8 @@ export type WorkspaceUncheckedUpdateWithoutMemoryRevisionsInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -1729,6 +1827,8 @@ export type WorkspaceCreateWithoutConnectorsInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -1758,6 +1858,8 @@ export type WorkspaceUncheckedCreateWithoutConnectorsInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -1803,6 +1905,8 @@ export type WorkspaceUpdateWithoutConnectorsInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -1832,6 +1936,8 @@ export type WorkspaceUncheckedUpdateWithoutConnectorsInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -1861,6 +1967,8 @@ export type WorkspaceCreateWithoutSkillsInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -1890,6 +1998,8 @@ export type WorkspaceUncheckedCreateWithoutSkillsInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -1935,6 +2045,8 @@ export type WorkspaceUpdateWithoutSkillsInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -1964,6 +2076,8 @@ export type WorkspaceUncheckedUpdateWithoutSkillsInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -1993,6 +2107,8 @@ export type WorkspaceCreateWithoutHarnessProposalsInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -2022,6 +2138,8 @@ export type WorkspaceUncheckedCreateWithoutHarnessProposalsInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -2067,6 +2185,8 @@ export type WorkspaceUpdateWithoutHarnessProposalsInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -2096,6 +2216,8 @@ export type WorkspaceUncheckedUpdateWithoutHarnessProposalsInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -2125,6 +2247,8 @@ export type WorkspaceCreateWithoutConversationsInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -2154,6 +2278,8 @@ export type WorkspaceUncheckedCreateWithoutConversationsInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -2199,6 +2325,8 @@ export type WorkspaceUpdateWithoutConversationsInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -2228,6 +2356,8 @@ export type WorkspaceUncheckedUpdateWithoutConversationsInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -2257,6 +2387,8 @@ export type WorkspaceCreateWithoutConversationMessagesInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -2286,6 +2418,8 @@ export type WorkspaceUncheckedCreateWithoutConversationMessagesInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -2331,6 +2465,8 @@ export type WorkspaceUpdateWithoutConversationMessagesInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -2360,6 +2496,8 @@ export type WorkspaceUncheckedUpdateWithoutConversationMessagesInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -2389,6 +2527,8 @@ export type WorkspaceCreateWithoutAuditLogsInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -2418,6 +2558,8 @@ export type WorkspaceUncheckedCreateWithoutAuditLogsInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -2463,6 +2605,8 @@ export type WorkspaceUpdateWithoutAuditLogsInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -2492,6 +2636,8 @@ export type WorkspaceUncheckedUpdateWithoutAuditLogsInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -2521,6 +2667,8 @@ export type WorkspaceCreateWithoutInquiriesInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -2550,6 +2698,8 @@ export type WorkspaceUncheckedCreateWithoutInquiriesInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -2595,6 +2745,8 @@ export type WorkspaceUpdateWithoutInquiriesInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -2624,6 +2776,8 @@ export type WorkspaceUncheckedUpdateWithoutInquiriesInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -2653,6 +2807,8 @@ export type WorkspaceCreateWithoutMarketIntelligencesInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -2682,6 +2838,8 @@ export type WorkspaceUncheckedCreateWithoutMarketIntelligencesInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -2727,6 +2885,8 @@ export type WorkspaceUpdateWithoutMarketIntelligencesInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -2756,6 +2916,8 @@ export type WorkspaceUncheckedUpdateWithoutMarketIntelligencesInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -2785,6 +2947,8 @@ export type WorkspaceCreateWithoutExchangeRatesInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -2814,6 +2978,8 @@ export type WorkspaceUncheckedCreateWithoutExchangeRatesInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -2859,6 +3025,8 @@ export type WorkspaceUpdateWithoutExchangeRatesInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -2888,6 +3056,8 @@ export type WorkspaceUncheckedUpdateWithoutExchangeRatesInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -2917,6 +3087,8 @@ export type WorkspaceCreateWithoutQuotationsInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -2946,6 +3118,8 @@ export type WorkspaceUncheckedCreateWithoutQuotationsInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -2991,6 +3165,8 @@ export type WorkspaceUpdateWithoutQuotationsInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -3020,6 +3196,8 @@ export type WorkspaceUncheckedUpdateWithoutQuotationsInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -3049,6 +3227,8 @@ export type WorkspaceCreateWithoutEvolutionLogsInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -3078,6 +3258,8 @@ export type WorkspaceUncheckedCreateWithoutEvolutionLogsInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -3123,6 +3305,8 @@ export type WorkspaceUpdateWithoutEvolutionLogsInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -3152,6 +3336,8 @@ export type WorkspaceUncheckedUpdateWithoutEvolutionLogsInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -3181,6 +3367,8 @@ export type WorkspaceCreateWithoutToolRegistriesInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -3210,6 +3398,8 @@ export type WorkspaceUncheckedCreateWithoutToolRegistriesInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -3255,6 +3445,8 @@ export type WorkspaceUpdateWithoutToolRegistriesInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -3284,6 +3476,8 @@ export type WorkspaceUncheckedUpdateWithoutToolRegistriesInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -3313,6 +3507,8 @@ export type WorkspaceCreateWithoutToolGrantsInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -3342,6 +3538,8 @@ export type WorkspaceUncheckedCreateWithoutToolGrantsInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -3387,6 +3585,8 @@ export type WorkspaceUpdateWithoutToolGrantsInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -3416,6 +3616,8 @@ export type WorkspaceUncheckedUpdateWithoutToolGrantsInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -3445,6 +3647,8 @@ export type WorkspaceCreateWithoutWorkflowsInput = {
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -3474,6 +3678,8 @@ export type WorkspaceUncheckedCreateWithoutWorkflowsInput = {
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -3519,6 +3725,8 @@ export type WorkspaceUpdateWithoutWorkflowsInput = {
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -3548,6 +3756,8 @@ export type WorkspaceUncheckedUpdateWithoutWorkflowsInput = {
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -3577,6 +3787,8 @@ export type WorkspaceCreateWithoutWorkflowRunsInput = {
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -3606,6 +3818,8 @@ export type WorkspaceUncheckedCreateWithoutWorkflowRunsInput = {
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -3651,6 +3865,8 @@ export type WorkspaceUpdateWithoutWorkflowRunsInput = {
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -3680,6 +3896,8 @@ export type WorkspaceUncheckedUpdateWithoutWorkflowRunsInput = {
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -3709,6 +3927,8 @@ export type WorkspaceCreateWithoutWorkflowNodeRunsInput = {
   toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
   workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -3738,6 +3958,8 @@ export type WorkspaceUncheckedCreateWithoutWorkflowNodeRunsInput = {
   toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
   settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
 }
 
@@ -3783,6 +4005,8 @@ export type WorkspaceUpdateWithoutWorkflowNodeRunsInput = {
   toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
   workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -3812,6 +4036,288 @@ export type WorkspaceUncheckedUpdateWithoutWorkflowNodeRunsInput = {
   toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
+  settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
+}
+
+export type WorkspaceCreateWithoutTasksInput = {
+  id?: string
+  name: string
+  plan?: string
+  createdAt?: Date | string
+  members?: Prisma.WorkspaceMemberCreateNestedManyWithoutWorkspaceInput
+  agents?: Prisma.AgentCreateNestedManyWithoutWorkspaceInput
+  agentLogs?: Prisma.AgentLogCreateNestedManyWithoutWorkspaceInput
+  projects?: Prisma.ProjectCreateNestedManyWithoutWorkspaceInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutWorkspaceInput
+  memoryRevisions?: Prisma.MemoryRevisionCreateNestedManyWithoutWorkspaceInput
+  connectors?: Prisma.ConnectorCreateNestedManyWithoutWorkspaceInput
+  skills?: Prisma.SkillCreateNestedManyWithoutWorkspaceInput
+  harnessProposals?: Prisma.HarnessProposalCreateNestedManyWithoutWorkspaceInput
+  conversations?: Prisma.ConversationCreateNestedManyWithoutWorkspaceInput
+  conversationMessages?: Prisma.ConversationMessageCreateNestedManyWithoutWorkspaceInput
+  auditLogs?: Prisma.AuditLogCreateNestedManyWithoutWorkspaceInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
+  marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
+  quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
+  evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
+  toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
+  toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
+  workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
+  workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
+  workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportCreateNestedManyWithoutWorkspaceInput
+  settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
+}
+
+export type WorkspaceUncheckedCreateWithoutTasksInput = {
+  id?: string
+  name: string
+  plan?: string
+  createdAt?: Date | string
+  members?: Prisma.WorkspaceMemberUncheckedCreateNestedManyWithoutWorkspaceInput
+  agents?: Prisma.AgentUncheckedCreateNestedManyWithoutWorkspaceInput
+  agentLogs?: Prisma.AgentLogUncheckedCreateNestedManyWithoutWorkspaceInput
+  projects?: Prisma.ProjectUncheckedCreateNestedManyWithoutWorkspaceInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutWorkspaceInput
+  memoryRevisions?: Prisma.MemoryRevisionUncheckedCreateNestedManyWithoutWorkspaceInput
+  connectors?: Prisma.ConnectorUncheckedCreateNestedManyWithoutWorkspaceInput
+  skills?: Prisma.SkillUncheckedCreateNestedManyWithoutWorkspaceInput
+  harnessProposals?: Prisma.HarnessProposalUncheckedCreateNestedManyWithoutWorkspaceInput
+  conversations?: Prisma.ConversationUncheckedCreateNestedManyWithoutWorkspaceInput
+  conversationMessages?: Prisma.ConversationMessageUncheckedCreateNestedManyWithoutWorkspaceInput
+  auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutWorkspaceInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
+  marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
+  quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
+  evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
+  toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
+  toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
+  workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
+  workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutWorkspaceInput
+  settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
+}
+
+export type WorkspaceCreateOrConnectWithoutTasksInput = {
+  where: Prisma.WorkspaceWhereUniqueInput
+  create: Prisma.XOR<Prisma.WorkspaceCreateWithoutTasksInput, Prisma.WorkspaceUncheckedCreateWithoutTasksInput>
+}
+
+export type WorkspaceUpsertWithoutTasksInput = {
+  update: Prisma.XOR<Prisma.WorkspaceUpdateWithoutTasksInput, Prisma.WorkspaceUncheckedUpdateWithoutTasksInput>
+  create: Prisma.XOR<Prisma.WorkspaceCreateWithoutTasksInput, Prisma.WorkspaceUncheckedCreateWithoutTasksInput>
+  where?: Prisma.WorkspaceWhereInput
+}
+
+export type WorkspaceUpdateToOneWithWhereWithoutTasksInput = {
+  where?: Prisma.WorkspaceWhereInput
+  data: Prisma.XOR<Prisma.WorkspaceUpdateWithoutTasksInput, Prisma.WorkspaceUncheckedUpdateWithoutTasksInput>
+}
+
+export type WorkspaceUpdateWithoutTasksInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  members?: Prisma.WorkspaceMemberUpdateManyWithoutWorkspaceNestedInput
+  agents?: Prisma.AgentUpdateManyWithoutWorkspaceNestedInput
+  agentLogs?: Prisma.AgentLogUpdateManyWithoutWorkspaceNestedInput
+  projects?: Prisma.ProjectUpdateManyWithoutWorkspaceNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutWorkspaceNestedInput
+  memoryRevisions?: Prisma.MemoryRevisionUpdateManyWithoutWorkspaceNestedInput
+  connectors?: Prisma.ConnectorUpdateManyWithoutWorkspaceNestedInput
+  skills?: Prisma.SkillUpdateManyWithoutWorkspaceNestedInput
+  harnessProposals?: Prisma.HarnessProposalUpdateManyWithoutWorkspaceNestedInput
+  conversations?: Prisma.ConversationUpdateManyWithoutWorkspaceNestedInput
+  conversationMessages?: Prisma.ConversationMessageUpdateManyWithoutWorkspaceNestedInput
+  auditLogs?: Prisma.AuditLogUpdateManyWithoutWorkspaceNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
+  marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
+  quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
+  evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
+  toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
+  toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
+  workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
+  workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
+  workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutWorkspaceNestedInput
+  settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
+}
+
+export type WorkspaceUncheckedUpdateWithoutTasksInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  members?: Prisma.WorkspaceMemberUncheckedUpdateManyWithoutWorkspaceNestedInput
+  agents?: Prisma.AgentUncheckedUpdateManyWithoutWorkspaceNestedInput
+  agentLogs?: Prisma.AgentLogUncheckedUpdateManyWithoutWorkspaceNestedInput
+  projects?: Prisma.ProjectUncheckedUpdateManyWithoutWorkspaceNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+  memoryRevisions?: Prisma.MemoryRevisionUncheckedUpdateManyWithoutWorkspaceNestedInput
+  connectors?: Prisma.ConnectorUncheckedUpdateManyWithoutWorkspaceNestedInput
+  skills?: Prisma.SkillUncheckedUpdateManyWithoutWorkspaceNestedInput
+  harnessProposals?: Prisma.HarnessProposalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  conversations?: Prisma.ConversationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  conversationMessages?: Prisma.ConversationMessageUncheckedUpdateManyWithoutWorkspaceNestedInput
+  auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutWorkspaceNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
+  marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
+  evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
+  toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
+  toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutWorkspaceNestedInput
+  settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
+}
+
+export type WorkspaceCreateWithoutReportsInput = {
+  id?: string
+  name: string
+  plan?: string
+  createdAt?: Date | string
+  members?: Prisma.WorkspaceMemberCreateNestedManyWithoutWorkspaceInput
+  agents?: Prisma.AgentCreateNestedManyWithoutWorkspaceInput
+  agentLogs?: Prisma.AgentLogCreateNestedManyWithoutWorkspaceInput
+  projects?: Prisma.ProjectCreateNestedManyWithoutWorkspaceInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutWorkspaceInput
+  memoryRevisions?: Prisma.MemoryRevisionCreateNestedManyWithoutWorkspaceInput
+  connectors?: Prisma.ConnectorCreateNestedManyWithoutWorkspaceInput
+  skills?: Prisma.SkillCreateNestedManyWithoutWorkspaceInput
+  harnessProposals?: Prisma.HarnessProposalCreateNestedManyWithoutWorkspaceInput
+  conversations?: Prisma.ConversationCreateNestedManyWithoutWorkspaceInput
+  conversationMessages?: Prisma.ConversationMessageCreateNestedManyWithoutWorkspaceInput
+  auditLogs?: Prisma.AuditLogCreateNestedManyWithoutWorkspaceInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutWorkspaceInput
+  marketIntelligences?: Prisma.MarketIntelligenceCreateNestedManyWithoutWorkspaceInput
+  quotations?: Prisma.QuotationCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateCreateNestedManyWithoutWorkspaceInput
+  evolutionLogs?: Prisma.EvolutionLogCreateNestedManyWithoutWorkspaceInput
+  toolRegistries?: Prisma.ToolRegistryCreateNestedManyWithoutWorkspaceInput
+  toolGrants?: Prisma.ToolGrantCreateNestedManyWithoutWorkspaceInput
+  workflows?: Prisma.WorkflowCreateNestedManyWithoutWorkspaceInput
+  workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutWorkspaceInput
+  workflowNodeRuns?: Prisma.WorkflowNodeRunCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  settings?: Prisma.WorkspaceSettingsCreateNestedOneWithoutWorkspaceInput
+}
+
+export type WorkspaceUncheckedCreateWithoutReportsInput = {
+  id?: string
+  name: string
+  plan?: string
+  createdAt?: Date | string
+  members?: Prisma.WorkspaceMemberUncheckedCreateNestedManyWithoutWorkspaceInput
+  agents?: Prisma.AgentUncheckedCreateNestedManyWithoutWorkspaceInput
+  agentLogs?: Prisma.AgentLogUncheckedCreateNestedManyWithoutWorkspaceInput
+  projects?: Prisma.ProjectUncheckedCreateNestedManyWithoutWorkspaceInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutWorkspaceInput
+  memoryRevisions?: Prisma.MemoryRevisionUncheckedCreateNestedManyWithoutWorkspaceInput
+  connectors?: Prisma.ConnectorUncheckedCreateNestedManyWithoutWorkspaceInput
+  skills?: Prisma.SkillUncheckedCreateNestedManyWithoutWorkspaceInput
+  harnessProposals?: Prisma.HarnessProposalUncheckedCreateNestedManyWithoutWorkspaceInput
+  conversations?: Prisma.ConversationUncheckedCreateNestedManyWithoutWorkspaceInput
+  conversationMessages?: Prisma.ConversationMessageUncheckedCreateNestedManyWithoutWorkspaceInput
+  auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutWorkspaceInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutWorkspaceInput
+  marketIntelligences?: Prisma.MarketIntelligenceUncheckedCreateNestedManyWithoutWorkspaceInput
+  quotations?: Prisma.QuotationUncheckedCreateNestedManyWithoutWorkspaceInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedCreateNestedManyWithoutWorkspaceInput
+  evolutionLogs?: Prisma.EvolutionLogUncheckedCreateNestedManyWithoutWorkspaceInput
+  toolRegistries?: Prisma.ToolRegistryUncheckedCreateNestedManyWithoutWorkspaceInput
+  toolGrants?: Prisma.ToolGrantUncheckedCreateNestedManyWithoutWorkspaceInput
+  workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutWorkspaceInput
+  workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  settings?: Prisma.WorkspaceSettingsUncheckedCreateNestedOneWithoutWorkspaceInput
+}
+
+export type WorkspaceCreateOrConnectWithoutReportsInput = {
+  where: Prisma.WorkspaceWhereUniqueInput
+  create: Prisma.XOR<Prisma.WorkspaceCreateWithoutReportsInput, Prisma.WorkspaceUncheckedCreateWithoutReportsInput>
+}
+
+export type WorkspaceUpsertWithoutReportsInput = {
+  update: Prisma.XOR<Prisma.WorkspaceUpdateWithoutReportsInput, Prisma.WorkspaceUncheckedUpdateWithoutReportsInput>
+  create: Prisma.XOR<Prisma.WorkspaceCreateWithoutReportsInput, Prisma.WorkspaceUncheckedCreateWithoutReportsInput>
+  where?: Prisma.WorkspaceWhereInput
+}
+
+export type WorkspaceUpdateToOneWithWhereWithoutReportsInput = {
+  where?: Prisma.WorkspaceWhereInput
+  data: Prisma.XOR<Prisma.WorkspaceUpdateWithoutReportsInput, Prisma.WorkspaceUncheckedUpdateWithoutReportsInput>
+}
+
+export type WorkspaceUpdateWithoutReportsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  members?: Prisma.WorkspaceMemberUpdateManyWithoutWorkspaceNestedInput
+  agents?: Prisma.AgentUpdateManyWithoutWorkspaceNestedInput
+  agentLogs?: Prisma.AgentLogUpdateManyWithoutWorkspaceNestedInput
+  projects?: Prisma.ProjectUpdateManyWithoutWorkspaceNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutWorkspaceNestedInput
+  memoryRevisions?: Prisma.MemoryRevisionUpdateManyWithoutWorkspaceNestedInput
+  connectors?: Prisma.ConnectorUpdateManyWithoutWorkspaceNestedInput
+  skills?: Prisma.SkillUpdateManyWithoutWorkspaceNestedInput
+  harnessProposals?: Prisma.HarnessProposalUpdateManyWithoutWorkspaceNestedInput
+  conversations?: Prisma.ConversationUpdateManyWithoutWorkspaceNestedInput
+  conversationMessages?: Prisma.ConversationMessageUpdateManyWithoutWorkspaceNestedInput
+  auditLogs?: Prisma.AuditLogUpdateManyWithoutWorkspaceNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutWorkspaceNestedInput
+  marketIntelligences?: Prisma.MarketIntelligenceUpdateManyWithoutWorkspaceNestedInput
+  quotations?: Prisma.QuotationUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUpdateManyWithoutWorkspaceNestedInput
+  evolutionLogs?: Prisma.EvolutionLogUpdateManyWithoutWorkspaceNestedInput
+  toolRegistries?: Prisma.ToolRegistryUpdateManyWithoutWorkspaceNestedInput
+  toolGrants?: Prisma.ToolGrantUpdateManyWithoutWorkspaceNestedInput
+  workflows?: Prisma.WorkflowUpdateManyWithoutWorkspaceNestedInput
+  workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutWorkspaceNestedInput
+  workflowNodeRuns?: Prisma.WorkflowNodeRunUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  settings?: Prisma.WorkspaceSettingsUpdateOneWithoutWorkspaceNestedInput
+}
+
+export type WorkspaceUncheckedUpdateWithoutReportsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  members?: Prisma.WorkspaceMemberUncheckedUpdateManyWithoutWorkspaceNestedInput
+  agents?: Prisma.AgentUncheckedUpdateManyWithoutWorkspaceNestedInput
+  agentLogs?: Prisma.AgentLogUncheckedUpdateManyWithoutWorkspaceNestedInput
+  projects?: Prisma.ProjectUncheckedUpdateManyWithoutWorkspaceNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+  memoryRevisions?: Prisma.MemoryRevisionUncheckedUpdateManyWithoutWorkspaceNestedInput
+  connectors?: Prisma.ConnectorUncheckedUpdateManyWithoutWorkspaceNestedInput
+  skills?: Prisma.SkillUncheckedUpdateManyWithoutWorkspaceNestedInput
+  harnessProposals?: Prisma.HarnessProposalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  conversations?: Prisma.ConversationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  conversationMessages?: Prisma.ConversationMessageUncheckedUpdateManyWithoutWorkspaceNestedInput
+  auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutWorkspaceNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutWorkspaceNestedInput
+  marketIntelligences?: Prisma.MarketIntelligenceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  quotations?: Prisma.QuotationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  exchangeRates?: Prisma.ExchangeRateUncheckedUpdateManyWithoutWorkspaceNestedInput
+  evolutionLogs?: Prisma.EvolutionLogUncheckedUpdateManyWithoutWorkspaceNestedInput
+  toolRegistries?: Prisma.ToolRegistryUncheckedUpdateManyWithoutWorkspaceNestedInput
+  toolGrants?: Prisma.ToolGrantUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workflowNodeRuns?: Prisma.WorkflowNodeRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
   settings?: Prisma.WorkspaceSettingsUncheckedUpdateOneWithoutWorkspaceNestedInput
 }
 
@@ -3843,6 +4349,8 @@ export type WorkspaceCountOutputType = {
   workflows: number
   workflowRuns: number
   workflowNodeRuns: number
+  tasks: number
+  reports: number
 }
 
 export type WorkspaceCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -3868,6 +4376,8 @@ export type WorkspaceCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensi
   workflows?: boolean | WorkspaceCountOutputTypeCountWorkflowsArgs
   workflowRuns?: boolean | WorkspaceCountOutputTypeCountWorkflowRunsArgs
   workflowNodeRuns?: boolean | WorkspaceCountOutputTypeCountWorkflowNodeRunsArgs
+  tasks?: boolean | WorkspaceCountOutputTypeCountTasksArgs
+  reports?: boolean | WorkspaceCountOutputTypeCountReportsArgs
 }
 
 /**
@@ -4034,6 +4544,20 @@ export type WorkspaceCountOutputTypeCountWorkflowNodeRunsArgs<ExtArgs extends ru
   where?: Prisma.WorkflowNodeRunWhereInput
 }
 
+/**
+ * WorkspaceCountOutputType without action
+ */
+export type WorkspaceCountOutputTypeCountTasksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TaskWhereInput
+}
+
+/**
+ * WorkspaceCountOutputType without action
+ */
+export type WorkspaceCountOutputTypeCountReportsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ReportWhereInput
+}
+
 
 export type WorkspaceSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -4062,6 +4586,8 @@ export type WorkspaceSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   workflows?: boolean | Prisma.Workspace$workflowsArgs<ExtArgs>
   workflowRuns?: boolean | Prisma.Workspace$workflowRunsArgs<ExtArgs>
   workflowNodeRuns?: boolean | Prisma.Workspace$workflowNodeRunsArgs<ExtArgs>
+  tasks?: boolean | Prisma.Workspace$tasksArgs<ExtArgs>
+  reports?: boolean | Prisma.Workspace$reportsArgs<ExtArgs>
   settings?: boolean | Prisma.Workspace$settingsArgs<ExtArgs>
   _count?: boolean | Prisma.WorkspaceCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["workspace"]>
@@ -4111,6 +4637,8 @@ export type WorkspaceInclude<ExtArgs extends runtime.Types.Extensions.InternalAr
   workflows?: boolean | Prisma.Workspace$workflowsArgs<ExtArgs>
   workflowRuns?: boolean | Prisma.Workspace$workflowRunsArgs<ExtArgs>
   workflowNodeRuns?: boolean | Prisma.Workspace$workflowNodeRunsArgs<ExtArgs>
+  tasks?: boolean | Prisma.Workspace$tasksArgs<ExtArgs>
+  reports?: boolean | Prisma.Workspace$reportsArgs<ExtArgs>
   settings?: boolean | Prisma.Workspace$settingsArgs<ExtArgs>
   _count?: boolean | Prisma.WorkspaceCountOutputTypeDefaultArgs<ExtArgs>
 }
@@ -4142,6 +4670,8 @@ export type $WorkspacePayload<ExtArgs extends runtime.Types.Extensions.InternalA
     workflows: Prisma.$WorkflowPayload<ExtArgs>[]
     workflowRuns: Prisma.$WorkflowRunPayload<ExtArgs>[]
     workflowNodeRuns: Prisma.$WorkflowNodeRunPayload<ExtArgs>[]
+    tasks: Prisma.$TaskPayload<ExtArgs>[]
+    reports: Prisma.$ReportPayload<ExtArgs>[]
     settings: Prisma.$WorkspaceSettingsPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
@@ -4565,6 +5095,8 @@ export interface Prisma__WorkspaceClient<T, Null = never, ExtArgs extends runtim
   workflows<T extends Prisma.Workspace$workflowsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$workflowsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WorkflowPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   workflowRuns<T extends Prisma.Workspace$workflowRunsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$workflowRunsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   workflowNodeRuns<T extends Prisma.Workspace$workflowNodeRunsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$workflowNodeRunsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WorkflowNodeRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  tasks<T extends Prisma.Workspace$tasksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$tasksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  reports<T extends Prisma.Workspace$reportsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$reportsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ReportPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   settings<T extends Prisma.Workspace$settingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$settingsArgs<ExtArgs>>): Prisma.Prisma__WorkspaceSettingsClient<runtime.Types.Result.GetResult<Prisma.$WorkspaceSettingsPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -5515,6 +6047,54 @@ export type Workspace$workflowNodeRunsArgs<ExtArgs extends runtime.Types.Extensi
   take?: number
   skip?: number
   distinct?: Prisma.WorkflowNodeRunScalarFieldEnum | Prisma.WorkflowNodeRunScalarFieldEnum[]
+}
+
+/**
+ * Workspace.tasks
+ */
+export type Workspace$tasksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Task
+   */
+  select?: Prisma.TaskSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Task
+   */
+  omit?: Prisma.TaskOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TaskInclude<ExtArgs> | null
+  where?: Prisma.TaskWhereInput
+  orderBy?: Prisma.TaskOrderByWithRelationInput | Prisma.TaskOrderByWithRelationInput[]
+  cursor?: Prisma.TaskWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TaskScalarFieldEnum | Prisma.TaskScalarFieldEnum[]
+}
+
+/**
+ * Workspace.reports
+ */
+export type Workspace$reportsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Report
+   */
+  select?: Prisma.ReportSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Report
+   */
+  omit?: Prisma.ReportOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ReportInclude<ExtArgs> | null
+  where?: Prisma.ReportWhereInput
+  orderBy?: Prisma.ReportOrderByWithRelationInput | Prisma.ReportOrderByWithRelationInput[]
+  cursor?: Prisma.ReportWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ReportScalarFieldEnum | Prisma.ReportScalarFieldEnum[]
 }
 
 /**

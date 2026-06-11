@@ -15,8 +15,21 @@ import {
   Clock,
   BookOpen,
 } from "lucide-react";
-import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import dynamic from "next/dynamic";
 import Link from "next/link";
+
+/** 懒加载审批概览环形图（recharts 体积大且仅客户端渲染） */
+const ApprovalDonutChart = dynamic(
+  () => import("./_components/approval-donut-chart"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full flex items-center justify-center text-hint text-xs">
+        图表加载中...
+      </div>
+    ),
+  },
+);
 
 /** Tab 值 → 过滤逻辑 */
 type TabValue = "pending" | "processed" | "all";
@@ -215,28 +228,11 @@ export default function HarnessApprovalPage() {
           </div>
 
           <div className="h-[160px] relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={[
-                    { name: "已批准", value: stats.approved || 0.1 },
-                    { name: "已拒绝", value: stats.rejected || 0.1 },
-                    { name: "待审批", value: stats.pending || 0.1 },
-                  ]}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={75}
-                  paddingAngle={2}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  <Cell fill="var(--chart-3)" />
-                  <Cell fill="var(--chart-5)" />
-                  <Cell fill="var(--chart-4)" />
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
+            <ApprovalDonutChart
+              approved={stats.approved}
+              rejected={stats.rejected}
+              pending={stats.pending}
+            />
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <span className="text-muted-foreground text-xs">总提案</span>
               <span className="text-foreground font-bold text-xl">{stats.total}</span>

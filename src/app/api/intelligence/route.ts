@@ -15,12 +15,21 @@ function serializeIntelligence(intel: {
   }
 }
 
-/** GET /api/intelligence —— 获取市场情报列表（按发布时间倒序） */
+/** GET /api/intelligence —— 获取市场情报列表（按发布时间倒序）
+ * —— 查询参数：impactLevel（high/mid/low），可选按影响力等级筛选
+ * —— ALWAYS 包含 workspaceId（AGENTS.md §4.11）
+ */
 export async function GET(request: Request) {
   try {
     const ctx = await buildWorkspaceContext(request)
+    const url = new URL(request.url)
+    const impactLevel = url.searchParams.get("impactLevel") || undefined
+
+    const where: Record<string, unknown> = { workspaceId: ctx.workspaceId }
+    if (impactLevel) where.impactLevel = impactLevel
+
     const intelligence = await prisma.marketIntelligence.findMany({
-      where: { workspaceId: ctx.workspaceId },
+      where,
       orderBy: { publishedAt: "desc" },
     })
     return successResponse({ intelligence: intelligence.map(serializeIntelligence) })

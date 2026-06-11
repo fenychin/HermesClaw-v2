@@ -152,3 +152,8 @@ export type WorkflowRun = Prisma.WorkflowRunModel
  * 
  */
 export type WorkflowNodeRun = Prisma.WorkflowNodeRunModel
+/**
+ * Model Task
+ * 
+ */
+export type Task = Prisma.TaskModel
