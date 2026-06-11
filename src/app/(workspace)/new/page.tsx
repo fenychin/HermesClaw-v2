@@ -65,8 +65,15 @@ function NewTopicPageInner() {
   }, [searchParams, loadConversation]);
 
   const [input, setInput] = useState("");
-  const [selectedModelId, setSelectedModelId] = useState<string>(loadSavedModel);
+  // 初始值用确定性默认（与服务端 SSR 一致），避免 localStorage 读值导致首屏水合不匹配
+  const [selectedModelId, setSelectedModelId] = useState<string>(DEFAULT_MODEL_ID);
   const [pendingSystemPrompt, setPendingSystemPrompt] = useState<string | undefined>(undefined);
+
+  // 挂载后从 localStorage 恢复上次选择的模型（仅客户端，不参与水合比对）
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedModelId(loadSavedModel());
+  }, []);
 
   const handleModelChange = useCallback((modelId: string) => {
     setSelectedModelId(modelId);

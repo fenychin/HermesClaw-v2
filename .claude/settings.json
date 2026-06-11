@@ -122,7 +122,12 @@
       "Bash(echo \"=== fetch 退出码 $? ===\")",
       "Bash(git checkout *)",
       "Bash(git add *)",
-      "Bash(git reset *)"
+      "Bash(git reset *)",
+      "Bash(git commit -m ' *)",
+      "Bash(node_modules/.bin/eslint src/components/common/relative-time.tsx)",
+      "Bash(node_modules/.bin/eslint src/components/pages/new/recent-panel.tsx)",
+      "Bash(node_modules/.bin/eslint src/components/layout/sidebar-recent.tsx)",
+      "Bash(curl -s -o /dev/null -w \"/new -> HTTP %{http_code}\\\\n\" \"http://localhost:3000/new\")"
     ],
     "additionalDirectories": [
       "/Users/Feng/Desktop/Hermesclaw-v2/src/components/pages"

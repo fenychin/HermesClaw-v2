@@ -36,7 +36,7 @@ import { mapImpactToSeverity, mapRiskToSeverity } from "@/types/dashboard";
 import type { ImpactLevel, MarketIntelligence } from "@/types/trade";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonList } from "@/components/common/skeleton-list";
-import { relativeTime } from "@/lib/date-utils";
+import { RelativeTime } from "@/components/common/relative-time";
 import { cn } from "@/lib/utils";
 
 /**
@@ -503,9 +503,10 @@ function DashboardContent() {
                           <div key={item.id} className="py-3 first:pt-0 last:pb-0 flex items-start gap-4">
                             <div className="flex flex-col gap-1.5 flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className="text-hint text-xs">
-                                  {relativeTime(item.timestamp)}
-                                </span>
+                                <RelativeTime
+                                  value={item.timestamp}
+                                  className="text-hint text-xs"
+                                />
                                 <span
                                   className={cn(
                                     "text-[10px] font-medium px-2 py-0.5 rounded-full border",
@@ -601,7 +602,7 @@ function DashboardContent() {
                     <div className="flex items-center gap-2 text-hint text-xs">
                       <span>{item.source}</span>
                       <span>•</span>
-                      <span>{relativeTime(item.publishedAt)}</span>
+                      <RelativeTime value={item.publishedAt} />
                     </div>
                     {/* 分发为任务按钮 */}
                     <button

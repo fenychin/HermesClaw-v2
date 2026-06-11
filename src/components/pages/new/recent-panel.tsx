@@ -13,7 +13,7 @@ import {
 import Link from "next/link";
 import { useProjectStore } from "@/stores/project-store";
 import { useTradeStore } from "@/stores/trade-store";
-import { relativeTime } from "@/lib/date-utils";
+import { RelativeTime } from "@/components/common/relative-time";
 import { buildRecentRecords } from "@/lib/recent-utils";
 import { useRecentConversations } from "@/hooks/use-recent-conversations";
 import type { RecentRecord, RecentType } from "@/hooks/use-recent-conversations";
@@ -128,9 +128,10 @@ export function RecentPanel({
               </span>
 
               {/* 相对时间 */}
-              <span className="text-hint text-[10px] shrink-0">
-                {relativeTime(record.timestamp)}
-              </span>
+              <RelativeTime
+                value={record.timestamp}
+                className="text-hint text-[10px] shrink-0"
+              />
             </motion.button>
           );
         })}

@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useTradeStore } from "@/stores/trade-store";
-import { relativeTime } from "@/lib/date-utils";
+import { RelativeTime } from "@/components/common/relative-time";
 import { buildRecentRecords } from "@/lib/recent-utils";
 import { useRecentConversations } from "@/hooks/use-recent-conversations";
 import type { RecentType } from "@/hooks/use-recent-conversations";
@@ -148,9 +148,10 @@ export function SidebarRecent({
                     <span className="text-sidebar-foreground text-xs truncate flex-1">
                       {record.title}
                     </span>
-                    <span className="text-hint text-[10px] shrink-0">
-                      {relativeTime(record.timestamp)}
-                    </span>
+                    <RelativeTime
+                      value={record.timestamp}
+                      className="text-hint text-[10px] shrink-0"
+                    />
                   </Link>
                 );
               })}

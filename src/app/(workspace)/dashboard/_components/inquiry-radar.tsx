@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronRight, Radar, AlertTriangle, Bell, Info } from "lucide-react";
-import { relativeTime } from "@/lib/date-utils";
+import { RelativeTime } from "@/components/common/relative-time";
 import { cn } from "@/lib/utils";
 import { SkeletonList } from "@/components/common/skeleton-list";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -150,9 +150,10 @@ export function InquiryRadar({ inquiries, isLoading }: InquiryRadarProps) {
                         <span className="text-xs text-muted-foreground capitalize shrink-0">
                           {inquiry.channel}
                         </span>
-                        <span className="text-xs text-hint tabular-nums shrink-0">
-                          {relativeTime(inquiry.receivedAt)}
-                        </span>
+                        <RelativeTime
+                          value={inquiry.receivedAt}
+                          className="text-xs text-hint tabular-nums shrink-0"
+                        />
                       </div>
 
                       {/* 优先级标签 */}
