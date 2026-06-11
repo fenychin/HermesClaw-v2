@@ -168,12 +168,18 @@ export function CommandBox({
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 可用技能命令列表（/ft-*）
+  // 可用技能命令列表（/ft-*，与 .claude/skills/ft-*/ 目录同步）
+  // ⚠️ 新增/删除 skill 时须同步更新此列表（AGENTS.md §4.14）
   const SLASH_COMMANDS = [
+    { name: "/ft-inquiry-sorter", label: "邮件解析与询盘分拣", desc: "解析入站邮件，提取询盘关键信息并分类" },
     { name: "/ft-inquiry-grading", label: "询盘智能分级", desc: "A/B/C 三级评分询盘" },
+    { name: "/ft-inquiry-priority", label: "询盘优先级评估", desc: "四维度评分，辅助跟进决策" },
     { name: "/ft-outreach-email", label: "自动开发信生成", desc: "个性化外贸开发信草稿" },
+    { name: "/ft-ab-testing", label: "开发信 A/B 测试", desc: "版本对比 + 打开率追踪 + 优胜推荐" },
+    { name: "/ft-auto-reply", label: "自动回复草稿", desc: "多语种多风格回复草稿生成" },
     { name: "/ft-customer-profiling", label: "客户画像分析", desc: "多渠道客户画像构建" },
     { name: "/ft-cost-accounting", label: "成本核算", desc: "多贸易术语成本明细表" },
+    { name: "/ft-quotation-pdf", label: "报价单 PDF 生成", desc: "多币种专业格式报价单" },
     { name: "/ft-document-parsing", label: "单证解析", desc: "提单/发票/装箱单审核" },
     { name: "/ft-follow-up-crm", label: "客户跟进管理", desc: "跟进提醒与话术建议" },
     { name: "/ft-competitor-analysis", label: "竞品动态分析", desc: "目标市场画像与竞品格局" },

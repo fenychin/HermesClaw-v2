@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { apiClient } from "@/lib/api-client";
 import { parseSSEStream } from "@/lib/sse-parser";
+import { truncateTitle } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   queuePendingConversation,
@@ -88,10 +89,7 @@ export function useChat() {
     async (userContent: string, assistantContent: string) => {
       try {
         if (!conversationIdRef.current) {
-          const title =
-            userContent.length > 50
-              ? userContent.slice(0, 50) + "…"
-              : userContent;
+          const title = truncateTitle(userContent);
           const result = await apiClient.createConversation(title);
           conversationIdRef.current = result.conversation.id;
         }

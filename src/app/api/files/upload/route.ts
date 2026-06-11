@@ -1,11 +1,11 @@
-import { NextRequest } from "next/server"
 import { writeFile, mkdir } from "fs/promises"
 import { join } from "path"
 import { logger } from '@/lib/logger'
 import { successResponse, errorResponse } from "@/lib/api-utils"
-import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
+import { type WorkspaceContext } from "@/lib/workspace"
 import { actorFromSession, createAuditEntry, updateAuditEntry } from "@/lib/server/audit"
 import { writeAgentLog } from "@/lib/server/agent-log"
+import { withRBAC } from "@/lib/server/api-handler"
 import { rateLimit } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
@@ -53,6 +53,7 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024
 /**
  * POST /api/files/upload
  * —— 文件附件上传端点（multipart/form-data）。
+ *    RBAC 由 withRBAC 统一守卫（自动 RBAC_DENIED 审计 + 403 响应）。
  *
  * 接收表单字段：
  *   - file: File（必填）
@@ -60,17 +61,16 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024
  * 返回：
  *   { file: { name, url, size, type } }
  */
-export async function POST(req: NextRequest) {
+export const POST = withRBAC(async (
+  request: Request,
+  ctx: WorkspaceContext,
+) => {
   const start = Date.now()
   const elapsed = () => `${((Date.now() - start) / 1000).toFixed(1)}s`
 
   try {
-    // RBAC 门禁
-    const ctx = await buildWorkspaceContext(req)
-    requireWritable(ctx.role)
-
     // 频率限制：每分钟最多 20 次
-    const ip = req.headers.get("x-forwarded-for") || "unknown"
+    const ip = request.headers.get("x-forwarded-for") || "unknown"
     if (!rateLimit(ip, 20, 60_000)) {
       return Response.json(
         { success: false, error: "请求过于频繁，请稍后重试" },
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const formData = await req.formData()
+    const formData = await request.formData()
     const file = formData.get("file")
 
     if (!file || !(file instanceof File)) {
@@ -175,9 +175,6 @@ export async function POST(req: NextRequest) {
       throw writeError
     }
   } catch (error) {
-    if (error instanceof ForbiddenError) {
-      return errorResponse(error.message, 403)
-    }
     logger.error('POST /api/files/upload: 失败', { error: error instanceof Error ? error.message : '未知错误' })
     void writeAgentLog({
       source: "hermes-chat",
@@ -188,4 +185,4 @@ export async function POST(req: NextRequest) {
     })
     return errorResponse("文件上传失败")
   }
-}
+}, "MEMBER")
