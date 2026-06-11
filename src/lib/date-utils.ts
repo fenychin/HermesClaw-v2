@@ -1,6 +1,6 @@
 /**
  * 时间格式化工具（共享）
- * —— recent-panel 与 recent-page-client 共用
+ * —— recent-page-client 使用
  */
 
 /** 时间组分类 */

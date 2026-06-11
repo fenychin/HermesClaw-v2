@@ -1,6 +1,6 @@
 /**
  * 最近记录构建工具
- * —— sidebar-recent / recent-panel 共享的 buildRecentRecords() 与 mock 基线数据
+ * —— sidebar-recent 使用的 buildRecentRecords() 与 mock 基线数据
  */
 import type { RecentRecord } from "@/hooks/use-recent-conversations";
 import type { Inquiry } from "@/types";

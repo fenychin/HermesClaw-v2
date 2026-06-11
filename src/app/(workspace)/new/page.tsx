@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState, useCallback, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { PageTransition } from "@/components/common/PageTransition";
 import {
   CommandBox,
@@ -11,8 +11,6 @@ import {
 import { QuickCards } from "@/components/pages/new/quick-cards";
 import { ConversationArea } from "@/components/pages/new/conversation-area";
 import { SuggestionPanel } from "@/components/pages/new/suggestion-panel";
-import { RecentPanel } from "@/components/pages/new/recent-panel";
-import type { RecentRecord } from "@/hooks/use-recent-conversations";
 import { useChat } from "@/hooks/useChat";
 
 const LS_MODEL_KEY = "hermes-selected-model";
@@ -30,7 +28,7 @@ function loadSavedModel(): string {
 
 /**
  * 新话题页面（超级入口）— PRD §10.2
- * —— 两栏布局：对话与输入 | AI 建议与工作流
+ * —— 简约居中布局：输入框 + 双排快捷入口 | 右侧 AI 建议
  * —— 支持 ?load=conversationId 自动加载历史对话（从 /recent 跳转）
  */
 export default function NewTopicPage() {
@@ -52,8 +50,6 @@ function NewTopicPageInner() {
     clearMessages,
     loadConversation,
   } = useChat();
-
-  const router = useRouter();
 
   // 从 /recent 点击跳转时通过 ?load=conversationId 自动加载历史对话
   const searchParams = useSearchParams();
@@ -103,23 +99,6 @@ function NewTopicPageInner() {
     setInput(text);
   }, []);
 
-  // 点击「最近」记录：优先用记录自带 href（如询盘派生项）；
-  // 否则按 type 分流——真实对话→恢复历史，项目→详情，任务→最近页。
-  const handleRecentSelect = useCallback(
-    (record: RecentRecord) => {
-      if (record.href) {
-        router.push(record.href);
-      } else if (record.type === "conversation") {
-        loadConversation(record.id);
-      } else if (record.type === "project") {
-        router.push(`/projects/${record.id}`);
-      } else {
-        router.push("/recent");
-      }
-    },
-    [loadConversation, router],
-  );
-
   const handleMentionAgent = useCallback(
     (agentName: string) => {
       setInput((prev) => {
@@ -161,16 +140,11 @@ function NewTopicPageInner() {
             />
           </div>
 
-          {/* 快捷卡片 + 最近记录（仅空状态展示） */}
+          {/* 快捷入口：双排网格（仅空状态展示） */}
           {!hasMessages && (
-            <>
-              <div className="w-full max-w-2xl">
-                <QuickCards onSelect={handleQuickActionSelect} />
-              </div>
-              <div className="w-full max-w-2xl">
-                <RecentPanel onSelect={handleRecentSelect} />
-              </div>
-            </>
+            <div className="w-full max-w-2xl">
+              <QuickCards onSelect={handleQuickActionSelect} />
+            </div>
           )}
         </div>
 

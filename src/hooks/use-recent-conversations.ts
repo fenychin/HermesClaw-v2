@@ -5,7 +5,7 @@ import { apiClient } from "@/lib/api-client";
 import { classifyTimeGroup } from "@/lib/date-utils";
 
 /**
- * 最近的记录类型（统一定义 — sidebar-recent / recent-panel 共享）
+ * 最近的记录类型（统一定义 — sidebar-recent 使用）
  */
 export type RecentType = "conversation" | "task" | "project";
 
@@ -25,7 +25,7 @@ export interface RecentRecord {
 
 /**
  * 从 API 获取真实对话列表，映射为 RecentRecord 并附带 timeGroup 分组。
- * 供 sidebar-recent / recent-panel 共享使用。
+ * 供 sidebar-recent 使用。
  *
  * @param includeTimeGroup 是否附带 timeGroup（侧边栏不需要）
  * @returns RecentRecord[] — API 真实对话
