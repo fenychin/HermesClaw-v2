@@ -112,7 +112,7 @@ const PROJECT_TYPE_LABEL: Record<string, string> = {
 
 interface CommandBoxProps {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string | ((prev: string) => string)) => void;
   /** 发送回调（Enter 或发送按钮触发） */
   onSubmit?: () => void;
   /** 停止流式输出回调 */
@@ -155,9 +155,9 @@ export function CommandBox({
   const [agentSearch, setAgentSearch] = useState("");
   const [projectSearch, setProjectSearch] = useState("");
 
-  // 语音录入状态
+  // 语音录入状态（Web Speech API）
   const [isRecording, setIsRecording] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   // URL 粘贴弹窗
   const [showUrlInput, setShowUrlInput] = useState(false);
@@ -254,7 +254,7 @@ export function CommandBox({
     }
   };
 
-  // ---- 文件上传 ----
+  // ---- 文件上传（真实上传到服务端） ----
   const handleFileUpload = () => {
     fileInputRef.current?.click();
   };
@@ -265,66 +265,144 @@ export function CommandBox({
     const fileName = file.name;
     const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
 
-    // 尝试读取文本文件内容（检测后缀或 MIME 类型）
-    const textExtensions = [".txt", ".md", ".csv", ".json", ".xml", ".html", ".htm", ".log", ".yaml", ".yml", ".env", ".ts", ".tsx", ".js", ".jsx", ".py", ".java", ".css", ".sql"];
-    const isTextFile = textExtensions.some((ext) => fileName.toLowerCase().endsWith(ext)) ||
-      file.type.startsWith("text/") || file.type === "application/json";
+    // 1. 上传文件到服务端
+    const toastId = toast.loading(`上传中: ${fileName}…`);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
 
-    if (isTextFile && file.size < 1024 * 1024) {
-      // 文本文件且 < 1MB：读取内容并附到输入框
-      try {
-        const content = await file.text();
-        const preview = content.slice(0, 3000);
-        const truncated = content.length > 3000 ? "\n…(内容已截断)" : "";
-        insertAtCursor(
-          `[📎 文件: ${fileName} (${sizeMB}MB)]\n\`\`\`\n${preview}${truncated}\n\`\`\`\n`,
-        );
-        toast.success(`已读取: ${fileName}`);
-      } catch {
-        insertAtCursor(`[📎 ${fileName} (${sizeMB}MB)]`);
-        toast.warning("无法读取文件内容，仅附文件名");
-      }
-    } else {
-      // 非文本或大文件：仅附文件名
-      insertAtCursor(`[📎 ${fileName} (${sizeMB}MB)]`);
-      toast.info("文件已附加", {
-        description: "大文件/二进制文件仅传递文件名引用",
+      const res = await fetch("/api/files/upload", {
+        method: "POST",
+        body: formData,
       });
+
+      const json = await res.json() as {
+        success: boolean;
+        data?: { file: { name: string; url: string; size: number; type: string } };
+        error?: string;
+      };
+
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "上传失败");
+      }
+
+      const uploaded = json.data!.file;
+      toast.dismiss(toastId);
+      toast.success(`已上传: ${fileName}`);
+
+      // 2. 文本文件（< 1MB）：读取内容附预览；其他文件：仅链接
+      const textExtensions = [".txt", ".md", ".csv", ".json", ".xml", ".html", ".htm", ".log", ".yaml", ".yml", ".env", ".ts", ".tsx", ".js", ".jsx", ".py", ".java", ".css", ".sql"];
+      const isTextFile = textExtensions.some((ext) => fileName.toLowerCase().endsWith(ext)) ||
+        uploaded.type.startsWith("text/") || uploaded.type === "application/json";
+
+      if (isTextFile && file.size < 1024 * 1024) {
+        try {
+          const content = await file.text();
+          const preview = content.slice(0, 3000);
+          const truncated = content.length > 3000 ? "\n…(内容已截断)" : "";
+          insertAtCursor(
+            `[📎 ${fileName} (${sizeMB}MB)](${uploaded.url})\n\`\`\`\n${preview}${truncated}\n\`\`\`\n`,
+          );
+        } catch {
+          insertAtCursor(`[📎 ${fileName}](${uploaded.url})`);
+        }
+      } else {
+        insertAtCursor(`[📎 ${fileName} (${sizeMB}MB)](${uploaded.url})`);
+      }
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("文件上传失败", {
+        description: err instanceof Error ? err.message : "请稍后重试",
+      });
+      // 降级：仅附文件名（不阻断用户流程）
+      insertAtCursor(`[📎 ${fileName} (${sizeMB}MB)]`);
     }
     e.target.value = "";
   };
 
-  // ---- 语音录入 ----
+  // ---- 语音录入（Web Speech API，使用 isFinal 区分中间/最终结果） ----
+  // 记录最后一次 final 结果在输入框中的起始位置，用于仅更新 interim 区域
+  const lastFinalLengthRef = useRef(0);
+
   const toggleRecording = async () => {
     if (isRecording) {
-      mediaRecorderRef.current?.stop();
+      recognitionRef.current?.stop();
       setIsRecording(false);
-      toast.info("语音录入已停止");
+      return;
+    }
+
+    // 检测浏览器 SpeechRecognition API 支持
+    const SpeechRecognitionAPI =
+      (window as unknown as { SpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition ||
+      (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
+
+    if (!SpeechRecognitionAPI) {
+      toast.error("当前浏览器不支持语音识别", {
+        description: "请使用 Chrome 或 Edge 浏览器",
+      });
       return;
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      const chunks: BlobPart[] = [];
+      const recognition = new SpeechRecognitionAPI();
+      recognitionRef.current = recognition;
 
-      mediaRecorder.ondataavailable = (e) => {
-        chunks.push(e.data);
+      // 配置：中文识别
+      recognition.lang = "zh-CN";
+      recognition.interimResults = true;
+      recognition.continuous = false; // 单段识别更稳定，避免 isFinal 管理复杂度
+      recognition.maxAlternatives = 1;
+
+      // 记录识别开始前的基础文本（不含之前可能残留的语音文本）
+      const baseText = value;
+      lastFinalLengthRef.current = baseText.length;
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let finalText = "";
+        let interimText = "";
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            finalText += result[0].transcript;
+          } else {
+            interimText += result[0].transcript;
+          }
+        }
+
+        // 用原生 isFinal 状态管理：基础文本 + 已确认文本 + (中间文本)
+        const base = value.slice(0, lastFinalLengthRef.current);
+        if (finalText) {
+          // final 结果：追加到基础文本末尾
+          const newBase = `${base} ${finalText}`.trim();
+          onChange(newBase);
+          lastFinalLengthRef.current = newBase.length;
+        } else if (interimText) {
+          // interim 结果：在基础文本后临时展示
+          onChange(`${base} ${interimText}`.trim());
+        }
       };
 
-      mediaRecorder.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        // 语音识别功能后置：当前版本仅记录
-        toast.info("语音录入完成", {
-          description: "语音转文字功能开发中，当前版本暂不可用",
-        });
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        if (event.error === "no-speech") {
+          toast.info("未检测到语音", { description: "请再试一次" });
+        } else if (event.error === "aborted") {
+          // 用户手动停止，无提示
+        } else {
+          toast.error("语音识别出错", { description: event.error });
+        }
+        setIsRecording(false);
       };
 
-      mediaRecorder.start();
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognition.start();
       setIsRecording(true);
+      toast.success("正在聆听…", { description: "说话内容将自动转为文字" });
     } catch {
-      toast.error("无法访问麦克风", {
+      toast.error("无法启动语音识别", {
         description: "请检查浏览器麦克风权限设置",
       });
     }
