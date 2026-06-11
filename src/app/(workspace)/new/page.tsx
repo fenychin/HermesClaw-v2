@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState, useCallback, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { PageTransition } from "@/components/common/PageTransition";
 import {
   CommandBox,
@@ -11,6 +11,10 @@ import {
 import { QuickCards } from "@/components/pages/new/quick-cards";
 import { ConversationArea } from "@/components/pages/new/conversation-area";
 import { SuggestionPanel } from "@/components/pages/new/suggestion-panel";
+import {
+  RecentPanel,
+  type RecentRecord,
+} from "@/components/pages/new/recent-panel";
 import { useChat } from "@/hooks/useChat";
 
 const LS_MODEL_KEY = "hermes-selected-model";
@@ -50,6 +54,8 @@ function NewTopicPageInner() {
     clearMessages,
     loadConversation,
   } = useChat();
+
+  const router = useRouter();
 
   // 从 /recent 点击跳转时通过 ?load=conversationId 自动加载历史对话
   const searchParams = useSearchParams();
@@ -92,6 +98,23 @@ function NewTopicPageInner() {
     setInput(text);
   }, []);
 
+  // 点击「最近」记录：优先用记录自带 href（如询盘派生项）；
+  // 否则按 type 分流——真实对话→恢复历史，项目→详情，任务→最近页。
+  const handleRecentSelect = useCallback(
+    (record: RecentRecord) => {
+      if (record.href) {
+        router.push(record.href);
+      } else if (record.type === "conversation") {
+        loadConversation(record.id);
+      } else if (record.type === "project") {
+        router.push(`/projects/${record.id}`);
+      } else {
+        router.push("/recent");
+      }
+    },
+    [loadConversation, router],
+  );
+
   const handleMentionAgent = useCallback(
     (agentName: string) => {
       setInput((prev) => {
@@ -121,6 +144,9 @@ function NewTopicPageInner() {
               </div>
               <div className="w-full max-w-2xl mt-5">
                 <QuickCards onSelect={handleQuickActionSelect} />
+              </div>
+              <div className="w-full max-w-2xl mt-6">
+                <RecentPanel onSelect={handleRecentSelect} />
               </div>
             </div>
           ) : (

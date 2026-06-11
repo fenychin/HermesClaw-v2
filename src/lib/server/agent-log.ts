@@ -8,8 +8,8 @@
  */
 import { prisma } from "@/lib/prisma"
 
-/** 执行来源：agent（绑定智能体）| hermes-chat（控制面对话）| quick-task（快捷任务）| hermes-suggestions（今日建议）| workflow（DAG 工作流节点） */
-export type AgentLogSource = "agent" | "hermes-chat" | "quick-task" | "hermes-suggestions" | "workflow"
+/** 执行来源：agent（绑定智能体）| hermes-chat（控制面对话）| quick-task（快捷任务）| hermes-suggestions（今日建议）| workflow（DAG 工作流节点）| conversation（对话创建写库） */
+export type AgentLogSource = "agent" | "hermes-chat" | "quick-task" | "hermes-suggestions" | "workflow" | "conversation"
 
 export interface WriteAgentLogInput {
   /** 绑定的智能体 ID；控制面 / 快捷任务无绑定时为空 */

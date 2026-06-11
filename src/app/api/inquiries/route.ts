@@ -4,7 +4,8 @@ import { successResponse, errorResponse } from "@/lib/api-utils"
 import { buildWorkspaceContext, type WorkspaceContext } from "@/lib/workspace"
 import { withRBAC } from "@/lib/server/api-handler"
 import { validateBody, InquiryCreateSchema } from "@/lib/validators"
-import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
+import { actorFromSession } from "@/lib/server/audit"
+import { auditedWrite } from "@/lib/server/audited-write"
 import { ApiResponse } from "@/lib/server/api-response"
 import { countryCodeToFlag } from "@/lib/country-utils"
 import {
@@ -86,110 +87,108 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
   const countryFlag = countryCodeToFlag(body.countryCode)
   const actor = await actorFromSession()
 
-  // 2. 预记录审计日志（AGENTS.md §5 #3 禁止静默执行：写操作前先留痕）
-  const auditEntry = await createAuditEntry({
-    actor,
-    action: "inquiry.create",
-    targetType: "inquiry",
-    targetId: inquiryId,
-    detail: `创建询盘: ${body.subject}（来自 ${body.fromEmail}，${body.countryCode}）`,
-    riskLevel: "low",
-    workspaceId: ctx.workspaceId,
-    automationLevel: "L2",
-    triggeredBy: "user",
-    contextSnapshot: {
-      fromEmail: body.fromEmail,
-      countryCode: body.countryCode,
-      subject: body.subject,
-      step: "inquiry-create",
-    },
-  })
-
-  // 3. 创建 Inquiry 记录
-  let inquiry: Awaited<ReturnType<typeof prisma.inquiry.create>>
+  // 2-5. 预记录审计 + 写库 + 不阻断的分级工作流 + 成功/失败回填，统一经 auditedWrite
+  //       （AGENTS.md §4.3 / §5 #3：写操作前先留痕，执行后回填溯源上下文）
+  const wfRef: { value: { runId: string; status: string; output: unknown } | null } = { value: null }
   try {
-    inquiry = await prisma.inquiry.create({
-      data: {
-        id: inquiryId,
+    const inquiry = await auditedWrite(
+      {
+        actor,
+        action: "inquiry.create",
+        targetType: "inquiry",
+        targetId: inquiryId,
+        detail: `创建询盘: ${body.subject}（来自 ${body.fromEmail}，${body.countryCode}）`,
+        riskLevel: "low",
         workspaceId: ctx.workspaceId,
-        fromCountry: body.countryCode.toUpperCase(),
-        countryFlag,
-        companyName,
-        summary,
-        priority: "mid",           // 初始中优先级，由分级工作流调整
-        channel: "email",
-        receivedAt: now,
-        replied: false,            // false 等效 "pending" 状态
+        automationLevel: "L2",
+        triggeredBy: "user",
+        contextSnapshot: {
+          fromEmail: body.fromEmail,
+          countryCode: body.countryCode,
+          subject: body.subject,
+          step: "inquiry-create",
+        },
       },
+      async () => {
+        // 创建 Inquiry 记录
+        const created = await prisma.inquiry.create({
+          data: {
+            id: inquiryId,
+            workspaceId: ctx.workspaceId,
+            fromCountry: body.countryCode.toUpperCase(),
+            countryFlag,
+            companyName,
+            summary,
+            priority: "mid",           // 初始中优先级，由分级工作流调整
+            channel: "email",
+            receivedAt: now,
+            replied: false,            // false 等效 "pending" 状态
+          },
+        })
+
+        // 执行询盘分级工作流（inquiry-grading），失败不阻断询盘创建
+        try {
+          const workflow = await prisma.workflow.findFirst({
+            where: { workspaceId: ctx.workspaceId, name: "inquiry-grading" },
+          })
+          if (workflow) {
+            wfRef.value = await runWorkflow(workflow.id, {
+              inquiryId,
+              subject: body.subject,
+              content: body.content,
+              fromEmail: body.fromEmail,
+              countryCode: body.countryCode,
+            })
+            logger.info("POST /api/inquiries: 询盘分级工作流已执行", {
+              inquiryId,
+              workflowId: workflow.id,
+              runId: wfRef.value.runId,
+              status: wfRef.value.status,
+            })
+          } else {
+            logger.warn("POST /api/inquiries: 未找到 inquiry-grading 工作流，跳过自动触发", {
+              inquiryId,
+              workspaceId: ctx.workspaceId,
+            })
+          }
+        } catch (wfError) {
+          // 分类处理：WorkflowNotFoundError 为配置缺失，其余为运行时异常
+          if (wfError instanceof WorkflowNotFoundError) {
+            logger.warn("POST /api/inquiries: inquiry-grading 工作流未配置", {
+              error: wfError.message,
+            })
+          } else {
+            logger.error("POST /api/inquiries: 执行分级工作流失败（询盘已创建）", {
+              inquiryId,
+              error: wfError instanceof Error ? wfError.message : "未知错误",
+            })
+          }
+        }
+
+        return created
+      },
+      {
+        onSuccess: () => ({
+          contextSnapshot: {
+            inquiryId,
+            workflowTriggered: wfRef.value !== null,
+            workflowRunId: wfRef.value?.runId ?? null,
+            workflowStatus: wfRef.value?.status ?? null,
+          },
+        }),
+      },
+    )
+
+    return ApiResponse.ok({
+      ...serializeInquiry(inquiry),
+      workflowRunId: wfRef.value?.runId ?? null,
+      workflowStatus: wfRef.value?.status ?? null,
+      workflowOutput: wfRef.value?.output ?? null,
     })
   } catch (error) {
     logger.error("POST /api/inquiries: 创建 Inquiry 记录失败", {
       error: error instanceof Error ? error.message : "未知错误",
     })
-    await updateAuditEntry({
-      auditId: auditEntry.auditId,
-      status: "failed",
-      detail: `创建失败: ${error instanceof Error ? error.message : "未知错误"}`,
-    })
     return ApiResponse.error("创建询盘失败", 500)
   }
-
-  // 4. 执行询盘分级工作流（inquiry-grading），失败不阻断询盘创建
-  let workflowResult: { runId: string; status: string; output: unknown } | null = null
-  try {
-    const workflow = await prisma.workflow.findFirst({
-      where: { workspaceId: ctx.workspaceId, name: "inquiry-grading" },
-    })
-    if (workflow) {
-      workflowResult = await runWorkflow(workflow.id, {
-        inquiryId,
-        subject: body.subject,
-        content: body.content,
-        fromEmail: body.fromEmail,
-        countryCode: body.countryCode,
-      })
-      logger.info("POST /api/inquiries: 询盘分级工作流已执行", {
-        inquiryId,
-        workflowId: workflow.id,
-        runId: workflowResult.runId,
-        status: workflowResult.status,
-      })
-    } else {
-      logger.warn("POST /api/inquiries: 未找到 inquiry-grading 工作流，跳过自动触发", {
-        inquiryId,
-        workspaceId: ctx.workspaceId,
-      })
-    }
-  } catch (wfError) {
-    // 分类处理：WorkflowNotFoundError 为配置缺失，其余为运行时异常
-    if (wfError instanceof WorkflowNotFoundError) {
-      logger.warn("POST /api/inquiries: inquiry-grading 工作流未配置", {
-        error: wfError.message,
-      })
-    } else {
-      logger.error("POST /api/inquiries: 执行分级工作流失败（询盘已创建）", {
-        inquiryId,
-        error: wfError instanceof Error ? wfError.message : "未知错误",
-      })
-    }
-  }
-
-  // 5. 更新审计状态为成功
-  await updateAuditEntry({
-    auditId: auditEntry.auditId,
-    status: "success",
-    contextSnapshot: {
-      inquiryId,
-      workflowTriggered: workflowResult !== null,
-      workflowRunId: workflowResult?.runId ?? null,
-      workflowStatus: workflowResult?.status ?? null,
-    },
-  })
-
-  return ApiResponse.ok({
-    ...serializeInquiry(inquiry),
-    workflowRunId: workflowResult?.runId ?? null,
-    workflowStatus: workflowResult?.status ?? null,
-    workflowOutput: workflowResult?.output ?? null,
-  })
 }, "MEMBER")

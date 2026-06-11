@@ -5,7 +5,7 @@
  * 数据读取类标 low。用法：pnpm seed:tools
  */
 import 'dotenv/config'
-import { PrismaClient } from '../src/generated/prisma-new/client'
+import { PrismaClient } from '../src/generated/prisma-v2/client'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 
 const adapter = new PrismaBetterSqlite3({

@@ -32,9 +32,9 @@ export interface GenerateReportResult {
   generatedAt: string
 }
 
-/** 报告列表 API 响应 */
+/** 报告列表 API 响应（经 ApiResponse.ok 包裹：{ success, data: { reports } }） */
 interface ReportListResponse {
-  reports: ReportItem[]
+  data: { reports: ReportItem[] }
 }
 
 // ==============================
@@ -61,7 +61,7 @@ async function fetchReports(
     error?: string
   }
   if (!json.success) throw new Error(json.error ?? "未知错误")
-  return json.reports
+  return json.data.reports
 }
 
 /** 触发生成报告 */

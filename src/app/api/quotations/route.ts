@@ -4,7 +4,8 @@ import { successResponse, errorResponse } from "@/lib/api-utils"
 import { buildWorkspaceContext, type WorkspaceContext } from "@/lib/workspace"
 import { withRBAC } from "@/lib/server/api-handler"
 import { validateBody, QuotationCreateSchema } from "@/lib/validators"
-import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
+import { actorFromSession } from "@/lib/server/audit"
+import { auditedWrite } from "@/lib/server/audited-write"
 import { ApiResponse } from "@/lib/server/api-response"
 
 /** 序列化 Quotation，将 DateTime 转为 ISO 字符串 */
@@ -59,70 +60,66 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
     return ApiResponse.error("关联询盘不存在", 404)
   }
 
-  // 3. 预记录审计日志（AGENTS.md §5 #3 禁止静默执行）
-  const auditEntry = await createAuditEntry({
-    actor,
-    action: "quotation.create",
-    targetType: "quotation",
-    targetId: quotationId,
-    detail: `创建报价: 关联询盘 ${body.inquiryId}，金额 ${body.totalAmount} ${body.currency}`,
-    riskLevel: "low",
-    workspaceId: ctx.workspaceId,
-    automationLevel: "L2",
-    triggeredBy: "user",
-    contextSnapshot: {
-      inquiryId: body.inquiryId,
-      totalAmount: body.totalAmount,
-      currency: body.currency,
-      step: "quotation-create",
-    },
-  })
-
-  // 4. 事务：创建报价 + 流转询盘状态
-  //    —— projectId 存储 inquiryId 作为软引用（Quotation 无 inquiryId 字段）
+  // 3-5. 预记录审计 + 事务（创建报价 + 流转询盘状态）+ 成功/失败回填，统一经 auditedWrite
+  //      —— projectId 存储 inquiryId 作为软引用（Quotation 无 inquiryId 字段）
   try {
-    const [quotation] = await prisma.$transaction([
-      // 4a. 创建报价记录
-      prisma.quotation.create({
-        data: {
-          id: quotationId,
-          workspaceId: ctx.workspaceId,
-          projectId: body.inquiryId,     // 软引用关联询盘
+    const quotation = await auditedWrite(
+      {
+        actor,
+        action: "quotation.create",
+        targetType: "quotation",
+        targetId: quotationId,
+        detail: `创建报价: 关联询盘 ${body.inquiryId}，金额 ${body.totalAmount} ${body.currency}`,
+        riskLevel: "low",
+        workspaceId: ctx.workspaceId,
+        automationLevel: "L2",
+        triggeredBy: "user",
+        contextSnapshot: {
+          inquiryId: body.inquiryId,
           totalAmount: body.totalAmount,
           currency: body.currency,
-          version: body.version,
-          status: "draft",
+          step: "quotation-create",
         },
-      }),
-      // 4b. 流转询盘状态：replied=false → true（等效 "pending" → "quoted"）
-      prisma.inquiry.update({
-        where: { id: body.inquiryId },
-        data: { replied: true },
-      }),
-    ])
-
-    // 5. 更新审计状态为成功
-    await updateAuditEntry({
-      auditId: auditEntry.auditId,
-      status: "success",
-      contextSnapshot: {
-        quotationId,
-        inquiryId: body.inquiryId,
-        inquiryStatusTransition: "pending→quoted",
-        totalAmount: body.totalAmount,
       },
-    })
+      async () => {
+        const [created] = await prisma.$transaction([
+          // 创建报价记录
+          prisma.quotation.create({
+            data: {
+              id: quotationId,
+              workspaceId: ctx.workspaceId,
+              projectId: body.inquiryId,     // 软引用关联询盘
+              totalAmount: body.totalAmount,
+              currency: body.currency,
+              version: body.version,
+              status: "draft",
+            },
+          }),
+          // 流转询盘状态：replied=false → true（等效 "pending" → "quoted"）
+          prisma.inquiry.update({
+            where: { id: body.inquiryId },
+            data: { replied: true },
+          }),
+        ])
+        return created
+      },
+      {
+        onSuccess: () => ({
+          contextSnapshot: {
+            quotationId,
+            inquiryId: body.inquiryId,
+            inquiryStatusTransition: "pending→quoted",
+            totalAmount: body.totalAmount,
+          },
+        }),
+      },
+    )
 
     return ApiResponse.ok(serializeQuotation(quotation))
   } catch (error) {
     logger.error("POST /api/quotations: 创建报价失败", {
       error: error instanceof Error ? error.message : "未知错误",
       inquiryId: body.inquiryId,
-    })
-    await updateAuditEntry({
-      auditId: auditEntry.auditId,
-      status: "failed",
-      detail: `创建失败: ${error instanceof Error ? error.message : "未知错误"}`,
     })
     return ApiResponse.error("创建报价失败", 500)
   }

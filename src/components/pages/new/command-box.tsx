@@ -64,7 +64,7 @@ export const SELECTABLE_MODELS: SelectableModel[] = [
     provider: "anthropic",
     label: "Claude",
     version: "Sonnet 4.6",
-    color: "bg-orange-400",
+    color: "bg-warning",
     modelId: "claude-sonnet-4-6",
     available: true,
   },
@@ -73,7 +73,7 @@ export const SELECTABLE_MODELS: SelectableModel[] = [
     provider: "anthropic",
     label: "Claude",
     version: "Haiku 4.5",
-    color: "bg-orange-400",
+    color: "bg-warning",
     modelId: "claude-haiku-4-5",
     available: false,
   },
@@ -82,7 +82,7 @@ export const SELECTABLE_MODELS: SelectableModel[] = [
     provider: "anthropic",
     label: "Claude",
     version: "Opus 4.8",
-    color: "bg-orange-400",
+    color: "bg-warning",
     modelId: "claude-opus-4-8",
     available: false,
   },
@@ -768,7 +768,7 @@ export function CommandBox({
           {isStreaming ? (
             <Button
               size="icon"
-              className="size-8 rounded-lg bg-danger hover:bg-danger/80 text-danger-foreground"
+              className="size-8 rounded-lg bg-danger hover:bg-danger/80 text-primary-foreground"
               onClick={onStop}
               title="停止生成"
             >

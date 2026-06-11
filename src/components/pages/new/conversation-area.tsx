@@ -180,7 +180,7 @@ export function ConversationArea({
               {/* AI 头像（H 字母，紫色小圆图标） */}
               {!isUser && (
                 <div className="size-4 rounded-full bg-primary flex items-center justify-center shrink-0 mt-1">
-                  <span className="text-[10px] font-bold text-white leading-none">
+                  <span className="text-[10px] font-bold text-primary-foreground leading-none">
                     H
                   </span>
                 </div>
@@ -191,7 +191,7 @@ export function ConversationArea({
                 className={cn(
                   "px-4 py-3 text-sm leading-relaxed break-words max-w-[80%]",
                   isUser
-                    ? "bg-violet-600 text-white rounded-2xl rounded-tr-sm ml-auto"
+                    ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-sm ml-auto"
                     : "bg-card border border-border rounded-2xl rounded-tl-sm text-foreground",
                 )}
               >
@@ -215,7 +215,7 @@ export function ConversationArea({
           >
             {/* AI 头像 */}
             <div className="size-4 rounded-full bg-primary flex items-center justify-center shrink-0 mt-1">
-              <span className="text-[10px] font-bold text-white leading-none">
+              <span className="text-[10px] font-bold text-primary-foreground leading-none">
                 H
               </span>
             </div>
@@ -223,7 +223,7 @@ export function ConversationArea({
             {/* 流式气泡 + 光标 */}
             <div className="bg-card border border-border rounded-2xl rounded-tl-sm px-4 py-3 text-sm leading-relaxed text-foreground max-w-[80%]">
               <MarkdownRenderer content={streamingContent} />
-              <span className="inline-block w-0.5 h-4 bg-violet-400 animate-pulse ml-0.5 align-text-bottom" />
+              <span className="inline-block w-0.5 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom" />
             </div>
           </motion.div>
         )}

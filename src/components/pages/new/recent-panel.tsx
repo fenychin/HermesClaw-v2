@@ -28,6 +28,11 @@ export interface RecentRecord {
   type: RecentType;
   title: string;
   timestamp: string;
+  /**
+   * 可选导航目标：存在时点击直接跳转该路由（用于询盘派生「对话」等无真实对话记录的项）；
+   * 为空且 type==="conversation" 时按真实对话 ID 加载历史会话。
+   */
+  href?: string;
 }
 
 /** 类型 → 图标映射 */
@@ -53,7 +58,8 @@ function buildRecentRecords(
   storeProjects: { id: string; name: string; updatedAt: string }[],
   inquiries: Inquiry[],
 ): RecentRecord[] {
-  // 对话 → 来自询盘（DB 数据）
+  // 对话 → 来自询盘（DB 数据）。这些并非真实 Conversation 记录，
+  // 点击应跳转外贸询盘板块而非按假 ID 加载会话（避免必然 404）。
   const conversations: RecentRecord[] = inquiries
     .slice(0, 4)
     .map((inq) => ({
@@ -61,6 +67,7 @@ function buildRecentRecords(
       type: "conversation" as RecentType,
       title: inq.companyName,
       timestamp: inq.receivedAt,
+      href: "/foreign-trade",
     }));
 
   // 项目 → 来自 store（数据库数据）

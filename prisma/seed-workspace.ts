@@ -2,7 +2,7 @@
  * Workspace 初始化种子：为现有数据库创建默认工作空间并分配所有用户
  * —— 向后兼容：所有无 workspaceId 的旧数据均归属默认 Workspace
  */
-import { PrismaClient } from "../src/generated/prisma-new/client";
+import { PrismaClient } from "../src/generated/prisma-v2/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 
 const adapter = new PrismaBetterSqlite3({
