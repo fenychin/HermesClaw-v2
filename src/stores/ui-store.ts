@@ -12,6 +12,14 @@ export interface Notification {
   createdAt: string;
 }
 
+/** 新话题附件引用 */
+export interface TopicAttachment {
+  name: string
+  url: string
+  size?: number
+  type?: string
+}
+
 /** OpenClaw 智能体执行状态快照 */
 export interface AgentExecutionState {
   /** 智能体 ID */
@@ -54,7 +62,29 @@ interface UiState {
   /** OpenClaw 智能体执行状态映射（agentId → 执行快照） */
   agentExecutionStates: Record<string, AgentExecutionState>;
 
+  // ---- 新话题（/new）输入态 ----
+  /** 新话题输入框内容 */
+  newTopicInput: string;
+  /** 新话题选中的模型 ID */
+  newTopicModelId: string;
+  /** 新话题待提交的 system prompt（快捷卡片注入） */
+  newTopicPendingSystemPrompt: string | undefined;
+  /** 新话题已上传的附件列表 */
+  newTopicAttachments: TopicAttachment[];
+
   // ---- 操作方法 ----
+  /** 设置新话题输入框内容 */
+  setNewTopicInput: (input: string | ((prev: string) => string)) => void;
+  /** 设置新话题选中模型 */
+  setNewTopicModelId: (modelId: string) => void;
+  /** 设置新话题 pending system prompt */
+  setNewTopicPendingSystemPrompt: (prompt: string | undefined) => void;
+  /** 添加附件到新话题 */
+  addNewTopicAttachment: (attachment: TopicAttachment) => void;
+  /** 移除新话题附件 */
+  removeNewTopicAttachment: (index: number) => void;
+  /** 清空新话题所有输入态 */
+  clearNewTopicInput: () => void;
   /** 切换侧边栏折叠态 */
   toggleSidebar: () => void;
   /** 显式设置侧边栏折叠态 */
@@ -171,5 +201,32 @@ export const useUiStore = create<UiState>((set) => ({
       const next = { ...state.agentExecutionStates }
       delete next[agentId]
       return { agentExecutionStates: next }
+    }),
+
+  // ---- 新话题输入态 ----
+  newTopicInput: "",
+  newTopicModelId: "deepseek-v4-pro",
+  newTopicPendingSystemPrompt: undefined,
+  newTopicAttachments: [],
+
+  setNewTopicInput: (input) =>
+    set((state) => ({
+      newTopicInput: typeof input === "function" ? input(state.newTopicInput) : input,
+    })),
+  setNewTopicModelId: (modelId) => set({ newTopicModelId: modelId }),
+  setNewTopicPendingSystemPrompt: (prompt) => set({ newTopicPendingSystemPrompt: prompt }),
+  addNewTopicAttachment: (attachment) =>
+    set((state) => ({
+      newTopicAttachments: [...state.newTopicAttachments, attachment],
+    })),
+  removeNewTopicAttachment: (index) =>
+    set((state) => ({
+      newTopicAttachments: state.newTopicAttachments.filter((_, i) => i !== index),
+    })),
+  clearNewTopicInput: () =>
+    set({
+      newTopicInput: "",
+      newTopicPendingSystemPrompt: undefined,
+      newTopicAttachments: [],
     }),
 }));
