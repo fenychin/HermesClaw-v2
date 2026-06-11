@@ -1,11 +1,13 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger'
 import { successResponse, errorResponse } from "@/lib/api-utils"
-import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
+import { type WorkspaceContext } from "@/lib/workspace"
 import { actorFromSession } from "@/lib/server/audit"
 import { auditedWrite } from "@/lib/server/audited-write"
 import { writeAgentLog } from "@/lib/server/agent-log"
+import { withRBAC } from "@/lib/server/api-handler"
 import { validateBody } from "@/lib/validators"
+import { truncateTitle } from "@/lib/utils"
 import { z } from "zod"
 
 /** 新话题创建 Schema —— PRD §10.2 超级入口 */
@@ -36,71 +38,26 @@ const TopicCreateSchema = z.object({
 })
 
 /**
- * GET /api/topics —— 获取话题列表（最近对话）
- * —— 按更新时间倒序，返回包含消息计数的对话列表
- */
-export async function GET(request: Request) {
-  try {
-    const ctx = await buildWorkspaceContext(request)
-    const { searchParams } = new URL(request.url)
-    const rawLimit = parseInt(searchParams.get("limit") || "20", 10)
-    const limit = Number.isFinite(rawLimit) ? Math.min(rawLimit, 100) : 20
-
-    const conversations = await prisma.conversation.findMany({
-      where: { workspaceId: ctx.workspaceId },
-      orderBy: { updatedAt: "desc" },
-      take: limit,
-      include: {
-        _count: { select: { messages: true } },
-        messages: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-          select: { content: true, role: true },
-        },
-      },
-    })
-
-    // 映射为 Topic 视图（PRD §10.2 最近对话与任务）
-    const topics = conversations.map((c) => ({
-      id: c.id,
-      title: c.title,
-      projectId: c.projectId,
-      lastMessage: c.messages[0]?.content?.slice(0, 120) ?? null,
-      lastMessageRole: c.messages[0]?.role ?? null,
-      messageCount: c._count.messages,
-      createdAt: c.createdAt.toISOString(),
-      updatedAt: c.updatedAt.toISOString(),
-    }))
-
-    return successResponse({ topics })
-  } catch (error) {
-    logger.error('GET /api/topics: 失败', { error: error instanceof Error ? error.message : '未知错误' })
-    return errorResponse("服务器内部错误")
-  }
-}
-
-/**
  * POST /api/topics —— 创建新话题（超级入口）
  * —— 接收 { content, attachments, agentId?, projectId? }，
- *    写入 Conversation + 初始消息，写审计日志与 AgentLog（AGENTS.md §4.3 / §5 #3）
+ *    写入 Conversation + 初始消息，写审计日志与 AgentLog（AGENTS.md §4.3 / §5 #3）。
+ *    RBAC 由 withRBAC 统一守卫（自动 RBAC_DENIED 审计 + 403 响应）。
  */
-export async function POST(request: Request) {
+export const POST = withRBAC(async (
+  request: Request,
+  ctx: WorkspaceContext,
+) => {
   const start = Date.now()
   const elapsed = () => `${((Date.now() - start) / 1000).toFixed(1)}s`
 
   try {
-    const ctx = await buildWorkspaceContext(request)
-    requireWritable(ctx.role)
-
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, TopicCreateSchema)
     if (parsed instanceof Response) return parsed
     const body = parsed
 
     // 生成对话标题（截取内容前 50 字）
-    const title = body.content.length > 50
-      ? body.content.slice(0, 50) + "…"
-      : body.content
+    const title = truncateTitle(body.content)
 
     const conversationId = crypto.randomUUID()
     const actor = await actorFromSession()
@@ -118,7 +75,7 @@ export async function POST(request: Request) {
     const conversation = await auditedWrite(
       {
         actor,
-        action: "conversation.create",
+        action: "topic.create",
         targetType: "conversation",
         targetId: conversationId,
         riskLevel: "low",
@@ -187,9 +144,6 @@ export async function POST(request: Request) {
       201,
     )
   } catch (error) {
-    if (error instanceof ForbiddenError) {
-      return errorResponse(error.message, 403)
-    }
     logger.error('POST /api/topics: 失败', { error: error instanceof Error ? error.message : '未知错误' })
     void writeAgentLog({
       source: "conversation",
@@ -200,4 +154,4 @@ export async function POST(request: Request) {
     })
     return errorResponse("服务器内部错误")
   }
-}
+}, "MEMBER")

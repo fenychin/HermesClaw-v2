@@ -1,9 +1,9 @@
 # AGENTS.md — HermesClaw-v2 项目最高规则文档
 
-> **版本**: v2.15.0-alpha  
+> **版本**: v2.16.0-alpha  
 > **项目**: HermesClaw-v2（空间项目）  
 > **状态**: 🟢 生效中  
-> **最后更新**: 2026-06-11
+> **最后更新**: 2026-06-12
 
 ***
 
@@ -474,7 +474,7 @@ draft（AI 生成，待审核）→ active（人工激活，可执行）→ arch
 - 写操作通用最低角色为 `MEMBER`（即非 VIEWER）。
 - Workspace 成员管理路由使用 `guardRole()` 便捷封装（直接返回 403 Response）。
 - **禁止**在应用层做 `if (role !== 'VIEWER')` 等裸判断——必须通过上述门禁函数统一校验。
-- **审计动作枚举**：RBAC 拒绝写 `RBAC_DENIED`；提案治理写 `proposal.approve` / `proposal.reject` / `proposal.approve.l4_blocked`（L4 硬拦截留痕）；工作流执行写 `workflow.run`；策略路由写 `model.route`；模型路由配置变更写 `update.model-routing`；询盘创建写 `inquiry.create`；报价创建写 `quotation.create`；对话创建写 `conversation.create`；对话消息追加写 `conversation.message`；大盘活动流读取写 `dashboard.feed.read`。
+- **审计动作枚举**：RBAC 拒绝写 `RBAC_DENIED`；提案治理写 `proposal.approve` / `proposal.reject` / `proposal.approve.l4_blocked`（L4 硬拦截留痕）；工作流执行写 `workflow.run`；策略路由写 `model.route`；模型路由配置变更写 `update.model-routing`；询盘创建写 `inquiry.create`；报价创建写 `quotation.create`；对话创建写 `conversation.create`；话题创建写 `topic.create`（/new 超级入口）；对话消息追加写 `conversation.message`；文件上传写 `file.upload`；大盘活动流读取写 `dashboard.feed.read`；沉默预警读取写 `dashboard.silence-alerts.read`。
 
 **Session 约定**：
 
@@ -701,9 +701,28 @@ draft（AI 生成，待审核）→ active（人工激活，可执行）→ arch
 - `newTopicAttachments: TopicAttachment[]` — 附件列表（`TopicAttachment` 接口：`{ name, url, size?, type? }`）。
 - `clearNewTopicInput()` — 一键清空输入态。
 
+**`TopicAttachment` 接口**：
+
+- 定义于 `src/stores/ui-store.ts`，供新话题附件列表与 `/api/topics` 请求体共用。
+- 字段：
+  - `name: string` — 附件文件名（必填，1-255 字）。
+  - `url: string` — 附件可访问 URL（必填，上传后返回的相对路径或外部链接）。
+  - `size?: number` — 文件大小（字节，可选，上限 100 MB）。
+  - `type?: string` — MIME 类型或扩展名描述（可选，≤100 字）。
+- 附件列表上限 20 个（`TopicCreateSchema.attachments.max(20)`），超量由 zod 校验拦截。
+
+**`src/components/pages/new/command-box.tsx` — SLASH_COMMANDS 技能命令列表**：
+
+- `SLASH_COMMANDS` 数组定义了 `/new` 输入框中 `/` 触发的可用技能命令菜单，当前包含 12 个外贸技能命令（`/ft-inquiry-sorter` 至 `/ft-competitor-analysis`）。
+- 每个命令项结构：`{ name: string, label: string, desc: string }`，其中 `name` 为以 `/ft-` 开头的技能标识符，须与 `.claude/skills/ft-*/SKILL.md` 中的 skill name 对应。
+- 命令选中后自动注入对应 skill 的 system prompt 到消息发送上下文。
+- ⚠️ **同步义务**：新增或删除 `.claude/skills/ft-*/` 目录中的 skill 时，须同步更新此 `SLASH_COMMANDS` 列表（增删对应条目），确保斜杠命令菜单与实际可用技能一致。未被注册的 skill 无法通过 `/new` 输入框的 `/` 菜单调用。
+
 **审计枚举新增**：
 
-- `file.upload` — 文件上传动作审计（L2, low）。写入 `ActorLog` 的 source 为 `hermes-chat`。
+- `topic.create` — 话题创建动作审计（L2, low）。写入 `AuditLog`，source 见 `auditedWrite` 封装。
+- `file.upload` — 文件上传动作审计（L2, low）。预记录 + 成功/失败回填，`AgentLog` source 为 `hermes-chat`。
+- `dashboard.silence-alerts.read` — 沉默预警读取审计（riskLevel: low），读数据溯源。
 
 ### 4.15 Dashboard 动态大盘数据管道
 
