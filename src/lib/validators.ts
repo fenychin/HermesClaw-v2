@@ -109,12 +109,22 @@ export const MemoryUpdateSchema = z.object({
 export const ConversationCreateSchema = z.object({
   title: z.string().max(200).optional().default("新对话"),
   projectId: z.string().uuid().nullable().optional().default(null),
-  initialMessage: z.string().max(10000).optional(),
+  initialMessage: z.string().max(100000).optional(),
+  // 批量导入：一次性带入完整消息（用于本地 pending 队列原子回放，对话+消息单事务落库）
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1).max(100000),
+      }),
+    )
+    .max(100)
+    .optional(),
 });
 
 export const ConversationMessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
-  content: z.string().min(1).max(10000),
+  content: z.string().min(1).max(100000),
 });
 
 // ==============================

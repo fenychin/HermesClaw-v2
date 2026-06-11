@@ -161,84 +161,62 @@ export function ConversationArea({
   const showActionBar = !isStreaming && messages.length >= 2;
 
   return (
-    <div className="max-h-[50vh] overflow-y-auto mb-4 space-y-4 px-1">
-      <AnimatePresence initial={false}>
-        {messages.map((msg) => {
-          const isUser = msg.role === "user";
+    // 跟随父容器高度（max-h-[30vh]），不主动撑开；内容溢出时内部滚动
+    <div className="h-full overflow-y-auto">
+      <div className="space-y-6 py-3">
+        <AnimatePresence initial={false}>
+          {messages.map((msg) => {
+            const isUser = msg.role === "user";
 
-          return (
-            <motion.div
-              key={msg.id}
-              initial={{ opacity: 0, y: 8, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className={cn(
-                "flex gap-2.5",
-                isUser ? "justify-end" : "justify-start",
-              )}
-            >
-              {/* AI 头像（H 字母，紫色小圆图标） */}
-              {!isUser && (
-                <div className="size-4 rounded-full bg-primary flex items-center justify-center shrink-0 mt-1">
-                  <span className="text-[10px] font-bold text-primary-foreground leading-none">
-                    H
-                  </span>
-                </div>
-              )}
-
-              {/* 消息气泡 */}
-              <div
-                className={cn(
-                  "px-4 py-3 text-sm leading-relaxed break-words max-w-[80%]",
-                  isUser
-                    ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-sm ml-auto"
-                    : "bg-card border border-border rounded-2xl rounded-tl-sm text-foreground",
-                )}
+            return (
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className={cn("flex", isUser ? "justify-end" : "justify-start")}
               >
                 {isUser ? (
-                  <span>{msg.content || "…"}</span>
+                  // 用户消息：右对齐灰色气泡
+                  <div className="max-w-[85%] rounded-2xl bg-accent px-4 py-2.5 text-sm leading-relaxed text-foreground break-words whitespace-pre-wrap">
+                    {msg.content || "…"}
+                  </div>
                 ) : (
-                  <MarkdownRenderer content={msg.content || "…"} />
+                  // AI 消息：全宽、无边框、纯 Markdown
+                  <div className="w-full min-w-0 text-sm leading-relaxed text-foreground break-words">
+                    <MarkdownRenderer content={msg.content || "…"} />
+                  </div>
                 )}
+              </motion.div>
+            );
+          })}
+
+          {/* 流式输出中的 AI 消息（全宽 + 光标） */}
+          {isStreaming && streamingContent && (
+            <motion.div
+              key="streaming-bubble"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex justify-start"
+            >
+              <div className="w-full min-w-0 text-sm leading-relaxed text-foreground break-words">
+                <MarkdownRenderer content={streamingContent} />
+                <span className="inline-block w-0.5 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom" />
               </div>
             </motion.div>
-          );
-        })}
+          )}
+        </AnimatePresence>
 
-        {/* 流式输出中的 AI 消息气泡（未沉淀） */}
-        {isStreaming && streamingContent && (
-          <motion.div
-            key="streaming-bubble"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex gap-2.5 justify-start"
-          >
-            {/* AI 头像 */}
-            <div className="size-4 rounded-full bg-primary flex items-center justify-center shrink-0 mt-1">
-              <span className="text-[10px] font-bold text-primary-foreground leading-none">
-                H
-              </span>
-            </div>
-
-            {/* 流式气泡 + 光标 */}
-            <div className="bg-card border border-border rounded-2xl rounded-tl-sm px-4 py-3 text-sm leading-relaxed text-foreground max-w-[80%]">
-              <MarkdownRenderer content={streamingContent} />
-              <span className="inline-block w-0.5 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom" />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* 消息沉淀操作栏 */}
-      <AnimatePresence>
-        {showActionBar && (
-          <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            transition={{ duration: 0.15 }}
-            className="flex items-center gap-1 pt-1"
-          >
+        {/* 消息沉淀操作栏 */}
+        <AnimatePresence>
+          {showActionBar && (
+            <motion.div
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 4 }}
+              transition={{ duration: 0.15 }}
+              className="flex items-center gap-1 pt-1"
+            >
             <Button
               variant="ghost"
               size="xs"
@@ -284,10 +262,11 @@ export function ConversationArea({
             </Button>
           </motion.div>
         )}
-      </AnimatePresence>
+        </AnimatePresence>
 
-      {/* 自动滚底锚点 */}
-      <div ref={bottomRef} />
+        {/* 自动滚底锚点 */}
+        <div ref={bottomRef} />
+      </div>
     </div>
   );
 }

@@ -184,7 +184,7 @@ export function CommandBox({
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.max(80, el.scrollHeight)}px`;
+    el.style.height = `${Math.max(40, el.scrollHeight)}px`;
   }, []);
 
   useEffect(() => {
@@ -422,7 +422,7 @@ export function CommandBox({
         rows={1}
         readOnly={isStreaming}
         className={cn(
-          "w-full min-h-[80px] resize-none bg-transparent",
+          "w-full min-h-[40px] resize-none bg-transparent",
           "text-foreground placeholder:text-hint text-sm",
           "outline-none border-none",
           "leading-relaxed",

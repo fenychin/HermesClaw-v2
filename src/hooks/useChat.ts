@@ -1,9 +1,15 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { apiClient } from "@/lib/api-client";
 import { parseSSEStream } from "@/lib/sse-parser";
 import { toast } from "sonner";
+import {
+  queuePendingConversation,
+  getPendingCount,
+  flushPendingConversations,
+  getFlushFailures,
+} from "@/lib/pending-conversations";
 
 /** 单条对话消息 */
 export interface Message {
@@ -27,6 +33,8 @@ export interface Message {
  *  - stopStreaming    中断当前流式响应
  *  - clearMessages    清空对话历史
  *  - loadConversation 从数据库加载历史对话
+ *  - pendingCount     本地待回放队列积压数（>0 表示有未同步的历史记录）
+ *  - flushPending     手动触发回放（挂载/网络恢复/保存成功后自动，通常无需手动）
  */
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -36,6 +44,41 @@ export function useChat() {
   const abortControllerRef = useRef<AbortController | null>(null);
   /** 当前持久化对话 ID */
   const conversationIdRef = useRef<string | null>(null);
+
+  /** 本地待回放队列积压数（lazy init 直接读 localStorage，避免 effect 同步 setState） */
+  const [pendingCount, setPendingCount] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    return getPendingCount();
+  });
+
+  // 同步 count 的 flush 封装（含连续失败感知）
+  const flush = useCallback(async () => {
+    const flushed = await flushPendingConversations();
+    if (flushed > 0) {
+      setPendingCount(getPendingCount());
+    } else if (getFlushFailures() >= 3) {
+      toast.error("历史对话同步失败", {
+        description: "已积压多条对话未同步，请检查网络后刷新页面",
+      });
+    }
+  }, []);
+
+  // 挂载时：尝试回放积压对话（计数已在 lazy init 就绪，此处只 flush）
+  // flush 内部 setState 仅在异步成功后触发，非同步级联渲染
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    flush().catch(() => {});
+  }, [flush]);
+
+  // 网络恢复时：刷新计数并回放
+  useEffect(() => {
+    const onOnline = () => {
+      setPendingCount(getPendingCount());
+      flush().catch(() => {});
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [flush]);
 
   /**
    * 将当前对话持久化到数据库
@@ -63,25 +106,25 @@ export function useChat() {
           "assistant",
           assistantContent,
         );
+        // 本次保存成功 → 尝试回放之前积压的失败对话 + 通知侧边栏/面板刷新
+        flush().catch(() => {});
+        window.dispatchEvent(new CustomEvent("conversation-saved"));
       } catch {
         toast.error("对话保存失败", {
-          description: "网络异常，对话内容已暂存本地",
+          description: "已暂存本地，网络恢复后自动同步",
         });
-        try {
-          const pending = JSON.parse(
-            localStorage.getItem("hermes-pending-conversations") || "[]",
-          );
-          pending.push({ userContent, assistantContent, time: Date.now() });
-          localStorage.setItem(
-            "hermes-pending-conversations",
-            JSON.stringify(pending.slice(-20)),
-          );
-        } catch {
-          // localStorage 不可用时静默降级
-        }
+        // 两阶段写入可能部分失败（createConversation 成功但 addMessage 失败）
+        // → 重置 conversationIdRef，避免下次追加到无消息的孤对话
+        conversationIdRef.current = null;
+        queuePendingConversation({
+          userContent,
+          assistantContent,
+          time: Date.now(),
+        });
+        setPendingCount(getPendingCount());
       }
     },
-    [],
+    [flush],
   );
 
   const sendMessage = useCallback(
@@ -196,8 +239,8 @@ export function useChat() {
       } catch (err) {
         lastErr = err;
         if (attempt < MAX_RETRIES) {
-          // 等待后重试
-          await new Promise((r) => setTimeout(r, 1000));
+          // 等待后重试（300ms 快速重试，减少导航等待感）
+          await new Promise((r) => setTimeout(r, 300));
         }
       }
     }
@@ -216,5 +259,9 @@ export function useChat() {
     stopStreaming,
     clearMessages,
     loadConversation,
+    /** 本地待回放对话积压数（>0 表示有未同步的历史记录） */
+    pendingCount,
+    /** 手动触发回放（通常无需调用——挂载/网络恢复/每次保存成功自动触发） */
+    flushPending: flush,
   };
 }

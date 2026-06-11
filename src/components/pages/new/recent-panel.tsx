@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect, useState } from "react";
+import { useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
@@ -13,27 +13,10 @@ import {
 import Link from "next/link";
 import { useProjectStore } from "@/stores/project-store";
 import { useTradeStore } from "@/stores/trade-store";
-import { apiClient } from "@/lib/api-client";
-import { relativeTime, classifyTimeGroup } from "@/lib/date-utils";
-import type { Inquiry } from "@/types";
-
-// ============================================================
-// 数据类型定义
-// ============================================================
-
-type RecentType = "conversation" | "task" | "project";
-
-export interface RecentRecord {
-  id: string;
-  type: RecentType;
-  title: string;
-  timestamp: string;
-  /**
-   * 可选导航目标：存在时点击直接跳转该路由（用于询盘派生「对话」等无真实对话记录的项）；
-   * 为空且 type==="conversation" 时按真实对话 ID 加载历史会话。
-   */
-  href?: string;
-}
+import { relativeTime } from "@/lib/date-utils";
+import { buildRecentRecords } from "@/lib/recent-utils";
+import { useRecentConversations } from "@/hooks/use-recent-conversations";
+import type { RecentRecord, RecentType } from "@/hooks/use-recent-conversations";
 
 /** 类型 → 图标映射 */
 const TYPE_ICON: Record<RecentType, typeof MessageSquare> = {
@@ -48,59 +31,6 @@ const TYPE_COLOR: Record<RecentType, string> = {
   task: "text-warning",
   project: "text-success",
 };
-
-// ============================================================
-// 构建混合最近记录（8 条）
-// ============================================================
-
-/** 从 store 数据生成混合最近记录 */
-function buildRecentRecords(
-  storeProjects: { id: string; name: string; updatedAt: string }[],
-  inquiries: Inquiry[],
-): RecentRecord[] {
-  // 对话 → 来自询盘（DB 数据）。这些并非真实 Conversation 记录，
-  // 点击应跳转外贸询盘板块而非按假 ID 加载会话（避免必然 404）。
-  const conversations: RecentRecord[] = inquiries
-    .slice(0, 4)
-    .map((inq) => ({
-      id: inq.id,
-      type: "conversation" as RecentType,
-      title: inq.companyName,
-      timestamp: inq.receivedAt,
-      href: "/foreign-trade",
-    }));
-
-  // 项目 → 来自 store（数据库数据）
-  const projects: RecentRecord[] = storeProjects.slice(0, 2).map((proj) => ({
-    id: proj.id,
-    type: "project" as RecentType,
-    title: proj.name,
-    timestamp: proj.updatedAt,
-  }));
-
-  // 任务 → 手写 2 条（mock 数据无独立 task 实体）
-  const now = new Date();
-  const tasks: RecentRecord[] = [
-    {
-      id: "task-recent-001",
-      type: "task",
-      title: "Sakura 样品质量整改",
-      timestamp: new Date(now.getTime() - 45 * 60000).toISOString(),
-    },
-    {
-      id: "task-recent-002",
-      type: "task",
-      title: "BrightPath 报价单修订",
-      timestamp: new Date(now.getTime() - 120 * 60000).toISOString(),
-    },
-  ];
-
-  // 合并并按时间倒序
-  return [...conversations, ...projects, ...tasks].sort(
-    (a, b) =>
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-  );
-}
 
 // ============================================================
 // 组件
@@ -129,23 +59,11 @@ export function RecentPanel({
   const inquiries = useTradeStore((s) => s.inquiries);
   const loadInquiries = useTradeStore((s) => s.loadInquiries);
 
-  // 从 API 加载真实对话列表
-  const [apiConversations, setApiConversations] = useState<RecentRecord[]>([]);
+  // 从 API 加载真实对话列表（共享 hook：含自动刷新）
+  const { apiConversations } = useRecentConversations();
+
   useEffect(() => {
     loadInquiries();
-    // 异步加载真实对话
-    apiClient.getConversations().then((data) => {
-      const convs = (data as { conversations: Array<{ id: string; title: string; updatedAt: string }> }).conversations ?? [];
-      setApiConversations(
-        convs.map((c) => ({
-          id: c.id,
-          type: "conversation" as const,
-          title: c.title,
-          timestamp: c.updatedAt,
-          timeGroup: classifyTimeGroup(c.updatedAt),
-        })),
-      );
-    }).catch(() => { /* 对话列表加载失败不阻断面板 */ });
   }, [loadInquiries]);
 
   const recentRecords = useMemo(
@@ -156,7 +74,7 @@ export function RecentPanel({
       const filtered = base.filter((r) => r.type !== "conversation" || !seen.has(r.title));
       return [...apiConversations, ...filtered]
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-        .slice(0, 12);
+        .slice(0, 5);
     },
     [storeProjects, inquiries, apiConversations],
   );

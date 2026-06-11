@@ -11,10 +11,8 @@ import {
 import { QuickCards } from "@/components/pages/new/quick-cards";
 import { ConversationArea } from "@/components/pages/new/conversation-area";
 import { SuggestionPanel } from "@/components/pages/new/suggestion-panel";
-import {
-  RecentPanel,
-  type RecentRecord,
-} from "@/components/pages/new/recent-panel";
+import { RecentPanel } from "@/components/pages/new/recent-panel";
+import type { RecentRecord } from "@/hooks/use-recent-conversations";
 import { useChat } from "@/hooks/useChat";
 
 const LS_MODEL_KEY = "hermes-selected-model";
@@ -128,48 +126,44 @@ function NewTopicPageInner() {
   return (
     <PageTransition>
       <div className="h-full flex bg-background">
-        <div className="flex-1 flex flex-col min-w-0 min-h-0">
-          {!hasMessages ? (
-            <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-8">
-              <div className="w-full max-w-2xl">
-                <CommandBox
-                  value={input}
-                  onChange={setInput}
-                  onSubmit={handleSend}
-                  isStreaming={isStreaming}
-                  error={error}
-                  selectedModelId={selectedModelId}
-                  onModelChange={handleModelChange}
-                />
-              </div>
-              <div className="w-full max-w-2xl mt-5">
-                <QuickCards onSelect={handleQuickActionSelect} />
-              </div>
-              <div className="w-full max-w-2xl mt-6">
-                <RecentPanel onSelect={handleRecentSelect} />
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col min-h-0 px-4 md:px-8">
+        {/* 左栏：输入框始终垂直居中；上方显示对话历史（max-h 限制，不挤走输入框）或快捷入口 */}
+        <div className="flex-1 flex flex-col items-center justify-center min-w-0 min-h-0 gap-5 px-4 md:px-8">
+          {/* 对话历史（仅当有消息时，限制高度不影响输入框居中） */}
+          {hasMessages && (
+            <div className="w-full max-w-2xl max-h-[30vh] shrink-0">
               <ConversationArea
                 messages={messages}
                 isStreaming={isStreaming}
                 streamingContent={streamingContent}
                 onClearMessages={clearMessages}
               />
-              <div className="shrink-0 pb-4 max-w-2xl mx-auto w-full">
-                <CommandBox
-                  value={input}
-                  onChange={setInput}
-                  onSubmit={handleSend}
-                  onStop={stopStreaming}
-                  isStreaming={isStreaming}
-                  error={error}
-                  selectedModelId={selectedModelId}
-                  onModelChange={handleModelChange}
-                />
-              </div>
             </div>
+          )}
+
+          {/* 输入框 — 始终居中 */}
+          <div className="w-full max-w-2xl shrink-0">
+            <CommandBox
+              value={input}
+              onChange={setInput}
+              onSubmit={handleSend}
+              onStop={stopStreaming}
+              isStreaming={isStreaming}
+              error={error}
+              selectedModelId={selectedModelId}
+              onModelChange={handleModelChange}
+            />
+          </div>
+
+          {/* 快捷卡片 + 最近记录（仅空状态展示） */}
+          {!hasMessages && (
+            <>
+              <div className="w-full max-w-2xl">
+                <QuickCards onSelect={handleQuickActionSelect} />
+              </div>
+              <div className="w-full max-w-2xl">
+                <RecentPanel onSelect={handleRecentSelect} />
+              </div>
+            </>
           )}
         </div>
 

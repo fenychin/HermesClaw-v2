@@ -194,6 +194,16 @@ export const apiClient = {
       body: JSON.stringify({ title, initialMessage }),
     }),
 
+  /** 原子导入：对话 + 完整消息一次事务落库（用于本地 pending 队列回放） */
+  importConversation: (
+    title: string,
+    messages: Array<{ role: "user" | "assistant"; content: string }>,
+  ) =>
+    apiFetch<{ conversation: { id: string } }>("/api/conversations", {
+      method: "POST",
+      body: JSON.stringify({ title, messages }),
+    }),
+
   addMessage: (
     convId: string,
     role: "user" | "assistant",

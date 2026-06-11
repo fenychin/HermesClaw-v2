@@ -66,16 +66,27 @@ export async function POST(request: Request) {
             workspaceId: ctx.workspaceId,
             title: body.title,
             projectId: body.projectId,
-            messages: body.initialMessage
-              ? {
-                  create: {
-                    id: crypto.randomUUID(),
-                    workspaceId: ctx.workspaceId,
-                    role: "user",
-                    content: body.initialMessage,
-                  },
-                }
-              : undefined,
+            // 优先批量 messages[]（原子回放），其次单条 initialMessage（向后兼容）
+            messages:
+              body.messages && body.messages.length > 0
+                ? {
+                    create: body.messages.map((m) => ({
+                      id: crypto.randomUUID(),
+                      workspaceId: ctx.workspaceId,
+                      role: m.role,
+                      content: m.content,
+                    })),
+                  }
+                : body.initialMessage
+                  ? {
+                      create: {
+                        id: crypto.randomUUID(),
+                        workspaceId: ctx.workspaceId,
+                        role: "user",
+                        content: body.initialMessage,
+                      },
+                    }
+                  : undefined,
           },
           include: {
             _count: { select: { messages: true } },
