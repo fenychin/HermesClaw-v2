@@ -2,13 +2,11 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { buildUrl, type QueryParams } from "@/hooks/use-query-factory"
+import type { ReportType } from "@/types/dashboard"
 
 // ==============================
 // 类型定义
 // ==============================
-
-/** 报告类型 */
-export type ReportType = "MORNING" | "EVENING" | "WEEKLY"
 
 /** 报告条目（API 序列化后） */
 export interface ReportItem {
@@ -65,8 +63,12 @@ async function fetchReports(
 }
 
 /** 触发生成报告 */
-async function generateReport(): Promise<GenerateReportResult> {
-  const res = await fetch("/api/reports/generate", { method: "POST" })
+async function generateReport(type: ReportType = "MORNING"): Promise<GenerateReportResult> {
+  const res = await fetch("/api/reports/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type }),
+  })
   const json = (await res.json()) as {
     success: boolean
     data: GenerateReportResult
@@ -111,13 +113,13 @@ export function useReports(
 /**
  * 生成报告 Mutation Hook
  * —— 成功后自动刷新报告列表缓存
- * —— mutationFn 内不调用 Date.now()，避免 React purity 规则
+ * —— 支持指定报告类型（MORNING / EVENING / WEEKLY）
  */
 export function useGenerateReport(workspaceId = "default") {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: generateReport,
+    mutationFn: (type: ReportType = "MORNING") => generateReport(type),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...REPORTS_KEY, workspaceId] })
     },

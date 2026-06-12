@@ -73,6 +73,31 @@ export function serializeWorkflow<
   return result as Omit<T, 'nodes' | 'edges'> & { nodes: unknown; edges: unknown }
 }
 
+/**
+ * 项目共享序列化 —— 将 DB 中的 JSON 字符串字段反序列化。
+ * 消除 projects/route.ts 与 projects/[id]/route.ts 中的重复定义。
+ */
+export function serializeProject(project: Record<string, unknown>) {
+  return {
+    ...project,
+    activeAgents: parseJsonField(project.activeAgents as string, []),
+    riskPoints: parseJsonField(project.riskPoints as string, []),
+    nextActions: parseJsonField(project.nextActions as string, []),
+    tags: parseJsonField(project.tags as string, []),
+  }
+}
+
+/**
+ * 记忆共享序列化 —— 将 DB 中的 JSON 字符串 tags 反序列化。
+ * 消除 memory/route.ts、memory/[id]/route.ts、projects/[id]/memory/route.ts 中的重复定义。
+ */
+export function serializeMemory(m: Record<string, unknown>) {
+  return {
+    ...m,
+    tags: parseJsonField(m.tags as string, []),
+  }
+}
+
 /** 统一错误响应 */
 export function errorResponse(message: string, status = 500) {
   return Response.json({ success: false, error: message }, { status })

@@ -2,6 +2,18 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { buildUrl } from "@/hooks/use-query-factory"
+import type {
+  DailyInquiryPoint,
+  ActiveClientAlert,
+  GeoDistributionPoint,
+  RiskDimension,
+  IndustrySentiment,
+  PredictiveIndicator,
+  TrendIndicator,
+  StatSparklines,
+  StatTrends,
+  DashboardComparisons,
+} from "@/types/dashboard"
 
 // ==============================
 // 类型定义
@@ -24,7 +36,28 @@ export interface DashboardStats {
   urgentCount: number
   activeProjects: number
   weeklyWorkflowRuns: WeeklyWorkflowDay[]
+  /** 近 14 天询盘日趋势（折线图数据） */
+  dailyInquiryTrend: DailyInquiryPoint[]
+  /** 活跃客户预警（近 7 天高频询盘客户） */
+  activeClientAlerts: ActiveClientAlert[]
+  /** 地理分布（近 30 天按国家聚合） */
+  geoDistribution: GeoDistributionPoint[]
+  /** 五维风险评分（雷达图数据） */
+  riskRadar: RiskDimension[]
+  /** 五大外贸行业情绪 */
+  industrySentiments: IndustrySentiment[]
+  /** 预测指示器 */
+  predictiveIndicators: PredictiveIndicator[]
+  /** 迷你趋势线数据 */
+  sparklines: StatSparklines
+  /** 指标趋势方向 */
+  trends: StatTrends
+  /** KPI 较上周同期对比 */
+  comparisons: DashboardComparisons
 }
+
+// 从共享类型重新导出（保持向后兼容）
+export type { DailyInquiryPoint, ActiveClientAlert, GeoDistributionPoint, RiskDimension, IndustrySentiment, PredictiveIndicator, TrendIndicator }
 
 /** 报价列表项（用于外贸页聚合） */
 export interface QuotationItem {
