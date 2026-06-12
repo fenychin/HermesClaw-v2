@@ -56,6 +56,34 @@ export function formatTime(isoStr: string, timeGroup: string): string {
   return `${dayLabel} ${hours}:${minutes}`;
 }
 
+/** 相对日期格式化（天级粒度，用于文件列表等场景） */
+export function formatRelativeDay(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return "今天";
+  if (diffDays === 1) return "昨天";
+  if (diffDays < 7) return `${diffDays} 天前`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} 周前`;
+
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  return `${m}月${d}日`;
+}
+
+/** 完整日期时间格式化（yyyy/M/d HH:mm） */
+export function formatFullDateTime(iso: string): string {
+  const date = new Date(iso);
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  const h = date.getHours().toString().padStart(2, "0");
+  const min = date.getMinutes().toString().padStart(2, "0");
+  return `${y}/${m}/${d} ${h}:${min}`;
+}
+
 /** API 对话记录 → 统一 RecentRecord 结构 */
 export interface ApiConversation {
   id: string;

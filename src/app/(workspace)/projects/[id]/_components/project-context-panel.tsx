@@ -13,7 +13,7 @@ import {
   CheckCircle,
   Pencil,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatFileSize } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useProjectContextStore } from "@/stores/project-context-store";
 import type { ProjectFile, ProjectSkill, ProjectConnection } from "@/types";
@@ -21,15 +21,6 @@ import type { ProjectFile, ProjectSkill, ProjectConnection } from "@/types";
 interface ProjectContextPanelProps {
   className?: string;
 }
-
-/** 格式化文件大小为人类可读的字符串 */
-const formatFileSize = (bytes: number) => {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-};
 
 export function ProjectContextPanel({ className }: ProjectContextPanelProps) {
   const params = useParams<{ id?: string }>();

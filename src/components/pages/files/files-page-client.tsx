@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import type { LucideIcon } from "lucide-react";
 import {
   Search,
   Upload,
@@ -16,6 +17,17 @@ import {
   X,
   FolderOpen,
   FileText,
+  User,
+  ImageIcon,
+  Video,
+  Mic,
+  Package,
+  DollarSign,
+  ScrollText,
+  Archive,
+  Files,
+  Loader2,
+  CheckCircle2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -46,14 +58,45 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
-import { cn } from "@/lib/utils";
+import { cn, formatFileSize } from "@/lib/utils";
+import { formatRelativeDay, formatFullDateTime } from "@/lib/date-utils";
 import type { FileItem, FileParseStatus, VectorIndexStatus } from "@/types";
 
-import {
-  mockFiles,
-  fileCategories,
-  fileTypeIconMap,
-} from "./file-mock-data";
+import { mockFiles } from "./file-mock-data";
+
+/** 文件图标组件（静态条件渲染，避免 render 中创建组件） */
+function FileIcon({ type, className }: { type: string; className?: string }) {
+  const c = className;
+  const lower = type.toLowerCase();
+  if (["pdf"].includes(lower)) return <FileText className={c} />;
+  if (["xlsx", "xls", "csv"].includes(lower)) return <ScrollText className={c} />;
+  if (["docx", "doc"].includes(lower)) return <FileText className={c} />;
+  if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(lower)) return <ImageIcon className={c} />;
+  if (["mp4", "mov", "avi", "webm"].includes(lower)) return <Video className={c} />;
+  if (["m4a", "mp3", "wav", "ogg"].includes(lower)) return <Mic className={c} />;
+  if (["zip", "rar", "gz", "7z"].includes(lower)) return <Archive className={c} />;
+  return <FileText className={c} />;
+}
+
+/** 文件分类定义（使用 Lucide 图标组件） */
+interface FileCategoryDef {
+  key: string;
+  label: string;
+  icon: LucideIcon;
+  category: FileItem["category"] | null;
+}
+
+const fileCategories: FileCategoryDef[] = [
+  { key: "all", label: "全部文件", icon: Files, category: null },
+  { key: "customer", label: "客户资料", icon: User, category: "customer" },
+  { key: "product", label: "产品资料", icon: Package, category: "product" },
+  { key: "quotation", label: "报价单", icon: DollarSign, category: "quotation" },
+  { key: "contract", label: "合同", icon: ScrollText, category: "contract" },
+  { key: "image", label: "图像", icon: ImageIcon, category: "image" },
+  { key: "video", label: "视频", icon: Video, category: "video" },
+  { key: "audio", label: "语音", icon: Mic, category: "audio" },
+  { key: "archive", label: "归档文件", icon: Archive, category: "archive" },
+];
 
 /** 文件分类树（左侧栏） */
 function FileCategoryTree({
@@ -76,30 +119,33 @@ function FileCategoryTree({
 
       {/* 分类列表 */}
       <nav className="flex-1 overflow-y-auto px-3 space-y-0.5">
-        {fileCategories.map((cat) => (
-          <button
-            key={cat.key}
-            type="button"
-            onClick={() => onSelect(cat.key)}
-            className={cn(
-              "w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors text-left",
-              selected === cat.key
-                ? "bg-accent text-foreground font-medium"
-                : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-            )}
-          >
-            <span className="text-base shrink-0">{cat.icon}</span>
-            <span className="flex-1 truncate">{cat.label}</span>
-            {counts[cat.key] !== undefined && counts[cat.key] > 0 && (
-              <Badge
-                variant="secondary"
-                className="bg-card text-hint shrink-0 h-5 px-1.5 text-[10px] font-medium tabular-nums"
-              >
-                {counts[cat.key]}
-              </Badge>
-            )}
-          </button>
-        ))}
+        {fileCategories.map((cat) => {
+          const Icon = cat.icon;
+          return (
+            <button
+              key={cat.key}
+              type="button"
+              onClick={() => onSelect(cat.key)}
+              className={cn(
+                "w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors text-left",
+                selected === cat.key
+                  ? "bg-accent text-foreground font-medium"
+                  : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+              )}
+            >
+              <Icon className="size-4 shrink-0" />
+              <span className="flex-1 truncate">{cat.label}</span>
+              {counts[cat.key] !== undefined && counts[cat.key] > 0 && (
+                <Badge
+                  variant="secondary"
+                  className="bg-card text-hint shrink-0 h-5 px-1.5 text-[10px] font-medium tabular-nums"
+                >
+                  {counts[cat.key]}
+                </Badge>
+              )}
+            </button>
+          );
+        })}
       </nav>
 
       {/* 底部新建按钮 */}
@@ -196,16 +242,14 @@ function FileDetailDrawer({
         {/* Header */}
         <SheetHeader className="border-border border-b px-5 py-4">
           <SheetTitle className="flex items-start gap-3 text-base">
-            <span className="text-2xl shrink-0 mt-0.5">
-              {fileTypeIconMap[file.type] || "📄"}
-            </span>
+            <FileIcon type={file.type} className="size-6 shrink-0 mt-0.5 text-muted-foreground" />
             <span className="flex-1 leading-snug break-words">
               {file.name}
             </span>
           </SheetTitle>
           <SheetDescription className="flex items-center gap-2 mt-2">
             <FileTypeBadge type={file.type} />
-            <span className="text-hint text-xs">{file.size}</span>
+            <span className="text-hint text-xs">{formatFileSize(file.size)}</span>
           </SheetDescription>
         </SheetHeader>
 
@@ -336,7 +380,7 @@ function FileDetailDrawer({
                         {v.fileName}
                       </p>
                       <p className="text-hint mt-0.5 text-[10px]">
-                        {v.operator} · {formatDate(v.createdAt)}
+                        {v.operator} · {formatRelativeDay(v.createdAt)}
                         {v.note ? ` · ${v.note}` : ""}
                       </p>
                     </div>
@@ -389,6 +433,9 @@ function VectorIndexBadge({ status }: { status: VectorIndexStatus }) {
   );
 }
 
+/** 单文件最大 50MB（与服务端 POST /api/files/upload 一致） */
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
+
 /** 文件上传 Drawer */
 function FileUploadSheet({
   open,
@@ -397,22 +444,111 @@ function FileUploadSheet({
   open: boolean;
   onClose: () => void;
 }) {
-  const [selectedFiles, setSelectedFiles] = useState<
-    { name: string; size: string }[]
-  >([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [autoParse, setAutoParse] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [uploadResults, setUploadResults] = useState<
+    { name: string; success: boolean; error?: string }[]
+  >([]);
+  const [rejectedFiles, setRejectedFiles] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleAddFiles = () => {
-    // Mock: 模拟选择文件
-    setSelectedFiles([
-      { name: "新产品目录_2026Q3.pdf", size: "5.2 MB" },
-      { name: "客户报价模板_新版.xlsx", size: "1.1 MB" },
-    ]);
-  };
+  const handleFileSelect = useCallback((fileList: FileList | null) => {
+    if (!fileList) return;
+    const files = Array.from(fileList);
+    const oversized: string[] = [];
+    const valid: File[] = [];
 
-  const handleRemoveFile = (idx: number) => {
+    for (const f of files) {
+      if (f.size > MAX_FILE_SIZE) {
+        oversized.push(f.name);
+      } else {
+        valid.push(f);
+      }
+    }
+
+    if (oversized.length > 0) {
+      setRejectedFiles((prev) => [...prev, ...oversized]);
+    }
+
+    if (valid.length > 0) {
+      setSelectedFiles((prev) => [
+        ...prev,
+        ...valid.filter(
+          (f) => !prev.some((pf) => pf.name === f.name && pf.size === f.size),
+        ),
+      ]);
+    }
+  }, []);
+
+  const handleRemoveFile = useCallback((idx: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== idx));
-  };
+  }, []);
+
+  const handleUpload = useCallback(async () => {
+    if (selectedFiles.length === 0) return;
+    setUploading(true);
+    setUploadResults([]);
+
+    const results: { name: string; success: boolean; error?: string }[] = [];
+
+    for (const file of selectedFiles) {
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/files/upload", {
+          method: "POST",
+          body: formData,
+        });
+        const json = await res.json();
+        if (res.ok && json.success) {
+          results.push({ name: file.name, success: true });
+        } else {
+          results.push({
+            name: file.name,
+            success: false,
+            error: json.error || "上传失败",
+          });
+        }
+      } catch (err) {
+        results.push({
+          name: file.name,
+          success: false,
+          error: err instanceof Error ? err.message : "网络错误",
+        });
+      }
+    }
+
+    setUploadResults(results);
+    setUploading(false);
+    if (results.every((r) => r.success)) {
+      // 全部成功：延迟关闭，让用户看到结果
+      setTimeout(() => {
+        setSelectedFiles([]);
+        setUploadResults([]);
+        onClose();
+      }, 1500);
+    }
+  }, [selectedFiles, onClose]);
+
+  // 拖拽事件
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragOver(false);
+      handleFileSelect(e.dataTransfer.files);
+    },
+    [handleFileSelect],
+  );
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
@@ -428,144 +564,236 @@ function FileUploadSheet({
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {/* 隐藏文件 input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => handleFileSelect(e.target.files)}
+          />
+
           {/* 拖拽区域 */}
           <div
-            onClick={handleAddFiles}
-            className="border-border hover:border-brand/40 hover:bg-accent/50 flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-14 text-center transition-colors"
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={cn(
+              "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-14 text-center transition-colors",
+              isDragOver
+                ? "border-brand bg-brand/10"
+                : "border-border hover:border-brand/40 hover:bg-accent/50",
+            )}
           >
             <div className="bg-brand/10 text-brand flex size-14 items-center justify-center rounded-2xl">
               <Upload className="size-7" />
             </div>
             <div>
               <p className="text-foreground text-sm font-medium">
-                拖拽文件到此处或点击上传
+                拖拽文件到此处或点击选择
               </p>
               <p className="text-hint mt-1 text-xs">
-                支持 PDF、Excel、Word、图片、音频、视频，单文件最大 200MB
+                支持 PDF、Excel、Word、图片、音频、视频，单文件最大 50MB
               </p>
             </div>
           </div>
 
+          {/* 超大文件拒绝提示 */}
+          {rejectedFiles.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-danger text-[11px] font-medium uppercase tracking-wide">
+                超出大小限制（已跳过 {rejectedFiles.length} 个文件）
+              </p>
+              <div className="space-y-1">
+                {rejectedFiles.map((name, i) => (
+                  <div
+                    key={i}
+                    className="bg-danger/10 text-danger flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs"
+                  >
+                    <X className="size-3 shrink-0" />
+                    <span className="truncate">{name}</span>
+                    <span className="shrink-0 text-[10px] opacity-70">超过 50MB</span>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setRejectedFiles([])}
+                className="text-hint hover:text-foreground text-[10px] transition-colors"
+              >
+                清除提示
+              </button>
+            </div>
+          )}
+
           {/* 已选文件列表 */}
-          {selectedFiles.length > 0 ? (
+          {selectedFiles.length > 0 && !uploading && uploadResults.length === 0 && (
             <div className="space-y-2">
               <p className="text-hint text-[11px] font-medium uppercase tracking-wide">
                 已选文件 ({selectedFiles.length})
               </p>
               <div className="space-y-2">
-                {selectedFiles.map((f, i) => (
+                {selectedFiles.map((f, i) => {
+                  const ext = f.name.split(".").pop()?.toLowerCase() || "";
+                  return (
+                    <div
+                      key={`${f.name}-${f.size}-${i}`}
+                      className="border-border bg-accent/40 flex items-center gap-3 rounded-xl border px-3 py-2.5"
+                    >
+                      <FileIcon type={ext} className="size-5 shrink-0 text-muted-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-foreground truncate text-sm font-medium">
+                          {f.name}
+                        </p>
+                        <p className="text-hint text-[11px]">
+                          {formatFileSize(f.size)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFile(i)}
+                        className="text-hint hover:text-danger transition-colors"
+                      >
+                        <X className="size-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 上传进度 */}
+          {uploading && (
+            <div className="flex items-center gap-3 py-8 justify-center">
+              <Loader2 className="size-5 text-brand animate-spin" />
+              <span className="text-muted-foreground text-sm">
+                正在上传 {selectedFiles.length} 个文件...
+              </span>
+            </div>
+          )}
+
+          {/* 上传结果 */}
+          {uploadResults.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-hint text-[11px] font-medium uppercase tracking-wide">
+                上传结果
+              </p>
+              <div className="space-y-1.5">
+                {uploadResults.map((r, i) => (
                   <div
                     key={i}
-                    className="border-border bg-accent/40 flex items-center gap-3 rounded-xl border px-3 py-2.5"
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg px-3 py-2 text-sm",
+                      r.success
+                        ? "bg-success/10 text-success"
+                        : "bg-danger/10 text-danger",
+                    )}
                   >
-                    <span className="text-lg">{fileTypeIconMap["pdf"] || "📄"}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-foreground truncate text-sm font-medium">
-                        {f.name}
-                      </p>
-                      <p className="text-hint text-[11px]">{f.size}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveFile(i)}
-                      className="text-hint hover:text-danger transition-colors"
-                    >
-                      <X className="size-4" />
-                    </button>
+                    {r.success ? (
+                      <CheckCircle2 className="size-4 shrink-0" />
+                    ) : (
+                      <X className="size-4 shrink-0" />
+                    )}
+                    <span className="truncate flex-1">{r.name}</span>
+                    {r.error && (
+                      <span className="text-xs opacity-80">{r.error}</span>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
-          ) : null}
+          )}
 
-          {/* 上传选项 */}
-          <div className="space-y-3">
-            <p className="text-hint text-[11px] font-medium uppercase tracking-wide">
-              上传选项
-            </p>
+          {/* 上传选项（上传前展示） */}
+          {!uploading && uploadResults.length === 0 && (
+            <div className="space-y-3">
+              <p className="text-hint text-[11px] font-medium uppercase tracking-wide">
+                上传选项
+              </p>
 
-            {/* 自动解析开关 */}
-            <label className="flex items-center justify-between cursor-pointer">
-              <div>
-                <p className="text-foreground text-sm">上传后自动解析</p>
-                <p className="text-hint text-[11px]">
-                  AI 将自动提取文本、图像、表格等结构化信息
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={autoParse}
-                onClick={() => setAutoParse(!autoParse)}
-                className={cn(
-                  "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
-                  autoParse ? "bg-primary" : "bg-muted border-border",
-                )}
-              >
-                <span
+              {/* 自动解析开关 */}
+              <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <p className="text-foreground text-sm">上传后自动解析</p>
+                  <p className="text-hint text-[11px]">
+                    AI 将自动提取文本、图像、表格等结构化信息
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={autoParse}
+                  onClick={() => setAutoParse(!autoParse)}
                   className={cn(
-                    "bg-background pointer-events-none inline-block size-3.5 rounded-full shadow ring-0 transition-transform",
-                    autoParse ? "translate-x-4" : "translate-x-0.5",
+                    "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
+                    autoParse ? "bg-primary" : "bg-muted border-border",
                   )}
-                />
-              </button>
-            </label>
+                >
+                  <span
+                    className={cn(
+                      "bg-background pointer-events-none inline-block size-3.5 rounded-full shadow ring-0 transition-transform",
+                      autoParse ? "translate-x-4" : "translate-x-0.5",
+                    )}
+                  />
+                </button>
+              </label>
 
-            {/* 关联项目 */}
-            <div className="space-y-1.5">
-              <p className="text-foreground text-sm">关联到项目</p>
-              <select className="border-border bg-accent/40 text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none focus-visible:border-ring">
-                <option value="">不关联</option>
-                <option value="proj-001">美国 BrightPath 户外灯具订单</option>
-                <option value="proj-002">德国 Schmidt 精密五金长期合作</option>
-                <option value="proj-003">日本 Sakura 家居收纳新品开发</option>
-                <option value="proj-005">智能家居产品线 2026 出海计划</option>
-              </select>
+              {/* 关联项目 */}
+              <div className="space-y-1.5">
+                <p className="text-foreground text-sm">关联到项目</p>
+                <select className="border-border bg-accent/40 text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none focus-visible:border-ring">
+                  <option value="">不关联</option>
+                  <option value="proj-001">美国 BrightPath 户外灯具订单</option>
+                  <option value="proj-002">德国 Schmidt 精密五金长期合作</option>
+                  <option value="proj-003">日本 Sakura 家居收纳新品开发</option>
+                  <option value="proj-005">智能家居产品线 2026 出海计划</option>
+                </select>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <SheetFooter className="border-border border-t px-5 py-3">
-          <Button
-            size="sm"
-            disabled={selectedFiles.length === 0}
-            className="w-full gap-2"
-          >
-            <Upload className="size-4" />
-            开始上传 ({selectedFiles.length} 个文件)
-          </Button>
+          {uploadResults.length > 0 ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setSelectedFiles([]);
+                setUploadResults([]);
+                setRejectedFiles([]);
+                onClose();
+              }}
+            >
+              完成
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              disabled={selectedFiles.length === 0 || uploading}
+              className="w-full gap-2"
+              onClick={handleUpload}
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  上传中...
+                </>
+              ) : (
+                <>
+                  <Upload className="size-4" />
+                  开始上传 ({selectedFiles.length} 个文件)
+                </>
+              )}
+            </Button>
+          )}
         </SheetFooter>
       </SheetContent>
     </Sheet>
   );
-}
-
-/** 格式化日期（相对日期 + 精简展示） */
-function formatDate(iso: string): string {
-  const date = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return "今天";
-  if (diffDays === 1) return "昨天";
-  if (diffDays < 7) return `${diffDays} 天前`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} 周前`;
-
-  const m = date.getMonth() + 1;
-  const d = date.getDate();
-  return `${m}月${d}日`;
-}
-
-/** 格式化完整日期 */
-function formatFullDate(iso: string): string {
-  const date = new Date(iso);
-  const y = date.getFullYear();
-  const m = date.getMonth() + 1;
-  const d = date.getDate();
-  const h = date.getHours().toString().padStart(2, "0");
-  const min = date.getMinutes().toString().padStart(2, "0");
-  return `${y}/${m}/${d} ${h}:${min}`;
 }
 
 /** 根据 agentId 获取智能体名称（优先匹配 mock 数据） */
@@ -841,9 +1069,7 @@ export function FilesPageClient() {
                           onClick={() => handleOpenDetail(file.id)}
                           className="flex items-center gap-2.5 hover:opacity-80 transition-opacity text-left"
                         >
-                          <span className="text-lg shrink-0">
-                            {fileTypeIconMap[file.type] || "📄"}
-                          </span>
+                          <FileIcon type={file.type} className="size-5 shrink-0 text-muted-foreground" />
                           <span className="text-foreground truncate text-sm font-medium max-w-[320px]">
                             {file.name}
                           </span>
@@ -853,7 +1079,7 @@ export function FilesPageClient() {
                         <FileTypeBadge type={file.type} />
                       </TableCell>
                       <TableCell className="text-hint text-sm tabular-nums">
-                        {file.size}
+                        {formatFileSize(file.size)}
                       </TableCell>
                       <TableCell>
                         {file.relatedProjectName ? (
@@ -877,7 +1103,7 @@ export function FilesPageClient() {
                         <ParseStatusBadge status={file.parseStatus} />
                       </TableCell>
                       <TableCell className="text-hint text-sm">
-                        {formatDate(file.updatedAt)}
+                        {formatRelativeDay(file.updatedAt)}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -939,9 +1165,7 @@ export function FilesPageClient() {
                 >
                   {/* 选中标记 & 文件图标 */}
                   <div className="flex items-start justify-between mb-3">
-                    <span className="text-5xl">
-                      {fileTypeIconMap[file.type] || "📄"}
-                    </span>
+                    <FileIcon type={file.type} className="size-8 text-muted-foreground" />
                     <Checkbox
                       checked={selectedFileIds.has(file.id)}
                       onCheckedChange={() => toggleSelectFile(file.id)}
@@ -960,12 +1184,12 @@ export function FilesPageClient() {
                   <div className="flex items-center gap-2 mb-3">
                     <FileTypeBadge type={file.type} />
                     <span className="text-hint text-[11px]">
-                      {file.size}
+                      {formatFileSize(file.size)}
                     </span>
                   </div>
 
                   <div className="text-hint text-[11px] mb-3">
-                    {formatFullDate(file.updatedAt)}
+                    {formatFullDateTime(file.updatedAt)}
                   </div>
 
                   {/* 底部操作 */}

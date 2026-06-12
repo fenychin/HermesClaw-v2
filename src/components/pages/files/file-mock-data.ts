@@ -10,7 +10,7 @@ export const mockFiles: FileItem[] = [
     name: "BrightPath_客户画像报告_2026Q2.pdf",
     type: "pdf",
     category: "customer",
-    size: "3.2 MB",
+    size: 3.2 * 1024 * 1024,
     relatedProjectId: "proj-001",
     relatedProjectName: "美国 BrightPath 户外灯具订单",
     relatedAgentIds: ["agent-003", "agent-007"],
@@ -23,7 +23,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-001-3",
         fileName: "BrightPath_客户画像报告_2026Q2_v3.pdf",
-        size: "3.2 MB",
+        size: 3.2 * 1024 * 1024,
         operator: "Marcus",
         createdAt: "2026-06-05T16:00:00Z",
         note: "更新UL认证要求",
@@ -31,7 +31,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-001-2",
         fileName: "BrightPath_客户画像报告_2026Q2_v2.pdf",
-        size: "2.8 MB",
+        size: 2.8 * 1024 * 1024,
         operator: "Sophia",
         createdAt: "2026-05-20T10:00:00Z",
         note: "新增联系人信息",
@@ -39,7 +39,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-001-1",
         fileName: "BrightPath_客户画像报告_2026Q2_v1.pdf",
-        size: "2.5 MB",
+        size: 2.5 * 1024 * 1024,
         operator: "Marcus",
         createdAt: "2026-05-01T08:00:00Z",
       },
@@ -53,7 +53,7 @@ export const mockFiles: FileItem[] = [
     name: "德国Schmidt_联系记录汇总_2026.xlsx",
     type: "xlsx",
     category: "customer",
-    size: "1.5 MB",
+    size: 1.5 * 1024 * 1024,
     relatedProjectId: "proj-002",
     relatedProjectName: "德国 Schmidt 精密五金长期合作",
     relatedAgentIds: ["agent-003"],
@@ -66,14 +66,14 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-002-2",
         fileName: "德国Schmidt_联系记录汇总_2026_v2.xlsx",
-        size: "1.5 MB",
+        size: 1.5 * 1024 * 1024,
         operator: "Marcus",
         createdAt: "2026-06-04T14:00:00Z",
       },
       {
         id: "ver-002-1",
         fileName: "德国Schmidt_联系记录汇总_2026_v1.xlsx",
-        size: "1.1 MB",
+        size: 1.1 * 1024 * 1024,
         operator: "Marcus",
         createdAt: "2026-05-15T10:00:00Z",
       },
@@ -87,7 +87,7 @@ export const mockFiles: FileItem[] = [
     name: "户外LED灯具_产品规格书_IP65系列.pdf",
     type: "pdf",
     category: "product",
-    size: "8.7 MB",
+    size: 8.7 * 1024 * 1024,
     relatedProjectId: "proj-001",
     relatedProjectName: "美国 BrightPath 户外灯具订单",
     relatedAgentIds: ["agent-005"],
@@ -100,7 +100,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-003-1",
         fileName: "户外LED灯具_产品规格书_IP65系列_v1.pdf",
-        size: "8.7 MB",
+        size: 8.7 * 1024 * 1024,
         operator: "Diana",
         createdAt: "2026-03-10T08:00:00Z",
       },
@@ -114,7 +114,7 @@ export const mockFiles: FileItem[] = [
     name: "智能家居产品目录_2026海外版.pdf",
     type: "pdf",
     category: "product",
-    size: "12.3 MB",
+    size: 12.3 * 1024 * 1024,
     relatedProjectId: "proj-005",
     relatedProjectName: "智能家居产品线 2026 出海计划",
     relatedAgentIds: ["agent-005", "agent-006"],
@@ -126,7 +126,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-004-1",
         fileName: "智能家居产品目录_2026海外版_v1.pdf",
-        size: "12.3 MB",
+        size: 12.3 * 1024 * 1024,
         operator: "Diana",
         createdAt: "2026-06-01T09:00:00Z",
       },
@@ -140,7 +140,7 @@ export const mockFiles: FileItem[] = [
     name: "BrightPath_FOB报价单_Q3_Rev3.pdf",
     type: "pdf",
     category: "quotation",
-    size: "1.8 MB",
+    size: 1.8 * 1024 * 1024,
     relatedProjectId: "proj-001",
     relatedProjectName: "美国 BrightPath 户外灯具订单",
     relatedAgentIds: ["agent-004"],
@@ -153,7 +153,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-005-3",
         fileName: "BrightPath_FOB报价单_Q3_Rev3.pdf",
-        size: "1.8 MB",
+        size: 1.8 * 1024 * 1024,
         operator: "Quincy",
         createdAt: "2026-06-05T16:00:00Z",
         note: "更新汇率至7.25",
@@ -161,7 +161,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-005-2",
         fileName: "BrightPath_FOB报价单_Q3_Rev2.pdf",
-        size: "1.7 MB",
+        size: 1.7 * 1024 * 1024,
         operator: "Quincy",
         createdAt: "2026-05-25T14:00:00Z",
         note: "调整数量阶梯价格",
@@ -169,7 +169,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-005-1",
         fileName: "BrightPath_FOB报价单_Q3_Rev1.pdf",
-        size: "1.5 MB",
+        size: 1.5 * 1024 * 1024,
         operator: "Quincy",
         createdAt: "2026-05-18T10:00:00Z",
       },
@@ -183,7 +183,7 @@ export const mockFiles: FileItem[] = [
     name: "Sakura_CIF报价单_家居收纳_Rev2.xlsx",
     type: "xlsx",
     category: "quotation",
-    size: "956 KB",
+    size: 956 * 1024,
     relatedProjectId: "proj-003",
     relatedProjectName: "日本 Sakura 家居收纳新品开发",
     relatedAgentIds: ["agent-004"],
@@ -196,7 +196,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-006-2",
         fileName: "Sakura_CIF报价单_家居收纳_Rev2.xlsx",
-        size: "956 KB",
+        size: 956 * 1024,
         operator: "Quincy",
         createdAt: "2026-06-03T14:00:00Z",
         note: "更新模具费用分摊",
@@ -204,7 +204,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-006-1",
         fileName: "Sakura_CIF报价单_家居收纳_Rev1.xlsx",
-        size: "832 KB",
+        size: 832 * 1024,
         operator: "Quincy",
         createdAt: "2026-05-22T11:00:00Z",
       },
@@ -218,7 +218,7 @@ export const mockFiles: FileItem[] = [
     name: "Hackett百货_销售合同_PO-2026-0421.pdf",
     type: "pdf",
     category: "contract",
-    size: "4.1 MB",
+    size: 4.1 * 1024 * 1024,
     relatedProjectId: "proj-006",
     relatedProjectName: "英国 Hackett 百货 PO-2026-0421",
     relatedAgentIds: ["agent-008"],
@@ -231,7 +231,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-007-2",
         fileName: "Hackett百货_销售合同_PO-2026-0421_v2.pdf",
-        size: "4.1 MB",
+        size: 4.1 * 1024 * 1024,
         operator: "Victor",
         createdAt: "2026-06-06T08:45:00Z",
         note: "更新UKCA条款备注",
@@ -239,7 +239,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-007-1",
         fileName: "Hackett百货_销售合同_PO-2026-0421_v1.pdf",
-        size: "3.8 MB",
+        size: 3.8 * 1024 * 1024,
         operator: "Victor",
         createdAt: "2026-05-20T09:00:00Z",
       },
@@ -253,7 +253,7 @@ export const mockFiles: FileItem[] = [
     name: "广交会2026春季_展位产品图_01.png",
     type: "png",
     category: "image",
-    size: "6.4 MB",
+    size: 6.4 * 1024 * 1024,
     relatedProjectId: "proj-004",
     relatedProjectName: "广交会春季 2026 线索跟进",
     relatedAgentIds: ["agent-009"],
@@ -266,7 +266,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-008-1",
         fileName: "广交会2026春季_展位产品图_01.png",
-        size: "6.4 MB",
+        size: 6.4 * 1024 * 1024,
         operator: "Scout",
         createdAt: "2026-04-20T09:00:00Z",
       },
@@ -280,7 +280,7 @@ export const mockFiles: FileItem[] = [
     name: "智能家居产品_演示视频_英文版.mp4",
     type: "mp4",
     category: "video",
-    size: "48.5 MB",
+    size: 48.5 * 1024 * 1024,
     relatedProjectId: "proj-005",
     relatedProjectName: "智能家居产品线 2026 出海计划",
     relatedAgentIds: ["agent-005"],
@@ -291,7 +291,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-009-1",
         fileName: "智能家居产品_演示视频_英文版.mp4",
-        size: "48.5 MB",
+        size: 48.5 * 1024 * 1024,
         operator: "Diana",
         createdAt: "2026-05-28T15:00:00Z",
       },
@@ -305,7 +305,7 @@ export const mockFiles: FileItem[] = [
     name: "Sakura质检会议_录音_20260603.m4a",
     type: "m4a",
     category: "audio",
-    size: "22.1 MB",
+    size: 22.1 * 1024 * 1024,
     relatedProjectId: "proj-003",
     relatedProjectName: "日本 Sakura 家居收纳新品开发",
     relatedAgentIds: ["agent-007", "agent-008"],
@@ -318,7 +318,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-010-1",
         fileName: "Sakura质检会议_录音_20260603.m4a",
-        size: "22.1 MB",
+        size: 22.1 * 1024 * 1024,
         operator: "Sophia",
         createdAt: "2026-06-03T15:30:00Z",
       },
@@ -332,7 +332,7 @@ export const mockFiles: FileItem[] = [
     name: "2025年度订单归档_汇总.zip",
     type: "zip",
     category: "archive",
-    size: "156.2 MB",
+    size: 156.2 * 1024 * 1024,
     relatedAgentIds: [],
     parseStatus: "unparsed",
     vectorIndexStatus: "unindexed",
@@ -341,7 +341,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-011-1",
         fileName: "2025年度订单归档_汇总.zip",
-        size: "156.2 MB",
+        size: 156.2 * 1024 * 1024,
         operator: "张伟",
         createdAt: "2026-01-15T08:00:00Z",
       },
@@ -355,7 +355,7 @@ export const mockFiles: FileItem[] = [
     name: "BrightPath_UL认证更新文件_2026.pdf",
     type: "pdf",
     category: "customer",
-    size: "2.1 MB",
+    size: 2.1 * 1024 * 1024,
     relatedProjectId: "proj-001",
     relatedProjectName: "美国 BrightPath 户外灯具订单",
     relatedAgentIds: ["agent-004", "agent-008"],
@@ -368,7 +368,7 @@ export const mockFiles: FileItem[] = [
       {
         id: "ver-012-1",
         fileName: "BrightPath_UL认证更新文件_2026.pdf",
-        size: "2.1 MB",
+        size: 2.1 * 1024 * 1024,
         operator: "Quincy",
         createdAt: "2026-06-05T18:00:00Z",
       },
@@ -378,53 +378,3 @@ export const mockFiles: FileItem[] = [
     operatedBy: "Quincy",
   },
 ]
-
-/** 文件分类定义 */
-export interface FileCategoryDef {
-  key: string
-  label: string
-  icon: string
-  /** 用于过滤 mockFiles 的 category 字段；为 null 表示"全部" */
-  category: FileItem["category"] | null
-}
-
-export const fileCategories: FileCategoryDef[] = [
-  { key: "all", label: "全部文件", icon: "📁", category: null },
-  { key: "customer", label: "客户资料", icon: "👤", category: "customer" },
-  { key: "product", label: "产品资料", icon: "📦", category: "product" },
-  { key: "quotation", label: "报价单", icon: "💰", category: "quotation" },
-  { key: "contract", label: "合同", icon: "📝", category: "contract" },
-  { key: "image", label: "图像", icon: "🖼️", category: "image" },
-  { key: "video", label: "视频", icon: "🎬", category: "video" },
-  { key: "audio", label: "语音", icon: "🎤", category: "audio" },
-  { key: "archive", label: "归档文件", icon: "📦", category: "archive" },
-]
-
-/** 文件类型图标映射 */
-export const fileTypeIconMap: Record<string, string> = {
-  pdf: "📄",
-  xlsx: "📊",
-  xls: "📊",
-  docx: "📝",
-  doc: "📝",
-  png: "🖼️",
-  jpg: "🖼️",
-  jpeg: "🖼️",
-  gif: "🖼️",
-  mp4: "🎬",
-  mov: "🎬",
-  avi: "🎬",
-  m4a: "🎤",
-  mp3: "🎤",
-  wav: "🎤",
-  zip: "📦",
-  rar: "📦",
-}
-
-/** 解析状态中文标签 */
-export const parseStatusLabel: Record<string, string> = {
-  parsed: "已解析",
-  parsing: "解析中",
-  unparsed: "未解析",
-  failed: "失败",
-}
