@@ -6,13 +6,18 @@ import {
   Circle,
   ChevronRight,
   Play,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { PageTransition } from "@/components/common/PageTransition";
 import { StatusBadge } from "@/components/common/status-badge";
+import { AutomationLevelBadge } from "@/components/common/agent-status-badge";
 import { useAgentStore } from "@/stores/agent-store";
 import { useSkillStore } from "@/stores/skill-store";
+import { apiClient } from "@/lib/api-client";
 import type { Skill, SkillSource } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -72,9 +77,64 @@ function SkillListItem({
 /** 技能详情面板（右侧） */
 function SkillDetail({ skill }: { skill: Skill }) {
   const storeAgents = useAgentStore((s) => s.agents);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    ok: boolean;
+    message: string;
+  } | null>(null);
   const usedAgents = useMemo(() => {
     return storeAgents.filter((a) => skill.usedByAgents.includes(a.id));
   }, [skill, storeAgents]);
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      // 首次尝试（不带 confirm）
+      const result = await apiClient.testSkill(skill.id);
+      const data = result as { success?: boolean; message?: string; error?: string };
+      setTestResult({
+        ok: data.success !== false,
+        message: data.message ?? "技能测试已执行",
+      });
+    } catch (err: unknown) {
+      // L3 技能需二次确认：API 返回 409
+      const apiErr = err as { status?: number; message?: string };
+      if (apiErr.status === 409 && skill.automationLevel === "L3") {
+        const confirmed = confirm(
+          `「${skill.name}」为 L3 需人工确认技能，测试后将立即生效且无法撤销。确认执行测试？`,
+        );
+        if (confirmed) {
+          try {
+            const retryResult = await apiClient.testSkill(skill.id, true);
+            const retryData = retryResult as { success?: boolean; message?: string };
+            setTestResult({
+              ok: retryData.success !== false,
+              message: retryData.message ?? "技能测试已执行（已确认）",
+            });
+          } catch (retryErr: unknown) {
+            const retryApiErr = retryErr as { message?: string };
+            setTestResult({
+              ok: false,
+              message: retryApiErr.message ?? "确认后测试请求失败",
+            });
+          }
+        } else {
+          setTestResult({
+            ok: false,
+            message: "已取消：L3 技能测试需人工确认",
+          });
+        }
+      } else {
+        setTestResult({
+          ok: false,
+          message: apiErr.message ?? "测试请求失败",
+        });
+      }
+    } finally {
+      setTesting(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -85,6 +145,7 @@ function SkillDetail({ skill }: { skill: Skill }) {
             <h2 className="text-foreground text-lg font-semibold">
               {skill.name}
             </h2>
+            <AutomationLevelBadge level={skill.automationLevel} />
             <span className="bg-accent text-muted-foreground rounded-md px-2 py-0.5 text-[10px] font-mono">
               v{skill.version}
             </span>
@@ -183,14 +244,38 @@ function SkillDetail({ skill }: { skill: Skill }) {
       )}
 
       {/* 测试技能按钮 */}
-      <div className="border-border border-t pt-4">
+      <div className="border-border border-t pt-4 space-y-3">
         <button
           type="button"
-          className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm transition-colors"
+          onClick={handleTest}
+          disabled={testing}
+          className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm transition-colors disabled:opacity-60"
         >
-          <Play className="size-4" />
-          测试技能
+          {testing ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Play className="size-4" />
+          )}
+          {testing ? "测试中…" : "测试技能"}
         </button>
+
+        {testResult && (
+          <div
+            className={cn(
+              "flex items-start gap-2 rounded-lg border px-3 py-2 text-xs",
+              testResult.ok
+                ? "border-success/30 bg-success/5 text-success"
+                : "border-danger/30 bg-danger/5 text-danger",
+            )}
+          >
+            {testResult.ok ? (
+              <CheckCircle2 className="mt-0.5 size-3.5 shrink-0" />
+            ) : (
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+            )}
+            <span>{testResult.message}</span>
+          </div>
+        )}
       </div>
     </div>
   );

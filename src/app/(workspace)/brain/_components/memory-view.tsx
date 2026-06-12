@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import {
   Layers,
   Lock,
@@ -10,6 +10,7 @@ import {
   ArrowUp,
   AlertCircle,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
@@ -17,6 +18,7 @@ import { PageTransition } from "@/components/common/PageTransition";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useMemoryStore } from "@/stores/memory-store";
 import { SkeletonCard } from "@/components/common/skeleton-card";
+import { apiClient } from "@/lib/api-client";
 import type { Memory, MemoryType } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -168,6 +170,8 @@ export function MemoryView({ initialTab }: MemoryViewProps) {
   const loading = useMemoryStore((s) => s.loading);
   const error = useMemoryStore((s) => s.error);
   const loadMemories = useMemoryStore((s) => s.loadMemories);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [batchMsg, setBatchMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     loadMemories();
@@ -285,10 +289,74 @@ export function MemoryView({ initialTab }: MemoryViewProps) {
                   description="随对话积累，系统将自动汇总和沉淀对应记忆"
                 />
               ) : (
-                <div className="grid grid-cols-2 gap-4">
-                  {memoriesByTab[tab.value].map((memory) => (
-                    <MemoryCard key={memory.id} memory={memory} />
-                  ))}
+                <div className="space-y-3">
+                  {/* 短期记忆批量操作（PRD #10.6.1：可清理、可合并转入中期记忆） */}
+                  {tab.value === "short" && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={batchLoading}
+                          onClick={async () => {
+                            if (!confirm(`确认清理全部 ${memoriesByTab.short.length} 条短期记忆？此操作不可撤销。`)) return;
+                            setBatchLoading(true);
+                            setBatchMsg(null);
+                            const failed: string[] = [];
+                            const ids = memoriesByTab.short.map((m) => ({ id: m.id, summary: m.summary }));
+                            for (const { id, summary } of ids) {
+                              try { await apiClient.deleteMemory(id, true); }
+                              catch { failed.push(summary); }
+                            }
+                            await loadMemories();
+                            if (failed.length > 0) {
+                              setBatchMsg({ ok: false, text: `${failed.length} 条清理失败: ${failed.slice(0, 3).join("、")}${failed.length > 3 ? "…" : ""}` });
+                            }
+                            setBatchLoading(false);
+                          }}
+                          className="text-danger hover:bg-danger/10 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
+                        >
+                          {batchLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                          清理全部
+                        </button>
+                        <button
+                          type="button"
+                          disabled={batchLoading}
+                          onClick={async () => {
+                            if (!confirm(`确认将全部 ${memoriesByTab.short.length} 条短期记忆合并转入中期记忆？`)) return;
+                            setBatchLoading(true);
+                            setBatchMsg(null);
+                            const failed: string[] = [];
+                            const ids = memoriesByTab.short.map((m) => ({ id: m.id, summary: m.summary }));
+                            for (const { id, summary } of ids) {
+                              try { await apiClient.updateMemory(id, { type: "mid" }); }
+                              catch { failed.push(summary); }
+                            }
+                            await loadMemories();
+                            if (failed.length > 0) {
+                              setBatchMsg({ ok: false, text: `${failed.length} 条升级失败: ${failed.slice(0, 3).join("、")}${failed.length > 3 ? "…" : ""}` });
+                            }
+                            setBatchLoading(false);
+                          }}
+                          className="text-brand-blue hover:bg-brand-blue/10 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
+                        >
+                          {batchLoading ? <Loader2 className="size-3.5 animate-spin" /> : <ArrowUp className="size-3.5" />}
+                          合并转入中期记忆
+                        </button>
+                      </div>
+                      {batchMsg && (
+                        <div className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs ${batchMsg.ok ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
+                          <AlertCircle className="size-3.5 shrink-0" />
+                          <span>{batchMsg.text}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {memoriesByTab[tab.value].map((memory) => (
+                      <MemoryCard key={memory.id} memory={memory} />
+                    ))}
+                  </div>
                 </div>
               )}
             </TabsContent>

@@ -241,6 +241,11 @@ export const apiClient = {
       body: JSON.stringify(data),
     }),
 
+  testSkill: (id: string, confirm = false) =>
+    apiFetch<{ success?: boolean; message?: string }>(`/api/skills/${id}/test${confirm ? '?confirm=true' : ''}`, {
+      method: "POST",
+    }),
+
   // ---- 连接器 ----
   getConnectors: () =>
     apiFetch<{ connectors: unknown[] }>("/api/connectors"),

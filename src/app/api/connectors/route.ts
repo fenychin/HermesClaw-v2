@@ -1,23 +1,14 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import {
-  parseJsonField,
   stringifyJsonField,
+  serializeConnector,
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { ConnectorCreateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
-
-/** 序列化 Connector，将 JSON 字符串字段反序列化 */
-function serializeConnector(connector: Record<string, unknown>) {
-  return {
-    ...connector,
-    permissions: parseJsonField(connector.permissions as string, []),
-    usedByAgents: parseJsonField(connector.usedByAgents as string, []),
-  }
-}
 
 /** GET /api/connectors —— 获取所有连接器列表（CDN 缓存 60s，过期后可 revalidate 30s） */
 export async function GET(request: Request) {
