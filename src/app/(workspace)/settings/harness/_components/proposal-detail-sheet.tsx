@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { HarnessProposal } from "@/types";
-import { automationLevelFromRisk } from "@/types";
+import { resolveAutomationLevel } from "@/types";
 
 interface ProposalDetailSheetProps {
   proposal: HarnessProposal | null;
@@ -44,7 +44,7 @@ export function ProposalDetailSheet({
   } = proposal;
 
   const { targetComponent, description, riskLevel } = proposedChange;
-  const automationLevel = proposedChange.automationLevel || automationLevelFromRisk(riskLevel);
+  const automationLevel = resolveAutomationLevel(proposedChange.automationLevel, riskLevel);
 
   const isPending = status === "pending";
   const isL4 = automationLevel === "L4";
