@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import type { HarnessProposal } from "@/types";
+import { resolveAutomationLevel } from "@/types";
 import { cn } from "@/lib/utils";
 import { RiskBadge } from "@/components/common/risk-badge";
 import { AutomationBadge } from "@/components/common/automation-badge";
@@ -13,8 +14,15 @@ import {
   Check,
   X,
   Clock,
+  ShieldOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ProposalCardProps {
   proposal: HarnessProposal;
@@ -62,6 +70,13 @@ export function ProposalCard({
 }: ProposalCardProps) {
   const { proposedChange, status } = proposal;
   const isPending = status === "pending";
+
+  // 解析自动化授权等级（AGENTS.md §4.7）—— L4 禁用审批按钮
+  const automationLevel = resolveAutomationLevel(
+    proposedChange.automationLevel,
+    proposedChange.riskLevel,
+  );
+  const isL4 = automationLevel === "L4";
 
   const handleApprove = useCallback(() => {
     onApprove?.(proposal);
@@ -146,14 +161,37 @@ export function ProposalCard({
               <Eye className="size-3" />
               查看详情
             </Button>
-            <Button
-              size="xs"
-              onClick={handleApprove}
-              className="bg-success/20 text-success hover:bg-success/30 rounded-xl"
-            >
-              <Check className="size-3" />
-              批准
-            </Button>
+            {isL4 ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger render={
+                    <span tabIndex={0}>
+                      <Button
+                        size="xs"
+                        disabled
+                        aria-disabled="true"
+                        className="bg-muted/30 text-hint rounded-xl cursor-not-allowed"
+                      >
+                        <ShieldOff className="size-3" />
+                        批准
+                      </Button>
+                    </span>
+                  } />
+                  <TooltipContent side="top">
+                    <p>L4 操作须在源业务系统手动发起，不可通过此系统批准</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <Button
+                size="xs"
+                onClick={handleApprove}
+                className="bg-success/20 text-success hover:bg-success/30 rounded-xl"
+              >
+                <Check className="size-3" />
+                批准
+              </Button>
+            )}
             <Button
               size="xs"
               onClick={handleReject}

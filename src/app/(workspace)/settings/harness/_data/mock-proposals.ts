@@ -160,4 +160,34 @@ export const mockProposals: HarnessProposal[] = [
     reviewedAt: "2026-06-07T14:00:00Z",
     reviewedBy: "管理员",
   },
+
+  // ---- 待审批：L4 绝对禁止自动（PRD §10.9 L4 测试用例）----
+  {
+    id: "hep-006",
+    proposalId: "HEP-1717820000",
+    triggeredBy: "auto",
+    triggerReason: "连续 3 次高风险任务失败 + 触发 L2 评估",
+    problemStatement:
+      "财务结算 Agent 在执行跨境支付对账时连续 3 次超时失败，系统自动评估建议将 Agent 的任务边界扩展至可直接调用银行支付接口发起退款。该操作涉及外部资金调度，属于 AGENTS.md §4.5 高危操作（永远需要人工审批），且因涉及资金安全被标记为 L4。",
+    evidence: [
+      "失败日志：payment-agent TIMEOUT 2026-06-09 共 3 次",
+      "审计快照：跨境对账成功率降至 67%（阈值 85%）",
+      "风险评估：直接退款操作涉及资金流水，任何自动化均不可接受",
+    ],
+    proposedChange: {
+      targetComponent: "安全护栏",
+      description:
+        "授予财务结算 Agent 直接调用银行支付接口发起退款的能力，绕过现有的人工复核环节。",
+      riskLevel: "high",
+      automationLevel: "L4",
+    },
+    requiresHumanApproval: true,
+    estimatedImpact:
+      "若获批：对账-退款端到端延迟从 2 小时降至 5 分钟。但该变更为 L4 级别，禁止系统自动审批。",
+    affectedAgents: ["财务结算 Agent", "银行支付连接器"],
+    rollbackPlan:
+      "立即撤回银行退款 API 权限，恢复人工复核流程。回滚窗口 ≤ 1 分钟，无数据损失风险。",
+    status: "pending",
+    createdAt: "2026-06-09T16:00:00Z",
+  },
 ];

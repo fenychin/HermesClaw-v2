@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { HarnessProposal } from "@/types";
+import { resolveAutomationLevel } from "@/types";
 import { PageHeader } from "@/components/common/page-header";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ProposalCard } from "./_components/proposal-card";
@@ -68,13 +69,21 @@ export default function HarnessApprovalPage() {
 
   /* 真实 approve API 调用（TanStack Query 承载服务端状态，CLAUDE.md §7） */
   const approveMutation = useMutation({
-    mutationFn: async (proposal: HarnessProposal) => {
+    mutationFn: async ({
+      proposal,
+      confirmed,
+    }: {
+      proposal: HarnessProposal;
+      confirmed: boolean;
+    }) => {
       const res = await fetch(
         `/api/harness/proposals/${proposal.proposalId}/approve`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ confirmText: "确认执行" }),
+          body: JSON.stringify({
+            confirmText: confirmed ? "确认执行" : undefined,
+          }),
         },
       );
       const body = await res.json().catch(() => ({}));
@@ -84,11 +93,36 @@ export default function HarnessApprovalPage() {
       }
       return body;
     },
-    onSuccess: (_data, proposal) => {
+    onSuccess: (_data, { proposal }) => {
       approveProposal(proposal.id, "当前用户");
       toast.success(`提案 ${proposal.proposalId} 已批准`);
       setConfirmOpen(false);
       setConfirmTarget(null);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  /* 真实 reject API 调用（AGENTS.md §4.11 所有写操作须经 RBAC 门禁） */
+  const rejectMutation = useMutation({
+    mutationFn: async (proposal: HarnessProposal) => {
+      const res = await fetch(
+        `/api/harness/proposals/${proposal.proposalId}/reject`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.message ?? body.error ?? `拒绝失败 (${res.status})`);
+      }
+      return body;
+    },
+    onSuccess: (_data, proposal) => {
+      rejectProposal(proposal.id, "当前用户");
+      toast.success(`提案 ${proposal.proposalId} 已拒绝`);
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -115,30 +149,42 @@ export default function HarnessApprovalPage() {
     setDetailOpen(true);
   }, []);
 
-  /* 批准流程：高风险（L3）须二次确认，其余直接通过 */
+  /* 批准流程：L4 拒绝、L3 二次确认、L1/L2 调 API（AGENTS.md §4.7） */
   const handleApprove = useCallback((proposal: HarnessProposal) => {
-    /* riskLevel === 'high' 等价 L3 高风险，弹二次确认（AGENTS.md §4.7） */
-    if (proposal.proposedChange.riskLevel === "high") {
+    const level = resolveAutomationLevel(
+      proposal.proposedChange.automationLevel,
+      proposal.proposedChange.riskLevel,
+    );
+
+    // L4：绝对禁止自动，审批通道亦不得放行
+    if (level === "L4") {
+      toast.error("L4 提案禁止系统自动审批，须在源业务系统人工发起");
+      return;
+    }
+
+    // L3：高风险须二次确认
+    if (level === "L3") {
       setConfirmTarget(proposal);
       setConfirmOpen(true);
-    } else {
-      /* L1/L2 低/中风险直接批准 */
-      approveProposal(proposal.id, "当前用户");
+      return;
     }
-  }, [approveProposal]);
+
+    // L1/L2：直接调 API 审批（走服务端 checkAutomationGate + 审计）
+    approveMutation.mutate({ proposal, confirmed: false });
+  }, [approveMutation]);
 
   /* 二次确认后执行真实 approve API */
   const handleConfirmApprove = useCallback(
     (proposal: HarnessProposal) => {
-      approveMutation.mutate(proposal);
+      approveMutation.mutate({ proposal, confirmed: true });
     },
     [approveMutation],
   );
 
-  /* 拒绝 */
+  /* 拒绝：调真实 API（走服务端 checkAutomationGate + RBAC + 审计） */
   const handleReject = useCallback((proposal: HarnessProposal) => {
-    rejectProposal(proposal.id, "当前用户");
-  }, [rejectProposal]);
+    rejectMutation.mutate(proposal);
+  }, [rejectMutation]);
 
   return (
     <div className="flex gap-6 p-6 min-h-full">

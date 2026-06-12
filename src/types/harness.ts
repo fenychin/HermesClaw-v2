@@ -162,6 +162,8 @@ export interface HarnessProposal {
   createdAt: string
   reviewedBy?: string
   reviewedAt?: string
+  /** 多租户隔离（§4.11），默认 "default" */
+  workspaceId?: string
 }
 
 /**
