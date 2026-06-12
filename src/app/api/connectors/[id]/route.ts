@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import {
-  parseJsonField,
+  serializeConnector,
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
@@ -9,15 +9,6 @@ import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/serv
 import { checkConfirmQuery } from "@/lib/server/guardrail"
 import { ConnectorUpdateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
-
-/** 序列化 Connector，将 JSON 字符串字段反序列化 */
-function serializeConnector(connector: Record<string, unknown>) {
-  return {
-    ...connector,
-    permissions: parseJsonField(connector.permissions as string, []),
-    usedByAgents: parseJsonField(connector.usedByAgents as string, []),
-  }
-}
 
 /** GET /api/connectors/[id] —— 获取连接器详情 */
 export async function GET(

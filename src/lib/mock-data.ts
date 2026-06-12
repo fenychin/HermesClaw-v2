@@ -41,6 +41,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"subject":"string","body":"string","abVersion":"string","confidence":"number"}',
     usedByAgents: ['agent-001', 'agent-007'],
     scenarios: ['新客户触达', '展会后续跟进', '沉睡客户激活'],
+    automationLevel: 'L2',
     updatedAt: '2026-05-20T10:30:00Z',
   },
   {
@@ -55,6 +56,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"intent":"string","priority":"string","genuineScore":"number","recommendedReply":"string"}',
     usedByAgents: ['agent-002', 'agent-007'],
     scenarios: ['询盘初筛', 'B2B 平台询盘处理', '邮件询盘分类'],
+    automationLevel: 'L2',
     updatedAt: '2026-06-01T08:15:00Z',
   },
   {
@@ -69,6 +71,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"unitPrice":"number","totalAmount":"number","validityDays":"number","termsText":"string"}',
     usedByAgents: ['agent-004'],
     scenarios: ['FOB 报价', 'CIF 报价', '阶梯报价', '样品报价'],
+    automationLevel: 'L2',
     updatedAt: '2026-05-28T14:00:00Z',
   },
   {
@@ -83,6 +86,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"profile":"object","persona":"string","buyingSignals":"array","riskFlags":"array"}',
     usedByAgents: ['agent-003', 'agent-007'],
     scenarios: ['新客户建档', '老客户画像更新', '流失预警'],
+    automationLevel: 'L2',
     updatedAt: '2026-04-15T09:00:00Z',
   },
   {
@@ -97,6 +101,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"category":"string","sentiment":"string","assignedAgent":"string","priority":"string"}',
     usedByAgents: ['agent-010'],
     scenarios: ['日常邮件分拣', '大促期间邮件洪峰', '多语种邮件路由'],
+    automationLevel: 'L2',
     updatedAt: '2026-05-10T16:45:00Z',
   },
   {
@@ -111,6 +116,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"report":"string","keyFindings":"array","charts":"array","recommendations":"array"}',
     usedByAgents: ['agent-006'],
     scenarios: ['新市场进入评估', '季度市场复盘', '竞品动态监控'],
+    automationLevel: 'L2',
     updatedAt: '2026-03-22T11:00:00Z',
   },
   {
@@ -125,6 +131,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"riskItems":"array","missingClauses":"array","overallScore":"number"}',
     usedByAgents: ['agent-008'],
     scenarios: ['销售合同审查', '采购合同审查', '代理协议审查'],
+    automationLevel: 'L2',
     updatedAt: '2026-02-18T13:30:00Z',
   },
   {
@@ -139,6 +146,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"translated":"string","confidence":"number","termMapping":"object"}',
     usedByAgents: ['agent-001', 'agent-004', 'agent-007'],
     scenarios: ['产品描述翻译', '邮件翻译', '合同双语对照'],
+    automationLevel: 'L2',
     updatedAt: '2026-05-05T07:00:00Z',
   },
   {
@@ -153,6 +161,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"title":"string","description":"string","bulletPoints":"array","keywords":"array"}',
     usedByAgents: ['agent-005'],
     scenarios: ['阿里巴巴产品发布', '亚马逊 Listing', '独立站产品页'],
+    automationLevel: 'L2',
     updatedAt: '2026-04-08T10:00:00Z',
   },
   {
@@ -167,6 +176,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"leads":"array","hotLeads":"array","followUpSchedule":"array","summary":"string"}',
     usedByAgents: ['agent-009'],
     scenarios: ['广交会线索整理', '海外展会跟进', '线上展会线索提取'],
+    automationLevel: 'L2',
     updatedAt: '2026-05-12T15:20:00Z',
   },
   {
@@ -181,6 +191,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"status":"array","anomalies":"array","suggestions":"array","onTimeRate":"number"}',
     usedByAgents: ['agent-003'],
     scenarios: ['海运追踪', '空运追踪', '多式联运监控'],
+    automationLevel: 'L2',
     updatedAt: '2026-06-03T09:45:00Z',
   },
   {
@@ -195,6 +206,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"priceChanges":"array","promotions":"array","trendAnalysis":"string"}',
     usedByAgents: ['agent-006'],
     scenarios: ['竞品定价跟踪', '促销季价格策略', '新品市场定价参考'],
+    automationLevel: 'L2',
     updatedAt: '2026-05-30T12:00:00Z',
   },
 ]
