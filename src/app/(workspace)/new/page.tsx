@@ -175,7 +175,7 @@ function NewTopicPageInner() {
                 : "flex-1 flex flex-col items-center justify-center",
             )}
           >
-            <div className="w-full max-w-2xl">
+            <div className="w-full max-w-2xl mx-auto">
               <CommandBox
                 value={input}
                 onChange={setInput}
@@ -190,7 +190,7 @@ function NewTopicPageInner() {
 
             {/* 快捷入口：仅空状态展示，置于输入框下方 */}
             {!hasMessages && (
-              <div className="w-full max-w-2xl mt-5">
+              <div className="w-full max-w-2xl mx-auto mt-5">
                 <QuickCards onSelect={handleQuickActionSelect} />
               </div>
             )}
