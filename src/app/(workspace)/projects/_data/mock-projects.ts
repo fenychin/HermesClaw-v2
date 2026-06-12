@@ -18,6 +18,11 @@ export interface MockProject {
   agents: MockAgent[];
   updatedAt: string;
   industry: "foreign-trade" | "other"; // 行业类型
+  type: string;            // 项目类型：customer | order | region | product_line | other
+  relatedClient?: string;  // 关联客户
+  country?: string;        // 目标国家/地区
+  productLine?: string;    // 产品线
+  tags?: string[];         // 分类标签
 }
 
 /**
@@ -36,6 +41,11 @@ export const MOCK_PROJECTS: MockProject[] = [
     ],
     updatedAt: "2026-06-08T10:30:00Z",
     industry: "foreign-trade",
+    type: "customer",
+    relatedClient: "BrightPath Inc.",
+    country: "US",
+    productLine: "LED 户外灯具",
+    tags: ["北美", "UL认证", "灯具"],
   },
   {
     id: "proj-002",
@@ -48,6 +58,11 @@ export const MOCK_PROJECTS: MockProject[] = [
     ],
     updatedAt: "2026-06-07T16:00:00Z",
     industry: "foreign-trade",
+    type: "order",
+    relatedClient: "Schmidt GmbH",
+    country: "DE",
+    productLine: "精密五金件",
+    tags: ["德国", "采购", "欧元"],
   },
   {
     id: "proj-003",
@@ -60,6 +75,11 @@ export const MOCK_PROJECTS: MockProject[] = [
     ],
     updatedAt: "2026-06-06T09:45:00Z",
     industry: "foreign-trade",
+    type: "customer",
+    relatedClient: "Sakura Living Co.",
+    country: "JP",
+    productLine: "家居模具",
+    tags: ["日本", "质检", "紧急"],
   },
   {
     id: "proj-004",
@@ -72,6 +92,11 @@ export const MOCK_PROJECTS: MockProject[] = [
     ],
     updatedAt: "2026-06-05T14:20:00Z",
     industry: "foreign-trade",
+    type: "customer",
+    relatedClient: "Maison Elegance SARL",
+    country: "FR",
+    productLine: "陶瓷餐具",
+    tags: ["法国", "关税", "物流"],
   },
   {
     id: "proj-005",
@@ -84,5 +109,10 @@ export const MOCK_PROJECTS: MockProject[] = [
     ],
     updatedAt: "2026-06-04T11:15:00Z",
     industry: "other",
+    type: "region",
+    relatedClient: "多家潜在分销商",
+    country: "AE",
+    productLine: "智能家居",
+    tags: ["中东", "市场调研", "智能"],
   },
 ];

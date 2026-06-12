@@ -53,32 +53,53 @@ async function callDeepSeekText(
   return content
 }
 
-/** 构建晨报 prompt */
-function buildMorningBriefPrompt(data: {
+import type { ReportType } from "@/types/dashboard"
+
+/** 报告类型中文标签 */
+const REPORT_TYPE_LABEL: Record<ReportType, string> = {
+  MORNING: "晨报",
+  EVENING: "晚报",
+  WEEKLY: "周报",
+}
+
+/** 构建报告 prompt（晨报/晚报/周报通用） */
+function buildReportPrompt(data: {
   intelTitles: string[]
   inquiryCount: number
   urgentCount: number
   pendingTasks: number
   workflowSummary: string
   dateStr: string
+  reportType: ReportType
 }): string {
+  const label = REPORT_TYPE_LABEL[data.reportType]
+  const scope =
+    data.reportType === "WEEKLY"
+      ? "本周"
+      : data.reportType === "EVENING"
+        ? "今日"
+        : "今日"
+
   return [
-    `你是外贸助理。基于以下数据，为 ${data.dateStr} 生成一份今日晨报。`,
-    "要求：200 字以内，中文，使用 Markdown，包含三个段落：市场动态、询盘概况、待办提醒。",
+    `你是外贸助理。基于以下数据，为 ${data.dateStr} 生成一份${scope}${label}。`,
+    data.reportType === "WEEKLY"
+      ? "要求：300 字以内，中文，使用 Markdown，包含三个段落：本周市场回顾、询盘周统计、下周待办。"
+      : "要求：200 字以内，中文，使用 Markdown，包含三个段落：市场动态、询盘概况、待办提醒。",
     "",
-    "**今日数据**：",
+    `**${scope}数据**：`,
     `- 高影响力情报：${data.intelTitles.length > 0 ? data.intelTitles.join("；") : "暂无"}`,
     `- 待处理询盘：${data.inquiryCount} 条`,
     `- 紧急待办：${data.urgentCount} 项`,
     `- 待办任务：${data.pendingTasks} 项`,
     `- 工作流执行：${data.workflowSummary || "本周暂无执行记录"}`,
     "",
-    "请直接输出晨报内容（Markdown 格式），不要包含前言或后记。",
+    `请直接输出${label}内容（Markdown 格式），不要包含前言或后记。`,
   ].join("\n")
 }
 
 /**
- * POST /api/reports/generate —— 生成 AI 晨报
+ * POST /api/reports/generate —— 生成 AI 报告（晨报/晚报/周报）
+ * —— 请求体可选 { type: "MORNING" | "EVENING" | "WEEKLY" }，默认 MORNING
  * —— RBAC: MEMBER+
  * —— 调用 LLM（selectModel → text generation），存储 Report，写入 AuditLog + AgentLog
  * —— automationLevel: L2, riskLevel: low
@@ -87,6 +108,24 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
   const actor = await actorFromSession()
   const reportId = crypto.randomUUID()
   const now = new Date()
+
+  // 解析请求体中的报告类型（默认晨报）
+  let reportType: ReportType = "MORNING"
+  try {
+    const body = await request.json()
+    if (body && typeof body === "object" && !Array.isArray(body)) {
+      if (body.type === "EVENING" || body.type === "WEEKLY" || body.type === "MORNING") {
+        reportType = body.type
+      }
+    }
+  } catch (parseError) {
+    // body 为空或 JSON 格式错误，使用默认 MORNING
+    logger.warn("[report.generate] 请求体解析失败，使用默认报告类型", {
+      error: parseError instanceof Error ? parseError.message : "未知解析错误",
+    })
+  }
+
+  const typeLabel = REPORT_TYPE_LABEL[reportType]
   const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
   const startTime = Date.now()
 
@@ -96,12 +135,12 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
     action: "report.generate",
     targetType: "report",
     targetId: reportId,
-    detail: `生成晨报: ${dateStr}`,
+    detail: `生成${typeLabel}: ${dateStr}`,
     riskLevel: "low",
     workspaceId: ctx.workspaceId,
     automationLevel: "L2",
     triggeredBy: "user",
-    contextSnapshot: { type: "MORNING", date: dateStr },
+    contextSnapshot: { type: reportType, date: dateStr },
   })
 
   // 1. 采集数据
@@ -112,7 +151,7 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
   let workflowSummary = ""
 
   try {
-    const [intelItems, inquiries, pendingTaskCount, workflowRuns] =
+    const [intelItems, inquiries, pendingTaskCount, workflowRuns, urgentInquiries] =
       await Promise.all([
         prisma.marketIntelligence.findMany({
           where: { workspaceId: ctx.workspaceId },
@@ -138,16 +177,20 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
           },
           select: { status: true },
         }),
+        // 紧急未回复高优先级询盘（纳入并行查询，消除串行耗时）
+        prisma.inquiry.count({
+          where: {
+            workspaceId: ctx.workspaceId,
+            replied: false,
+            priority: "high",
+          },
+        }),
       ])
 
     intelTitles = intelItems.map((i) => i.title)
     inquiryCount = inquiries
     pendingTasks = pendingTaskCount
-
-    // 紧急未回复高优先级询盘
-    urgentCount = await prisma.inquiry.count({
-      where: { workspaceId: ctx.workspaceId, replied: false, priority: "high" },
-    })
+    urgentCount = urgentInquiries
 
     // 工作流摘要
     const completed = workflowRuns.filter((r) => r.status === "completed").length
@@ -162,19 +205,20 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
       status: "failed",
       detail: "数据采集失败",
     })
-    return ApiResponse.error("数据采集失败，无法生成晨报", 500)
+    return ApiResponse.error("数据采集失败，无法生成报告", 500)
   }
 
   // 2. 构建 prompt
   const systemPrompt =
-    "你是一个专业的外贸助理 AI，负责生成简洁、有洞察力的每日晨报。"
-  const userPrompt = buildMorningBriefPrompt({
+    "你是一个专业的外贸助理 AI，负责生成简洁、有洞察力的每日/每周报告。"
+  const userPrompt = buildReportPrompt({
     intelTitles,
     inquiryCount,
     urgentCount,
     pendingTasks,
     workflowSummary,
     dateStr,
+    reportType,
   })
 
   // 数据快照（存储于 Report.dataSnapshot）
@@ -185,6 +229,7 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
     pendingTasks,
     workflowSummary,
     date: dateStr,
+    reportType,
   }
 
   // 3. 路由并调用 LLM
@@ -233,8 +278,8 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
         data: {
           id: crypto.randomUUID(),
           workspaceId: ctx.workspaceId,
-          source: "morning-brief",
-          taskName: `生成晨报 ${dateStr}`,
+          source: reportType === "EVENING" ? "evening-brief" : reportType === "WEEKLY" ? "weekly-brief" : "morning-brief",
+          taskName: `生成${typeLabel} ${dateStr}`,
           status: "error",
           duration: `${Math.round((Date.now() - startTime) / 1000)}s`,
           detail: llmError instanceof Error ? llmError.message : "未知错误",
@@ -256,7 +301,7 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
     threshold: 50,
   }
   if (!qualityCheck.passed) {
-    logger.warn("[report.generate] 晨报内容质量低于阈值", {
+    logger.warn(`[report.generate] ${typeLabel}内容质量低于阈值`, {
       reportId,
       contentLength: content.length,
       preview: content.slice(0, 100),
@@ -272,7 +317,7 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
       data: {
         id: reportId,
         workspaceId: ctx.workspaceId,
-        type: "MORNING",
+        type: reportType,
         content,
         generatedAt: now,
         dataSnapshot: JSON.stringify(dataSnapshot),
@@ -287,23 +332,24 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
       status: "failed",
       detail: "存储失败",
     })
-    return ApiResponse.error("存储晨报失败", 500)
+    return ApiResponse.error(`存储${typeLabel}失败`, 500)
   }
 
   // 5. 写入 AgentLog（成功）
   try {
-    await prisma.agentLog.create({
-      data: {
-        id: crypto.randomUUID(),
-        workspaceId: ctx.workspaceId,
-        source: "morning-brief",
-        taskName: `生成晨报 ${dateStr}`,
-        status: "success",
-        duration,
-        detail: `晨报已生成，${content.length} 字符`,
-        riskLevel: "low",
-      },
-    })
+    await prisma.agentLog
+      .create({
+        data: {
+          id: crypto.randomUUID(),
+          workspaceId: ctx.workspaceId,
+          source: reportType === "EVENING" ? "evening-brief" : reportType === "WEEKLY" ? "weekly-brief" : "morning-brief",
+          taskName: `生成${typeLabel} ${dateStr}`,
+          status: "success",
+          duration,
+          detail: `${typeLabel}已生成，${content.length} 字符`,
+          riskLevel: "low",
+        },
+      })
   } catch (agentLogError) {
     logger.error("[report.generate] AgentLog 写入失败", {
       error: agentLogError instanceof Error ? agentLogError.message : "未知错误",
@@ -324,7 +370,7 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
 
   return ApiResponse.ok({
     id: reportId,
-    type: "MORNING",
+    type: reportType,
     content,
     generatedAt: now.toISOString(),
     dataSnapshot,

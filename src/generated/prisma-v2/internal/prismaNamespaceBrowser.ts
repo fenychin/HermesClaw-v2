@@ -545,6 +545,7 @@ export const TaskScalarFieldEnum = {
   source: 'source',
   relatedType: 'relatedType',
   relatedId: 'relatedId',
+  projectId: 'projectId',
   dueAt: 'dueAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'

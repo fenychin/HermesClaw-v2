@@ -1,22 +1,14 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import {
-  parseJsonField,
   stringifyJsonField,
+  serializeMemory,
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { MemoryCreateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
-
-/** 序列化 Memory，将 JSON 字符串字段反序列化 */
-function serializeMemory(memory: Record<string, unknown>) {
-  return {
-    ...memory,
-    tags: parseJsonField(memory.tags as string, []),
-  }
-}
 
 /** GET /api/memory?type=short|mid|long —— 获取记忆列表，支持类型过滤 */
 export async function GET(request: Request) {

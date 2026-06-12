@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Settings } from "lucide-react";
+import { Settings, MapPin, User, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import type { MockProject } from "../_data/mock-projects";
 import { ProjectSettingsDialog } from "./project-settings-dialog";
 
@@ -12,6 +13,18 @@ interface ProjectCardProps {
   onUpdate: (id: string, updated: Partial<MockProject>) => void;
   onDelete: (id: string) => void;
   className?: string;
+}
+
+/** 项目类型中文映射 */
+function typeLabel(type: string): string {
+  const map: Record<string, string> = {
+    customer: "客户",
+    order: "订单",
+    region: "地区",
+    product_line: "产品线",
+    other: "其他",
+  }
+  return map[type] ?? type
 }
 
 /**
@@ -93,9 +106,38 @@ export function ProjectCard({
         </div>
 
         {/* 中部：一行项目描述 */}
-        <p className="text-muted-foreground text-sm line-clamp-2 mt-3 mb-4 flex-1">
+        <p className="text-muted-foreground text-sm line-clamp-2 mt-3 mb-2 flex-1">
           {project.description}
         </p>
+
+        {/* 分类标签行 */}
+        <div className="flex flex-wrap items-center gap-1.5 mb-3">
+          {/* 项目类型标签 */}
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal capitalize">
+            {typeLabel(project.type)}
+          </Badge>
+          {/* 关联客户 */}
+          {project.relatedClient && (
+            <span className="text-hint text-[10px] flex items-center gap-0.5" title={project.relatedClient}>
+              <User className="size-2.5" />
+              {project.relatedClient.length > 12 ? project.relatedClient.slice(0, 12) + "…" : project.relatedClient}
+            </span>
+          )}
+          {/* 目标国家 */}
+          {project.country && (
+            <span className="text-hint text-[10px] flex items-center gap-0.5">
+              <MapPin className="size-2.5" />
+              {project.country}
+            </span>
+          )}
+          {/* 产品线 */}
+          {project.productLine && (
+            <span className="text-hint text-[10px] flex items-center gap-0.5">
+              <Package className="size-2.5" />
+              {project.productLine.length > 10 ? project.productLine.slice(0, 10) + "…" : project.productLine}
+            </span>
+          )}
+        </div>
 
         {/* 底部 flex justify-between */}
         <div className="flex items-center justify-between pt-1 border-t border-border/50">

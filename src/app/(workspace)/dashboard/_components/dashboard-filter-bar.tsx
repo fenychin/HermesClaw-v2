@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Filter, Globe, Flag, Zap } from "lucide-react";
+import { Filter, Globe, Flag, Zap, Package } from "lucide-react";
 import {
   Select,
   SelectTrigger,
@@ -37,11 +37,22 @@ const IMPACT_OPTIONS = [
   { value: "low", label: "低影响" },
 ] as const;
 
+/** 品类选项（映射到 MarketIntelligence.type） */
+const CATEGORY_OPTIONS = [
+  { value: "all", label: "全部分类" },
+  { value: "currency", label: "汇率" },
+  { value: "tariff", label: "关税" },
+  { value: "competitor", label: "竞品" },
+  { value: "market", label: "市场" },
+  { value: "logistics", label: "物流" },
+] as const;
+
 /** 筛选参数名（URL searchParams keys） */
 const PARAM = {
   country: "country",
   stage: "stage",
   impact: "impact",
+  category: "category",
 } as const;
 
 // ============================================================
@@ -56,6 +67,7 @@ export function DashboardFilterBar() {
   const activeCountry = searchParams.get(PARAM.country) ?? "all";
   const activeStage = searchParams.get(PARAM.stage) ?? "all";
   const activeImpact = searchParams.get(PARAM.impact) ?? "all";
+  const activeCategory = searchParams.get(PARAM.category) ?? "all";
 
   // 获取所有询盘以提取去重国家列表（用于下拉选项）
   const { allInquiries } = useInquiries();
@@ -87,9 +99,12 @@ export function DashboardFilterBar() {
   );
 
   // 活跃筛选计数
-  const activeCount = [activeCountry, activeStage, activeImpact].filter(
-    (v) => v !== "all",
-  ).length;
+  const activeCount = [
+    activeCountry,
+    activeStage,
+    activeImpact,
+    activeCategory,
+  ].filter((v) => v !== "all").length;
 
   return (
     <div className="bg-card rounded-2xl border border-border p-4">
@@ -160,6 +175,26 @@ export function DashboardFilterBar() {
           <SelectContent>
             <SelectList>
               {IMPACT_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectList>
+          </SelectContent>
+        </Select>
+
+        {/* 品类筛选 */}
+        <Select
+          value={activeCategory}
+          onValueChange={(v) => setParam(PARAM.category, v ?? "all")}
+        >
+          <SelectTrigger className="w-auto min-w-[120px]">
+            <Package className="size-3 text-muted-foreground mr-1 shrink-0" />
+            <SelectValue placeholder="全部分类" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectList>
+              {CATEGORY_OPTIONS.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </SelectItem>

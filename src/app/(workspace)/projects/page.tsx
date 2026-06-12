@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Plus, FolderKanban } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { PageTransition } from "@/components/common/PageTransition";
 import { EmptyState } from "@/components/common/empty-state";
 import { PageHeader } from "@/components/common/page-header";
@@ -11,14 +12,30 @@ import { MOCK_PROJECTS, MockProject, MockAgent } from "./_data/mock-projects";
 import { ProjectCard } from "./_components/project-card";
 import { NewProjectDialog } from "./_components/new-project-dialog";
 
+/** 分类筛选维度 */
+const FILTER_CATEGORIES = [
+  { key: "all", label: "全部" },
+  { key: "customer", label: "客户" },
+  { key: "order", label: "订单" },
+  { key: "region", label: "地区" },
+  { key: "product_line", label: "产品线" },
+] as const;
+
 /**
  * 项目空间一级大盘页面
- * 布局：顶部栏（左侧标题，右侧“+ 新建空间”按钮） + 主内容区（3列卡片网格）
- * 支持卡片的本地状态修改与项目空间删除/新建
+ * 布局：顶部栏（左侧标题，右侧"+ 新建空间"按钮） + 分类筛选栏 + 主内容区（3列卡片网格）
+ * 支持按客户/订单/地区/产品线分类筛选，支持卡片的本地状态修改与项目空间删除/新建
  */
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<MockProject[]>(MOCK_PROJECTS);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<string>("all");
+
+  // 按分类筛选项目
+  const filteredProjects = useMemo(() => {
+    if (activeFilter === "all") return projects;
+    return projects.filter((p) => p.type === activeFilter);
+  }, [projects, activeFilter]);
 
   // 备选的 mock 智能体，用于新创建项目时随机指派
   const candidateAgents: MockAgent[] = [
@@ -68,10 +85,14 @@ export default function ProjectsPage() {
       id: `proj-${Date.now()}`,
       name: newProj.name,
       description: newProj.description,
-      status: "processing", // 默认状态为“进行中”
+      status: "processing",
       agents: assignedAgents,
       updatedAt: new Date().toISOString(),
       industry: newProj.industry,
+      type: "customer",
+      country: undefined,
+      productLine: undefined,
+      tags: [],
     };
 
     setProjects((prev) => [newProject, ...prev]);
@@ -95,14 +116,36 @@ export default function ProjectsPage() {
           }
         />
 
+        {/* 分类筛选栏 */}
+        <div className="flex items-center gap-1.5 pb-4">
+          {FILTER_CATEGORIES.map((cat) => (
+            <button
+              key={cat.key}
+              onClick={() => setActiveFilter(cat.key)}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                activeFilter === cat.key
+                  ? "bg-primary/15 text-primary border border-primary/30"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent"
+              )}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+
         {/* 主内容区：卡片网格或空状态 */}
-        <div className="flex-1 py-6">
-          {projects.length === 0 ? (
+        <div className="flex-1">
+          {filteredProjects.length === 0 ? (
             <div className="flex h-[350px] items-center justify-center">
               <EmptyState
                 icon={FolderKanban}
-                title="暂无项目空间"
-                description="点击右上角“新建空间”按钮，开始管理您的客户项目、采购订单或展会跟进。"
+                title={projects.length === 0 ? "暂无项目空间" : "该分类下暂无项目"}
+                description={
+                  projects.length === 0
+                    ? "点击右上角新建空间按钮，开始管理您的客户项目、采购订单或展会跟进。"
+                    : "尝试其他分类筛选，或创建新的项目空间。"
+                }
                 action={{
                   label: "新建项目空间",
                   onClick: () => setDialogOpen(true),
@@ -111,7 +154,7 @@ export default function ProjectsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {projects.map((project) => (
+              {filteredProjects.map((project) => (
                 <ProjectCard
                   key={project.id}
                   project={project}

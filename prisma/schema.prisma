@@ -189,6 +189,7 @@ model Project {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   memories      Memory[]
+  tasks         Task[]
 
   @@index([workspaceId])
   @@index([status])
@@ -595,12 +596,15 @@ model Task {
   source        String?                                 // intelligence | manual | inquiry
   relatedType   String?                                 // source entity type
   relatedId     String?                                 // source entity id
+  projectId     String?                                 // 关联项目空间
+  project       Project?  @relation(fields: [projectId], references: [id])
   dueAt         DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   @@index([workspaceId, status])
   @@index([workspaceId, createdAt])
+  @@index([projectId])
 }
 
 // ============================================================
