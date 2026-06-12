@@ -12,7 +12,7 @@ import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { writeAgentLog } from "@/lib/server/agent-log"
 import { AgentLogCreateSchema, validateBody } from "@/lib/validators"
-import { buildWorkspaceContext } from "@/lib/workspace"
+import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 /** 单次查询返回的日志条数上限 */
 const LOGS_LIMIT = 50
@@ -44,15 +44,19 @@ export async function GET(
   }
 }
 
-/** POST /api/agents/[id]/logs —— 写入一条运行日志 */
+/** POST /api/agents/[id]/logs —— 写入一条运行日志（需写权限，AGENTS.md §4.11） */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params
+    const ctx = await buildWorkspaceContext(request)
+    requireWritable(ctx.role)
 
-    const agent = await prisma.agent.findUnique({ where: { id } })
+    const agent = await prisma.agent.findUnique({
+      where: { id, workspaceId: ctx.workspaceId },
+    })
     if (!agent) {
       return errorResponse("智能体不存在", 404)
     }

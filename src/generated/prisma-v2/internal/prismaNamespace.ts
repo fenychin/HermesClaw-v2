@@ -2699,6 +2699,7 @@ export const AgentScalarFieldEnum = {
   bindConnectors: 'bindConnectors',
   memoryPermission: 'memoryPermission',
   harnessVersion: 'harnessVersion',
+  automationLevel: 'automationLevel',
   canDo: 'canDo',
   cannotDo: 'cannotDo',
   statsJson: 'statsJson',

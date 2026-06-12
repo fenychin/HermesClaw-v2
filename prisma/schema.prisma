@@ -131,6 +131,7 @@ model Agent {
   bindConnectors  String   // JSON 数组
   memoryPermission String  @default("read")
   harnessVersion  String   @default("v1.0.0")
+  automationLevel String   @default("L2")  // 自动化授权等级（AGENTS.md §4.7）：L1/L2/L3/L4
   canDo           String   // JSON 数组
   cannotDo        String   // JSON 数组
   statsJson       String   // JSON 对象
