@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import {
   Trash2,
   Loader2,
   CheckCircle2,
+  ArrowUpRight,
 } from "lucide-react";
 import type { Message } from "@/hooks/useChat";
 import { MarkdownRenderer } from "@/components/common/markdown-renderer";
@@ -39,12 +41,13 @@ export function ConversationArea({
   onClearMessages,
 }: ConversationAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // 沉淀为技能 / 创建项目 — 异步状态
   const [savingSkill, setSavingSkill] = useState(false);
-  const [skillSaved, setSkillSaved] = useState(false);
+  const [createdSkillId, setCreatedSkillId] = useState<string | null>(null);
   const [creatingProject, setCreatingProject] = useState(false);
-  const [projectCreated, setProjectCreated] = useState<string | null>(null);
+  const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
 
   // 自动滚底
   useEffect(() => {
@@ -53,7 +56,7 @@ export function ConversationArea({
 
   /** 沉淀为技能：收集对话内容，创建技能记录 */
   const handleSaveAsSkill = useCallback(async () => {
-    if (savingSkill || skillSaved) return;
+    if (savingSkill || createdSkillId) return;
     setSavingSkill(true);
     try {
       // 提取对话中最后一条用户消息作为技能名
@@ -68,7 +71,7 @@ export function ConversationArea({
         .map((m) => m.content)
         .join("\n\n---\n\n");
 
-      await apiClient.createSkill({
+      const result = await apiClient.createSkill({
         name: `对话沉淀: ${skillName}`,
         description: aiContent.slice(0, 800) || "从对话中沉淀的技能",
         category: "custom:对话沉淀",
@@ -83,8 +86,16 @@ export function ConversationArea({
         }),
       });
 
-      setSkillSaved(true);
-      setTimeout(() => setSkillSaved(false), 3000);
+      const skill = (result as { skill?: { id?: string } }).skill;
+      const skillId = skill?.id;
+      if (skillId) {
+        setCreatedSkillId(skillId);
+      } else {
+        setCreatedSkillId("__no_id__"); // 成功但无 ID，仍展示成功态
+      }
+      toast.success("技能已沉淀", {
+        description: `「${skillName}」已保存至智慧大脑`,
+      });
     } catch (err) {
       toast.error("沉淀技能失败", {
         description: err instanceof Error ? err.message : "请稍后重试",
@@ -92,11 +103,11 @@ export function ConversationArea({
     } finally {
       setSavingSkill(false);
     }
-  }, [messages, savingSkill, skillSaved]);
+  }, [messages, savingSkill, createdSkillId]);
 
   /** 创建项目空间：从对话内容提取关键信息并创建项目 */
   const handleCreateProject = useCallback(async () => {
-    if (creatingProject || projectCreated) return;
+    if (creatingProject || createdProjectId) return;
     setCreatingProject(true);
     try {
       const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
@@ -122,24 +133,26 @@ export function ConversationArea({
         tags: ["从对话创建"],
       });
 
-      const createdId = (result.project as { id: string })?.id;
-      if (createdId) {
-        setProjectCreated(createdId);
-        // 延迟跳转到新项目空间
-        setTimeout(() => {
-          window.location.href = `/projects/${createdId}`;
-        }, 800);
+      const project = (result as { project?: { id?: string } }).project;
+      const projectId = project?.id;
+      if (projectId) {
+        setCreatedProjectId(projectId);
+        toast.success("项目已创建", {
+          description: `「${projectName}」已创建，点击"查看项目"进入`,
+        });
+      } else {
+        toast.error("项目创建异常", {
+          description: "未获取到项目 ID，请查看项目列表",
+        });
       }
     } catch (err) {
       toast.error("创建项目失败", {
-        description: err instanceof Error ? err.message : "请稍后重试，将跳转到项目列表",
+        description: err instanceof Error ? err.message : "请稍后重试",
       });
-      // 降级：仍然跳转到项目列表
-      window.location.href = "/projects";
     } finally {
       setCreatingProject(false);
     }
-  }, [messages, creatingProject, projectCreated]);
+  }, [messages, creatingProject, createdProjectId]);
 
   // 空状态
   if (messages.length === 0 && !streamingContent) {
@@ -221,35 +234,65 @@ export function ConversationArea({
               variant="ghost"
               size="xs"
               className="text-muted-foreground hover:text-foreground text-xs gap-1.5 h-7"
-              onClick={handleSaveAsSkill}
+              onClick={createdSkillId ? () => router.push("/brain/skills") : handleSaveAsSkill}
               disabled={savingSkill}
             >
               {savingSkill ? (
                 <Loader2 className="size-3.5 animate-spin" />
-              ) : skillSaved ? (
+              ) : createdSkillId ? (
                 <CheckCircle2 className="size-3.5 text-success" />
               ) : (
                 <Puzzle className="size-3.5" />
               )}
-              {skillSaved ? "已沉淀" : "沉淀为技能"}
+              {savingSkill
+                ? "沉淀中…"
+                : createdSkillId
+                  ? "已沉淀"
+                  : "沉淀为技能"}
             </Button>
+            {createdSkillId && (
+              <Button
+                variant="ghost"
+                size="xs"
+                className="text-brand-blue hover:text-brand-blue/80 text-xs gap-1 h-7"
+                onClick={() => router.push("/brain/skills")}
+              >
+                查看技能
+                <ArrowUpRight className="size-3" />
+              </Button>
+            )}
 
             <Button
               variant="ghost"
               size="xs"
               className="text-muted-foreground hover:text-foreground text-xs gap-1.5 h-7"
-              onClick={handleCreateProject}
+              onClick={createdProjectId ? () => router.push(`/projects/${createdProjectId}`) : handleCreateProject}
               disabled={creatingProject}
             >
               {creatingProject ? (
                 <Loader2 className="size-3.5 animate-spin" />
-              ) : projectCreated ? (
+              ) : createdProjectId ? (
                 <CheckCircle2 className="size-3.5 text-success" />
               ) : (
                 <FolderPlus className="size-3.5" />
               )}
-              {projectCreated ? "已创建" : "创建项目空间"}
+              {creatingProject
+                ? "创建中…"
+                : createdProjectId
+                  ? "已创建"
+                  : "创建项目空间"}
             </Button>
+            {createdProjectId && (
+              <Button
+                variant="ghost"
+                size="xs"
+                className="text-brand-blue hover:text-brand-blue/80 text-xs gap-1 h-7"
+                onClick={() => router.push(`/projects/${createdProjectId}`)}
+              >
+                查看项目
+                <ArrowUpRight className="size-3" />
+              </Button>
+            )}
 
             <Button
               variant="ghost"
