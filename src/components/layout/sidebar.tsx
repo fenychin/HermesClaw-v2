@@ -11,9 +11,6 @@ import { SidebarNavItem } from "./sidebar-nav-item";
 import { SidebarRecent } from "./sidebar-recent";
 import { cn } from "@/lib/utils";
 
-/** 除"最近"以外的主导航项 */
-const topNavItems = mainNav.filter((item) => item.href !== "/recent");
-
 /** 左侧固定侧边栏：品牌区 + 主导航 + 可展开最近 + 左下角固定设置 */
 export function Sidebar() {
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
@@ -84,16 +81,21 @@ export function Sidebar() {
 
       {/* 主导航 */}
       <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-3 py-2">
-        {topNavItems.map((item) => (
-          <SidebarNavItem
-            key={item.href}
-            item={item}
-            collapsed={sidebarCollapsed}
-          />
-        ))}
-
-        {/* 可展开的"最近"面板 */}
-        <SidebarRecent collapsed={sidebarCollapsed} />
+        {mainNav.map((item) => {
+          // "最近"使用可展开面板（SidebarRecent），其余用标准导航项
+          if (item.href === "/recent") {
+            return (
+              <SidebarRecent key={item.href} collapsed={sidebarCollapsed} />
+            );
+          }
+          return (
+            <SidebarNavItem
+              key={item.href}
+              item={item}
+              collapsed={sidebarCollapsed}
+            />
+          );
+        })}
       </nav>
 
       {/* 左下角固定设置 */}

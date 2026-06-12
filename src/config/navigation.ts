@@ -35,16 +35,54 @@ export interface NavItem {
   description?: string;
 }
 
+/** 导航板块 */
+export interface NavSection {
+  /** 板块标题 */
+  label: string;
+  /** 板块内导航项 */
+  items: NavItem[];
+}
+
 /** 一级主导航（左侧栏主体，对应 PRD 9.1） */
 export const mainNav: NavItem[] = [
-  { href: "/foreign-trade", label: "外贸", icon: Ship, description: "外贸行业工作台与专属工作流" },
-  { href: "/new", label: "新话题", icon: Sparkles, description: "快速发起需求、对话与任务的超级入口" },
-  { href: "/dashboard", label: "动态大盘", icon: LayoutDashboard, description: "行业情报、询盘雷达与经营监测" },
+  /* ——— 第一板块：系统 ——— */
+  { href: "/new", label: "新对话", icon: Sparkles, description: "快速发起需求、对话与任务的超级入口" },
   { href: "/agents", label: "智能体", icon: Bot, description: "创建、管理与升级企业数字员工" },
-  { href: "/projects", label: "项目空间", icon: FolderKanban, description: "面向客户 / 订单 / 市场的 AI 工作单元" },
   { href: "/brain", label: "智慧大脑", icon: Brain, description: "记忆、技能与连接器的控制面中枢" },
+  /* ——— 第二板块：行业 ——— */
+  { href: "/foreign-trade", label: "外贸", icon: Ship, description: "外贸行业工作台与专属工作流" },
+  { href: "/dashboard", label: "行业动态", icon: LayoutDashboard, description: "行业情报、询盘雷达与经营监测" },
+  { href: "/projects", label: "空间", icon: FolderKanban, description: "面向客户 / 订单 / 市场的 AI 工作单元" },
+  /* ——— 第三板块：资料库 ——— */
   { href: "/files", label: "文件", icon: FileText, description: "企业内容供给链与结构化解析" },
   { href: "/recent", label: "最近", icon: Clock, description: "继续最近的对话、任务与项目" },
+];
+
+/** 三板块分组（左侧栏按板块渲染，含分组标题） */
+export const navSections: NavSection[] = [
+  {
+    label: "系统",
+    items: [
+      mainNav[0], // 新话题
+      mainNav[1], // 智能体
+      mainNav[2], // 智慧大脑
+    ],
+  },
+  {
+    label: "行业",
+    items: [
+      mainNav[3], // 外贸
+      mainNav[4], // 动态大盘
+      mainNav[5], // 项目空间
+    ],
+  },
+  {
+    label: "资料库",
+    items: [
+      mainNav[6], // 文件
+      mainNav[7], // 最近
+    ],
+  },
 ];
 
 /** 左下角固定导航（PRD 9.1：设置固定左下角） */

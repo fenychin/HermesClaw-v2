@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { memo, useState, useMemo, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -42,7 +42,7 @@ const TYPE_COLOR: Record<RecentType, string> = {
  *    当前路由为 /recent 时自动展开
  *    侧边栏收起时自动折叠二级展开
  */
-export function SidebarRecent({
+export const SidebarRecent = memo(function SidebarRecent({
   collapsed = false,
 }: {
   collapsed?: boolean;
@@ -58,8 +58,16 @@ export function SidebarRecent({
   // 从 API 获取真实对话列表（共享 hook：含自动刷新）
   const { apiConversations } = useRecentConversations();
 
+  // 延迟加载询盘数据——避免阻塞首屏渲染与导航切换
+  const loadedRef = useRef(false);
   useEffect(() => {
-    loadInquiries();
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    const id = requestIdleCallback(
+      () => loadInquiries(),
+      { timeout: 2000 },
+    );
+    return () => cancelIdleCallback(id);
   }, [loadInquiries]);
 
   // 合并：API 真实对话 + 询盘派生 + 项目 + mock 任务
@@ -174,4 +182,4 @@ export function SidebarRecent({
       </AnimatePresence>
     </div>
   );
-}
+});

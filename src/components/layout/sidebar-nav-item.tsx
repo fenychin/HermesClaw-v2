@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -12,7 +13,7 @@ interface SidebarNavItemProps {
 }
 
 /** 侧边栏单个导航项：根据当前路径高亮 active 态（支持二级路由） */
-export function SidebarNavItem({
+export const SidebarNavItem = memo(function SidebarNavItem({
   item,
   collapsed = false,
 }: SidebarNavItemProps) {
@@ -43,4 +44,4 @@ export function SidebarNavItem({
       </span>
     </Link>
   );
-}
+});
