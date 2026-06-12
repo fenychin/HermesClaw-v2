@@ -7,6 +7,7 @@ import { actorFromSession, createAuditEntry, updateAuditEntry } from "@/lib/serv
 import { writeAgentLog } from "@/lib/server/agent-log"
 import { withRBAC } from "@/lib/server/api-handler"
 import { rateLimit } from "@/lib/rate-limit"
+import { extractFileText } from "@/lib/server/extract-file-text"
 
 export const runtime = "nodejs"
 
@@ -154,6 +155,9 @@ export const POST = withRBAC(async (
         riskLevel: "low",
       })
 
+      // 提取文件文本内容（供 AI 分析）
+      const extractResult = await extractFileText(buffer, file.type, fileName)
+
       return successResponse(
         {
           file: {
@@ -161,6 +165,10 @@ export const POST = withRBAC(async (
             url,
             size: file.size,
             type: file.type || "application/octet-stream",
+            // 文本提取结果 — 前端可直接附到消息中供 AI 分析
+            extracted: extractResult.ok
+              ? { ok: true, content: extractResult.content }
+              : { ok: false, note: extractResult.note },
           },
         },
         201,

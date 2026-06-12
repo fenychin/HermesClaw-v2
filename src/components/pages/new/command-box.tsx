@@ -274,7 +274,7 @@ export function CommandBox({
     const fileName = file.name;
     const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
 
-    // 1. 上传文件到服务端
+    // 1. 上传文件到服务端（含自动文本提取）
     const toastId = toast.loading(`上传中: ${fileName}…`);
     try {
       const formData = new FormData();
@@ -287,7 +287,15 @@ export function CommandBox({
 
       const json = await res.json() as {
         success: boolean;
-        data?: { file: { name: string; url: string; size: number; type: string } };
+        data?: {
+          file: {
+            name: string;
+            url: string;
+            size: number;
+            type: string;
+            extracted?: { ok: boolean; content?: string; note?: string };
+          };
+        };
         error?: string;
       };
 
@@ -297,38 +305,26 @@ export function CommandBox({
 
       const uploaded = json.data!.file;
       toast.dismiss(toastId);
-      toast.success(`已上传: ${fileName}`);
 
-      // 2. 文本文件（< 1MB）：读取内容附预览；其他文件：仅链接
-      const textExtensions = [".txt", ".md", ".csv", ".json", ".xml", ".html", ".htm", ".log", ".yaml", ".yml", ".env", ".ts", ".tsx", ".js", ".jsx", ".py", ".java", ".css", ".sql"];
-      const isTextFile = textExtensions.some((ext) => fileName.toLowerCase().endsWith(ext)) ||
-        uploaded.type.startsWith("text/") || uploaded.type === "application/json";
-
-      if (isTextFile && file.size < 1024 * 1024) {
-        // 文本文件：直接读取内容，附在消息中供 AI 分析
-        try {
-          const content = await file.text();
-          const preview = content.slice(0, 3000);
-          const truncated = content.length > 3000 ? "\n…(内容已截断，全文见附件)" : "";
-          insertAtCursor(
-            `[📎 ${fileName} (${sizeMB}MB)](${uploaded.url})\n` +
-            `\`\`\`\n${preview}${truncated}\n\`\`\`\n`,
-          );
-        } catch {
-          insertAtCursor(`[📎 ${fileName}](${uploaded.url})`);
-        }
-      } else {
-        // 非文本文件（PDF/DOCX/XLSX/图片等）：插入链接 + 文件描述，供 AI 知晓
-        const isImage = uploaded.type.startsWith("image/");
-        const isPdf = uploaded.type === "application/pdf";
-        const isDoc = uploaded.type.includes("document") || uploaded.type.includes("spreadsheet") ||
-          uploaded.type.includes("presentation") || [".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"]
-            .some((ext) => fileName.toLowerCase().endsWith(ext));
-        const fileDesc = isImage ? "图片文件" : isPdf ? "PDF 文档" : isDoc ? "办公文档" : "二进制文件";
+      const extracted = uploaded.extracted;
+      if (extracted?.ok && extracted.content) {
+        // 服务端已提取文本 → 直接附在消息中供 AI 分析
+        toast.success(`已上传并分析: ${fileName}`);
         insertAtCursor(
-          `[📎 ${fileName} (${fileDesc}, ${sizeMB}MB)](${uploaded.url})\n` +
-          `> 注：此文件为${fileDesc}，已上传至服务器。如需分析其中内容，请告知用户。\n`,
+          `[📎 ${fileName} (${sizeMB}MB)](${uploaded.url})\n` +
+          `\`\`\`\n${extracted.content}\n\`\`\`\n`,
         );
+      } else if (extracted && !extracted.ok) {
+        // 提取失败（如图片、扫描PDF等）→ 插入链接 + 说明
+        toast.success(`已上传: ${fileName}`);
+        insertAtCursor(
+          `[📎 ${fileName} (${sizeMB}MB)](${uploaded.url})\n` +
+          `> 注：${extracted.note || "此文件内容暂无法自动解析"}\n`,
+        );
+      } else {
+        // 无提取结果（旧版兼容）
+        toast.success(`已上传: ${fileName}`);
+        insertAtCursor(`[📎 ${fileName} (${sizeMB}MB)](${uploaded.url})`);
       }
     } catch (err) {
       toast.dismiss(toastId);
