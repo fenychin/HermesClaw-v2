@@ -121,6 +121,7 @@ export function CommandBox({
     { name: "/ft-customer-profiling", label: "客户画像分析", desc: "多渠道客户画像构建" },
     { name: "/ft-cost-accounting", label: "成本核算", desc: "多贸易术语成本明细表" },
     { name: "/ft-quotation-pdf", label: "报价单 PDF 生成", desc: "多币种专业格式报价单" },
+    { name: "/ft-quote-generator", label: "报价生成与优化", desc: "多贸易术语报价方案与版本管理" },
     { name: "/ft-document-parsing", label: "单证解析", desc: "提单/发票/装箱单审核" },
     { name: "/ft-follow-up-crm", label: "客户跟进管理", desc: "跟进提醒与话术建议" },
     { name: "/ft-competitor-analysis", label: "竞品动态分析", desc: "目标市场画像与竞品格局" },

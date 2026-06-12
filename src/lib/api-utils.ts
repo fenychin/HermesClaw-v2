@@ -47,6 +47,32 @@ export function serializeDates<T extends Record<string, unknown>>(
   return result
 }
 
+/**
+ * 工作流共享序列化 —— 将 DB 中的 JSON 字符串 nodes/edges 解析为结构化对象，
+ * 同时过滤内部字段（workspaceId），仅暴露安全字段给前端。
+ *
+ * 消除 route.ts 与 [id]/route.ts 中的重复解析逻辑。
+ *
+ * @param wf  — Prisma Workflow 查询结果（含 nodes / edges 字符串或已解析对象）
+ * @param extraFields — 额外需透传的字段名列表（默认不含 workspaceId）
+ */
+export function serializeWorkflow<
+  T extends { nodes: string | object; edges: string | object } & Record<string, unknown>,
+>(wf: T, extraFields: string[] = []): Omit<T, 'nodes' | 'edges'> & { nodes: unknown; edges: unknown } {
+  const nodes = typeof wf.nodes === 'string' ? parseJsonField(wf.nodes, []) : wf.nodes
+  const edges = typeof wf.edges === 'string' ? parseJsonField(wf.edges, []) : wf.edges
+
+  // 白名单：仅保留安全字段（排除 workspaceId 等内部字段）
+  const safeKeys = new Set(['id', 'name', 'description', 'status', 'nodes', 'edges', 'createdAt', 'updatedAt', ...extraFields])
+  const result: Record<string, unknown> = { nodes, edges }
+  for (const key of Object.keys(wf)) {
+    if (safeKeys.has(key)) {
+      result[key] = wf[key]
+    }
+  }
+  return result as Omit<T, 'nodes' | 'edges'> & { nodes: unknown; edges: unknown }
+}
+
 /** 统一错误响应 */
 export function errorResponse(message: string, status = 500) {
   return Response.json({ success: false, error: message }, { status })
