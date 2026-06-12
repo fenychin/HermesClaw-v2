@@ -26,7 +26,7 @@ export async function GET(
     const { id } = await params
     const ctx = await buildWorkspaceContext(request)
 
-    const agent = await prisma.agent.findUnique({ where: { id } })
+    const agent = await prisma.agent.findUnique({ where: { id, workspaceId: ctx.workspaceId } })
     if (!agent) {
       return errorResponse("智能体不存在", 404)
     }
