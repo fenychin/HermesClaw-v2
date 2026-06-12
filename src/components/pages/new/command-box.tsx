@@ -168,6 +168,9 @@ export function CommandBox({
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 语音权限提示（首次使用）
+  const [voicePermissionDenied, setVoicePermissionDenied] = useState(false);
+
   // 可用技能命令列表（/ft-*，与 .claude/skills/ft-*/ 目录同步）
   // ⚠️ 新增/删除 skill 时须同步更新此列表（AGENTS.md §4.14）
   const SLASH_COMMANDS = [
@@ -391,11 +394,16 @@ export function CommandBox({
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         if (event.error === "no-speech") {
-          toast.info("未检测到语音", { description: "请再试一次" });
+          toast.info("未检测到语音", { description: "请靠近麦克风再试一次" });
+        } else if (event.error === "not-allowed") {
+          setVoicePermissionDenied(true);
+          toast.error("麦克风权限被拒绝", {
+            description: "请在浏览器设置中允许麦克风访问后重试",
+          });
         } else if (event.error === "aborted") {
           // 用户手动停止，无提示
         } else {
-          toast.error("语音识别出错", { description: event.error });
+          toast.error("语音识别出错", { description: event.error || "未知错误" });
         }
         setIsRecording(false);
       };
@@ -407,10 +415,12 @@ export function CommandBox({
       recognition.start();
       setIsRecording(true);
       toast.success("正在聆听…", { description: "说话内容将自动转为文字" });
-    } catch {
-      toast.error("无法启动语音识别", {
-        description: "请检查浏览器麦克风权限设置",
-      });
+    } catch (err) {
+      const msg = err instanceof DOMException && err.name === "NotAllowedError"
+        ? "麦克风权限被拒绝，请在浏览器设置中允许后重试"
+        : "请检查浏览器麦克风权限设置";
+      toast.error("无法启动语音识别", { description: msg });
+      setVoicePermissionDenied(true);
     }
   };
 
@@ -454,9 +464,37 @@ export function CommandBox({
     setShowSlashMenu(false);
   };
 
-  // ---- 筛选列表（从 store 获取，支持 API 加载的数据） ----
+  // ---- 筛选列表（从 store 获取，首开下拉时自动触发加载） ----
+  const agentLoading = useAgentStore((s) => s.loading);
+  const agentError = useAgentStore((s) => s.error);
   const storeAgents = useAgentStore((s) => s.agents);
+  const loadAgents = useAgentStore((s) => s.loadAgents);
+
+  const projectLoading = useProjectStore((s) => s.loading);
+  const projectError = useProjectStore((s) => s.error);
   const storeProjects = useProjectStore((s) => s.projects);
+  const loadProjects = useProjectStore((s) => s.loadProjects);
+
+  // 打开 @ / # 下拉时，若 store 无数据且未加载中则触发拉取
+  const openAgentDropdown = () => {
+    const next = activeDropdown === "agent" ? null : "agent";
+    setActiveDropdown(next);
+    setShowUrlInput(false);
+    setShowSlashMenu(false);
+    if (next === "agent" && storeAgents.length === 0 && !agentLoading) {
+      loadAgents();
+    }
+  };
+
+  const openProjectDropdown = () => {
+    const next = activeDropdown === "project" ? null : "project";
+    setActiveDropdown(next);
+    setShowUrlInput(false);
+    setShowSlashMenu(false);
+    if (next === "project" && storeProjects.length === 0 && !projectLoading) {
+      loadProjects();
+    }
+  };
 
   const filteredAgents = storeAgents.filter(
     (a) =>
@@ -545,7 +583,7 @@ export function CommandBox({
                 ? "text-danger bg-danger/10 animate-pulse"
                 : "text-hint hover:text-foreground hover:bg-accent",
             )}
-            title={isRecording ? "停止录音" : "语音输入"}
+            title={isRecording ? "停止录音" : voicePermissionDenied ? "语音输入（需麦克风权限）" : "语音输入"}
           >
             {isRecording ? <MicOff className="size-4" /> : <Mic className="size-4" />}
           </button>
@@ -613,9 +651,7 @@ export function CommandBox({
             <button
               ref={agentBtnRef}
               type="button"
-              onClick={() =>
-                setActiveDropdown(activeDropdown === "agent" ? null : "agent")
-              }
+              onClick={openAgentDropdown}
               className={cn(
                 "rounded-lg p-1.5 transition-colors",
                 activeDropdown === "agent"
@@ -654,9 +690,17 @@ export function CommandBox({
 
                   {/* 列表 */}
                   <div className="max-h-56 overflow-y-auto py-1">
-                    {filteredAgents.length === 0 ? (
+                    {agentLoading ? (
+                      <p className="text-hint text-xs text-center py-4 animate-pulse">
+                        加载中…
+                      </p>
+                    ) : agentError ? (
+                      <p className="text-danger text-xs text-center py-4">
+                        加载失败，请重试
+                      </p>
+                    ) : filteredAgents.length === 0 ? (
                       <p className="text-hint text-xs text-center py-4">
-                        无匹配智能体
+                        {storeAgents.length === 0 ? "暂无智能体" : "无匹配智能体"}
                       </p>
                     ) : (
                       filteredAgents.map((agent) => (
@@ -698,11 +742,7 @@ export function CommandBox({
             <button
               ref={projectBtnRef}
               type="button"
-              onClick={() =>
-                setActiveDropdown(
-                  activeDropdown === "project" ? null : "project",
-                )
-              }
+              onClick={openProjectDropdown}
               className={cn(
                 "rounded-lg p-1.5 transition-colors",
                 activeDropdown === "project"
@@ -741,9 +781,17 @@ export function CommandBox({
 
                   {/* 列表 */}
                   <div className="max-h-56 overflow-y-auto py-1">
-                    {filteredProjects.length === 0 ? (
+                    {projectLoading ? (
+                      <p className="text-hint text-xs text-center py-4 animate-pulse">
+                        加载中…
+                      </p>
+                    ) : projectError ? (
+                      <p className="text-danger text-xs text-center py-4">
+                        加载失败，请重试
+                      </p>
+                    ) : filteredProjects.length === 0 ? (
                       <p className="text-hint text-xs text-center py-4">
-                        无匹配项目
+                        {storeProjects.length === 0 ? "暂无项目" : "无匹配项目"}
                       </p>
                     ) : (
                       filteredProjects.map((project) => (
