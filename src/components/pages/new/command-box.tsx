@@ -305,18 +305,30 @@ export function CommandBox({
         uploaded.type.startsWith("text/") || uploaded.type === "application/json";
 
       if (isTextFile && file.size < 1024 * 1024) {
+        // 文本文件：直接读取内容，附在消息中供 AI 分析
         try {
           const content = await file.text();
           const preview = content.slice(0, 3000);
-          const truncated = content.length > 3000 ? "\n…(内容已截断)" : "";
+          const truncated = content.length > 3000 ? "\n…(内容已截断，全文见附件)" : "";
           insertAtCursor(
-            `[📎 ${fileName} (${sizeMB}MB)](${uploaded.url})\n\`\`\`\n${preview}${truncated}\n\`\`\`\n`,
+            `[📎 ${fileName} (${sizeMB}MB)](${uploaded.url})\n` +
+            `\`\`\`\n${preview}${truncated}\n\`\`\`\n`,
           );
         } catch {
           insertAtCursor(`[📎 ${fileName}](${uploaded.url})`);
         }
       } else {
-        insertAtCursor(`[📎 ${fileName} (${sizeMB}MB)](${uploaded.url})`);
+        // 非文本文件（PDF/DOCX/XLSX/图片等）：插入链接 + 文件描述，供 AI 知晓
+        const isImage = uploaded.type.startsWith("image/");
+        const isPdf = uploaded.type === "application/pdf";
+        const isDoc = uploaded.type.includes("document") || uploaded.type.includes("spreadsheet") ||
+          uploaded.type.includes("presentation") || [".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"]
+            .some((ext) => fileName.toLowerCase().endsWith(ext));
+        const fileDesc = isImage ? "图片文件" : isPdf ? "PDF 文档" : isDoc ? "办公文档" : "二进制文件";
+        insertAtCursor(
+          `[📎 ${fileName} (${fileDesc}, ${sizeMB}MB)](${uploaded.url})\n` +
+          `> 注：此文件为${fileDesc}，已上传至服务器。如需分析其中内容，请告知用户。\n`,
+        );
       }
     } catch (err) {
       toast.dismiss(toastId);
@@ -424,7 +436,7 @@ export function CommandBox({
     }
   };
 
-  // ---- URL 粘贴（含元数据抓取） ----
+  // ---- URL 粘贴（元数据 + 全文内容抓取，供 AI 分析） ----
   const [urlFetching, setUrlFetching] = useState(false);
 
   const handleUrlPaste = async () => {
@@ -435,15 +447,41 @@ export function CommandBox({
     }
     setUrlFetching(true);
     try {
-      // 尝试通过服务端代理抓取页面标题（避免 CORS）
-      const res = await fetch(`/api/fetch-meta?url=${encodeURIComponent(url)}`);
-      if (res.ok) {
-        const meta = await res.json() as { title?: string; description?: string };
-        if (meta.title) {
-          const desc = meta.description ? ` — ${meta.description.slice(0, 200)}` : "";
-          insertAtCursor(`[🌐 ${meta.title}${desc}](${url})`);
+      // 第一步：抓取页面元数据（标题 + 描述）
+      const metaRes = await fetch(`/api/fetch-meta?url=${encodeURIComponent(url)}`);
+      let title = "";
+      let desc = "";
+      if (metaRes.ok) {
+        const meta = await metaRes.json() as { title?: string; description?: string };
+        title = meta.title || "";
+        desc = meta.description ? ` — ${meta.description.slice(0, 200)}` : "";
+      }
+
+      // 第二步：抓取全文可读内容（供 LLM 分析）
+      let pageContent = "";
+      try {
+        const contentRes = await fetch(
+          `/api/fetch-content?url=${encodeURIComponent(url)}&maxChars=8000`,
+        );
+        if (contentRes.ok) {
+          const contentData = await contentRes.json() as { content?: string };
+          if (contentData.content && !contentData.content.startsWith("[")) {
+            pageContent = contentData.content;
+          }
+        }
+      } catch {
+        // 内容抓取失败不阻断——降级为仅插入链接
+      }
+
+      // 构建最终插入文本：链接 + 正文内容
+      if (title) {
+        const linkText = `[🌐 ${title}${desc}](${url})`;
+        if (pageContent) {
+          insertAtCursor(
+            `${linkText}\n\n> 以下为网页全文（供 AI 分析参考）：\n\n${pageContent}`,
+          );
         } else {
-          insertAtCursor(url);
+          insertAtCursor(linkText);
         }
       } else {
         insertAtCursor(url);
