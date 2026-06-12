@@ -146,6 +146,8 @@ export function useChat() {
 
       abortControllerRef.current = new AbortController();
 
+      let fullContent = "";
+
       try {
         const response = await fetch("/api/chat", {
           method: "POST",
@@ -164,7 +166,6 @@ export function useChat() {
         if (!response.ok) throw new Error("请求失败");
         if (!response.body) throw new Error("响应流为空");
 
-        let fullContent = "";
         const reader = response.body.getReader();
 
         // 复用共享 SSE 解析器（替换手写 ReadableStream 读取）
@@ -192,6 +193,18 @@ export function useChat() {
       } catch (err: unknown) {
         if (err instanceof Error && err.name !== "AbortError") {
           setError(err.message || "对话失败，请重试");
+        }
+        // 用户主动停止（AbortError）：持久化已接收的部分 AI 回复，避免丢失
+        if (err instanceof Error && err.name === "AbortError" && fullContent) {
+          const partialMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: fullContent,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, partialMessage]);
+          setStreamingContent("");
+          persistConversation(content.trim(), fullContent);
         }
       } finally {
         setIsStreaming(false);
