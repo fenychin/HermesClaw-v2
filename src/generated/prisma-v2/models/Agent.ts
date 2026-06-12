@@ -37,6 +37,7 @@ export type AgentMinAggregateOutputType = {
   bindConnectors: string | null
   memoryPermission: string | null
   harnessVersion: string | null
+  automationLevel: string | null
   canDo: string | null
   cannotDo: string | null
   statsJson: string | null
@@ -58,6 +59,7 @@ export type AgentMaxAggregateOutputType = {
   bindConnectors: string | null
   memoryPermission: string | null
   harnessVersion: string | null
+  automationLevel: string | null
   canDo: string | null
   cannotDo: string | null
   statsJson: string | null
@@ -79,6 +81,7 @@ export type AgentCountAggregateOutputType = {
   bindConnectors: number
   memoryPermission: number
   harnessVersion: number
+  automationLevel: number
   canDo: number
   cannotDo: number
   statsJson: number
@@ -102,6 +105,7 @@ export type AgentMinAggregateInputType = {
   bindConnectors?: true
   memoryPermission?: true
   harnessVersion?: true
+  automationLevel?: true
   canDo?: true
   cannotDo?: true
   statsJson?: true
@@ -123,6 +127,7 @@ export type AgentMaxAggregateInputType = {
   bindConnectors?: true
   memoryPermission?: true
   harnessVersion?: true
+  automationLevel?: true
   canDo?: true
   cannotDo?: true
   statsJson?: true
@@ -144,6 +149,7 @@ export type AgentCountAggregateInputType = {
   bindConnectors?: true
   memoryPermission?: true
   harnessVersion?: true
+  automationLevel?: true
   canDo?: true
   cannotDo?: true
   statsJson?: true
@@ -238,6 +244,7 @@ export type AgentGroupByOutputType = {
   bindConnectors: string
   memoryPermission: string
   harnessVersion: string
+  automationLevel: string
   canDo: string
   cannotDo: string
   statsJson: string
@@ -280,6 +287,7 @@ export type AgentWhereInput = {
   bindConnectors?: Prisma.StringFilter<"Agent"> | string
   memoryPermission?: Prisma.StringFilter<"Agent"> | string
   harnessVersion?: Prisma.StringFilter<"Agent"> | string
+  automationLevel?: Prisma.StringFilter<"Agent"> | string
   canDo?: Prisma.StringFilter<"Agent"> | string
   cannotDo?: Prisma.StringFilter<"Agent"> | string
   statsJson?: Prisma.StringFilter<"Agent"> | string
@@ -303,6 +311,7 @@ export type AgentOrderByWithRelationInput = {
   bindConnectors?: Prisma.SortOrder
   memoryPermission?: Prisma.SortOrder
   harnessVersion?: Prisma.SortOrder
+  automationLevel?: Prisma.SortOrder
   canDo?: Prisma.SortOrder
   cannotDo?: Prisma.SortOrder
   statsJson?: Prisma.SortOrder
@@ -329,6 +338,7 @@ export type AgentWhereUniqueInput = Prisma.AtLeast<{
   bindConnectors?: Prisma.StringFilter<"Agent"> | string
   memoryPermission?: Prisma.StringFilter<"Agent"> | string
   harnessVersion?: Prisma.StringFilter<"Agent"> | string
+  automationLevel?: Prisma.StringFilter<"Agent"> | string
   canDo?: Prisma.StringFilter<"Agent"> | string
   cannotDo?: Prisma.StringFilter<"Agent"> | string
   statsJson?: Prisma.StringFilter<"Agent"> | string
@@ -352,6 +362,7 @@ export type AgentOrderByWithAggregationInput = {
   bindConnectors?: Prisma.SortOrder
   memoryPermission?: Prisma.SortOrder
   harnessVersion?: Prisma.SortOrder
+  automationLevel?: Prisma.SortOrder
   canDo?: Prisma.SortOrder
   cannotDo?: Prisma.SortOrder
   statsJson?: Prisma.SortOrder
@@ -379,6 +390,7 @@ export type AgentScalarWhereWithAggregatesInput = {
   bindConnectors?: Prisma.StringWithAggregatesFilter<"Agent"> | string
   memoryPermission?: Prisma.StringWithAggregatesFilter<"Agent"> | string
   harnessVersion?: Prisma.StringWithAggregatesFilter<"Agent"> | string
+  automationLevel?: Prisma.StringWithAggregatesFilter<"Agent"> | string
   canDo?: Prisma.StringWithAggregatesFilter<"Agent"> | string
   cannotDo?: Prisma.StringWithAggregatesFilter<"Agent"> | string
   statsJson?: Prisma.StringWithAggregatesFilter<"Agent"> | string
@@ -399,6 +411,7 @@ export type AgentCreateInput = {
   bindConnectors: string
   memoryPermission?: string
   harnessVersion?: string
+  automationLevel?: string
   canDo: string
   cannotDo: string
   statsJson: string
@@ -422,6 +435,7 @@ export type AgentUncheckedCreateInput = {
   bindConnectors: string
   memoryPermission?: string
   harnessVersion?: string
+  automationLevel?: string
   canDo: string
   cannotDo: string
   statsJson: string
@@ -443,6 +457,7 @@ export type AgentUpdateInput = {
   bindConnectors?: Prisma.StringFieldUpdateOperationsInput | string
   memoryPermission?: Prisma.StringFieldUpdateOperationsInput | string
   harnessVersion?: Prisma.StringFieldUpdateOperationsInput | string
+  automationLevel?: Prisma.StringFieldUpdateOperationsInput | string
   canDo?: Prisma.StringFieldUpdateOperationsInput | string
   cannotDo?: Prisma.StringFieldUpdateOperationsInput | string
   statsJson?: Prisma.StringFieldUpdateOperationsInput | string
@@ -466,6 +481,7 @@ export type AgentUncheckedUpdateInput = {
   bindConnectors?: Prisma.StringFieldUpdateOperationsInput | string
   memoryPermission?: Prisma.StringFieldUpdateOperationsInput | string
   harnessVersion?: Prisma.StringFieldUpdateOperationsInput | string
+  automationLevel?: Prisma.StringFieldUpdateOperationsInput | string
   canDo?: Prisma.StringFieldUpdateOperationsInput | string
   cannotDo?: Prisma.StringFieldUpdateOperationsInput | string
   statsJson?: Prisma.StringFieldUpdateOperationsInput | string
@@ -488,6 +504,7 @@ export type AgentCreateManyInput = {
   bindConnectors: string
   memoryPermission?: string
   harnessVersion?: string
+  automationLevel?: string
   canDo: string
   cannotDo: string
   statsJson: string
@@ -508,6 +525,7 @@ export type AgentUpdateManyMutationInput = {
   bindConnectors?: Prisma.StringFieldUpdateOperationsInput | string
   memoryPermission?: Prisma.StringFieldUpdateOperationsInput | string
   harnessVersion?: Prisma.StringFieldUpdateOperationsInput | string
+  automationLevel?: Prisma.StringFieldUpdateOperationsInput | string
   canDo?: Prisma.StringFieldUpdateOperationsInput | string
   cannotDo?: Prisma.StringFieldUpdateOperationsInput | string
   statsJson?: Prisma.StringFieldUpdateOperationsInput | string
@@ -529,6 +547,7 @@ export type AgentUncheckedUpdateManyInput = {
   bindConnectors?: Prisma.StringFieldUpdateOperationsInput | string
   memoryPermission?: Prisma.StringFieldUpdateOperationsInput | string
   harnessVersion?: Prisma.StringFieldUpdateOperationsInput | string
+  automationLevel?: Prisma.StringFieldUpdateOperationsInput | string
   canDo?: Prisma.StringFieldUpdateOperationsInput | string
   cannotDo?: Prisma.StringFieldUpdateOperationsInput | string
   statsJson?: Prisma.StringFieldUpdateOperationsInput | string
@@ -560,6 +579,7 @@ export type AgentCountOrderByAggregateInput = {
   bindConnectors?: Prisma.SortOrder
   memoryPermission?: Prisma.SortOrder
   harnessVersion?: Prisma.SortOrder
+  automationLevel?: Prisma.SortOrder
   canDo?: Prisma.SortOrder
   cannotDo?: Prisma.SortOrder
   statsJson?: Prisma.SortOrder
@@ -581,6 +601,7 @@ export type AgentMaxOrderByAggregateInput = {
   bindConnectors?: Prisma.SortOrder
   memoryPermission?: Prisma.SortOrder
   harnessVersion?: Prisma.SortOrder
+  automationLevel?: Prisma.SortOrder
   canDo?: Prisma.SortOrder
   cannotDo?: Prisma.SortOrder
   statsJson?: Prisma.SortOrder
@@ -602,6 +623,7 @@ export type AgentMinOrderByAggregateInput = {
   bindConnectors?: Prisma.SortOrder
   memoryPermission?: Prisma.SortOrder
   harnessVersion?: Prisma.SortOrder
+  automationLevel?: Prisma.SortOrder
   canDo?: Prisma.SortOrder
   cannotDo?: Prisma.SortOrder
   statsJson?: Prisma.SortOrder
@@ -685,6 +707,7 @@ export type AgentCreateWithoutWorkspaceInput = {
   bindConnectors: string
   memoryPermission?: string
   harnessVersion?: string
+  automationLevel?: string
   canDo: string
   cannotDo: string
   statsJson: string
@@ -706,6 +729,7 @@ export type AgentUncheckedCreateWithoutWorkspaceInput = {
   bindConnectors: string
   memoryPermission?: string
   harnessVersion?: string
+  automationLevel?: string
   canDo: string
   cannotDo: string
   statsJson: string
@@ -756,6 +780,7 @@ export type AgentScalarWhereInput = {
   bindConnectors?: Prisma.StringFilter<"Agent"> | string
   memoryPermission?: Prisma.StringFilter<"Agent"> | string
   harnessVersion?: Prisma.StringFilter<"Agent"> | string
+  automationLevel?: Prisma.StringFilter<"Agent"> | string
   canDo?: Prisma.StringFilter<"Agent"> | string
   cannotDo?: Prisma.StringFilter<"Agent"> | string
   statsJson?: Prisma.StringFilter<"Agent"> | string
@@ -776,6 +801,7 @@ export type AgentCreateWithoutRunLogsInput = {
   bindConnectors: string
   memoryPermission?: string
   harnessVersion?: string
+  automationLevel?: string
   canDo: string
   cannotDo: string
   statsJson: string
@@ -798,6 +824,7 @@ export type AgentUncheckedCreateWithoutRunLogsInput = {
   bindConnectors: string
   memoryPermission?: string
   harnessVersion?: string
+  automationLevel?: string
   canDo: string
   cannotDo: string
   statsJson: string
@@ -834,6 +861,7 @@ export type AgentUpdateWithoutRunLogsInput = {
   bindConnectors?: Prisma.StringFieldUpdateOperationsInput | string
   memoryPermission?: Prisma.StringFieldUpdateOperationsInput | string
   harnessVersion?: Prisma.StringFieldUpdateOperationsInput | string
+  automationLevel?: Prisma.StringFieldUpdateOperationsInput | string
   canDo?: Prisma.StringFieldUpdateOperationsInput | string
   cannotDo?: Prisma.StringFieldUpdateOperationsInput | string
   statsJson?: Prisma.StringFieldUpdateOperationsInput | string
@@ -856,6 +884,7 @@ export type AgentUncheckedUpdateWithoutRunLogsInput = {
   bindConnectors?: Prisma.StringFieldUpdateOperationsInput | string
   memoryPermission?: Prisma.StringFieldUpdateOperationsInput | string
   harnessVersion?: Prisma.StringFieldUpdateOperationsInput | string
+  automationLevel?: Prisma.StringFieldUpdateOperationsInput | string
   canDo?: Prisma.StringFieldUpdateOperationsInput | string
   cannotDo?: Prisma.StringFieldUpdateOperationsInput | string
   statsJson?: Prisma.StringFieldUpdateOperationsInput | string
@@ -876,6 +905,7 @@ export type AgentCreateManyWorkspaceInput = {
   bindConnectors: string
   memoryPermission?: string
   harnessVersion?: string
+  automationLevel?: string
   canDo: string
   cannotDo: string
   statsJson: string
@@ -896,6 +926,7 @@ export type AgentUpdateWithoutWorkspaceInput = {
   bindConnectors?: Prisma.StringFieldUpdateOperationsInput | string
   memoryPermission?: Prisma.StringFieldUpdateOperationsInput | string
   harnessVersion?: Prisma.StringFieldUpdateOperationsInput | string
+  automationLevel?: Prisma.StringFieldUpdateOperationsInput | string
   canDo?: Prisma.StringFieldUpdateOperationsInput | string
   cannotDo?: Prisma.StringFieldUpdateOperationsInput | string
   statsJson?: Prisma.StringFieldUpdateOperationsInput | string
@@ -917,6 +948,7 @@ export type AgentUncheckedUpdateWithoutWorkspaceInput = {
   bindConnectors?: Prisma.StringFieldUpdateOperationsInput | string
   memoryPermission?: Prisma.StringFieldUpdateOperationsInput | string
   harnessVersion?: Prisma.StringFieldUpdateOperationsInput | string
+  automationLevel?: Prisma.StringFieldUpdateOperationsInput | string
   canDo?: Prisma.StringFieldUpdateOperationsInput | string
   cannotDo?: Prisma.StringFieldUpdateOperationsInput | string
   statsJson?: Prisma.StringFieldUpdateOperationsInput | string
@@ -938,6 +970,7 @@ export type AgentUncheckedUpdateManyWithoutWorkspaceInput = {
   bindConnectors?: Prisma.StringFieldUpdateOperationsInput | string
   memoryPermission?: Prisma.StringFieldUpdateOperationsInput | string
   harnessVersion?: Prisma.StringFieldUpdateOperationsInput | string
+  automationLevel?: Prisma.StringFieldUpdateOperationsInput | string
   canDo?: Prisma.StringFieldUpdateOperationsInput | string
   cannotDo?: Prisma.StringFieldUpdateOperationsInput | string
   statsJson?: Prisma.StringFieldUpdateOperationsInput | string
@@ -990,6 +1023,7 @@ export type AgentSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   bindConnectors?: boolean
   memoryPermission?: boolean
   harnessVersion?: boolean
+  automationLevel?: boolean
   canDo?: boolean
   cannotDo?: boolean
   statsJson?: boolean
@@ -1014,6 +1048,7 @@ export type AgentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   bindConnectors?: boolean
   memoryPermission?: boolean
   harnessVersion?: boolean
+  automationLevel?: boolean
   canDo?: boolean
   cannotDo?: boolean
   statsJson?: boolean
@@ -1036,6 +1071,7 @@ export type AgentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   bindConnectors?: boolean
   memoryPermission?: boolean
   harnessVersion?: boolean
+  automationLevel?: boolean
   canDo?: boolean
   cannotDo?: boolean
   statsJson?: boolean
@@ -1058,6 +1094,7 @@ export type AgentSelectScalar = {
   bindConnectors?: boolean
   memoryPermission?: boolean
   harnessVersion?: boolean
+  automationLevel?: boolean
   canDo?: boolean
   cannotDo?: boolean
   statsJson?: boolean
@@ -1066,7 +1103,7 @@ export type AgentSelectScalar = {
   updatedAt?: boolean
 }
 
-export type AgentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "name" | "role" | "description" | "status" | "source" | "category" | "bindSkills" | "bindConnectors" | "memoryPermission" | "harnessVersion" | "canDo" | "cannotDo" | "statsJson" | "lastActive" | "createdAt" | "updatedAt", ExtArgs["result"]["agent"]>
+export type AgentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "name" | "role" | "description" | "status" | "source" | "category" | "bindSkills" | "bindConnectors" | "memoryPermission" | "harnessVersion" | "automationLevel" | "canDo" | "cannotDo" | "statsJson" | "lastActive" | "createdAt" | "updatedAt", ExtArgs["result"]["agent"]>
 export type AgentInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   runLogs?: boolean | Prisma.Agent$runLogsArgs<ExtArgs>
@@ -1098,6 +1135,7 @@ export type $AgentPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     bindConnectors: string
     memoryPermission: string
     harnessVersion: string
+    automationLevel: string
     canDo: string
     cannotDo: string
     statsJson: string
@@ -1541,6 +1579,7 @@ export interface AgentFieldRefs {
   readonly bindConnectors: Prisma.FieldRef<"Agent", 'String'>
   readonly memoryPermission: Prisma.FieldRef<"Agent", 'String'>
   readonly harnessVersion: Prisma.FieldRef<"Agent", 'String'>
+  readonly automationLevel: Prisma.FieldRef<"Agent", 'String'>
   readonly canDo: Prisma.FieldRef<"Agent", 'String'>
   readonly cannotDo: Prisma.FieldRef<"Agent", 'String'>
   readonly statsJson: Prisma.FieldRef<"Agent", 'String'>

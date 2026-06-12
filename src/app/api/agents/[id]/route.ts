@@ -1,40 +1,28 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import {
-  parseJsonField,
   stringifyJsonField,
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { writeAgentLog } from "@/lib/server/agent-log"
-import { checkConfirmQuery, checkConfirmValue } from "@/lib/server/guardrail"
+import { checkConfirmQuery, checkConfirmValue, checkAutomationGate } from "@/lib/server/guardrail"
 import { AgentUpdateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
+import { serializeAgent } from "@/lib/server/agent-serializer"
 
-/** 序列化 Agent，将 JSON 字符串字段反序列化 */
-function serializeAgent(agent: Record<string, unknown>) {
-  return {
-    ...agent,
-    category: parseJsonField(agent.category as string, []),
-    bindSkills: parseJsonField(agent.bindSkills as string, []),
-    bindConnectors: parseJsonField(agent.bindConnectors as string, []),
-    canDo: parseJsonField(agent.canDo as string, []),
-    cannotDo: parseJsonField(agent.cannotDo as string, []),
-    statsJson: parseJsonField(agent.statsJson as string, {}),
-  }
-}
-
-/** GET /api/agents/[id] —— 获取智能体详情（含运行日志） */
+/** GET /api/agents/[id] —— 获取智能体详情（含运行日志，workspaceId 隔离） */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params
+    const ctx = await buildWorkspaceContext(request)
 
     const agent = await prisma.agent.findUnique({
-      where: { id },
+      where: { id, workspaceId: ctx.workspaceId },
       include: {
         runLogs: { orderBy: { createdAt: "desc" } },
       },
@@ -65,15 +53,27 @@ export async function PATCH(
     if (parsed instanceof Response) return parsed
     const body = parsed
 
-    const existing = await prisma.agent.findUnique({ where: { id } })
+    const existing = await prisma.agent.findUnique({ where: { id, workspaceId: ctx.workspaceId } })
     if (!existing) {
       return errorResponse("智能体不存在", 404)
     }
 
-    // 任务边界变更属高危操作（AGENTS.md 4.5 / 4.1）：须显式二次确认
+    // 任务边界变更属高危操作（AGENTS.md §4.5 / §4.1 / §4.7）：
+    // 先经自动化授权门禁（L4 硬拒绝、L3 强制确认），再经二次确认护栏
     const isBoundaryChange =
       body.canDo !== undefined || body.cannotDo !== undefined
     if (isBoundaryChange) {
+      // 门禁 1：自动化授权分级（AGENTS.md §4.7 统一门禁）
+      const isConfirmed = body.confirm === true
+      const autoGate = await checkAutomationGate({
+        automationLevel: body.automationLevel ?? existing.automationLevel,
+        riskLevel: "high",
+        confirmed: isConfirmed,
+        actionName: "修改任务边界",
+      })
+      if (!autoGate.ok) return autoGate.response
+
+      // 门禁 2：二次确认护栏（AGENTS.md §4.5 高危操作门禁）
       const guard = await checkConfirmValue(
         body.confirm,
         "修改智能体任务边界（canDo/cannotDo）需二次确认",
@@ -93,6 +93,7 @@ export async function PATCH(
     if (body.bindConnectors !== undefined) data.bindConnectors = stringifyJsonField(body.bindConnectors)
     if (body.memoryPermission !== undefined) data.memoryPermission = body.memoryPermission
     if (body.harnessVersion !== undefined) data.harnessVersion = body.harnessVersion
+    if (body.automationLevel !== undefined) data.automationLevel = body.automationLevel
     if (body.canDo !== undefined) data.canDo = stringifyJsonField(body.canDo)
     if (body.cannotDo !== undefined) data.cannotDo = stringifyJsonField(body.cannotDo)
     if (body.statsJson !== undefined) data.statsJson = stringifyJsonField(body.statsJson)
@@ -148,7 +149,7 @@ export async function DELETE(
     const ctx = await buildWorkspaceContext(request)
     requireWritable(ctx.role)
 
-    const existing = await prisma.agent.findUnique({ where: { id } })
+    const existing = await prisma.agent.findUnique({ where: { id, workspaceId: ctx.workspaceId } })
     if (!existing) {
       return errorResponse("智能体不存在", 404)
     }
@@ -157,9 +158,9 @@ export async function DELETE(
     const guard = await checkConfirmQuery(request, "删除智能体需二次确认")
     if (!guard.ok) return guard.response
 
-    // 先删除关联的运行日志，再删除智能体
-    await prisma.agentLog.deleteMany({ where: { agentId: id } })
-    await prisma.agent.delete({ where: { id } })
+    // 先删除关联的运行日志，再删除智能体（workspaceId 隔离）
+    await prisma.agentLog.deleteMany({ where: { agentId: id, workspaceId: ctx.workspaceId } })
+    await prisma.agent.delete({ where: { id, workspaceId: ctx.workspaceId } })
 
     await writeAuditLog({
       actor: guard.actor,

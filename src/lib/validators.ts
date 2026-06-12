@@ -19,6 +19,7 @@ export const AgentCreateSchema = z.object({
   bindConnectors: z.array(z.string()).optional().default([]),
   memoryPermission: z.enum(["read", "read-write", "none"]).optional().default("read"),
   harnessVersion: z.string().max(20).optional().default("v1.0.0"),
+  automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional().default("L2"),
   canDo: z.array(z.string()).optional().default([]),
   cannotDo: z.array(z.string()).optional().default([]),
   statsJson: z.record(z.string(), z.unknown()).optional().default({}),
@@ -36,12 +37,14 @@ export const AgentUpdateSchema = z.object({
   bindConnectors: z.array(z.string()).optional(),
   memoryPermission: z.enum(["read", "read-write", "none"]).optional(),
   harnessVersion: z.string().max(20).optional(),
+  automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional(),
   canDo: z.array(z.string()).optional(),
   cannotDo: z.array(z.string()).optional(),
   statsJson: z.record(z.string(), z.unknown()).optional(),
   lastActive: z.string().nullable().optional(),
-  // 二次确认字段
-  confirm: z.string().optional(),
+  // 二次确认字段（AGENTS.md §4.5 高危操作门禁）
+  confirm: z.boolean().optional(),
+  reason: z.string().max(500).optional(),
 });
 
 /** Agent 执行请求 */
@@ -98,7 +101,7 @@ export const MemoryUpdateSchema = z.object({
   content: z.string().max(10000).optional(),
   summary: z.string().max(500).optional(),
   confidence: z.number().min(0).max(1).optional(),
-  confirm: z.string().optional(),
+  confirm: z.boolean().optional(),
   reason: z.string().max(500).optional(),
 });
 
