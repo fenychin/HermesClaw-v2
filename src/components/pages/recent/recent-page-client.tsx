@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   Clock,
@@ -10,32 +10,29 @@ import {
   File,
   Zap,
   ArrowRight,
+  Filter,
+  Loader2,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useTradeStore } from "@/stores/trade-store";
-import { apiClient } from "@/lib/api-client";
-import { formatTime, classifyTimeGroup } from "@/lib/date-utils";
+import { formatTime } from "@/lib/date-utils";
+import {
+  useRecentRecords,
+  matchTimeFilter,
+  type RecentRecordEnriched,
+  type TimeFilter,
+  INDUSTRY_OPTIONS,
+} from "@/hooks/use-recent-records";
+import type { RecentRecordItem } from "@/lib/api-client";
 
 // ============================================================
 // 类型定义
 // ============================================================
 
-type RecentType = "conversation" | "task" | "project" | "file" | "upgrade";
-
-interface RecentRecord {
-  id: string;
-  type: RecentType;
-  title: string;
-  source: string;
-  timeGroup: "今天" | "昨天" | "本周" | "更早";
-  timestamp: string;
-  proposalId?: string;
-  /** 真实记录的可导航链接（为空时不跳转） */
-  href?: string;
-}
+/** 统合类型：与 api-client RecentRecordItem.type 一致 */
+type RecentType = RecentRecordItem["type"];
 
 /** 类型 → 图标、色值、标签、背景 */
 const TYPE_CONFIG: Record<
@@ -74,105 +71,15 @@ const TYPE_CONFIG: Record<
   },
 };
 
-// ============================================================
-// Mock 数据（作为基线，API 数据会动态合并）
-// ============================================================
+/** 是否是升级建议记录 */
+function isUpgradeRecord(r: RecentRecordEnriched): boolean {
+  return r.type === "upgrade";
+}
 
-const MOCK_RECORDS: RecentRecord[] = [
-  {
-    id: "r-001", type: "conversation",
-    title: "BrightPath Outdoors 报价确认与 UL 认证更新讨论",
-    source: "Gmail · 张伟", timeGroup: "今天",
-    timestamp: "2026-06-06T10:30:00Z",
-  },
-  {
-    id: "r-002", type: "task",
-    title: "Sakura 样品第三次质量整改方案制定",
-    source: "项目管理 · 王芳", timeGroup: "今天",
-    timestamp: "2026-06-06T09:45:00Z",
-  },
-  {
-    id: "r-003", type: "project",
-    title: "德国 Schmidt 精密五金 Q3 价格调整与合同续签",
-    source: "项目空间 · 李敏", timeGroup: "今天",
-    timestamp: "2026-06-06T08:30:00Z",
-    href: "/projects/proj-008",
-  },
-  {
-    id: "r-004", type: "file",
-    title: "2026 产品目录_v3.pdf",
-    source: "Google Drive · Diana 上传", timeGroup: "今天",
-    timestamp: "2026-06-06T07:50:00Z",
-  },
-  {
-    id: "r-005", type: "upgrade",
-    title: "询盘分拣置信度阈值微调（假阳性率升至 3.75%）",
-    source: "自动触发 · agent-002", timeGroup: "今天",
-    timestamp: "2026-06-06T06:00:00Z", proposalId: "HEP-20260601-001",
-  },
-  {
-    id: "r-006", type: "conversation",
-    title: "法国 Maison Élégance 高端骨瓷茶具 OEM 询价",
-    source: "邮件 · 未分配", timeGroup: "今天",
-    timestamp: "2026-06-06T05:15:00Z",
-  },
-  {
-    id: "r-007", type: "task",
-    title: "广交会春季 200+ 线索按区域分批分配至销售团队",
-    source: "任务面板 · 陈强", timeGroup: "昨天",
-    timestamp: "2026-06-05T16:30:00Z",
-  },
-  {
-    id: "r-008", type: "conversation",
-    title: "英国 Hackett 百货 PO-2026-0421 订单确认与 UKCA 标识方案",
-    source: "Outlook · 刘洋", timeGroup: "昨天",
-    timestamp: "2026-06-05T14:00:00Z",
-  },
-  {
-    id: "r-009", type: "file",
-    title: "Q3 市场调研报告_智能家居出海.docx",
-    source: "Notion · Athena 生成", timeGroup: "昨天",
-    timestamp: "2026-06-05T10:20:00Z",
-  },
-  {
-    id: "r-010", type: "project",
-    title: "智能家居产品线 2026 出海计划阶段复盘",
-    source: "项目空间 · 赵磊", timeGroup: "昨天",
-    timestamp: "2026-06-05T09:00:00Z",
-    href: "/projects/proj-007",
-  },
-  {
-    id: "r-011", type: "upgrade",
-    title: "WhatsApp 渠道跟进模板适配（回复率降至 51%）",
-    source: "自动触发 · agent-003", timeGroup: "昨天",
-    timestamp: "2026-06-05T08:00:00Z", proposalId: "HEP-20260603-002",
-  },
-  {
-    id: "r-012", type: "task",
-    title: "2026 春季广交会展会线索结构化整理与跟进计划",
-    source: "任务面板 · Scout", timeGroup: "本周",
-    timestamp: "2026-06-04T15:00:00Z",
-  },
-  {
-    id: "r-013", type: "conversation",
-    title: "阿联酋 Al-Khaleej LED 工矿灯 SASO 认证询盘",
-    source: "WhatsApp · 未分配", timeGroup: "本周",
-    timestamp: "2026-06-04T10:00:00Z",
-  },
-  {
-    id: "r-014", type: "project",
-    title: "东南亚家居市场代理拓展——越南代理背景调查",
-    source: "项目空间 · 李敏", timeGroup: "本周",
-    timestamp: "2026-06-03T11:30:00Z",
-    href: "/projects/proj-004",
-  },
-  {
-    id: "r-015", type: "file",
-    title: "竞品价格监控周报_0601-0605.xlsx",
-    source: "飞书文档 · Athena 生成", timeGroup: "本周",
-    timestamp: "2026-06-02T08:00:00Z",
-  },
-];
+/** 获取记录的可导航链接 */
+function getRecordHref(record: RecentRecordEnriched): string {
+  return record.href || "/new";
+}
 
 // ============================================================
 // 常量
@@ -189,24 +96,13 @@ const FILTER_TABS: { key: RecentType | "all"; label: string }[] = [
   { key: "upgrade", label: "升级建议" },
 ];
 
-// ============================================================
-// 工具函数
-// ============================================================
-
-/** 根据记录类型生成目标链接（统一兜底 /new） */
-function getRecordHref(record: RecentRecord): string | undefined {
-  if (record.href) return record.href;
-  switch (record.type) {
-    case "project":
-      return "/projects";
-    case "upgrade":
-      return "/settings?tab=harness";
-    case "conversation":
-    case "task":
-    default:
-      return "/new";
-  }
-}
+const TIME_FILTERS: { key: TimeFilter; label: string }[] = [
+  { key: "all", label: "全部时间" },
+  { key: "today", label: "今天" },
+  { key: "yesterday", label: "昨天" },
+  { key: "week", label: "本周" },
+  { key: "earlier", label: "更早" },
+];
 
 // ============================================================
 // 组件
@@ -214,86 +110,52 @@ function getRecordHref(record: RecentRecord): string | undefined {
 
 export function RecentPageClient() {
   const [activeFilter, setActiveFilter] = useState<RecentType | "all">("all");
-  const { harnessProposals, loadProposals } = useTradeStore();
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
+  const [industryFilter, setIndustryFilter] = useState<string>("all");
 
-  // 从 API 加载的真实对话列表
-  const [apiConversations, setApiConversations] = useState<RecentRecord[]>([]);
+  // TanStack Query：聚合最近记录，staleTime 30s
+  const {
+    data: apiRecords = [],
+    isLoading,
+    isError,
+  } = useRecentRecords("all", industryFilter !== "all" ? industryFilter : undefined);
 
-  useEffect(() => {
-    loadProposals();
-
-    // 异步加载真实对话列表
-    apiClient.getConversations()
-      .then((data) => {
-        const convs = (data as { conversations: Array<{ id: string; title: string; updatedAt: string }> }).conversations ?? [];
-        setApiConversations(
-          convs.map((c) => ({
-            id: c.id,
-            type: "conversation" as const,
-            title: c.title,
-            source: "Hermes 对话",
-            timeGroup: classifyTimeGroup(c.updatedAt),
-            timestamp: c.updatedAt,
-            href: `/new?load=${c.id}`,
-          })),
-        );
-      })
-      .catch(() => { /* 对话加载失败不阻断页面 */ });
-  }, [loadProposals]);
-
-  // 动态合并：mock 数据 + API 对话 + API 提案
+  // 客户端侧按类型 + 时间筛选
   const allRecords = useMemo(() => {
-    // API 提案 → upgrade 记录
-    const apiUpgradeRecords: RecentRecord[] = (harnessProposals || [])
-      .filter((p) => p.status === "pending")
-      .map((p) => ({
-        id: p.id,
-        type: "upgrade" as const,
-        title: p.problemStatement,
-        source: `${p.triggeredBy === 'auto' ? '自动触发' : '手动提交'} · ${(p as unknown as { proposedChange: { targetComponent: string } }).proposedChange?.targetComponent ?? 'Harness'}`,
-        timeGroup: classifyTimeGroup(p.createdAt),
-        timestamp: p.createdAt,
-        proposalId: p.proposalId,
-      }));
+    let filtered = apiRecords;
 
-    // mock 基线（移除 upgrade，由 API 数据替代）
-    const mockBase = MOCK_RECORDS.filter((r) => r.type !== "upgrade");
+    // 类型筛选
+    if (activeFilter !== "all") {
+      filtered = filtered.filter((r) => r.type === activeFilter);
+    }
 
-    // API 真实对话优先（去重：真实对话 ID 不重复于 mock）
-    const apiIds = new Set(apiConversations.map((c) => c.id));
-    const mockFiltered = mockBase.filter((r) => r.type !== "conversation" || !apiIds.has(r.id));
+    // 时间筛选
+    if (timeFilter !== "all") {
+      filtered = filtered.filter((r) => matchTimeFilter(r.timeGroup, timeFilter));
+    }
 
-    return [...apiConversations, ...mockFiltered, ...apiUpgradeRecords]
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [harnessProposals, apiConversations]);
+    return filtered;
+  }, [apiRecords, activeFilter, timeFilter]);
 
-  // 按筛选条件过滤 + 按时间组归组
+  // 按时间组归组
   const groupedRecords = useMemo(() => {
-    const filtered =
-      activeFilter === "all"
-        ? allRecords
-        : allRecords.filter((r) => r.type === activeFilter);
-
     return TIME_GROUPS.map((group) => {
-      const items = filtered.filter((r) => r.timeGroup === group);
+      const items = allRecords.filter((r) => r.timeGroup === group);
       items.sort(
         (a, b) =>
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
       );
       return { group, items };
     }).filter((g) => g.items.length > 0);
-  }, [activeFilter, allRecords]);
+  }, [allRecords]);
 
   return (
     <div className="flex flex-col h-full p-6">
       {/* 页头 */}
-      <PageHeader
-        title="最近"
-        description="继续你的工作"
-      />
+      <PageHeader title="最近" description="继续你的工作" />
 
-      {/* 筛选 Tabs */}
-      <div className="flex items-center gap-1 mb-5 overflow-x-auto">
+      {/* 第一行：类型筛选 Tabs */}
+      <div className="flex items-center gap-1 mb-3 overflow-x-auto">
         {FILTER_TABS.map((tab) => (
           <button
             key={tab.key}
@@ -311,12 +173,68 @@ export function RecentPageClient() {
         ))}
       </div>
 
+      {/* 第二行：时间 + 行业筛选器 */}
+      <div className="flex items-center gap-3 mb-5 flex-wrap">
+        {/* 时间筛选 */}
+        <div className="flex items-center gap-1">
+          <Filter className="size-3.5 text-muted-foreground shrink-0" />
+          <select
+            value={timeFilter}
+            onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
+            className="text-xs bg-transparent border border-border rounded-lg px-2 py-1.5 text-muted-foreground hover:text-foreground focus:outline-none focus:border-primary cursor-pointer appearance-none"
+          >
+            {TIME_FILTERS.map((tf) => (
+              <option key={tf.key} value={tf.key}>
+                {tf.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* 行业筛选 */}
+        <div className="flex items-center gap-1">
+          <select
+            value={industryFilter}
+            onChange={(e) => setIndustryFilter(e.target.value)}
+            className="text-xs bg-transparent border border-border rounded-lg px-2 py-1.5 text-muted-foreground hover:text-foreground focus:outline-none focus:border-primary cursor-pointer appearance-none"
+          >
+            {INDUSTRY_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* 加载指示器 */}
+        {isLoading && (
+          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+            <Loader2 className="size-3 animate-spin" />
+            加载中…
+          </span>
+        )}
+      </div>
+
+      {/* 记录列表 */}
       <div className="flex-1 overflow-y-auto space-y-6">
-        {groupedRecords.length === 0 ? (
+        {isLoading && apiRecords.length === 0 ? (
+          /* 首次加载中 */
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="size-6 text-muted-foreground animate-spin" />
+          </div>
+        ) : isError ? (
+          /* API 错误兜底 */
+          <EmptyState
+            icon={Clock}
+            title="加载失败"
+            description="暂时无法获取最近记录，请稍后重试。"
+          />
+        ) : groupedRecords.length === 0 ? (
+          /* 空结果 */
           <EmptyState
             icon={Clock}
             title="暂无最近记录"
-            description="您的最近对话、任务、项目或文件记录将显示在这里。"
+            description="您的最近对话、任务、项目、文件或升级建议将显示在这里。"
           />
         ) : (
           groupedRecords.map(({ group, items }) => (
@@ -331,7 +249,7 @@ export function RecentPageClient() {
                 {items.map((record, i) => {
                   const cfg = TYPE_CONFIG[record.type];
                   const Icon = cfg.icon;
-                  const isUpgrade = record.type === "upgrade";
+                  const isUpgrade = isUpgradeRecord(record);
                   const href = getRecordHref(record);
 
                   const rowContent = (
@@ -365,9 +283,9 @@ export function RecentPageClient() {
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {record.source}
-                          {isUpgrade && record.proposalId ? (
+                          {isUpgrade && record.meta?.proposalId ? (
                             <span className="ml-2 font-mono text-[10px] text-hint">
-                              {record.proposalId}
+                              {record.meta.proposalId as string}
                             </span>
                           ) : null}
                         </p>
@@ -399,16 +317,15 @@ export function RecentPageClient() {
                     </motion.div>
                   );
 
-                  // 有目标链接时包裹 Link 组件
-                  if (href) {
-                    return (
-                      <Link key={record.id} href={href} className="block cursor-pointer">
-                        {rowContent}
-                      </Link>
-                    );
-                  }
-
-                  return <div key={record.id} className="cursor-pointer">{rowContent}</div>;
+                  return (
+                    <Link
+                      key={`${record.type}-${record.id}`}
+                      href={href}
+                      className="block cursor-pointer"
+                    >
+                      {rowContent}
+                    </Link>
+                  );
                 })}
               </div>
             </section>

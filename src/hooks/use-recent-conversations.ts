@@ -6,6 +6,9 @@ import { classifyTimeGroup } from "@/lib/date-utils";
 
 /**
  * 最近的记录类型（统一定义 — sidebar-recent 使用）
+ *
+ * @deprecated 新代码请使用 api-client 中的 RecentRecordItem.type（5 种），
+ *             侧边栏迁移至 /api/recent 聚合端点后将移除此定义。
  */
 export type RecentType = "conversation" | "task" | "project";
 

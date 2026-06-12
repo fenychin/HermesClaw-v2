@@ -300,7 +300,26 @@ export const apiClient = {
       body: JSON.stringify(data),
     }),
 
+  // ---- 最近记录 ----
+  getRecent: (type = "all", industry?: string) => {
+    const params = new URLSearchParams({ type })
+    if (industry) params.set("industry", industry)
+    return apiFetch<{ records: RecentRecordItem[] }>(
+      `/api/recent?${params.toString()}`,
+    )
+  },
+
   // ---- AGENTS.md 规则文档 ----
   getAgentsMd: () =>
     apiFetch<{ content: string }>("/api/agents-md"),
+}
+
+/** 最近记录统合类型（与 /api/recent 返回一致） */
+export interface RecentRecordItem {
+  id: string
+  type: "conversation" | "task" | "project" | "file" | "upgrade"
+  title: string
+  timestamp: string
+  href: string
+  meta?: Record<string, unknown>
 }
