@@ -12,7 +12,7 @@ import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { writeAgentLog } from "@/lib/server/agent-log"
 import { AgentLogCreateSchema, validateBody } from "@/lib/validators"
-import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
+import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
 
 /** 单次查询返回的日志条数上限 */
 const LOGS_LIMIT = 50
@@ -39,6 +39,9 @@ export async function GET(
 
     return successResponse({ logs })
   } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return errorResponse(error.message, 403)
+    }
     logger.error('GET /api/agents/[id]/logs: 失败', { error: error instanceof Error ? error.message : '未知错误' })
     return errorResponse("服务器内部错误")
   }
@@ -77,6 +80,9 @@ export async function POST(
 
     return successResponse({ message: "日志已写入" }, 201)
   } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return errorResponse(error.message, 403)
+    }
     logger.error('POST /api/agents/[id]/logs: 失败', { error: error instanceof Error ? error.message : '未知错误' })
     return errorResponse("服务器内部错误")
   }

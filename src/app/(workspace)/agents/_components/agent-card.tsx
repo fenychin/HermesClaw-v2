@@ -151,12 +151,14 @@ export function AgentCard({
               详情
             </Button>
           </Link>
-          <Button
-            size="sm"
-            className="bg-primary text-primary-foreground hover:bg-primary/90 h-8 text-xs"
-          >
-            对话
-          </Button>
+          <Link href={`/new?agent=${id}`}>
+            <Button
+              size="sm"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 h-8 text-xs"
+            >
+              对话
+            </Button>
+          </Link>
         </div>
       </div>
     </div>

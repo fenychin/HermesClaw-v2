@@ -7,7 +7,7 @@ import {
 } from "@/lib/api-utils"
 import { actorFromSession } from "@/lib/server/audit"
 import { AgentCreateSchema, validateBody } from "@/lib/validators"
-import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
+import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
 import { serializeAgent } from "@/lib/server/agent-serializer"
 
 /** GET /api/agents —— 获取当前 workspace 的智能体列表 */
@@ -77,6 +77,10 @@ export async function POST(request: Request) {
 
     return successResponse({ agent: serializeAgent(agent as unknown as Record<string, unknown>) }, 201)
   } catch (error) {
+    // 权限错误：返回 403 并说明角色
+    if (error instanceof ForbiddenError) {
+      return errorResponse(error.message, 403)
+    }
     logger.error('POST /api/agents: 失败', { error: error instanceof Error ? error.message : '未知错误' })
     return errorResponse("服务器内部错误")
   }

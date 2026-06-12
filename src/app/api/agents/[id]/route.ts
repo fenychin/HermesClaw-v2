@@ -9,7 +9,7 @@ import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { writeAgentLog } from "@/lib/server/agent-log"
 import { checkConfirmQuery, checkConfirmValue, checkAutomationGate } from "@/lib/server/guardrail"
 import { AgentUpdateSchema, validateBody } from "@/lib/validators"
-import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
+import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
 import { serializeAgent } from "@/lib/server/agent-serializer"
 
 /** GET /api/agents/[id] —— 获取智能体详情（含运行日志，workspaceId 隔离） */
@@ -134,6 +134,9 @@ export async function PATCH(
 
     return successResponse({ agent: serializeAgent(agent as unknown as Record<string, unknown>) })
   } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return errorResponse(error.message, 403)
+    }
     logger.error('PATCH /api/agents/[id]: 失败', { error: error instanceof Error ? error.message : '未知错误' })
     return errorResponse("服务器内部错误")
   }
@@ -174,6 +177,9 @@ export async function DELETE(
 
     return successResponse({ message: "智能体已删除" })
   } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return errorResponse(error.message, 403)
+    }
     logger.error('DELETE /api/agents/[id]: 失败', { error: error instanceof Error ? error.message : '未知错误' })
     return errorResponse("服务器内部错误")
   }
