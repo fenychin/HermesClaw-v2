@@ -49,6 +49,7 @@ function NewTopicPageInner() {
     isStreaming,
     streamingContent,
     error,
+    conversationId,
     sendMessage,
     stopStreaming,
     clearMessages,
@@ -158,6 +159,7 @@ function NewTopicPageInner() {
                   messages={messages}
                   isStreaming={isStreaming}
                   streamingContent={streamingContent}
+                  conversationId={conversationId}
                   onClearMessages={clearMessages}
                 />
               </div>

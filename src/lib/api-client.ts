@@ -188,6 +188,13 @@ export const apiClient = {
   getConversation: (id: string) =>
     apiFetch<{ conversation: unknown }>(`/api/conversations/${id}`),
 
+  /** 更新对话：关联项目空间或重命名 */
+  updateConversation: (id: string, data: { projectId?: string | null; title?: string }) =>
+    apiFetch<{ conversation: unknown }>(`/api/conversations/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
   createConversation: (title: string, initialMessage?: string) =>
     apiFetch<{ conversation: { id: string } }>("/api/conversations", {
       method: "POST",

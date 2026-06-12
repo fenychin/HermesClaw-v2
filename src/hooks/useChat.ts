@@ -43,8 +43,9 @@ export function useChat() {
   const [streamingContent, setStreamingContent] = useState("");
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  /** 当前持久化对话 ID */
+  /** 当前持久化对话 ID（ref 供回调闭包，state 供组件消费） */
   const conversationIdRef = useRef<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
   /** 本地待回放队列积压数（lazy init 直接读 localStorage，避免 effect 同步 setState） */
   const [pendingCount, setPendingCount] = useState<number>(() => {
@@ -92,6 +93,7 @@ export function useChat() {
           const title = truncateTitle(userContent);
           const result = await apiClient.createConversation(title);
           conversationIdRef.current = result.conversation.id;
+          setConversationId(result.conversation.id);
         }
 
         await apiClient.addMessage(
@@ -114,6 +116,7 @@ export function useChat() {
         // 两阶段写入可能部分失败（createConversation 成功但 addMessage 失败）
         // → 重置 conversationIdRef，避免下次追加到无消息的孤对话
         conversationIdRef.current = null;
+        setConversationId(null);
         queuePendingConversation({
           userContent,
           assistantContent,
@@ -233,6 +236,7 @@ export function useChat() {
         setMessages(loaded);
         setStreamingContent("");
         conversationIdRef.current = conv.id;
+        setConversationId(conv.id);
         return; // 成功，退出
       } catch (err) {
         lastErr = err;
@@ -257,6 +261,8 @@ export function useChat() {
     stopStreaming,
     clearMessages,
     loadConversation,
+    /** 当前持久化对话 ID（用于跨页面关联，如创建项目时链接对话） */
+    conversationId,
     /** 本地待回放对话积压数（>0 表示有未同步的历史记录） */
     pendingCount,
     /** 手动触发回放（通常无需调用——挂载/网络恢复/每次保存成功自动触发） */
