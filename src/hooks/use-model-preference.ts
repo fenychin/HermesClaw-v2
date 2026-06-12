@@ -5,7 +5,7 @@ import {
   SELECTABLE_MODELS,
   DEFAULT_MODEL_ID,
   type SelectableModel,
-} from "@/components/pages/new/command-box";
+} from "@/config/models";
 
 const LS_MODEL_KEY = "hermes-selected-model";
 
