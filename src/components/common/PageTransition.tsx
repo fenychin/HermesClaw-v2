@@ -17,7 +17,7 @@ export function PageTransition({
   return (
     <div
       className={cn(
-        "h-full animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out",
+        "h-full animate-in fade-in-0 slide-in-from-bottom-2 duration-150 ease-out",
         className,
       )}
     >
