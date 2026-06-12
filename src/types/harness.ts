@@ -4,7 +4,10 @@
  */
 
 export type RiskLevel = 'low' | 'mid' | 'high'
-export type ProposalStatus = 'pending' | 'approved' | 'rejected'
+export type ProposalStatus = 'pending' | 'approved' | 'rejected' | 'rolled-back'
+
+/** Harness 目标组件（AGENTS.md §4.1-§4.6） */
+export type TargetComponent = '任务边界' | '上下文供给' | '工具接入' | '反馈闭环' | '安全护栏'
 
 /**
  * 自动化授权分级（AGENTS.md §4.7）
@@ -20,6 +23,87 @@ export function automationLevelFromRisk(risk: RiskLevel): AutomationLevel {
   if (risk === 'high') return 'L3'
   if (risk === 'mid') return 'L2'
   return 'L1'
+}
+
+/**
+ * 解析自动化授权等级：显式标注优先，否则由 riskLevel 派生。
+ * —— 统一 automationLevel ?? automationLevelFromRisk(riskLevel) 的样板代码。
+ *    供 Route Handler / guardrail / harness-eval 等复用。
+ */
+export function resolveAutomationLevel(
+  automationLevel: string | null | undefined,
+  riskLevel: RiskLevel,
+): AutomationLevel {
+  if (automationLevel === 'L1' || automationLevel === 'L2' || automationLevel === 'L3' || automationLevel === 'L4') {
+    return automationLevel
+  }
+  return automationLevelFromRisk(riskLevel)
+}
+
+/** 审计日志风险等级 */
+export type AuditRiskLevel = 'low' | 'mid' | 'high'
+
+/**
+ * 将 AutomationLevel 映射为审计日志 riskLevel。
+ *
+ * 映射规则（AGENTS.md §4.7）：
+ *   L1 → low（全自动，低风险）
+ *   L2 → low（建议执行留痕，低风险）
+ *   L3 → medium（需人工确认，中风险）
+ *   L4 → high（绝对禁止自动，高风险）
+ *
+ * 供 dag-runner / guardrail / 所有 Skill 调用方复用，避免在各处重复 switch。
+ */
+export function mapAutomationToAuditRisk(level: AutomationLevel): AuditRiskLevel {
+  switch (level) {
+    case 'L1':
+    case 'L2':
+      return 'low'
+    case 'L3':
+      return 'mid' // audit 用 mid，与 AgentLog 的 medium 区分
+    case 'L4':
+      return 'high'
+    default:
+      return 'low'
+  }
+}
+
+/**
+ * 将 AutomationLevel 映射为 AgentLog riskLevel 字符串。
+ * —— 与 mapAutomationToAuditRisk 类似但返回 'medium' 而非 'mid'（AgentLog 无 mid 概念）。
+ */
+export function mapAutomationToLogRisk(level: AutomationLevel): string {
+  switch (level) {
+    case 'L1':
+    case 'L2':
+      return 'low'
+    case 'L3':
+      return 'medium'
+    case 'L4':
+      return 'high'
+    default:
+      return 'low'
+  }
+}
+
+/**
+ * 将 AutomationLevel 映射为 selectModel() 使用的路由风险等级。
+ *
+ * L1/L2 → low（成本优化模型）
+ * L3    → medium（工作空间默认模型）
+ * L4    → high（高能力模型）
+ *
+ * 返回值为 model-router RouteRiskLevel 的等效字符串，调用方自行类型断言。
+ */
+export function mapAutomationToRouteRisk(level: AutomationLevel): 'low' | 'medium' | 'high' {
+  switch (level) {
+    case 'L4':
+      return 'high'
+    case 'L3':
+      return 'medium'
+    default:
+      return 'low'
+  }
 }
 
 /** Agent 业务动作 + 其自动化授权等级 */
@@ -59,21 +143,27 @@ export const TRADE_ACTIONS: AgentAction[] = [
 
 export interface HarnessProposal {
   id: string
-  proposalId: string
+  proposalId: string           // HEP-{timestamp}
   triggeredBy: 'auto' | 'manual'
+  triggerReason: string
   problemStatement: string
   evidence: string[]
-  targetComponent: string
-  proposedChange: string
-  riskLevel: RiskLevel
-  /** 自动化授权等级（§4.7）；审批拦截据此决定 L3 二次确认 / L4 硬拒绝 */
-  automationLevel: AutomationLevel
-  requiresApproval: true
-  status: ProposalStatus
+  proposedChange: {
+    targetComponent: TargetComponent
+    description: string
+    riskLevel: RiskLevel
+    automationLevel: AutomationLevel
+  }
+  requiresHumanApproval: true
   estimatedImpact: string
+  affectedAgents: string[]
+  rollbackPlan: string
+  status: ProposalStatus
   createdAt: string
   reviewedBy?: string
   reviewedAt?: string
+  /** 多租户隔离（§4.11），默认 "default" */
+  workspaceId?: string
 }
 
 /**

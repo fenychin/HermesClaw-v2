@@ -58,6 +58,10 @@ src/
     globals.css             # ★ 颜色系统单一落点（Tailwind v4 @theme inline）
     api/                    # 后端 Route Handlers（全栈）
       health/route.ts       #   GET 健康检查
+      openclaw/events/
+        route.ts            #   GET SSE 实时事件流（text/event-stream）
+      workspace/settings/
+        route.ts            #   GET/PATCH 模型路由配置
     (workspace)/            # 工作台路由组：共享左侧导航外壳
       layout.tsx            #   AppShell 包裹
       foreign-trade/        #   外贸
@@ -78,8 +82,18 @@ src/
     site.ts                 # 站点级常量
   lib/
     utils.ts                # cn() 等工具函数
+    sse-parser.ts           # 通用 SSE 流解析器（parseSSEStream）
+    server/                 # 服务端逻辑
+      llm-provider.ts       # 共享 LLM 工具层（Provider 选择 + 流式/非流式调用）
+      model-router.ts       # ★ 策略路由（selectModel）—— 按 risk/taskType/WS 配置决策 Provider
+      adapters/openclaw/
+        event-emitter.ts    # SSE 事件广播（全局 pub/sub）
+        mock.ts             # Mock 模式（含事件发射集成）
   stores/                   # Zustand stores（ui-store 等）
   hooks/                    # 自定义 hooks
+    use-openclaw-stream.ts  # OpenClaw SSE 事件流订阅 Hook
+    use-model-routing.ts    # 模型路由配置 Hook（TanStack Query + Mutation）
+    use-workspace.ts        # 工作空间数据 Hook
   types/                    # 全局 TS 类型
 ```
 
@@ -88,6 +102,8 @@ src/
 - 路由分组 `(workspace)` 不影响 URL，仅用于共享布局。
 - 信息架构（一级 / 二级导航）以 `src/config/navigation.ts` 为**唯一数据源**，新增模块在此登记，勿在多处硬编码。
 - 后端逻辑放 `app/api/<resource>/route.ts`；复杂业务逻辑后续下沉至 `src/lib/server/*`，Route Handler 只做 I/O 与校验。
+- **Prisma Client 生成路径**：`prisma/schema.prisma` 中 generator `output` 指向 `../src/generated/prisma-v2`（全仓库唯一生成目标，**勿改回**过时的 `prisma` 目录）。运行 `pnpm exec prisma generate` 后客户端位于 `src/generated/prisma-v2/`。
+- **技能（Skill）**遵循 Claude Code Skills 规范（[Agent Skills](https://agentskills.io) 开放标准），存放于 `.claude/skills/<name>/SKILL.md`（详见 [AGENTS.md §4.0](./AGENTS.md#40-技能规范claude-code-skills-标准)）。**项目中的"Skill"均指此格式，非传统功能模块。**
 
 ---
 
@@ -173,6 +189,56 @@ src/
 - `scope` 建议用模块名：`trade` / `dashboard` / `agents` / `brain` / `files` / `ui` / `config`。
 - subject 用中文、祈使语气、不加句号。例：`feat(brain): 新增连接器授权状态卡片`。
 - 涉及 Harness 规则或 AGENTS.md 变更，须遵循 AGENTS.md 第三/七章的 HEP 审批流程。
+
+---
+
+## 9. 功能完成后的代码健康检查
+
+**触发时机**：每在一个新会话窗口中完成一个功能的开发（新模块 / 新 API / 重构）后，**必须**自动执行一次代码健康检查。检查与诊断报告覆盖以下 5 个维度：
+
+1. **AGENTS.md 规则合规性**：逐条检查新增/变更代码是否违反 AGENTS.md 中的硬性约束（如 §5 禁止行为清单、§4.5 安全护栏、§2.3 无日志禁止静默执行等），列出每一项违规及具体位置。
+2. **重复逻辑识别**：对比项目中已有代码，检查是否有可提取为公共函数/共享模块的重复逻辑（如多处相同的校验链、序列化/反序列化样板、L4/L3 门禁等）。
+3. **TODO 遗留扫描**：搜索新增文件中的 `TODO` / `FIXME` / `HACK` / `XXX` 注释，列出所有未完成事项及其位置。
+4. **错误处理完整性**：沿 Policy Engine 调用链路逐层检查 try/catch 覆盖、异常传播、回滚语义、边界条件（TOCTOU、并发冲突、快照缺失等）。
+5. **AGENTS.md 更新需求**：如果本次开发引入了新的架构约定、状态值、API 模式、目录结构，列出需在 AGENTS.md 中记录的条目及建议位置。
+
+**执行规则**：
+
+- 检查形式为**只读诊断报告**，不要修改任何代码。
+- 诊断报告须按优先级分档：🔴 高危（违反 AGENTS.md 硬性规则）/ 🟡 中危（重复逻辑、不完整错误处理）/ 🟢 建议（代码风格、可维护性）。
+- 诊断报告末尾附「最优先修复项」汇总。
+- 用户确认报告后，再执行修复；修复完成后重新跑 `pnpm exec tsc --noEmit` + `pnpm lint` 确保零错误。
+
+---
+
+## 10. Git 备份推送规范
+
+**触发时机**：每完成一个功能 → 代码健康检查通过 → 修复执行完毕 → 类型检查与 lint 全量通过后，**必须**将当前工作推送到 GitHub 仓库做备份。
+
+**分支规则**：
+
+- 备份分支命名：`backup/feature-{NNN}`，编号从 `001` 起按顺序叠加。
+- 新建分支前，先 `git fetch origin` 获取远端已有备份分支列表，找到当前最大编号 N，新建分支编号为 N+1（左补零至 3 位）。
+- 当前会话的功能代码全部在该备份分支上提交并推送。
+
+**操作流程**：
+
+```bash
+# 1. 获取远端备份分支，计算下一个编号
+git fetch origin
+git branch -r | grep 'origin/backup/feature-' | sed 's/.*feature-//' | sort -n | tail -1
+# 2. 切出新备份分支并推送
+git checkout -b backup/feature-{NNN}
+git add -A
+git commit -m "chore: 备份 — {功能简述}"
+git push -u origin backup/feature-{NNN}
+```
+
+**约束**：
+
+- 仅在新功能完整开发 + 代码健康检查修复完成后才推送，不要在开发中途推送不完整代码。
+- commit message 遵循 Conventional Commits（见第 8 节），`type` 使用 `chore`。
+- 推送后向用户报告分支名和 GitHub 链接。
 
 ---
 

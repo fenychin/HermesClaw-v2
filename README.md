@@ -7,6 +7,11 @@
 
 ```bash
 pnpm install
+
+# 复制环境变量模板
+cp .env.example .env.local
+# (说明：.env.local 默认开启 HERMES_USE_MOCK=true 和 OPENCLAW_USE_MOCK=true，并配置了本地 8000/8001 端口的后端 API URL，用于在无后端时进行本地前端开发与 UI 调试。)
+
 pnpm dev        # → http://localhost:3000，自动跳转 /new（超级入口）
 ```
 

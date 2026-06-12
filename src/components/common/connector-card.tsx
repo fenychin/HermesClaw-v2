@@ -32,7 +32,7 @@ export function ConnectorCard({
   const isConnected = connector.status === "connected";
 
   return (
-    <div className="bg-card border-border rounded-2xl border p-4">
+    <div className="bg-card border-border rounded-card border p-5">
       {/* 顶部：iconEmoji + 名称 + category badge */}
       <div className="flex items-start gap-3">
         <span className="text-3xl leading-none" role="img" aria-label={connector.name}>

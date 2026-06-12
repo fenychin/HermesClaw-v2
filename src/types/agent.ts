@@ -5,6 +5,8 @@
 
 export type AgentStatus = 'running' | 'idle' | 'error' | 'paused'
 export type AgentSource = 'builtin' | 'custom' | 'industry'
+/** 自动化授权等级（AGENTS.md §4.7） */
+export type AutomationLevel = 'L1' | 'L2' | 'L3' | 'L4'
 
 export interface Agent {
   id: string
@@ -18,6 +20,8 @@ export interface Agent {
   bindConnectors: string[]
   memoryPermission: 'read' | 'read-write' | 'none'
   harnessVersion: string
+  /** 自动化授权等级（AGENTS.md §4.7）：L1 全自动 / L2 建议执行 / L3 需确认 / L4 禁止自动 */
+  automationLevel: AutomationLevel
   canDo: string[]
   cannotDo: string[]
   /** AI 生成的 Harness Spec Markdown 文档（AGENTS.md P6 Spec-First） */

@@ -3,10 +3,10 @@
  *
  * 体现 AGENTS.md 第一章「AI 不是工具，是第一工程主体」：用户一打开新话题页，
  * Hermes 就主动读取系统实时状态（待审批提案 / 24h 错误率 / 风险项目），交给
- * Claude（Opus 4.8）生成 3 条结构化今日工作建议，而非渲染静态文案。
+ * LLM 生成 3 条结构化今日工作建议，而非渲染静态文案。
  *
- * Provider 策略与 harness-llm 一致：有 ANTHROPIC_API_KEY 走 claude-opus-4-8
- * （结构化输出），否则回退 DeepSeek，保证无官方 key 时功能依然可用。
+ * Provider/Model 选择经 selectModel() 策略路由决策并自动写入 AuditLog（§4.12），
+ * 不再自行实现 Provider 选择逻辑。
  *
  * ⚠️ 仅服务端（Route Handler / lib/server）调用，切勿在客户端引入。
  */
@@ -14,6 +14,11 @@ import anthropic from "@/lib/anthropic"
 import { prisma } from "@/lib/prisma"
 import { isErrorStatus } from "@/lib/server/harness-eval"
 import { parseJsonLoose } from "@/lib/harness-llm"
+import { selectModel } from "@/lib/server/model-router"
+import {
+  classifyUpstreamError,
+  isProviderAvailable,
+} from "@/lib/server/llm-provider"
 import type {
   HermesSuggestion,
   HermesSuggestionsResult,
@@ -22,8 +27,6 @@ import type {
   SuggestionRelatedTo,
 } from "@/types"
 
-const ANTHROPIC_MODEL = "claude-opus-4-8"
-const DEEPSEEK_MODEL = "deepseek-chat"
 /** 错误率统计窗口（小时） */
 const WINDOW_HOURS = 24
 /** 目标建议条数 */
@@ -142,12 +145,56 @@ function validateSuggestions(raw: unknown): HermesSuggestion[] {
   return suggestions
 }
 
-/** Anthropic 路径：claude-opus-4-8 + 结构化输出 */
+/** LLM 不可用时的预设建议降级方案 */
+function fallbackSuggestions(snapshot: HermesSystemSnapshot): HermesSuggestion[] {
+  const suggestions: HermesSuggestion[] = [
+    {
+      priority: "high",
+      title: "处理待跟进询盘",
+      action: "帮我列出所有未回复的高优先级询盘，并按紧急程度排序",
+      relatedTo: "agents",
+    },
+    {
+      priority: "mid",
+      title: "检查市场情报",
+      action: "帮我分析最近的汇率和关税变化对现有报价的影响",
+      relatedTo: "projects",
+    },
+    {
+      priority: "low",
+      title: "审查 Harness 提案",
+      action: "帮我查看当前待审批的 Harness 升级提案",
+      relatedTo: "harness",
+    },
+  ];
+
+  if (snapshot.pendingProposals > 0) {
+    suggestions[0] = {
+      priority: "high",
+      title: "审批 Harness 升级提案",
+      action: `当前有 ${snapshot.pendingProposals} 条待审批提案，建议尽快审查`,
+      relatedTo: "harness",
+    };
+  }
+  if (snapshot.atRiskCount > 0) {
+    suggestions[1] = {
+      priority: "high",
+      title: "关注风险项目",
+      action: `当前有 ${snapshot.atRiskCount} 个项目处于风险状态，建议立即评估`,
+      relatedTo: "projects",
+    };
+  }
+
+  return suggestions;
+}
+
+/** Anthropic 路径：结构化输出 */
 async function generateWithAnthropic(
   prompt: string,
+  model: string,
 ): Promise<{ suggestions: HermesSuggestion[]; model: string }> {
   const response = await anthropic.messages.create({
-    model: ANTHROPIC_MODEL,
+    model,
     max_tokens: 2048,
     output_config: {
       format: {
@@ -165,13 +212,14 @@ async function generateWithAnthropic(
   }
   return {
     suggestions: validateSuggestions(parseJsonLoose(textBlock.text)),
-    model: ANTHROPIC_MODEL,
+    model,
   }
 }
 
-/** DeepSeek 路径：兜底，JSON 模式 */
+/** DeepSeek 路径：JSON 模式 */
 async function generateWithDeepSeek(
   prompt: string,
+  model: string,
 ): Promise<{ suggestions: HermesSuggestion[]; model: string }> {
   const apiKey = process.env.DEEPSEEK_API_KEY
   if (!apiKey) throw new Error("DEEPSEEK_API_KEY 未配置")
@@ -183,7 +231,7 @@ async function generateWithDeepSeek(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: DEEPSEEK_MODEL,
+      model,
       max_tokens: 1024,
       temperature: 0.5,
       response_format: { type: "json_object" },
@@ -206,7 +254,11 @@ async function generateWithDeepSeek(
 
   if (!res.ok) {
     const errBody = await res.text().catch(() => "")
-    throw new Error(`DeepSeek 请求失败 (${res.status})：${errBody.slice(0, 200)}`)
+    const classified = classifyUpstreamError(res.status)
+    throw Object.assign(
+      new Error(`DeepSeek 请求失败 (${res.status})：${errBody.slice(0, 200)}`),
+      { upstreamStatus: res.status, classified },
+    )
   }
 
   const data = (await res.json()) as {
@@ -217,48 +269,52 @@ async function generateWithDeepSeek(
 
   return {
     suggestions: validateSuggestions(parseJsonLoose(content)),
-    model: DEEPSEEK_MODEL,
+    model,
   }
 }
 
 /**
  * 生成 Hermes 今日建议。
- * Provider 选择与 harness-llm 对齐：HARNESS_LLM_PROVIDER 显式覆盖，否则有
- * ANTHROPIC_API_KEY 用 Anthropic，否则回退 DeepSeek。
+ *
+ * §4.12 策略路由：经 selectModel() 决策 Provider/Model（禁止自行选择 Provider），
+ * 决策自动写入 AuditLog(action='model.route')。
+ *
+ * LLM 不可用时返回基于系统快照的预设建议。
  */
 export async function generateHermesSuggestions(): Promise<HermesSuggestionsResult> {
   const snapshot = await collectSnapshot()
   const prompt = buildUserPrompt(snapshot)
 
-  const override = process.env.HARNESS_LLM_PROVIDER?.toLowerCase().trim()
-  const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY?.trim())
-  const hasDeepSeek = Boolean(process.env.DEEPSEEK_API_KEY?.trim())
+  // LLM 不可用时返回基于系统快照的预设建议
+  if (!isProviderAvailable("anthropic") && !isProviderAvailable("deepseek")) {
+    return {
+      suggestions: fallbackSuggestions(snapshot),
+      snapshot,
+      provider: "deepseek",
+      model: "fallback",
+    }
+  }
 
-  let provider: "anthropic" | "deepseek"
+  // §4.12 策略路由：经 selectModel() 决策并自动写入 AuditLog
+  const routing = await selectModel({
+    taskType: "analysis",
+    riskLevel: "low",
+    estimatedTokens: Math.ceil((SYSTEM_PROMPT.length + prompt.length) / 4),
+    workspaceId: "default",
+  })
+
   let generated: { suggestions: HermesSuggestion[]; model: string }
 
-  if (override === "deepseek") {
-    if (!hasDeepSeek) throw new Error("HARNESS_LLM_PROVIDER=deepseek 但未配置 DEEPSEEK_API_KEY")
-    provider = "deepseek"
-    generated = await generateWithDeepSeek(prompt)
-  } else if (override === "anthropic") {
-    if (!hasAnthropic) throw new Error("HARNESS_LLM_PROVIDER=anthropic 但未配置 ANTHROPIC_API_KEY")
-    provider = "anthropic"
-    generated = await generateWithAnthropic(prompt)
-  } else if (hasAnthropic) {
-    provider = "anthropic"
-    generated = await generateWithAnthropic(prompt)
-  } else if (hasDeepSeek) {
-    provider = "deepseek"
-    generated = await generateWithDeepSeek(prompt)
+  if (routing.provider === "anthropic") {
+    generated = await generateWithAnthropic(prompt, routing.model)
   } else {
-    throw new Error("未配置 ANTHROPIC_API_KEY 或 DEEPSEEK_API_KEY，无法生成今日建议")
+    generated = await generateWithDeepSeek(prompt, routing.model)
   }
 
   return {
     suggestions: generated.suggestions,
     snapshot,
-    provider,
+    provider: routing.provider,
     model: generated.model,
   }
 }

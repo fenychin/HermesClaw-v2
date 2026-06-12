@@ -1,31 +1,24 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import {
-  parseJsonField,
   stringifyJsonField,
+  serializeMemory,
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { MemoryCreateSchema, validateBody } from "@/lib/validators"
-
-/** 序列化 Memory，将 JSON 字符串字段反序列化 */
-function serializeMemory(memory: Record<string, unknown>) {
-  return {
-    ...memory,
-    tags: parseJsonField(memory.tags as string, []),
-  }
-}
+import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 /** GET /api/memory?type=short|mid|long —— 获取记忆列表，支持类型过滤 */
 export async function GET(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const { searchParams } = new URL(request.url)
     const type = searchParams.get("type")
 
-    const where = type
-      ? { type }
-      : {}
+    const where: Record<string, unknown> = { workspaceId: ctx.workspaceId }
+    if (type) where.type = type
 
     const memories = await prisma.memory.findMany({
       where,
@@ -44,6 +37,8 @@ export async function GET(request: Request) {
 /** POST /api/memory —— 创建新记忆 */
 export async function POST(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
+    requireWritable(ctx.role)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, MemoryCreateSchema)
     if (parsed instanceof Response) return parsed
@@ -52,6 +47,7 @@ export async function POST(request: Request) {
     const memory = await prisma.memory.create({
       data: {
         id: crypto.randomUUID(),
+        workspaceId: ctx.workspaceId,
         type: body.type,
         content: body.content,
         summary: body.summary,
@@ -72,6 +68,7 @@ export async function POST(request: Request) {
       targetId: memory.id,
       detail: `${memory.type} · ${memory.summary}`,
       riskLevel: "low",
+      workspaceId: ctx.workspaceId,
     })
 
     return successResponse(

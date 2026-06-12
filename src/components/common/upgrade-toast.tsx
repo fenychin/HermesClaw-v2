@@ -46,7 +46,7 @@ export function UpgradeToast() {
 
   const pendingIds = useMemo(
     () =>
-      harnessProposals
+      (harnessProposals || [])
         .filter((p) => p.status === "pending")
         .map((p) => p.id),
     [harnessProposals],
@@ -95,7 +95,7 @@ export function UpgradeToast() {
           }}
           className={cn(
             "fixed bottom-6 right-6 z-50 w-72",
-            "rounded-xl border border-brand-primary/30 bg-card p-4",
+            "rounded-card border border-brand-primary/30 bg-card p-5",
             "shadow-xl",
           )}
         >

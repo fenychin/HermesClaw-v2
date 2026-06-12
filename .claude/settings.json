@@ -114,10 +114,32 @@
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\)['data']['proposal']; print\\('status:',d['status'],'reviewedBy:',d['reviewedBy']\\)\")",
       "Bash(curl -s 'http://localhost:3000/api/harness/evolution-log?limit=3')",
       "Bash(curl -s 'http://localhost:3000/api/audit?limit=3')",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "Bash(kill 11419 11422)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(node_modules/.bin/eslint src/components/common/PageTransition.tsx src/app/\\\\\\(workspace\\\\\\)/dashboard/page.tsx)",
+      "Bash(git fetch *)",
+      "Bash(echo \"=== fetch 退出码 $? ===\")",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git reset *)",
+      "Bash(git commit -m ' *)",
+      "Bash(node_modules/.bin/eslint src/components/common/relative-time.tsx)",
+      "Bash(node_modules/.bin/eslint src/components/pages/new/recent-panel.tsx)",
+      "Bash(node_modules/.bin/eslint src/components/layout/sidebar-recent.tsx)",
+      "Bash(curl -s -o /dev/null -w \"/new -> HTTP %{http_code}\\\\n\" \"http://localhost:3000/new\")",
+      "Bash(mkdir -p /Users/Feng/Desktop/Hermesclaw-v2/src/app/api/projects/\\\\[id\\\\]/tasks)",
+      "Bash(mkdir -p /Users/Feng/Desktop/Hermesclaw-v2/src/app/api/projects/\\\\[id\\\\]/memory)",
+      "Bash(mkdir -p \"/Users/Feng/Desktop/Hermesclaw-v2/src/app/api/projects/[id]/memory\")",
+      "Bash(TMPDIR=/tmp grep -rn \"TODO\\\\|FIXME\\\\|HACK\\\\|XXX\" /Users/Feng/Desktop/Hermesclaw-v2/src/app/api/projects/route.ts)",
+      "Bash(CLAUDE_CODE_TMPDIR=/tmp grep -rn \"TODO\\\\|FIXME\\\\|HACK\\\\|XXX\" /Users/Feng/Desktop/Hermesclaw-v2/src/app/api/projects/route.ts /Users/Feng/Desktop/Hermesclaw-v2/src/app/api/projects/\\\\[id\\\\]/route.ts /Users/Feng/Desktop/Hermesclaw-v2/src/app/api/projects/\\\\[id\\\\]/tasks/route.ts /Users/Feng/Desktop/Hermesclaw-v2/src/app/api/projects/\\\\[id\\\\]/memory/route.ts /Users/Feng/Desktop/Hermesclaw-v2/src/app/\\\\\\(workspace\\\\\\)/projects/page.tsx /Users/Feng/Desktop/Hermesclaw-v2/src/app/\\\\\\(workspace\\\\\\)/projects/\\\\[id\\\\]/page.tsx /Users/Feng/Desktop/Hermesclaw-v2/src/app/\\\\\\(workspace\\\\\\)/projects/\\\\[id\\\\]/_components/project-tabs.tsx /Users/Feng/Desktop/Hermesclaw-v2/src/app/\\\\\\(workspace\\\\\\)/projects/\\\\[id\\\\]/_components/project-risk-panel.tsx /Users/Feng/Desktop/Hermesclaw-v2/src/app/\\\\\\(workspace\\\\\\)/projects/_components/project-card.tsx /Users/Feng/Desktop/Hermesclaw-v2/src/app/\\\\\\(workspace\\\\\\)/projects/_data/mock-projects.ts)",
+      "Bash(git commit -m 'chore: 备份 — 项目空间模块全链路补齐：PATCH RBAC+审计+ws隔离修复 + serializeProject/Memory提取 + findProjectOrThrow helper + Tasks/Memory新端点 + 详情页五标签Tabs + 风险面板 + 列表分类筛选 + AGENTS.md §4.16登记 *)",
+      "Bash(git push *)"
     ],
     "additionalDirectories": [
-      "/Users/Feng/Desktop/Hermesclaw-v2/src/components/pages"
+      "/Users/Feng/Desktop/Hermesclaw-v2/src/components/pages",
+      "/Users/Feng/Desktop/Hermesclaw-v2/src/app/api/projects/[id]",
+      "/Users/Feng/Desktop/Hermesclaw-v2/src/app/api/projects/[id]/memory"
     ]
   }
 }
