@@ -26,6 +26,10 @@ import {
   GitBranch,
   ChevronRight,
   ChevronLeft,
+  UserCheck,
+  Receipt,
+  Mail,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -59,10 +63,34 @@ const BUILTIN_TEMPLATES = [
     icon: Sparkles,
   },
   {
+    key: "followup",
+    name: "客户跟进员",
+    desc: "日程提醒、关怀邮件、活跃度监控",
+    icon: UserCheck,
+  },
+  {
+    key: "quotation",
+    name: "报价代理",
+    desc: "运费核算、阶梯定价、多币种报价",
+    icon: Receipt,
+  },
+  {
+    key: "email",
+    name: "邮件写作员",
+    desc: "高转化率开发信、本地化表达、模板管理",
+    icon: Mail,
+  },
+  {
     key: "document",
     name: "产品资料员",
     desc: "知识库检索、多语言翻译、规格整理",
     icon: FileText,
+  },
+  {
+    key: "market-research",
+    name: "市场研究员",
+    desc: "竞品监控、行业研报、趋势预测",
+    icon: Search,
   },
   {
     key: "risk",
@@ -77,6 +105,18 @@ const BUILTIN_TEMPLATES = [
     icon: GitBranch,
   },
 ] as const;
+
+/** 模板预填角色映射 */
+const TEMPLATE_ROLES: Record<string, string> = {
+  sales: "客户开发与跟进",
+  inquiry: "自动分类与评级",
+  followup: "生命周期维护",
+  quotation: "智能生成报价单",
+  email: "专业外贸邮件生成",
+  document: "整理商品详情与规格",
+  "market-research": "竞品与行业趋势分析",
+  risk: "客户背景与合规风险排查",
+};
 
 /** 预设技能列表（AGENTS.md §4.0 Claude Code Skills 标准） */
 const PRESET_SKILLS = [
@@ -351,7 +391,7 @@ export function NewAgentDialog() {
                       if (!isBlank) {
                         // 预填模板数据
                         update("name", tmpl.name);
-                        update("role", tmpl.key === "sales" ? "客户开发与跟进" : tmpl.key === "inquiry" ? "自动分类与评级" : tmpl.key === "document" ? "整理商品详情与规格" : "客户背景与合规风险排查");
+                        update("role", TEMPLATE_ROLES[tmpl.key] ?? tmpl.desc);
                       }
                     }}
                     className={cn(
