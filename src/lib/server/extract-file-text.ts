@@ -94,14 +94,14 @@ export async function extractFileText(
 
 /** PDF 文本提取 */
 async function extractPdf(buffer: Buffer): Promise<ExtractResult> {
-  // pdf-parse v2: 使用 PDFParse 类
+  // pdf-parse v2 API: new PDFParse({ data }) → load() → getText()
   const { PDFParse } = await import("pdf-parse");
-  const parser = new (PDFParse as unknown as new (opts: { data: Buffer }) => { getAllText: () => Promise<string | { text?: string }> })({ data: buffer });
-  const textResult = await parser.getAllText();
-  const text = truncate(
-    typeof textResult === "string" ? textResult : (textResult as { text?: string })?.text ?? String(textResult),
-    MAX_CHARS,
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const parser = new (PDFParse as any)({ data: buffer });
+  await parser.load();
+  const textResult: { text?: string } = await parser.getText();
+  const raw = textResult?.text ?? "";
+  const text = truncate(raw, MAX_CHARS);
   if (!text.trim()) {
     return { ok: false, note: "PDF 未包含可提取文本（可能是扫描图片型 PDF）" };
   }

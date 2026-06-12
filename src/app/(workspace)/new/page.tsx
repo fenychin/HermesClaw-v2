@@ -1,34 +1,20 @@
 "use client";
 
-import { Suspense, useCallback, useEffect } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageTransition } from "@/components/common/PageTransition";
-import {
-  CommandBox,
-  SELECTABLE_MODELS,
-  DEFAULT_MODEL_ID,
-} from "@/components/pages/new/command-box";
+import { CommandBox } from "@/components/pages/new/command-box";
 import { QuickCards } from "@/components/pages/new/quick-cards";
+import { QuickTaskPanel } from "@/components/pages/new/quick-task-panel";
 import { ConversationArea } from "@/components/pages/new/conversation-area";
 import { SuggestionPanel } from "@/components/pages/new/suggestion-panel";
 import { RecentPanel } from "@/components/pages/new/recent-panel";
 import { useChat } from "@/hooks/useChat";
+import { useModelPreference } from "@/hooks/use-model-preference";
 import { useUiStore } from "@/stores/ui-store";
-
-const LS_MODEL_KEY = "hermes-selected-model";
-
-/** 从 localStorage 恢复上次选择的模型 ID，默认 deepseek-v4-pro */
-function loadSavedModel(): string {
-  try {
-    const saved = localStorage.getItem(LS_MODEL_KEY);
-    if (saved && SELECTABLE_MODELS.some((m) => m.id === saved && m.available)) {
-      return saved;
-    }
-  } catch { /* localStorage 不可用时忽略 */ }
-  return DEFAULT_MODEL_ID;
-}
 
 /**
  * 新话题页面（超级入口）— PRD §10.2
@@ -62,8 +48,12 @@ function NewTopicPageInner() {
   const pendingSystemPrompt = useUiStore((s) => s.newTopicPendingSystemPrompt);
   const setPendingSystemPrompt = useUiStore((s) => s.setNewTopicPendingSystemPrompt);
   const clearNewTopicInput = useUiStore((s) => s.clearNewTopicInput);
-  const selectedModelId = useUiStore((s) => s.newTopicModelId);
-  const setSelectedModelId = useUiStore((s) => s.setNewTopicModelId);
+  const storeSetModelId = useUiStore((s) => s.setNewTopicModelId);
+
+  // 模型选择偏好 Hook（localStorage 恢复 + 持久化，同步到 Zustand ui-store）
+  const { selectedModelId, handleModelChange, getApiModelId } = useModelPreference(
+    storeSetModelId,
+  );
 
   // 从 /recent 点击跳转时通过 ?load=conversationId 自动加载历史对话
   const searchParams = useSearchParams();
@@ -74,25 +64,14 @@ function NewTopicPageInner() {
     }
   }, [searchParams, loadConversation]);
 
-  // 挂载后从 localStorage 恢复上次选择的模型（仅客户端，不参与水合比对）
-  useEffect(() => {
-    const saved = loadSavedModel();
-    if (saved !== DEFAULT_MODEL_ID) {
-      setSelectedModelId(saved);
-    }
-  }, [setSelectedModelId]);
-
-  const handleModelChange = useCallback((modelId: string) => {
-    setSelectedModelId(modelId);
-    try { localStorage.setItem(LS_MODEL_KEY, modelId); } catch { /* noop */ }
-  }, [setSelectedModelId]);
-
   const hasMessages = messages.length > 0;
+
+  // 快捷任务面板折叠态（仅空态展示）
+  const [showQuickTask, setShowQuickTask] = useState(false);
 
   const handleSend = useCallback(() => {
     if (!input.trim() || isStreaming) return;
-    const model = SELECTABLE_MODELS.find((m) => m.id === selectedModelId);
-    const apiModelId = model?.modelId;
+    const apiModelId = getApiModelId();
 
     // 解析输入中的 @智能体、#项目、/命令
     const agentMentions = input.match(/@(\S+)/g)?.map((m: string) => m.slice(1)) ?? [];
@@ -122,7 +101,7 @@ function NewTopicPageInner() {
 
     sendMessage(input.trim(), enhancedSystemPrompt, apiModelId);
     clearNewTopicInput();
-  }, [input, isStreaming, sendMessage, pendingSystemPrompt, selectedModelId, clearNewTopicInput]);
+  }, [input, isStreaming, sendMessage, pendingSystemPrompt, getApiModelId, clearNewTopicInput]);
 
   const handleQuickActionSelect = useCallback(
     (prompt: string, systemPrompt?: string) => {
@@ -192,8 +171,41 @@ function NewTopicPageInner() {
 
             {/* 快捷入口：仅空状态展示，置于输入框下方 */}
             {!hasMessages && (
-              <div className="w-full max-w-2xl mx-auto mt-5">
+              <div className="w-full max-w-2xl mx-auto mt-5 space-y-4">
                 <QuickCards onSelect={handleQuickActionSelect} />
+
+                {/* 结构化快捷任务（置信度护栏）— 可折叠 */}
+                <div className="border-t border-border pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickTask((v) => !v)}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ChevronDown
+                      className={cn(
+                        "size-3.5 transition-transform duration-200",
+                        showQuickTask && "rotate-180",
+                      )}
+                    />
+                    结构化任务
+                    <span className="text-hint font-normal">（带置信度护栏，低置信度自动提示人工复核）</span>
+                  </button>
+                  <AnimatePresence>
+                    {showQuickTask && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pt-3">
+                          <QuickTaskPanel />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
             )}
           </motion.div>

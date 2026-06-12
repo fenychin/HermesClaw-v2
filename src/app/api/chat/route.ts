@@ -5,7 +5,7 @@ import { writeAgentLog } from "@/lib/server/agent-log";
 import { getGovernanceClause } from "@/lib/server/agents-md";
 import { rateLimit } from "@/lib/rate-limit";
 import { ChatMessageSchema, validateBody } from "@/lib/validators";
-import { buildWorkspaceContext } from "@/lib/workspace";
+import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace";
 import { selectModel } from "@/lib/server/model-router";
 import { openChatStream } from "@/lib/server/llm-provider";
 
@@ -43,7 +43,9 @@ export async function POST(req: NextRequest) {
     const { messages, systemPrompt, modelId } = parsed;
 
     // 解析工作空间上下文（供路由配置读取 + 审计归属）
-    const { workspaceId } = await buildWorkspaceContext(req);
+    const ctx = await buildWorkspaceContext(req);
+    requireWritable(ctx.role); // 对话写入需 MEMBER+ 权限（AGENTS.md §4.11）
+    const { workspaceId } = ctx;
 
     // 注入 AGENTS.md 治理条款（运行时加载，最高优先级）
     const governance = await getGovernanceClause();
@@ -82,6 +84,14 @@ export async function POST(req: NextRequest) {
       elapsed,
     });
   } catch (error) {
+    // 权限不足（VIEWER）：返回 403
+    if (error instanceof ForbiddenError) {
+      return Response.json(
+        { error: error.message },
+        { status: 403 },
+      );
+    }
+
     const errMsg = error instanceof Error ? error.message : "";
     logger.error('Chat API 请求失败', { error: errMsg });
 

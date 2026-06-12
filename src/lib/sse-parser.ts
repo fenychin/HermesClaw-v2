@@ -7,8 +7,6 @@
  *   结束标记：data: [DONE]\n\n
  *
  * 可复用于 /api/chat、/api/openclaw/events 等所有 SSE 端点。
- *
- * TODO: 后续将 useChat.ts / chat-store.ts 中的内联 SSE 解析替换为本工具。
  */
 
 /** SSE 流配置选项 */

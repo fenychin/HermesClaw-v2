@@ -17,7 +17,10 @@ const TopicCreateSchema = z.object({
     .array(
       z.object({
         name: z.string().min(1).max(255),
-        url: z.string().url().max(2000),
+        url: z.string().min(1).max(2000).refine(
+          (v) => /^https?:\/\//i.test(v) || v.startsWith("/"),
+          { message: "url 须为绝对 http/https 链接或以 / 开头的相对路径" },
+        ),
         size: z.number().positive().max(100 * 1024 * 1024).optional(),
         type: z.string().max(100).optional(),
       }),

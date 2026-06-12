@@ -76,15 +76,18 @@ export async function PATCH(
     const body = await request.json().catch(() => null)
     if (!body) return errorResponse("请求体无效", 400)
 
-    const existing = await prisma.conversation.findUnique({ where: { id } })
+    // workspaceId 隔离：仅允许操作当前工作空间内的对话（AGENTS.md §4.11）
+    const existing = await prisma.conversation.findFirst({
+      where: { id, workspaceId: ctx.workspaceId },
+    })
     if (!existing) return errorResponse("对话不存在", 404)
 
-    // 仅允许更新 projectId 和 title
+    // 仅允许更新 projectId 和 title；拒绝空/纯空白标题
     const updateData: Record<string, unknown> = {}
     if (typeof body.projectId === "string" || body.projectId === null) {
       updateData.projectId = body.projectId
     }
-    if (typeof body.title === "string" && body.title.length <= 200) {
+    if (typeof body.title === "string" && body.title.trim().length > 0 && body.title.length <= 200) {
       updateData.title = body.title
     }
 
@@ -128,6 +131,13 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof ForbiddenError) return errorResponse(error.message, 403)
     logger.error('PATCH /api/conversations/[id]: 失败', { error: error instanceof Error ? error.message : '未知错误' })
+    void writeAgentLog({
+      source: "conversation",
+      taskName: "对话更新",
+      status: "error",
+      duration: elapsed(),
+      detail: error instanceof Error ? error.message : "对话更新失败",
+    })
     return errorResponse("服务器内部错误")
   }
 }
