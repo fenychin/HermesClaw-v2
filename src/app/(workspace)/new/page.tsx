@@ -146,40 +146,46 @@ function NewTopicPageInner() {
   return (
     <PageTransition>
       <div className="h-full flex bg-background">
-        {/* 左栏：输入框始终垂直居中；上方显示对话历史（max-h 限制，不挤走输入框）或快捷入口 */}
-        <div className="flex-1 flex flex-col items-center justify-center min-w-0 min-h-0 gap-5 px-4 md:px-8">
-          {/* 对话历史（仅当有消息时，限制高度不影响输入框居中） */}
+        {/* 左栏：对话区撑满剩余空间，输入框固定在底部 */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+          {/* 对话历史 — 撑满可用高度，内部滚动 */}
           {hasMessages && (
-            <div className="w-full max-w-2xl max-h-[30vh] shrink-0">
-              <ConversationArea
-                messages={messages}
+            <div className="flex-1 min-h-0 overflow-hidden px-4 md:px-8 pt-6">
+              <div className="h-full max-w-2xl mx-auto">
+                <ConversationArea
+                  messages={messages}
+                  isStreaming={isStreaming}
+                  streamingContent={streamingContent}
+                  onClearMessages={clearMessages}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* 空状态：快捷入口居中 */}
+          {!hasMessages && (
+            <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-8">
+              <div className="w-full max-w-2xl">
+                <QuickCards onSelect={handleQuickActionSelect} />
+              </div>
+            </div>
+          )}
+
+          {/* 输入框 — 固定在底部 */}
+          <div className="shrink-0 px-4 md:px-8 pb-4 pt-2">
+            <div className="max-w-2xl mx-auto">
+              <CommandBox
+                value={input}
+                onChange={setInput}
+                onSubmit={handleSend}
+                onStop={stopStreaming}
                 isStreaming={isStreaming}
-                streamingContent={streamingContent}
-                onClearMessages={clearMessages}
+                error={error}
+                selectedModelId={selectedModelId}
+                onModelChange={handleModelChange}
               />
             </div>
-          )}
-
-          {/* 输入框 — 始终居中 */}
-          <div className="w-full max-w-2xl shrink-0">
-            <CommandBox
-              value={input}
-              onChange={setInput}
-              onSubmit={handleSend}
-              onStop={stopStreaming}
-              isStreaming={isStreaming}
-              error={error}
-              selectedModelId={selectedModelId}
-              onModelChange={handleModelChange}
-            />
           </div>
-
-          {/* 快捷入口：双排网格（仅空状态展示） */}
-          {!hasMessages && (
-            <div className="w-full max-w-2xl">
-              <QuickCards onSelect={handleQuickActionSelect} />
-            </div>
-          )}
         </div>
 
         <aside className="w-64 xl:w-72 shrink-0 border-l border-border overflow-y-auto hidden xl:flex flex-col p-3">
