@@ -25,6 +25,8 @@ interface ConversationAreaProps {
   isStreaming: boolean;
   /** 当前流式输出文本（未沉淀到 messages） */
   streamingContent: string;
+  /** 当前持久化对话 ID（用于创建项目时关联对话） */
+  conversationId: string | null;
   /** 清空对话回调 */
   onClearMessages: () => void;
 }
@@ -38,6 +40,7 @@ export function ConversationArea({
   messages,
   isStreaming,
   streamingContent,
+  conversationId,
   onClearMessages,
 }: ConversationAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -105,7 +108,7 @@ export function ConversationArea({
     }
   }, [messages, savingSkill, createdSkillId]);
 
-  /** 创建项目空间：从对话内容提取关键信息并创建项目 */
+  /** 创建项目空间：从对话内容提取关键信息并创建项目，同时关联当前对话 */
   const handleCreateProject = useCallback(async () => {
     if (creatingProject || createdProjectId) return;
     setCreatingProject(true);
@@ -137,6 +140,14 @@ export function ConversationArea({
       const projectId = project?.id;
       if (projectId) {
         setCreatedProjectId(projectId);
+
+        // 将当前对话关联到新项目（传入真实会话内容）
+        if (conversationId) {
+          apiClient.updateConversation(conversationId, { projectId }).catch((err) => {
+            console.warn("关联对话到项目失败:", err);
+          });
+        }
+
         toast.success("项目已创建", {
           description: `「${projectName}」已创建，点击"查看项目"进入`,
         });
@@ -152,7 +163,7 @@ export function ConversationArea({
     } finally {
       setCreatingProject(false);
     }
-  }, [messages, creatingProject, createdProjectId]);
+  }, [messages, conversationId, creatingProject, createdProjectId]);
 
   // 空状态
   if (messages.length === 0 && !streamingContent) {
@@ -287,7 +298,11 @@ export function ConversationArea({
                 variant="ghost"
                 size="xs"
                 className="text-brand-blue hover:text-brand-blue/80 text-xs gap-1 h-7"
-                onClick={() => router.push(`/projects/${createdProjectId}`)}
+                onClick={() =>
+                  router.push(
+                    `/projects/${createdProjectId}${conversationId ? `?load=${conversationId}` : ""}`,
+                  )
+                }
               >
                 查看项目
                 <ArrowUpRight className="size-3" />
