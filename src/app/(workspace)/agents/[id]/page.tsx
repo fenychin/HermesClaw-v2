@@ -161,7 +161,9 @@ export default function AgentDetailPage() {
       try {
         const data = await apiClient.getAgent(id);
         const raw = data?.agent;
-        return isValidAgent(raw) ? raw : null;
+        if (isValidAgent(raw)) return raw;
+          // API 返回但校验失败 → 回退到 mock
+          return buildMockAgent(id);
       } catch {
         // API 失败 → 回退到 mock 数据
         return buildMockAgent(id);

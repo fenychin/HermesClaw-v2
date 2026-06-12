@@ -21,7 +21,7 @@ import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { getGovernanceClause } from "@/lib/server/agents-md"
 import { rateLimit } from "@/lib/rate-limit"
 import { AgentExecuteSchema, validateBody } from "@/lib/validators"
-import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
+import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
 import { selectModel } from "@/lib/server/model-router"
 import { callAnthropicText, type LlmProvider } from "@/lib/server/llm-provider"
 
@@ -251,6 +251,10 @@ export async function POST(
 
     return successResponse({ status: "ok", result: output })
   } catch (error) {
+    // 权限错误返回 403（而非模糊的 500）
+    if (error instanceof ForbiddenError) {
+      return errorResponse(error.message, 403)
+    }
     logger.error(
       "POST /api/agents/[id]/execute: 失败",
       { error: error instanceof Error ? error.message : "未知错误" },
