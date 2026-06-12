@@ -23,73 +23,12 @@ import {
 } from "lucide-react";
 import { useAgentStore } from "@/stores/agent-store";
 import { useProjectStore } from "@/stores/project-store";
+import { apiClient } from "@/lib/api-client";
 import type { Agent, Project } from "@/types";
 import { toast } from "sonner";
 
-// ============================================================
-// 可选模型配置（Provider + 具体型号 → API modelId）
-// ============================================================
-
-export interface SelectableModel {
-  id: string;
-  provider: "anthropic" | "deepseek";
-  label: string;
-  version: string;
-  color: string;
-  modelId: string; // 传给 /api/chat 的实际模型名
-  available: boolean;
-}
-
-export const SELECTABLE_MODELS: SelectableModel[] = [
-  {
-    id: "deepseek-v4-pro",
-    provider: "deepseek",
-    label: "DeepSeek",
-    version: "V4 Pro",
-    color: "bg-success",
-    modelId: "deepseek-v4-pro",
-    available: true,
-  },
-  {
-    id: "deepseek-v4-flash",
-    provider: "deepseek",
-    label: "DeepSeek",
-    version: "V4 Flash",
-    color: "bg-success",
-    modelId: "deepseek-v4-flash",
-    available: true,
-  },
-  {
-    id: "claude-sonnet-4-6",
-    provider: "anthropic",
-    label: "Claude",
-    version: "Sonnet 4.6",
-    color: "bg-warning",
-    modelId: "claude-sonnet-4-6",
-    available: true,
-  },
-  {
-    id: "claude-haiku-4-5",
-    provider: "anthropic",
-    label: "Claude",
-    version: "Haiku 4.5",
-    color: "bg-warning",
-    modelId: "claude-haiku-4-5",
-    available: false,
-  },
-  {
-    id: "claude-opus-4-8",
-    provider: "anthropic",
-    label: "Claude",
-    version: "Opus 4.8",
-    color: "bg-warning",
-    modelId: "claude-opus-4-8",
-    available: false,
-  },
-];
-
-/** 默认选中的模型 */
-export const DEFAULT_MODEL_ID = "deepseek-v4-pro";
+// 模型配置从 src/config/models.ts 统一导入（单一数据源）
+import { SELECTABLE_MODELS, type SelectableModel } from "@/config/models";
 
 /** 下拉弹窗类型 */
 type DropdownType = "agent" | "project" | null;
@@ -171,9 +110,8 @@ export function CommandBox({
   // 语音权限提示（首次使用）
   const [voicePermissionDenied, setVoicePermissionDenied] = useState(false);
 
-  // 可用技能命令列表（/ft-*，与 .claude/skills/ft-*/ 目录同步）
-  // ⚠️ 新增/删除 skill 时须同步更新此列表（AGENTS.md §4.14）
-  const SLASH_COMMANDS = [
+  /** 技能命令降级列表（API 不可用时兜底，与 .claude/skills/ft-* 目录对应） */
+  const FALLBACK_SLASH_COMMANDS = [
     { name: "/ft-inquiry-sorter", label: "邮件解析与询盘分拣", desc: "解析入站邮件，提取询盘关键信息并分类" },
     { name: "/ft-inquiry-grading", label: "询盘智能分级", desc: "A/B/C 三级评分询盘" },
     { name: "/ft-inquiry-priority", label: "询盘优先级评估", desc: "四维度评分，辅助跟进决策" },
@@ -187,6 +125,60 @@ export function CommandBox({
     { name: "/ft-follow-up-crm", label: "客户跟进管理", desc: "跟进提醒与话术建议" },
     { name: "/ft-competitor-analysis", label: "竞品动态分析", desc: "目标市场画像与竞品格局" },
   ];
+
+  interface SlashCommand {
+    name: string;
+    label: string;
+    desc: string;
+  }
+
+  // 技能命令列表（动态拉取 /api/skills，失败时降级为硬编码列表）
+  const [slashCommands, setSlashCommands] = useState<SlashCommand[]>(FALLBACK_SLASH_COMMANDS);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .getSkills()
+      .then(({ skills }) => {
+        if (cancelled || !Array.isArray(skills) || skills.length === 0) return;
+        const mapped: SlashCommand[] = [];
+        const seen = new Set<string>();
+        for (const s of skills) {
+          const skill = s as Record<string, unknown>;
+          const name = String(skill.name ?? "");
+          const description = String(skill.description ?? "");
+          // 尝试从 inputSchema 提取 commandName，否则根据名称生成
+          let cmdName: string;
+          try {
+            const schema = typeof skill.inputSchema === "string"
+              ? JSON.parse(skill.inputSchema)
+              : (skill.inputSchema as Record<string, unknown>) ?? {};
+            cmdName = typeof schema.commandName === "string" && schema.commandName
+              ? `/${schema.commandName}`
+              : `/${name.toLowerCase().replace(/\s+/g, "-")}`;
+          } catch {
+            cmdName = `/${name.toLowerCase().replace(/\s+/g, "-")}`;
+          }
+          if (!seen.has(cmdName)) {
+            seen.add(cmdName);
+            mapped.push({ name: cmdName, label: name, desc: description || name });
+          }
+        }
+        // 将降级列表中 API 未返回的内置命令合并进来
+        for (const fb of FALLBACK_SLASH_COMMANDS) {
+          if (!seen.has(fb.name)) {
+            seen.add(fb.name);
+            mapped.push(fb);
+          }
+        }
+        setSlashCommands(mapped);
+      })
+      .catch(() => {
+        // API 失败时保留降级列表，静默处理
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ---- 自动调整 textarea 高度 ----
   const autoResize = useCallback(() => {
@@ -895,7 +887,7 @@ export function CommandBox({
                     <p className="text-hint text-[10px] font-bold px-3 py-1.5 uppercase tracking-wider">
                       技能命令
                     </p>
-                    {SLASH_COMMANDS.map((cmd) => (
+                    {slashCommands.map((cmd) => (
                       <button
                         key={cmd.name}
                         type="button"

@@ -89,9 +89,7 @@ export type {
   ModelProvider,
   ChatMessage,
   ChatRequest,
-  ModelOption,
 } from "./chat";
-export { AVAILABLE_MODELS } from "./chat";
 
 // ---- Hermes 控制面（今日主动建议）----
 export type {
