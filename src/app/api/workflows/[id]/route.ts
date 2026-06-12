@@ -1,14 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
-import { successResponse, errorResponse, parseJsonField } from "@/lib/api-utils"
+import { successResponse, errorResponse, serializeWorkflow } from "@/lib/api-utils"
 import { buildWorkspaceContext } from "@/lib/workspace"
-
-/** 将 DB 中的 JSON 字符串 nodes/edges 解析为结构化对象 */
-function serializeWorkflow(wf: { nodes: string | object; edges: string | object } & Record<string, unknown>) {
-  const nodes = typeof wf.nodes === "string" ? parseJsonField(wf.nodes, []) : wf.nodes
-  const edges = typeof wf.edges === "string" ? parseJsonField(wf.edges, []) : wf.edges
-  return { ...wf, nodes, edges }
-}
 
 /** GET /api/workflows/[id] —— 获取单个工作流定义（含解析后的 nodes / edges） */
 export async function GET(
