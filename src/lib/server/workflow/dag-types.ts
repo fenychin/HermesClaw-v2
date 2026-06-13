@@ -171,6 +171,11 @@ export interface DagEngineHooks {
     ctx: WorkflowRunContext,
     result: NodeExecutionResult,
   ) => Promise<void>
+  /** 工作流执行完成（整体状态已确定） */
+  onWorkflowComplete?: (
+    ctx: WorkflowRunContext,
+    status: RunStatus,
+  ) => Promise<void>
 }
 
 // ---- 拓扑排序内部类型（不对外导出） ----

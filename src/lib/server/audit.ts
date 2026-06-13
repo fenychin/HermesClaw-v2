@@ -225,6 +225,10 @@ export async function createAuditEntry(
 export async function updateAuditEntry(
   input: UpdateAuditEntryInput,
 ): Promise<void> {
+  // 防御：当 auditId 缺失或为 undefined 时直接跳过
+  if (!input.auditId) {
+    return
+  }
   // 预记录写入失败时 auditId 为 lost-* 假 ID，直接跳过更新
   if (input.auditId.startsWith("lost-")) {
     return
