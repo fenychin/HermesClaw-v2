@@ -86,7 +86,16 @@ export const IndustryManifestSchema = z.object({
   /** 迁移规则列表（CLAUDE.md §6.3 migrationRules）。 */
   migrationRules: z.array(MigrationRuleSchema).default([]),
   /** 目录结构声明（CLAUDE.md §6.2）。 */
-  directories: IndustryDirectorySchema.default({}),
+  directories: IndustryDirectorySchema.default({
+    agents: false,
+    workflows: false,
+    skills: false,
+    knowledge: false,
+    connectors: false,
+    schemas: false,
+    dashboards: false,
+    evalRules: false,
+  }),
   /** 支持的语言列表。 */
   languages: z.array(z.string()).default(["zh-CN"]),
   /** 行业包激活状态。 */
