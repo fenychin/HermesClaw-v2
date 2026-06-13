@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
-import { parseJsonField, successResponse, errorResponse } from "@/lib/api-utils"
+import { parseJsonField, successResponse, errorResponse, serializeSkill } from "@/lib/api-utils"
 import { buildWorkspaceContext } from "@/lib/workspace"
 import { withRBAC } from "@/lib/server/api-handler"
 import { validateBody, SkillCreateSchema } from "@/lib/validators"
@@ -8,25 +8,16 @@ import type { WorkspaceContext } from "@/lib/workspace"
 import { rateLimit } from "@/lib/rate-limit"
 import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
 
-/** 序列化 Skill，将 JSON 字符串字段反序列化为数组 */
-function serializeSkill(skill: Record<string, unknown>) {
-  return {
-    ...skill,
-    usedByAgents: parseJsonField(skill.usedByAgents as string, []),
-    scenarios: parseJsonField(skill.scenarios as string, []),
-  }
-}
+import { getSkillsWithStats } from "@/lib/server/skills"
 
 /** GET /api/skills —— 获取所有技能列表 */
 export async function GET(request: Request) {
   try {
     const ctx = await buildWorkspaceContext(request)
-    const skills = await prisma.skill.findMany({
-      where: { workspaceId: ctx.workspaceId },
-      orderBy: { createdAt: "desc" },
-    })
+    const skills = await getSkillsWithStats(ctx.workspaceId)
+
     return successResponse({
-      skills: skills.map((s) => serializeSkill(s as unknown as Record<string, unknown>)),
+      skills,
     })
   } catch (error) {
     logger.error('GET /api/skills: 失败', { error: error instanceof Error ? error.message : '未知错误' })

@@ -16,7 +16,8 @@ export type StatusBadgeStatus =
   | "pending"
   | "approved"
   | "rejected"
-  | "upgrade";
+  | "upgrade"
+  | "pending_config";
 
 interface StatusBadgeProps {
   status: StatusBadgeStatus;
@@ -35,6 +36,7 @@ const STATUS_LABEL: Record<StatusBadgeStatus, string> = {
   approved: "已通过",
   rejected: "已驳回",
   upgrade: "可升级",
+  pending_config: "待配置",
 };
 
 /**
@@ -58,6 +60,8 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
         status === "connected" && "bg-success/10 text-success",
         /* 待审批：黄色 */
         status === "pending" && "bg-warning/10 text-warning",
+        /* 待配置：黄色 */
+        status === "pending_config" && "bg-warning/10 text-warning",
         /* 已通过：绿色 */
         status === "approved" && "bg-success/10 text-success",
         /* 已驳回：红色 */

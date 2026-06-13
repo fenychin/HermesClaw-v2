@@ -9,21 +9,21 @@ import {
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { ConnectorCreateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
+import type { Connector } from "@/types"
+
+import { getEnrichedConnectors } from "@/lib/server/connectors"
 
 /** GET /api/connectors —— 获取所有连接器列表（CDN 缓存 60s，过期后可 revalidate 30s） */
 export async function GET(request: Request) {
   try {
     const ctx = await buildWorkspaceContext(request)
-    const connectors = await prisma.connector.findMany({
-      where: { workspaceId: ctx.workspaceId },
-      orderBy: { createdAt: "desc" },
-    })
+    const enrichedConnectors = await getEnrichedConnectors(ctx.workspaceId)
 
     return Response.json(
       {
         success: true,
         data: {
-          connectors: connectors.map((c) => serializeConnector(c as unknown as Record<string, unknown>)),
+          connectors: enrichedConnectors,
         },
       },
       {
