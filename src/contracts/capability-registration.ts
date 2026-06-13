@@ -5,6 +5,9 @@ import {
   VersionSchema,
 } from "./shared"
 
+/** CapabilityRegistration 独立契约版本。 */
+export const CAPABILITY_REGISTRATION_VERSION = "1.0.0"
+
 /**
  * CapabilityRegistration —— 能力注册（OpenClaw Runtime → Hermes）。
  *

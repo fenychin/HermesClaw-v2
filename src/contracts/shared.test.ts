@@ -6,6 +6,7 @@ import {
   ExecutionStatusSchema,
   VersionSchema,
   TimestampSchema,
+  IdSchema,
   CONTRACT_VERSION,
 } from "./shared"
 
@@ -25,10 +26,22 @@ describe("shared enums & primitives", () => {
     expect(RiskLevelSchema.safeParse("severe").success).toBe(false)
   })
 
-  it("EventType 覆盖 run.* / session.* / tool.* 事件族（AGENTS §3.3）", () => {
+  it("EventType 覆盖 run.* / session.* / tool.* / approval.* / artifact.* 事件族（AGENTS §3.3）", () => {
+    // run 族
     expect(EventTypeSchema.safeParse("run.completed").success).toBe(true)
+    expect(EventTypeSchema.safeParse("run.cancelled").success).toBe(true)
+    // session 族
     expect(EventTypeSchema.safeParse("session.created").success).toBe(true)
+    expect(EventTypeSchema.safeParse("session.expired").success).toBe(true)
+    // tool 族
     expect(EventTypeSchema.safeParse("tool.call.failed").success).toBe(true)
+    // approval 族
+    expect(EventTypeSchema.safeParse("approval.requested").success).toBe(true)
+    expect(EventTypeSchema.safeParse("approval.resolved").success).toBe(true)
+    // artifact 族
+    expect(EventTypeSchema.safeParse("artifact.created").success).toBe(true)
+    expect(EventTypeSchema.safeParse("artifact.deleted").success).toBe(true)
+    // 非法
     expect(EventTypeSchema.safeParse("run.exploded").success).toBe(false)
   })
 
@@ -47,5 +60,13 @@ describe("shared enums & primitives", () => {
     expect(TimestampSchema.safeParse("2026-06-13T10:00:00Z").success).toBe(true)
     expect(TimestampSchema.safeParse("2026-06-13").success).toBe(false)
     expect(TimestampSchema.safeParse("not-a-date").success).toBe(false)
+  })
+
+  it("IdSchema 拒绝空串与纯空白，接受合法 id", () => {
+    expect(IdSchema.safeParse("").success).toBe(false)
+    expect(IdSchema.safeParse("   ").success).toBe(false)
+    expect(IdSchema.safeParse("\t\n").success).toBe(false)
+    expect(IdSchema.parse("task_1")).toBe("task_1")
+    expect(IdSchema.parse("  foo  ")).toBe("foo") // trim
   })
 })

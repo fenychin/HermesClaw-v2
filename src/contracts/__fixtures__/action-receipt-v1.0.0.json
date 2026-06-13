@@ -1,0 +1,11 @@
+{
+  "receiptId": "rcpt_fixture_1",
+  "taskId": "task_fixture_1",
+  "workflowRunId": "run_fixture_1",
+  "connectorId": "conn_email",
+  "idempotencyKey": "idem_fixture_1",
+  "outcome": "success",
+  "executedAt": "2026-06-13T10:00:05Z",
+  "response": { "messageId": "msg_42" },
+  "version": "1.0.0"
+}

@@ -21,8 +21,13 @@ export const VersionSchema = z
 /** ISO-8601 时间戳（带时区偏移），用于事件/回执的发生时刻。 */
 export const TimestampSchema = z.iso.datetime({ offset: true })
 
-/** 非空标识符（id/key 类字段的统一约束）。 */
-export const IdSchema = z.string().min(1)
+/**
+ * 非空标识符（id/key 类字段的统一约束）。
+ *
+ * .trim().min(1) 确保纯空白字符串被拒绝。
+ * 下游如需更严格约束（如 UUID/前缀格式），可在具体 schema 中叠加 .refine()。
+ */
+export const IdSchema = z.string().trim().min(1, "id 不能为空或纯空白")
 
 /**
  * 自动化授权等级 L1–L4（AGENTS §5.2）。
@@ -48,16 +53,25 @@ export const EventTypeSchema = z.enum([
   "run.progress",
   "run.completed",
   "run.failed",
+  "run.cancelled",
   // session 族：会话生命周期
   "session.created",
+  "session.resumed",
   "session.ended",
+  "session.expired",
   // tool 族：工具/连接器调用
   "tool.call.started",
   "tool.call.completed",
   "tool.call.failed",
-  // 审批与产物
+  // approval 族：审批流程
   "approval.requested",
+  "approval.resolved",
+  "approval.rejected",
+  "approval.expired",
+  // artifact 族：产物管理
   "artifact.created",
+  "artifact.updated",
+  "artifact.deleted",
 ])
 export type EventType = z.infer<typeof EventTypeSchema>
 
@@ -71,6 +85,11 @@ export const ExecutionStatusSchema = z.enum([
 ])
 export type ExecutionStatus = z.infer<typeof ExecutionStatusSchema>
 
-/** 任意结构化负载（外部输入/事件 payload），值不约束但键为字符串。 */
+/**
+ * 任意结构化负载（外部输入/事件 payload），值不约束但键为字符串。
+ *
+ * P2 待办：按 actionType / eventType 叠加 discriminatedUnion 做二级 content-type 校验，
+ * 而非长期保持最大化宽容。消费者侧可对具体字段叠加 .refine() 收窄。
+ */
 export const PayloadSchema = z.record(z.string(), z.unknown())
 export type Payload = z.infer<typeof PayloadSchema>

@@ -6,6 +6,9 @@ import {
   VersionSchema,
 } from "./shared"
 
+/** ConnectorLease 独立契约版本。 */
+export const CONNECTOR_LEASE_VERSION = "1.0.0"
+
 /** 租约状态。 */
 export const LeaseStatusSchema = z.enum(["active", "expired", "revoked"])
 export type LeaseStatus = z.infer<typeof LeaseStatusSchema>

@@ -7,6 +7,9 @@ import {
   VersionSchema,
 } from "./shared"
 
+/** HumanApprovalCheckpoint 独立契约版本。 */
+export const HUMAN_APPROVAL_CHECKPOINT_VERSION = "1.0.0"
+
 /** 审批检查点状态。 */
 export const ApprovalStatusSchema = z.enum([
   "pending",
