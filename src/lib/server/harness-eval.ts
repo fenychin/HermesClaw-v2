@@ -532,16 +532,24 @@ export async function runHarnessEvaluation(
       workspaceId,
       proposalId: `HEP-${Date.now()}`,
       triggeredBy,
+      triggerReason,
       problemStatement: draft.problemStatement,
-      evidence: stringifyJsonField(draft.evidence),
-      targetComponent: draft.targetComponent,
-      proposedChange: draft.proposedChange,
-      riskLevel: draft.riskLevel,
-      automationLevel,
-      status: "pending",
+      evidence: draft.evidence,
+      proposedChange: {
+        targetComponent: draft.targetComponent,
+        description: draft.proposedChange,
+        riskLevel: draft.riskLevel,
+        automationLevel,
+      },
+      requiresHumanApproval: true,
       estimatedImpact: draft.estimatedImpact,
+      affectedAgents: [],
+      rollbackPlan: "回滚至升级前配置版本",
+      status: "pending",
     },
   })
+
+  const createdPropChange = created.proposedChange as any
 
   // --- 9. 组装 EvaluationReport ---
   const evaluationTrigger: EvaluationTrigger = {
@@ -556,10 +564,10 @@ export async function runHarnessEvaluation(
   }
   const proposalSummary: ProposalSummary = {
     proposalId: created.proposalId,
-    targetComponent: created.targetComponent as TargetComponent,
-    proposedChange: created.proposedChange,
-    riskLevel: draft.riskLevel,
-    automationLevel: created.automationLevel as AutomationLevel,
+    targetComponent: createdPropChange.targetComponent as TargetComponent,
+    proposedChange: createdPropChange.description,
+    riskLevel: createdPropChange.riskLevel as RiskLevel,
+    automationLevel: createdPropChange.automationLevel as AutomationLevel,
     status: "pending",
   }
 
@@ -578,24 +586,25 @@ export async function runHarnessEvaluation(
   const proposal: HarnessProposal = {
     id: created.id,
     proposalId: created.proposalId,
+    workspaceId: created.workspaceId,
     triggeredBy: created.triggeredBy as "auto" | "manual",
-    triggerReason,
+    triggerReason: created.triggerReason,
     problemStatement: created.problemStatement,
-    evidence: draft.evidence,
+    evidence: created.evidence as string[],
     proposedChange: {
-      targetComponent: created.targetComponent as TargetComponent,
-      description: created.proposedChange,
-      riskLevel: draft.riskLevel,
-      automationLevel: created.automationLevel as AutomationLevel,
+      targetComponent: createdPropChange.targetComponent as TargetComponent,
+      description: createdPropChange.description,
+      riskLevel: createdPropChange.riskLevel as RiskLevel,
+      automationLevel: createdPropChange.automationLevel as AutomationLevel,
     },
-    requiresHumanApproval: true,
+    requiresHumanApproval: created.requiresHumanApproval,
     estimatedImpact: created.estimatedImpact,
-    affectedAgents: [],
-    rollbackPlan: "回滚至升级前配置版本",
+    affectedAgents: created.affectedAgents as string[],
+    rollbackPlan: created.rollbackPlan,
     status: created.status as ProposalStatus,
     createdAt: created.createdAt.toISOString(),
     reviewedBy: created.reviewedBy ?? undefined,
-    reviewedAt: created.reviewedAt ?? undefined,
+    reviewedAt: created.reviewedAt?.toISOString() ?? undefined,
   }
 
   // --- 11. 进化日志（reportId/logSample/durationSeconds 实际写入）---

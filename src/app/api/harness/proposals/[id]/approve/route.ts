@@ -1,5 +1,5 @@
 import { ApiResponse } from '@/lib/server/api-response'
-import { getMockProposal, updateMockProposalStatus } from '@/lib/server/mock-store'
+import { prisma } from '@/lib/prisma'
 import { checkAutomationGate } from '@/lib/server/guardrail'
 import { withRBAC, type RouteContext } from '@/lib/server/api-handler'
 import { createAuditEntry, updateAuditEntry, writeAuditLog, actorFromSession } from '@/lib/server/audit'
@@ -29,26 +29,36 @@ export const POST = withRBAC(
         // 忽略 JSON 解析错误，允许空 body
       }
 
-      // 从 mock/store 获取提案
-      const proposal = getMockProposal(id)
+      // 从 Prisma 获取提案
+      const queryWhere = id.startsWith("HEP-")
+        ? { proposalId: id, workspaceId: ctx.workspaceId }
+        : { id, workspaceId: ctx.workspaceId }
+
+      const proposal = await prisma.harnessProposal.findFirst({
+        where: queryWhere,
+      })
       if (!proposal) return ApiResponse.error('提案不存在', 404)
+
+      const propChange = proposal.proposedChange as any
+      const riskLevelRaw = propChange?.riskLevel
+      const automationLevelRaw = propChange?.automationLevel
 
       // AGENTS.md §5 #3 禁止静默执行：执行前写入预记录审计
       const entry = await createAuditEntry({
         actor,
         action: 'proposal.approve',
         targetType: 'proposal',
-        targetId: id,
+        targetId: proposal.id,
         detail: `批准提案 ${proposal.proposalId}`,
-        riskLevel: proposal.proposedChange.riskLevel,
+        riskLevel: riskLevelRaw,
         workspaceId: ctx.workspaceId,
-        automationLevel: proposal.proposedChange.automationLevel ?? undefined,
+        automationLevel: automationLevelRaw ?? undefined,
         triggeredBy: 'user',
         contextSnapshot: {
           proposalId: proposal.proposalId,
           status: proposal.status,
-          riskLevel: proposal.proposedChange.riskLevel,
-          automationLevel: proposal.proposedChange.automationLevel,
+          riskLevel: riskLevelRaw,
+          automationLevel: automationLevelRaw,
           triggeredBy: proposal.triggeredBy,
         },
       })
@@ -56,8 +66,8 @@ export const POST = withRBAC(
       // 自动化授权分级门禁（AGENTS.md §4.7）—— 统一走共享护栏，避免重复 L4/L3 判定：
       // L4 → 403 { error:'L4_FORBIDDEN' }；L3 缺确认 → 409；L2/L1 放行。
       const gate = await checkAutomationGate({
-        automationLevel: proposal.proposedChange.automationLevel ?? null,
-        riskLevel: proposal.proposedChange.riskLevel,
+        automationLevel: automationLevelRaw ?? null,
+        riskLevel: riskLevelRaw,
         confirmed: body.confirmText === '确认执行',
         actionName: '批准',
       })
@@ -68,7 +78,7 @@ export const POST = withRBAC(
             actor,
             action: 'proposal.approve.l4_blocked',
             targetType: 'proposal',
-            targetId: id,
+            targetId: proposal.id,
             detail: 'L4 动作禁止系统自动审批，审批 API 硬拒绝',
             riskLevel: 'high',
             workspaceId: ctx.workspaceId,
@@ -90,8 +100,15 @@ export const POST = withRBAC(
         return gate.response
       }
 
-      // 更新状态
-      updateMockProposalStatus(id, 'approved')
+      // 更新数据库状态
+      await prisma.harnessProposal.update({
+        where: { id: proposal.id },
+        data: {
+          status: 'approved',
+          reviewedBy: actor,
+          reviewedAt: new Date(),
+        },
+      })
 
       // 执行成功 → 更新预记录为 success（补充审批后 snapshot）
       await updateAuditEntry({
@@ -106,7 +123,7 @@ export const POST = withRBAC(
         },
       })
 
-      return ApiResponse.ok({ proposalId: id, approvedAt: new Date().toISOString() })
+      return ApiResponse.ok({ proposalId: proposal.proposalId, approvedAt: new Date().toISOString() })
     } catch (error) {
       const message = error instanceof Error ? error.message : '未知错误'
       return ApiResponse.error(message, 500)

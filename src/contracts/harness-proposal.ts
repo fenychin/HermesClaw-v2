@@ -39,42 +39,49 @@ export type TargetComponent = z.infer<typeof TargetComponentSchema>
  * 通过 re-export 消费，禁止手写重复 interface。
  */
 export const HarnessProposalSchema = z.object({
-  /** 提案唯一 ID（UUID）。 */
+  /** 提案唯一 ID (UUID/cuid) */
   id: IdSchema,
-  /** 租户 / 工作区 ID（RBAC 隔离，§4.11）。 */
+  /** 租户 / 工作区 ID（RBAC 隔离，§4.11） */
   workspaceId: IdSchema.default("default"),
-  /** 人类可读提案编号（HEP-{timestamp}）。 */
+  /** 人类可读提案编号（HEP-{timestamp}） */
   proposalId: IdSchema,
-  /** 触发方式：auto（评估引擎自动）/ manual（人工触发）。 */
+  /** 触发方式：auto（评估引擎自动）/ manual（人工触发） */
   triggeredBy: z.enum(["auto", "manual"]),
-  /** 问题描述（中文）。 */
+  /** 触发原因 */
+  triggerReason: z.string().default(""),
+  /** 问题描述（中文） */
   problemStatement: z.string().min(1),
-  /** 支撑证据（JSON 字符串数组，DB 层存储为 JSON 文本）。 */
+  /** 支撑证据 */
   evidence: z.array(z.string()).default([]),
-  /** 升级目标组件（六大核心组件之一）。 */
-  targetComponent: TargetComponentSchema,
-  /** 具体变更描述（中文）。 */
-  proposedChange: z.string().min(1),
-  /** 风险等级（low/medium/high，不含 critical）。 */
-  riskLevel: RiskLevelSchema,
-  /** 自动化授权等级 L1–L4（§4.7）。 */
-  automationLevel: AutomationLevelSchema,
-  /** 提案状态。 */
-  status: ProposalStatusSchema,
-  /** 预期影响描述（中文）。 */
+  /** 升级提案详细变更内容 */
+  proposedChange: z.object({
+    targetComponent: TargetComponentSchema,
+    description: z.string(),
+    riskLevel: RiskLevelSchema,
+    automationLevel: AutomationLevelSchema,
+  }),
+  /** 是否需要人工审批（§3.1） */
+  requiresHumanApproval: z.boolean().default(true),
+  /** 预期影响描述（中文） */
   estimatedImpact: z.string(),
-  /** 审批人（批准/拒绝后填入）。 */
+  /** 关联/受影响的 Agent */
+  affectedAgents: z.array(z.string()).default([]),
+  /** 回滚方案说明 */
+  rollbackPlan: z.string().default(""),
+  /** 提案状态 */
+  status: ProposalStatusSchema,
+  /** 审批人 */
   reviewedBy: z.string().nullable().optional(),
-  /** 审批时间（ISO-8601）。 */
-  reviewedAt: z.string().nullable().optional(),
-  /** 回滚前快照（JSON，用于一键回滚）。 */
+  /** 审批时间 */
+  reviewedAt: z.union([z.string(), z.date()]).nullable().optional(),
+  /** 回滚前快照（JSON） */
   previousSnapshot: z.unknown().nullable().optional(),
-  /** 创建时间（ISO-8601）。 */
-  createdAt: z.string(),
-  /** 更新时间（ISO-8601）。 */
-  updatedAt: z.string(),
-  /** 契约版本。 */
-  version: VersionSchema,
+  /** 创建时间 */
+  createdAt: z.union([z.string(), z.date()]),
+  /** 更新时间 */
+  updatedAt: z.union([z.string(), z.date()]),
+  /** 契约版本 */
+  version: VersionSchema.default(HARNESS_PROPOSAL_VERSION),
 })
 
 export type HarnessProposal = z.infer<typeof HarnessProposalSchema>

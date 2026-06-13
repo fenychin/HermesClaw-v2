@@ -17,14 +17,20 @@ describe("HarnessProposal（AGENTS §3.3 升级提案）", () => {
     workspaceId: "ws-default",
     proposalId: "HEP-20260613120000",
     triggeredBy: "auto" as const,
+    triggerReason: "测试原因",
     problemStatement: "Agent 上下文窗口频繁溢出导致任务失败率上升",
     evidence: ["日志 #1：context overflow at step 3", "日志 #2：token count exceeded 200K"],
-    targetComponent: "上下文供给" as const,
-    proposedChange: "将 compressionThreshold 从 150K 降至 120K，提前触发压缩",
-    riskLevel: "medium" as const,
-    automationLevel: "L2" as const,
-    status: "pending" as const,
+    proposedChange: {
+      targetComponent: "上下文供给" as const,
+      description: "将 compressionThreshold 从 150K 降至 120K，提前触发压缩",
+      riskLevel: "medium" as const,
+      automationLevel: "L2" as const,
+    },
+    requiresHumanApproval: true,
     estimatedImpact: "预期上下文溢出率降低 60%",
+    affectedAgents: ["agent-001"],
+    rollbackPlan: "回退配置",
+    status: "pending" as const,
     reviewedBy: null,
     reviewedAt: null,
     previousSnapshot: null,
@@ -51,33 +57,40 @@ describe("HarnessProposal（AGENTS §3.3 升级提案）", () => {
 
   it("非法 triggeredBy 被拒", () => {
     expect(() =>
-      HarnessProposalSchema.parse({ ...valid, triggeredBy: "cron" }),
+      HarnessProposalSchema.parse({ ...valid, triggeredBy: "cron" as any }),
     ).toThrow()
   })
 
   it("非法 targetComponent 被拒", () => {
     expect(() =>
-      HarnessProposalSchema.parse({ ...valid, targetComponent: "未知组件" }),
+      HarnessProposalSchema.parse({
+        ...valid,
+        proposedChange: { ...valid.proposedChange, targetComponent: "未知组件" as any },
+      }),
     ).toThrow()
   })
 
   it("非法 status 被拒", () => {
     expect(() =>
-      HarnessProposalSchema.parse({ ...valid, status: "deleted" }),
+      HarnessProposalSchema.parse({ ...valid, status: "deleted" as any }),
     ).toThrow()
   })
 
   it("非法 riskLevel 被拒（contracts RiskLevel 包含 critical 但 harness 层不应使用）", () => {
-    // critical 能通过 contracts RiskLevelSchema 校验（含 critical）
     expect(() =>
-      HarnessProposalSchema.parse({ ...valid, riskLevel: "critical" }),
+      HarnessProposalSchema.parse({
+        ...valid,
+        proposedChange: { ...valid.proposedChange, riskLevel: "critical" as any },
+      }),
     ).not.toThrow()
-    // 但 harness 层 RiskLevel（types/harness.ts）排除了 critical
   })
 
   it("非法 automationLevel 被拒", () => {
     expect(() =>
-      HarnessProposalSchema.parse({ ...valid, automationLevel: "L5" }),
+      HarnessProposalSchema.parse({
+        ...valid,
+        proposedChange: { ...valid.proposedChange, automationLevel: "L5" as any },
+      }),
     ).toThrow()
   })
 
