@@ -58,6 +58,7 @@ model WorkspaceSettings {
   workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   defaultModel    String    @default("deepseek-chat") // 默认模型（可配置，路由 fallback）
   taskProviderMap String    @default("{}")            // JSON：{chat|workflow|analysis|generation} -> 'anthropic'|'deepseek'
+  workflowEngine  String    @default("local")         // local | hermes
   updatedAt       DateTime  @updatedAt
   createdAt       DateTime  @default(now())
 }
@@ -227,6 +228,7 @@ model Memory {
   updatedAt      DateTime @updatedAt
 
   @@index([workspaceId])
+  @@index([workspaceId, status])
   @@index([type])
   @@index([frozen])
   @@index([projectId])

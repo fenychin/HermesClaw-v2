@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { POST } from "../route"
 import { logger } from "@/lib/logger"
@@ -68,6 +69,7 @@ vi.mock("@/contracts", async (importOriginal) => {
 describe("POST /api/workflows/run API 路由集成拦截测试", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    process.env.WORKFLOW_ROUTING_MODE = "hermes"
   })
 
   it("正常常规任务输入应放行并成功运行", async () => {
@@ -116,7 +118,7 @@ describe("POST /api/workflows/run API 路由集成拦截测试", () => {
 
     // 确保有日志警告且包含 Zod 的报错明细
     expect(logger.warn).toHaveBeenCalledWith(
-      "工作流执行被拦截：任务输入不符合 actionType 要求",
+      "[WorkflowScheduler] 执行被拦截：任务输入不符合 actionType 要求",
       expect.objectContaining({
         actionType: "trade.handle-inquiry",
         errors: expect.arrayContaining([expect.stringContaining("inquiryText")]),

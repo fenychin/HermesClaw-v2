@@ -109,19 +109,6 @@ export async function getBrainStats(
     const estimatedHits = totalLogs > 0 ? hitLogsCount : 48;
     const tokensSaved = estimatedHits * 850 + totalLogs * 120;
 
-    // 4. 知识缺口诊断（查询 Memory 是否存在匹配的关键字）
-    const allMemories = await deps.prisma.memory.findMany({
-      where: { workspaceId, status: "active" },
-      select: { content: true, summary: true, tags: true },
-    });
-
-    const checkResolved = (keywords: string[]): boolean => {
-      return allMemories.some((m) => {
-        const text = (m.content + " " + m.summary + " " + m.tags).toLowerCase();
-        return keywords.every((kw) => text.includes(kw));
-      });
-    };
-
     // 外贸常见盲区事实定义
     const defaultGaps = [
       {
@@ -150,13 +137,41 @@ export async function getBrainStats(
       },
     ];
 
+    // 4. 知识缺口诊断（利用 SQL COUNT 聚合检索过滤，完全避免 findMany 内存全量加载）
+    const gapResolutions = await Promise.all(
+      defaultGaps.map(async (gap) => {
+        const count = await deps.prisma.memory.count({
+          where: {
+            workspaceId,
+            status: "active",
+            AND: gap.keywords.map((kw) => {
+              const lowerKw = kw.toLowerCase();
+              return {
+                OR: [
+                  { content: { contains: lowerKw } },
+                  { summary: { contains: lowerKw } },
+                  { tags: { contains: lowerKw } },
+                ],
+              };
+            }),
+          },
+        });
+        return {
+          id: gap.id,
+          resolved: count > 0,
+        };
+      })
+    );
+
+    const resolutionMap = new Map(gapResolutions.map((r) => [r.id, r.resolved]));
+
     const knowledgeGaps = defaultGaps.map((gap) => ({
       id: gap.id,
       description: gap.description,
       missingType: gap.missingType,
       suggestedAction: gap.suggestedAction,
       detectedAt: gap.detectedAt,
-      resolved: checkResolved(gap.keywords),
+      resolved: !!resolutionMap.get(gap.id),
     }));
 
     return {

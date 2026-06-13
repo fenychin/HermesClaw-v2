@@ -1,5 +1,39 @@
-import { describe, it, expect } from "vitest"
-import { loadIndustryManifest, getCachedManifest } from "../lib/server/industry-pack-loader"
+import { loadIndustryManifest, getCachedManifest, mapLegacyManifest } from "../lib/server/industry-pack-loader"
+
+describe("mapLegacyManifest 遗留配置转换", () => {
+  it("应该能够将包含 id 和 directory 数组的旧格式映射为含 packId 和 directories 布尔标志的标准结构", () => {
+    const legacy = {
+      id: "legacy-pack",
+      name: "老包",
+      version: "1.0.0",
+      directory: {
+        workflows: ["wf-1"],
+        skills: [],
+        agents: ["agent-1"],
+        connectors: []
+      }
+    }
+
+    const mapped = mapLegacyManifest(legacy)
+
+    expect(mapped.packId).toBe("legacy-pack")
+    expect(mapped.id).toBe("legacy-pack")
+    expect(mapped.industry).toBe("legacy-pack")
+    expect(mapped.directories).toEqual({
+      agents: true,
+      workflows: true,
+      skills: false,
+      connectors: false,
+      knowledge: false,
+      schemas: false,
+      dashboards: false,
+      evalRules: false
+    })
+    expect(mapped.createdAt).toBeDefined()
+    expect(mapped.updatedAt).toBeDefined()
+    expect(mapped.version_field).toBe("1.0.0")
+  })
+})
 
 describe("Industry Pack Loader", () => {
   it("应该能够成功加载 foreign-trade 行业包并能通过 Zod 验证", () => {

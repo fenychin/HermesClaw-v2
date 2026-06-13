@@ -5,7 +5,7 @@
  *   1. RBAC 门禁（MEMBER 以上）
  *   2. 频率限制（IP 级，防止滥用）
  *   3. 校验必填参数（id 来自路径，input 来自请求体）
- *   4. 调用 dag-runner → runWorkflow(workflowId, input)
+ *   4. 调用统一的工作空间级别工作流调度器 WorkflowSchedulerService
  *   5. 成功返回 { runId, status, output }；失败按错误类型返回相应状态码
  *
  * 请求体（可选）：{ input?: Record<string, unknown> }
@@ -15,14 +15,10 @@ import { ApiResponse } from '@/lib/server/api-response'
 import { logger } from '@/lib/logger'
 import { rateLimit } from '@/lib/rate-limit'
 import { withRBAC, type RouteContext } from '@/lib/server/api-handler'
-import { TypedTaskInputSchema, isCriticalActionType } from '@/contracts'
 import { validateBody, WorkflowRunSchema } from '@/lib/validators'
-import {
-  runWorkflow,
-  WorkflowNotFoundError,
-  MaxDepthExceededError,
-} from '@/lib/server/workflow/dag-runner'
 import type { WorkspaceContext } from '@/lib/workspace'
+import { WorkflowSchedulerService } from '@/lib/server/workflow/scheduler'
+import { WorkflowNotFoundError, MaxDepthExceededError } from '@/lib/server/workflow/dag-runner'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -38,7 +34,7 @@ export const POST = withRBAC(
     }
 
     try {
-      // P1-③ zod schema 校验请求体（空 body 容错仍保留）
+      // zod schema 校验请求体（空 body 容错仍保留）
       let rawBody: unknown = {}
       try {
         const text = await req.text()
@@ -54,20 +50,13 @@ export const POST = withRBAC(
 
       const input = parsed.input
 
-      const actionType = typeof input._type === 'string' ? input._type : ''
-      const typedInput = TypedTaskInputSchema.safeParse(input)
-      if (!typedInput.success && isCriticalActionType(actionType)) {
-        logger.warn('指定工作流执行被拦截：任务输入不符合 actionType 要求', {
-          workflowId: id,
-          actionType,
-          errors: typedInput.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
-        })
-        return ApiResponse.error('任务输入不符合 actionType 要求', 400)
-      }
-
       logger.info('POST /api/workflows/[id]/run', { workflowId: id, userId: ctx.userId })
 
-      const result = await runWorkflow(id, Object.keys(input).length > 0 ? input : undefined)
+      const result = await WorkflowSchedulerService.runWorkflow({
+        workflowId: id,
+        inputs: input,
+        workspaceId: ctx.workspaceId,
+      })
 
       return ApiResponse.ok({
         runId: result.runId,
@@ -75,14 +64,18 @@ export const POST = withRBAC(
         output: result.output,
       })
     } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误'
+      
       if (error instanceof WorkflowNotFoundError) {
-        return ApiResponse.error(error.message, 404)
+        return ApiResponse.error(message, 404)
       }
-      if (error instanceof MaxDepthExceededError) {
-        return ApiResponse.error(error.message, 400)
+      if (error instanceof MaxDepthExceededError || message.includes('任务输入不符合')) {
+        return ApiResponse.error(message, 400)
+      }
+      if (message.includes('[Hermes API 错误]') || (error instanceof DOMException && error.name === 'TimeoutError')) {
+        return ApiResponse.error(message, 502)
       }
 
-      const message = error instanceof Error ? error.message : '未知错误'
       logger.error('POST /api/workflows/[id]/run 执行失败', {
         workflowId: id,
         error: message,
@@ -92,3 +85,4 @@ export const POST = withRBAC(
   },
   'MEMBER',
 )
+

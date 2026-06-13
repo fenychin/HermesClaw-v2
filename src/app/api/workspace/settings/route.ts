@@ -18,6 +18,7 @@ const PROVIDERS = ["anthropic", "deepseek"] as const
 const DEFAULT_SETTINGS = {
   defaultModel: "deepseek-chat",
   taskProviderMap: {} as Record<string, string>,
+  workflowEngine: "local",
 }
 
 // 各 taskType 的 Provider 偏好均为可选；未设置即跟随默认模型推断
@@ -32,6 +33,7 @@ const UpdateSettingsSchema = z.object({
       generation: ProviderEnum.optional(),
     })
     .default({}),
+  workflowEngine: z.enum(["local", "hermes"]).default("local"),
 })
 
 // ---- GET /api/workspace/settings ----
@@ -51,6 +53,7 @@ export async function GET(request: Request) {
     return successResponse({
       defaultModel: row.defaultModel,
       taskProviderMap: parseJsonField<Record<string, string>>(row.taskProviderMap, {}),
+      workflowEngine: row.workflowEngine,
     })
   } catch (error) {
     logger.error("GET /api/workspace/settings: 失败", {
@@ -87,10 +90,12 @@ export async function PATCH(request: Request) {
         workspaceId: ctx.workspaceId,
         defaultModel: parsed.data.defaultModel,
         taskProviderMap: taskProviderMapStr,
+        workflowEngine: parsed.data.workflowEngine,
       },
       update: {
         defaultModel: parsed.data.defaultModel,
         taskProviderMap: taskProviderMapStr,
+        workflowEngine: parsed.data.workflowEngine,
       },
     })
 
@@ -99,7 +104,7 @@ export async function PATCH(request: Request) {
       action: "update.model-routing",
       targetType: "workspace",
       targetId: ctx.workspaceId,
-      detail: `更新模型路由：默认模型 ${parsed.data.defaultModel}`,
+      detail: `更新模型路由：默认模型 ${parsed.data.defaultModel}，工作流引擎 ${parsed.data.workflowEngine}`,
       riskLevel: "medium",
       workspaceId: ctx.workspaceId,
     })
@@ -107,6 +112,7 @@ export async function PATCH(request: Request) {
     return successResponse({
       defaultModel: saved.defaultModel,
       taskProviderMap: parseJsonField<Record<string, string>>(saved.taskProviderMap, {}),
+      workflowEngine: saved.workflowEngine,
     })
   } catch (error) {
     logger.error("PATCH /api/workspace/settings: 失败", {
