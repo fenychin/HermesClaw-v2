@@ -14,7 +14,7 @@
  */
 import { prisma } from "@/lib/prisma"
 import { stringifyJsonField } from "@/lib/api-utils"
-import { parseJsonLoose } from "@/lib/harness-llm"
+import { parseJsonLoose } from "@/lib/server/harness-llm"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/server/audit"
 import { guardOutput } from "@/lib/server/output-guard"

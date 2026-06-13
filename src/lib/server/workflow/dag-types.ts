@@ -1,7 +1,14 @@
 /**
  * DAG 工作流类型定义
  * —— 与 dag-engine.ts / dag-runner.ts 共享的纯类型层，无运行时依赖
+ *
+ * 🔄 P1 扩展（2026-06-13）：
+ *   - WorkflowDefinition 新增 agentPolicy / automationLevel / riskLevel / skillBindings，
+ *     这些字段源自 Harness / AgentPolicy，不在页面中硬编码魔法数字。
+ *   - 新增 WorkflowAgentPolicy / WorkflowSkillBinding / WorkflowRiskProfile 类型。
  */
+
+import type { AutomationLevel, RiskLevel } from "@/contracts"
 
 // ---- 节点与边的种类 ----
 
@@ -16,6 +23,54 @@ export type RunStatus = 'pending' | 'running' | 'completed' | 'failed'
 
 /** 运行触发方式 */
 export type RunTrigger = 'manual' | 'auto' | 'subworkflow'
+
+// ---- Harness 注入的运行时策略 ----
+
+/**
+ * 工作流绑定的 Agent 策略快照。
+ * 源自 Harness Bundle 中的 AgentPolicy，在 Workflow 生成时注入，
+ * 约束节点的自动化授权上限与允许的 Agent 角色。
+ */
+export interface WorkflowAgentPolicy {
+  /** 允许执行本工作流的 Agent 角色列表 */
+  allowedRoles: string[]
+  /** 本工作流的自动化授权上限（L1-L4） */
+  maxAutomationLevel: AutomationLevel
+  /** 是否需要人工审批节点 */
+  requiresApproval: boolean
+  /** 策略快照版本（源自 Harness Bundle） */
+  policyVersion: string
+}
+
+/**
+ * 工作流绑定的技能约束。
+ * 源自 Harness Bundle 中的 SkillBinding，限制工作流中可使用的技能集合。
+ */
+export interface WorkflowSkillBinding {
+  /** 技能标识 */
+  skillId: string
+  /** 技能名称 */
+  name: string
+  /** 该技能允许的最大自动化等级 */
+  maxAutomationLevel: AutomationLevel
+  /** 是否启用 */
+  enabled: boolean
+}
+
+/**
+ * 工作流风险画像。
+ * 由 workflow-generator 根据任务内容自动评估，或从 AgentPolicy 继承。
+ */
+export interface WorkflowRiskProfile {
+  /** 整体风险等级 */
+  riskLevel: RiskLevel
+  /** 是否包含高危节点（L3/L4） */
+  hasHighRiskNodes: boolean
+  /** 高危节点 ID 列表 */
+  highRiskNodeIds: string[]
+  /** 建议的审批策略 */
+  approvalStrategy: 'none' | 'high-risk-only' | 'all'
+}
 
 // ---- 图结构 ----
 
@@ -49,6 +104,14 @@ export interface WorkflowDefinition {
   name: string
   nodes: WorkflowNode[]
   edges: WorkflowEdge[]
+  /** Harness 注入的 Agent 策略快照（P1 新增：禁止页面魔法数字） */
+  agentPolicy?: WorkflowAgentPolicy
+  /** Harness 注入的技能绑定约束（P1 新增） */
+  skillBindings?: WorkflowSkillBinding[]
+  /** 工作流整体自动化授权等级（P1 新增：派生自 AgentPolicy.maxAutomationLevel） */
+  automationLevel?: AutomationLevel
+  /** 工作流风险画像（P1 新增：生成时自动评估） */
+  riskProfile?: WorkflowRiskProfile
 }
 
 // ---- 运行时上下文 ----

@@ -14,7 +14,12 @@
  */
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
-import { actorFromSession, type AuditRiskLevel } from "@/lib/server/audit"
+import {
+  actorFromSession,
+  createAuditEntry,
+  updateAuditEntry,
+  type AuditRiskLevel,
+} from "@/lib/server/audit"
 import { parseJsonField } from "@/lib/api-utils"
 import {
   type LlmProvider,
@@ -208,39 +213,41 @@ export async function selectModel(ctx: ModelRouteContext): Promise<RoutingDecisi
   // —— 附带 contextSnapshot 供 §4.4 Level 2 评估使用
   // —— automationLevel 根据 riskLevel 推断：high→L3, medium→L2, low→L1
   // —— triggeredBy 根据调用来源推断（chat/agent 触发 → user，workflow 触发 → system）
-  // —— 路由决策即时完成，直接标记 success，使用增强审计字段
+  // —— 使用统一预记录模式（createAuditEntry + updateAuditEntry），与其他高风险动作审计路径一致
   const automationLevel: "L1" | "L2" | "L3" | "L4" =
     ctx.riskLevel === "high" ? "L3" : ctx.riskLevel === "medium" ? "L2" : "L1"
   const triggeredBy: "user" | "system" | "cron" =
     ctx.taskType === "workflow" ? "system" : "user"
 
-  try {
-    await prisma.auditLog.create({
-      data: {
-        actor: await actorFromSession(),
-        action: "model.route",
-        targetType: "model",
-        targetId: decision.model,
-        detail: decision.reason,
-        riskLevel: toAuditRiskLevel(ctx.riskLevel),
-        workspaceId: ctx.workspaceId,
-        contextSnapshot: {
-          taskType: ctx.taskType,
-          estimatedTokens: ctx.estimatedTokens,
-          selectedProvider: resolved.provider,
-          selectedModel: resolved.model,
-          degraded: resolved.degraded,
-          originalProvider: provider,
-          originalModel: model,
-        },
-        automationLevel,
-        triggeredBy,
-        status: "success",
-      },
+  const auditEntry = await createAuditEntry({
+    actor: await actorFromSession(),
+    action: "model.route",
+    targetType: "model",
+    targetId: decision.model,
+    detail: decision.reason,
+    riskLevel: toAuditRiskLevel(ctx.riskLevel),
+    workspaceId: ctx.workspaceId,
+    contextSnapshot: {
+      taskType: ctx.taskType,
+      estimatedTokens: ctx.estimatedTokens,
+      selectedProvider: resolved.provider,
+      selectedModel: resolved.model,
+      degraded: resolved.degraded,
+      originalProvider: provider,
+      originalModel: model,
+    },
+    automationLevel,
+    triggeredBy,
+  })
+
+  if (auditEntry.ok) {
+    await updateAuditEntry({
+      auditId: auditEntry.auditId,
+      status: "success",
+      detail: decision.reason,
     })
-  } catch {
-    // 静默吞错，不阻断路由决策
   }
+  // 审计失败不阻断路由决策（createAuditEntry 内部已 console.error）
 
   return decision
 }

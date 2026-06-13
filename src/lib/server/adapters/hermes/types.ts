@@ -130,3 +130,162 @@ export interface HermesHarnessProposal {
   /** 创建时间（ISO 8601） */
   createdAt: string
 }
+
+// ─── Agent 会话管理（P2 新增）───────────────────────────────────
+
+/**
+ * Hermes Agent 会话标识。
+ *
+ * Hermes 单 agent loop 模式：一个 agent 对应一个 session，
+ * session 内维护工具调用轨迹 + 三级记忆上下文。
+ */
+export interface HermesSessionIdentifier {
+  /** 会话 ID（Hermes 侧分配，跨轮次保持） */
+  sessionId: string
+  /** Agent 实例 ID */
+  agentId: string
+  /** 所属项目 ID（可选） */
+  projectId?: string
+  /** 所属工作空间 ID */
+  workspaceId: string
+  /** 创建时间（ISO 8601） */
+  createdAt: string
+}
+
+/**
+ * Hermes Agent 工具调用记录。
+ * 对齐 OpenClaw 的 tool.call.* 事件族，映射为 Hermes 内部 TraceEntry。
+ */
+export interface HermesToolCallTrace {
+  /** 工具调用 ID（Hermes 侧） */
+  callId: string
+  /** 工具名 */
+  toolName: string
+  /** 调用时间（ISO 8601） */
+  calledAt: string
+  /** 调用参数快照 */
+  input: Record<string, unknown>
+  /** 返回结果快照 */
+  output: unknown | null
+  /** 调用状态 */
+  status: "started" | "completed" | "failed"
+  /** 错误信息 */
+  error?: string
+  /** 耗时（ms） */
+  durationMs?: number
+}
+
+// ─── Prompt / Context 组装（P2 新增）─────────────────────────────
+
+/** 通用消息格式 */
+export interface HermesMessage {
+  role: "user" | "assistant" | "system"
+  content: string
+  toolCalls?: HermesToolCallTrace[]
+}
+
+/** 内存中的记忆条目（短/中/长） */
+export interface HermesMemoryEntry {
+  key: string
+  value: unknown
+  level: HermesMemoryLevel
+  writtenAt: string
+  confidence: number
+}
+
+/** 工具/技能清单 */
+export interface HermesToolManifest {
+  name: string
+  description: string
+  input_schema: Record<string, unknown>
+  automationLevel: AutomationLevel
+}
+
+/** 上下文策略快照（对应 harness-bundle 中的 ContextPolicy） */
+export interface ContextPolicySnapshot {
+  maxConversationTurns: number
+  includeProjectContext: boolean
+  includeOrgContext: boolean
+  toolCallMaxDepth: number
+}
+
+/**
+ * Prompt / Context 组装请求。
+ * 控制层构造此对象，由 adapter 负责组装为 Hermes 可消费的完整 Prompt。
+ */
+export interface HermesPromptAssemblyRequest {
+  /** 用户原始意图文本 */
+  intent: string
+  /** 会话历史（最近 N 轮） */
+  conversationHistory?: HermesMessage[]
+  /** 注入的上下文策略快照 */
+  contextPolicy?: ContextPolicySnapshot
+  /** 注入的三级记忆条目 */
+  memoryEntries?: HermesMemoryEntry[]
+  /** 可用的工具/技能清单 */
+  availableTools?: HermesToolManifest[]
+  /** 约束：自动化等级上限 */
+  maxAutomationLevel?: AutomationLevel
+}
+
+/** 组装后的 Prompt 结构 */
+export interface HermesAssembledPrompt {
+  /** 系统 prompt */
+  system: string
+  /** 用户 prompt */
+  user: string
+  /** 注入的工具定义（tool_use 格式） */
+  tools: HermesToolManifest[]
+}
+
+// ─── 会话创建 / 工具回调请求（P2 新增）──────────────────────────
+
+/** 创建 Hermes Agent 会话的请求参数 */
+export interface HermesCreateSessionRequest {
+  agentId: string
+  projectId?: string
+  workspaceId: string
+  contextPolicy?: ContextPolicySnapshot
+}
+
+/** 工具调用上报请求 */
+export interface HermesReportToolCallsRequest {
+  sessionId: string
+  traces: HermesToolCallTrace[]
+}
+
+// ─── 评估报告提交（P2 新增）─────────────────────────────────────
+
+/**
+ * 提交到 Hermes 的评估报告请求体。
+ * 控制层 runHarnessEvaluation() 产出的 EvaluationReport 经此接口提交。
+ */
+export interface HermesSubmitReportRequest {
+  reportId: string
+  workspaceId: string
+  triggeredBy: "auto" | "manual"
+  evaluatedAt: string
+  metrics: {
+    total: number
+    errors: number
+    success: number
+    errorRate: number
+    successRate: number
+    windowHours: number
+  }
+  triggered: boolean
+  reason?: string
+  provider: string | null
+  model: string | null
+  proposalId?: string
+  reportMd?: string
+}
+
+// ─── 健康检查（P2 新增）─────────────────────────────────────────
+
+/** Hermes 健康检查响应 */
+export interface HermesHealthCheckResponse {
+  ok: boolean
+  version: string
+  latencyMs: number
+}

@@ -17,8 +17,16 @@ import type {
   HermesMemoryWriteRequest,
   HermesMemoryReadRequest,
   HermesMemoryReadResponse,
+  HermesCreateSessionRequest,
+  HermesSessionIdentifier,
+  HermesReportToolCallsRequest,
+  HermesSubmitReportRequest,
+  HermesHealthCheckResponse,
+  HermesPromptAssemblyRequest,
+  HermesAssembledPrompt,
 } from './types'
 import { hermesMock } from './mock'
+import { assembleHermesPrompt } from './prompt-assembler'
 
 /**
  * Hermes 统一 HTTP 客户端
@@ -32,6 +40,16 @@ class HermesClient {
   private readonly config = ADAPTER_CONFIG.hermes
 
   /**
+   * 动态读取 Mock 模式开关（每次请求时读取，支持运行时切换）。
+   * 🔄 P2 整改（问题5.1）：getter 替代构造时固化，集成测试可临时关闭 Mock。
+   */
+  private get useMock(): boolean {
+    if (process.env.HERMES_USE_MOCK === 'true') return true
+    if (process.env.HERMES_USE_MOCK === 'false') return false
+    return process.env.NODE_ENV === 'development'
+  }
+
+  /**
    * 发送请求至 Hermes API
    * @param path - API 端点路径（不含版本前缀）
    * @param body - 请求体
@@ -39,7 +57,7 @@ class HermesClient {
    */
   private async request<T>(path: string, body: unknown): Promise<T> {
     // Mock 模式：直接返回模拟数据，不发起网络请求
-    if (this.config.useMock) {
+    if (this.useMock) {
       return hermesMock.handle(path, body) as T
     }
 
@@ -103,6 +121,104 @@ class HermesClient {
     req: HermesMemoryReadRequest
   ): Promise<HermesMemoryReadResponse> {
     return this.request('/memory/read', req)
+  }
+
+  // ─── P2 新增：Agent 会话管理 ──────────────────────────────
+
+  /**
+   * 创建（或恢复）一个 Hermes Agent 会话。
+   *
+   * Hermes 单 agent loop 模式：一个 agent 对应一个 session，
+   * session 内维护工具调用轨迹 + 三级记忆上下文。
+   */
+  async createSession(
+    req: HermesCreateSessionRequest,
+  ): Promise<HermesSessionIdentifier> {
+    return this.request('/sessions/create', req)
+  }
+
+  /**
+   * 结束会话并归档工具调用轨迹。
+   */
+  async closeSession(
+    sessionId: string,
+  ): Promise<{ archived: boolean }> {
+    return this.request('/sessions/close', { sessionId })
+  }
+
+  // ─── P2 新增：Prompt 组装（本地执行） ──────────────────────
+
+  /**
+   * 组装完整 Prompt。
+   *
+   * 此方法为本地纯函数，不发起网络请求，但遵循 Hermes 定义的 Prompt
+   * 组装规则：系统角色注入 → 上下文策略应用 → 记忆条目注入 → 工具清单注入。
+   *
+   * 当未来 Hermes 侧 Prompt 组装规则升级时，此方法作为稳定接口契约存在，
+   * 调用方无需修改即可使用更新后的规则。
+   */
+  /**
+   * 组装完整 Prompt（委托独立纯函数 assembleHermesPrompt）。
+   *
+   * 此方法作为 HermesClient 的便捷入口，保持向后兼容。
+   * 无需网络状态时可直接使用 `assembleHermesPrompt` 纯函数。
+   */
+  assemblePrompt(req: HermesPromptAssemblyRequest): HermesAssembledPrompt {
+    return assembleHermesPrompt(req)
+  }
+
+  // ─── P2 新增：工具调用回传 ─────────────────────────────────
+
+  /**
+   * 将本轮工具调用轨迹上报 Hermes（供记忆更新与策略调整）。
+   */
+  async reportToolCalls(
+    req: HermesReportToolCallsRequest,
+  ): Promise<{ accepted: boolean }> {
+    return this.request('/sessions/tool-calls', req)
+  }
+
+  // ─── P2 新增：评估报告提交 ─────────────────────────────────
+
+  /**
+   * 提交 Harness 评估报告到 Hermes。
+   *
+   * Hermes 是 EvaluationReport 的 Source of Truth（CLAUDE.md §4.2）。
+   */
+  async submitEvaluationReport(
+    req: HermesSubmitReportRequest,
+  ): Promise<{ reportId: string }> {
+    return this.request('/harness/report', req)
+  }
+
+  // ─── P2 新增：健康检查 ─────────────────────────────────────
+
+  /**
+   * 检查 Hermes 服务可达性。
+   *
+   * 不经过 Mock 层——健康检查必须验证真实的网络可达性。
+   */
+  async healthCheck(): Promise<HermesHealthCheckResponse> {
+    if (this.useMock) {
+      return { ok: true, version: `mock-${this.config.version}`, latencyMs: 0 }
+    }
+
+    const url = `${this.config.baseUrl}/v${this.config.version}/health`
+    const start = Date.now()
+
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000),
+      })
+      return {
+        ok: res.ok,
+        version: this.config.version,
+        latencyMs: Date.now() - start,
+      }
+    } catch {
+      return { ok: false, version: this.config.version, latencyMs: Date.now() - start }
+    }
   }
 }
 

@@ -9,6 +9,8 @@ import type {
   HermesRunWorkflowResponse,
   HermesHarnessProposal,
   HermesMemoryReadResponse,
+  HermesSessionIdentifier,
+  HermesHealthCheckResponse,
 } from './types'
 
 /** Mock 内存存储（模拟记忆层） */
@@ -34,6 +36,7 @@ const mockHandlers: Record<string, (body: unknown) => unknown> = {
     problemStatement: '模拟检测到工具调用成功率低于阈值（82%），需要评估当前 Harness 配置',
     proposedChange: '建议调整超时阈值并增加重试机制，优化工具接入层的容错能力',
     riskLevel: 'medium',
+    automationLevel: 'L2',
     requiresHumanApproval: true,
     estimatedImpact: '预计将工具调用成功率提升至 95% 以上，降低任务中断频率',
     createdAt: new Date().toISOString(),
@@ -59,6 +62,37 @@ const mockHandlers: Record<string, (body: unknown) => unknown> = {
       level: (req.level as 'short' | 'mid' | 'long') ?? 'short',
       writtenAt: stored?.writtenAt,
     }
+  },
+
+  // ─── P2 新增 Mock 路由 ──────────────────────────────────
+
+  '/sessions/create': (body): HermesSessionIdentifier => {
+    const req = body as { agentId?: string; projectId?: string; workspaceId?: string }
+    const sessionId = `mock-session-${Date.now()}`
+    return {
+      sessionId,
+      agentId: req.agentId ?? 'mock-agent',
+      projectId: req.projectId,
+      workspaceId: req.workspaceId ?? 'default',
+      createdAt: new Date().toISOString(),
+    }
+  },
+
+  '/sessions/close': (): { archived: boolean } => {
+    return { archived: true }
+  },
+
+  '/sessions/tool-calls': (): { accepted: boolean } => {
+    return { accepted: true }
+  },
+
+  '/harness/report': (body): { reportId: string } => {
+    const req = body as { reportId?: string }
+    return { reportId: req.reportId ?? `mock-report-${Date.now()}` }
+  },
+
+  '/health': (): HermesHealthCheckResponse => {
+    return { ok: true, version: 'mock-0.3.2', latencyMs: 0 }
   },
 }
 
