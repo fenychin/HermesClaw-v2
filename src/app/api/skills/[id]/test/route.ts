@@ -57,7 +57,7 @@ export const POST = withRBAC<{ params: Promise<{ id: string }> }>(async (
     targetType: "skill",
     targetId: skill.id,
     detail: `测试技能: ${skill.name}（${skill.automationLevel}）`,
-    riskLevel: gate.level === "L3" ? "mid" : "low",
+    riskLevel: gate.level === "L3" ? "medium" : "low",
     workspaceId: ctx.workspaceId,
     automationLevel: skill.automationLevel as AutomationLevel,
     triggeredBy: "user",

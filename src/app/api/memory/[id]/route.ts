@@ -147,7 +147,7 @@ export async function DELETE(
       targetType: "memory",
       targetId: id,
       detail: `${existing.type} · ${existing.summary}`,
-      riskLevel: "mid",
+      riskLevel: "medium",
       workspaceId: ctx.workspaceId,
     })
 

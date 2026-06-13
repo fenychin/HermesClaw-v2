@@ -81,7 +81,7 @@ export function ProposalDetailSheet({
               className={
                 riskLevel === "high"
                   ? "border-danger/30 text-danger bg-danger/10"
-                  : riskLevel === "mid"
+                  : riskLevel === "medium"
                   ? "border-warning/30 text-warning bg-warning/10"
                   : "border-success/30 text-success bg-success/10"
               }

@@ -377,12 +377,12 @@ export default function BrainOverviewPage() {
                       className={
                         p.proposedChange.riskLevel === "high"
                           ? "text-danger"
-                          : p.proposedChange.riskLevel === "mid"
+                          : p.proposedChange.riskLevel === "medium"
                             ? "text-warning"
                             : "text-success"
                       }
                     >
-                      [{p.proposedChange.riskLevel === "high" ? "高" : p.proposedChange.riskLevel === "mid" ? "中" : "低"}风险]
+                      [{p.proposedChange.riskLevel === "high" ? "高" : p.proposedChange.riskLevel === "medium" ? "中" : "低"}风险]
                     </span>{" "}
                     {p.proposalId}
                   </div>

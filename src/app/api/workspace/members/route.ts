@@ -206,7 +206,7 @@ export async function PATCH(request: Request) {
       targetType: "workspace",
       targetId: ctx.workspaceId,
       detail: `变更用户 ${parsed.data.userId} 角色：${targetMember.role} → ${parsed.data.role}`,
-      riskLevel: "mid",
+      riskLevel: "medium",
       workspaceId: ctx.workspaceId,
     })
 
@@ -266,7 +266,7 @@ export async function DELETE(request: Request) {
       targetType: "workspace",
       targetId: ctx.workspaceId,
       detail: `移除成员 ${userId}`,
-      riskLevel: "mid",
+      riskLevel: "medium",
       workspaceId: ctx.workspaceId,
     })
 

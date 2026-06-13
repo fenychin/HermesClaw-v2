@@ -123,9 +123,9 @@ function providerOf(model: string): LlmProvider {
 
 // isProviderAvailable() 从 llm-provider.ts 共享导入，此处不重复实现。
 
-/** 将路由风险等级映射为审计风险等级（medium → mid） */
+/** 将路由风险等级映射为审计风险等级（现两者均使用 'medium'，仅作类型收窄） */
 function toAuditRiskLevel(level: RouteRiskLevel): AuditRiskLevel {
-  return level === "medium" ? "mid" : level
+  return level as AuditRiskLevel
 }
 
 /**

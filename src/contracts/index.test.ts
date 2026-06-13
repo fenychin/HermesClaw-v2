@@ -11,7 +11,7 @@ import { describe, it, expect } from "vitest"
 import * as index from "./index"
 
 const REQUIRED_SCHEMA_EXPORTS = [
-  // 核心契约
+  // 核心契约（7 个）
   "TaskEnvelopeSchema",
   "ExecutionEventSchema",
   "ActionReceiptSchema",
@@ -19,6 +19,36 @@ const REQUIRED_SCHEMA_EXPORTS = [
   "CapabilityRegistrationSchema",
   "ConnectorLeaseSchema",
   "HumanApprovalCheckpointSchema",
+  // P1 新增契约（4 个）
+  "HarnessProposalSchema",
+  "HarnessBundleSchema",
+  "IndustryManifestSchema",
+  "EvolutionProposalSchema",
+  // 子对象 schema（P1 HarnessBundle / IndustryManifest / HarnessProposal）
+  "ProposalStatusSchema",
+  "TargetComponentSchema",
+  "WorkflowTemplateSchema",
+  "AgentPolicySchema",
+  "SkillBindingSchema",
+  "ContextPolicySchema",
+  "MemoryPolicySchema",
+  "ConnectorPolicySchema",
+  "EvalRuleSetSchema",
+  "IndustryDirectorySchema",
+  "MigrationRuleSchema",
+  // P2 新增
+  "EvaluationReportSchema",
+  "HarnessMetricsSchema",
+  "EvaluationTriggerSchema",
+  "AnalysisTraceSchema",
+  "ProposalSummarySchema",
+  // P2 类型化 Payload
+  "RunPayloadSchema",
+  "SessionPayloadSchema",
+  "ToolCallPayloadSchema",
+  "ApprovalPayloadSchema",
+  "ArtifactPayloadSchema",
+  "TypedExecutionEventSchema",
   // 公共基础
   "VersionSchema",
   "VersionRangeSchema",
@@ -40,6 +70,13 @@ const REQUIRED_VERSION_EXPORTS = [
   "CAPABILITY_REGISTRATION_VERSION",
   "CONNECTOR_LEASE_VERSION",
   "HUMAN_APPROVAL_CHECKPOINT_VERSION",
+  // P1 新增
+  "HARNESS_PROPOSAL_VERSION",
+  "HARNESS_BUNDLE_VERSION",
+  "INDUSTRY_MANIFEST_VERSION",
+  "EVOLUTION_PROPOSAL_VERSION",
+  // P2 新增
+  "EVALUATION_REPORT_VERSION",
 ]
 
 const REQUIRED_TYPE_EXPORTS = [
@@ -50,6 +87,21 @@ const REQUIRED_TYPE_EXPORTS = [
   "CapabilityRegistration",
   "ConnectorLease",
   "HumanApprovalCheckpoint",
+  "HarnessProposal",
+  "HarnessBundle",
+  "IndustryManifest",
+  "EvolutionProposal",
+  "ProposalStatus",
+  "TargetComponent",
+  "WorkflowTemplate",
+  "AgentPolicy",
+  "SkillBinding",
+  "ContextPolicy",
+  "MemoryPolicy",
+  "ConnectorPolicy",
+  "EvalRuleSet",
+  "IndustryDirectory",
+  "MigrationRule",
   "AutomationLevel",
   "RiskLevel",
   "EventType",
@@ -60,6 +112,17 @@ const REQUIRED_TYPE_EXPORTS = [
   "FinalStatus",
   "LeaseStatus",
   "ApprovalStatus",
+  "EvaluationReport",
+  "HarnessMetrics",
+  "EvaluationTrigger",
+  "AnalysisTrace",
+  "ProposalSummary",
+  "RunPayload",
+  "SessionPayload",
+  "ToolCallPayload",
+  "ApprovalPayload",
+  "ArtifactPayload",
+  "TypedExecutionEvent",
 ]
 
 describe("index.ts 导出完整性", () => {

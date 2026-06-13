@@ -100,7 +100,7 @@ export async function PATCH(request: Request) {
       targetType: "workspace",
       targetId: ctx.workspaceId,
       detail: `更新模型路由：默认模型 ${parsed.data.defaultModel}`,
-      riskLevel: "mid",
+      riskLevel: "medium",
       workspaceId: ctx.workspaceId,
     })
 

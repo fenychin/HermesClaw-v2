@@ -3,7 +3,12 @@
  *
  * 所有类型与底层 Hermes 版本解耦，作为稳定的接口契约存在。
  * 当底层 API 变更时，仅需在 client.ts 中做适配，本文件保持不变。
+ *
+ * P1-② 契约单源：风险等级 / 提案等基础类型从 contracts z.infer 派生，
+ * 不再手写重复 interface。
  */
+
+import type { RiskLevel, AutomationLevel } from "@/contracts"
 
 // ─── 工作流相关 ──────────────────────────────────────────────
 
@@ -81,8 +86,13 @@ export interface HermesMemoryReadResponse {
 
 // ─── Harness 评估相关 ─────────────────────────────────────────
 
-/** Harness 风险等级 */
-export type HermesRiskLevel = 'low' | 'mid' | 'high'
+/**
+ * Hermes 适配层风险等级。
+ *
+ * 从 contracts RiskLevel 派生，排除 'critical'（Harness 不处理 catastrophic 级事件）。
+ * 与 types/harness.ts 的 RiskLevel 定义一致，保证单源。
+ */
+export type HermesRiskLevel = Exclude<RiskLevel, 'critical'>
 
 /** Harness 评估触发请求 */
 export interface HermesHarnessEvaluateRequest {
@@ -94,7 +104,12 @@ export interface HermesHarnessEvaluateRequest {
   evidenceLogs?: string[]
 }
 
-/** Harness 升级提案（对应 AGENTS.md §3.3 Evolution Proposal） */
+/**
+ * Harness 升级提案（Hermes 适配层视图）。
+ *
+ * 基础字段从 contracts HarnessProposal 派生，适配层仅保留 Hermes API 交互所需的最小子集。
+ * 完整提案结构见 contracts/harness-proposal.ts。
+ */
 export interface HermesHarnessProposal {
   /** 提案 ID（格式：HEP-{timestamp}） */
   proposalId: string
@@ -104,8 +119,10 @@ export interface HermesHarnessProposal {
   problemStatement: string
   /** 变更内容 */
   proposedChange: string
-  /** 风险等级 */
+  /** 风险等级（从 contracts RiskLevel 派生，不含 critical） */
   riskLevel: HermesRiskLevel
+  /** 自动化授权等级（从 contracts AutomationLevel 派生） */
+  automationLevel: AutomationLevel
   /** 是否需要人工审批（永远为 true） */
   requiresHumanApproval: true
   /** 预期影响 */

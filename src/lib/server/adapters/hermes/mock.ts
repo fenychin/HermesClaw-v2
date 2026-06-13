@@ -33,7 +33,7 @@ const mockHandlers: Record<string, (body: unknown) => unknown> = {
     triggeredBy: '自动评估',
     problemStatement: '模拟检测到工具调用成功率低于阈值（82%），需要评估当前 Harness 配置',
     proposedChange: '建议调整超时阈值并增加重试机制，优化工具接入层的容错能力',
-    riskLevel: 'mid',
+    riskLevel: 'medium',
     requiresHumanApproval: true,
     estimatedImpact: '预计将工具调用成功率提升至 95% 以上，降低任务中断频率',
     createdAt: new Date().toISOString(),

@@ -97,7 +97,7 @@ export async function PATCH(
       targetType: "connector",
       targetId: id,
       detail: existing.name,
-      riskLevel: isConnect ? "mid" : isDisconnect ? "low" : "mid",
+      riskLevel: isConnect ? "medium" : isDisconnect ? "low" : "medium",
       workspaceId: ctx.workspaceId,
       automationLevel: "L2",
       triggeredBy: "user",

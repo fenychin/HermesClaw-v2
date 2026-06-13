@@ -39,7 +39,7 @@ export const POST = withRBAC(async (req: Request, ctx: WorkspaceContext) => {
       targetType: 'workflow',
       targetId: body.workflowId,
       detail: `执行工作流 ${body.workflowId}`,
-      riskLevel: 'mid',
+      riskLevel: 'medium',
       workspaceId: ctx.workspaceId,
     })
 

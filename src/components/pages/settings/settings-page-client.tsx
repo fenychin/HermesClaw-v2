@@ -431,11 +431,11 @@ function AuditSection() {
   /** 风险等级 → 徽章样式 */
   const riskBadge = (risk: string | null) => {
     if (risk === "high") return "bg-danger/10 text-danger";
-    if (risk === "mid") return "bg-warning/10 text-warning";
+    if (risk === "medium") return "bg-warning/10 text-warning";
     return "bg-success/10 text-success";
   };
   const riskLabel = (risk: string | null) =>
-    risk === "high" ? "高风险" : risk === "mid" ? "中风险" : "低风险";
+    risk === "high" ? "高风险" : risk === "medium" ? "中风险" : "低风险";
 
   return (
     <SectionBlock title="审计与日志" subtitle="记录所有关键操作，满足合规与溯源需求">
@@ -575,11 +575,11 @@ function ToolRegistryBlock() {
   const riskBadge = (risk: string) =>
     risk === "high"
       ? "bg-danger/10 text-danger"
-      : risk === "mid"
+      : risk === "medium"
         ? "bg-warning/10 text-warning"
         : "bg-success/10 text-success";
   const riskLabel = (risk: string) =>
-    risk === "high" ? "高危·双审批" : risk === "mid" ? "中" : "低";
+    risk === "high" ? "高危·双审批" : risk === "medium" ? "中" : "低";
 
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden max-w-2xl mt-4">

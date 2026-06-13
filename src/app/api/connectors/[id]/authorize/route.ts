@@ -67,7 +67,7 @@ export const POST = withRBAC<{ params: Promise<{ id: string }> }>(async (
       targetType: "connector",
       targetId: id,
       detail: existing.name,
-      riskLevel: "mid",
+      riskLevel: "medium",
       workspaceId: ctx.workspaceId,
       automationLevel: "L2",
       triggeredBy: "user",

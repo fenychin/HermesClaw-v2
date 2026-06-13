@@ -367,7 +367,7 @@ model AuditLog {
   targetType      String   // agent | connector | memory | project | proposal | inquiry ...
   targetId        String
   detail          String?
-  riskLevel       String?  // low | mid | high
+  riskLevel       String?  // low | medium | high
   // --- AGENTS.md §1.2 数据主权 / §4.4 Level 2 评估 新增字段 ---
   contextSnapshot Json?    // 执行时的关键上下文快照（供 §4.4 Level 2 评估使用）
   automationLevel String?  // L1 | L2 | L3 | L4（§4.7 自动化授权等级）
@@ -488,7 +488,7 @@ model ToolRegistry {
   description String
   category    String   // connector | skill | system ...
   scopes      String   // JSON 数组：权限范围
-  riskLevel   String   @default("low") // low | mid | high（high 须双审批）
+  riskLevel   String   @default("low") // low | medium | high（high 须双审批）
   enabled     Boolean  @default(true)
   grants      ToolGrant[]
   createdAt   DateTime @default(now())

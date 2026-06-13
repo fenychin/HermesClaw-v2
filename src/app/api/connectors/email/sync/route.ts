@@ -139,7 +139,7 @@ export async function POST(request: Request) {
       targetType: "inquiry",
       targetId: `error-${Date.now()}`,
       detail: `同步失败: ${message}`,
-      riskLevel: "mid",
+      riskLevel: "medium",
       workspaceId: ctx.workspaceId,
     })
 

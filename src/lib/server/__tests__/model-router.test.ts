@@ -167,7 +167,7 @@ describe("selectModel — 审计日志", () => {
     const auditData = mockAuditCreate.mock.calls[0][0].data;
     expect(auditData.action).toBe("model.route");
     expect(auditData.targetType).toBe("model");
-    expect(auditData.riskLevel).toBe("mid"); // medium → mid 映射
+    expect(auditData.riskLevel).toBe("medium");
   });
 
   it("审计日志附带 contextSnapshot", async () => {
