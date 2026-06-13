@@ -10,5 +10,6 @@
   "connectorId": "conn_email",
   "deviceId": "device_1",
   "receiptHash": "sha256:def456",
+  "parentWorkflowRunId": "run_parent_fixture_1",
   "version": "1.0.0"
 }

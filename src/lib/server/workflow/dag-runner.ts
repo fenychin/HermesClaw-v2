@@ -25,7 +25,8 @@ import { runHarnessEvaluation } from '@/lib/server/harness-eval'
 import { guardOutput } from '@/lib/server/output-guard'
 import { executeSkillNode } from '@/lib/server/workflow/skill-executor'
 import { executeDataWriteNode } from '@/lib/server/workflow/data-write-executor'
-import { emitOpenClawEvent } from '@/lib/server/adapters/openclaw/event-emitter'
+import { emitOpenClawEvent, emitExecutionEvent } from '@/lib/server/adapters/openclaw/event-emitter'
+import { EXECUTION_EVENT_VERSION } from '@/contracts/execution-event'
 import { createSubworkflowHandler } from './subworkflow-executor'
 import type {
   WorkflowNode,
@@ -171,6 +172,32 @@ export async function runWorkflow(
     trigger,
     depth,
   })
+
+  // 广播 run.created 事件（若有父工作流运行 ID 则传入，用于追踪链）
+  try {
+    emitExecutionEvent({
+      eventId: `evt-${crypto.randomUUID()}`,
+      taskId: `t-${runId}`,
+      workflowRunId: runId,
+      parentWorkflowRunId: options?.parentRunId,
+      runtimeId: 'workflow-runner',
+      eventType: 'run.created',
+      status: 'started',
+      timestamp: new Date().toISOString(),
+      payload: {
+        runId,
+        workflowId,
+        workflowName: def.name,
+        status: 'started',
+      },
+      version: EXECUTION_EVENT_VERSION,
+    })
+  } catch (error) {
+    logger.warn('[dag-runner] 广播 run.created 事件失败（已作为 fire-and-forget 容错忽略）', {
+      runId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
 
   // 3. 构造上下文
   const ctx: WorkflowRunContext = {
@@ -472,8 +499,15 @@ export async function runWorkflow(
 
   // 8. 发布 workflow 完成/失败事件（供 SSE 推送前端）
   try {
-    emitOpenClawEvent('workflow', {
-      type: finalStatus === 'completed' ? 'workflow:completed' : 'workflow:failed',
+    emitExecutionEvent({
+      eventId: `evt-${crypto.randomUUID()}`,
+      taskId: `t-${runId}`,
+      workflowRunId: runId,
+      parentWorkflowRunId: options?.parentRunId,
+      runtimeId: 'workflow-runner',
+      eventType: finalStatus === 'completed' ? 'run.completed' : 'run.failed',
+      status: finalStatus === 'completed' ? 'completed' : 'failed',
+      timestamp: new Date().toISOString(),
       payload: {
         runId,
         workflowId,
@@ -481,9 +515,14 @@ export async function runWorkflow(
         status: finalStatus,
         output: finalStatus === 'completed' ? output : null,
       },
+      version: EXECUTION_EVENT_VERSION,
     })
-  } catch {
-    // fire-and-forget：事件发布失败不阻断主流程
+  } catch (error) {
+    logger.warn('[dag-runner] 广播 workflow 终态事件失败（已作为 fire-and-forget 容错忽略）', {
+      runId,
+      eventType: finalStatus === 'completed' ? 'run.completed' : 'run.failed',
+      error: error instanceof Error ? error.message : String(error),
+    })
   }
 
   return {

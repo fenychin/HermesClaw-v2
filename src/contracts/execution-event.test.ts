@@ -73,4 +73,17 @@ describe("ExecutionEvent（AGENTS §3.3 必备字段）", () => {
       ExecutionEventSchema.safeParse({ ...valid, version: "x" }).success,
     ).toBe(false)
   })
+
+  it("含 parentWorkflowRunId 的 event 能 parse 通过", () => {
+    const withParent = { ...valid, parentWorkflowRunId: "run_parent_123" }
+    const parsed = ExecutionEventSchema.parse(withParent)
+    expect(parsed.parentWorkflowRunId).toBe("run_parent_123")
+  })
+
+  it("不含 parentWorkflowRunId 的 event 依然能 parse 通过", () => {
+    const withoutParent = { ...valid }
+    delete (withoutParent as Record<string, unknown>).parentWorkflowRunId
+    const parsed = ExecutionEventSchema.parse(withoutParent)
+    expect(parsed.parentWorkflowRunId).toBeUndefined()
+  })
 })
