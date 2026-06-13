@@ -24,7 +24,7 @@ describe("智慧大脑 (Brain) 模块健康度测试", () => {
           count: vi.fn().mockRejectedValue(new Error("Database connection timeout")),
         },
         memory: {
-          findMany: vi.fn(),
+          count: vi.fn().mockRejectedValue(new Error("Database connection timeout")),
         },
       } as unknown as typeof prisma;
 
@@ -55,14 +55,19 @@ describe("智慧大脑 (Brain) 模块健康度测试", () => {
           }),
         },
         memory: {
-          findMany: vi.fn().mockResolvedValue([
-            {
-              content: "沙特海关钢铁关税上调至 15%",
-              summary: "沙特钢铁关税政策",
-              tags: "沙特,关税",
-              status: "active",
-            },
-          ]),
+          count: vi.fn().mockImplementation(({ where }) => {
+            const andConds = where.AND || [];
+            const hasSaudi = andConds.some((cond: any) =>
+              cond.OR.some((orCond: any) => orCond.content?.contains === "沙特")
+            );
+            const hasTariff = andConds.some((cond: any) =>
+              cond.OR.some((orCond: any) => orCond.content?.contains === "关税")
+            );
+            if (hasSaudi && hasTariff) {
+              return Promise.resolve(1);
+            }
+            return Promise.resolve(0);
+          }),
         },
       } as unknown as typeof prisma;
 
