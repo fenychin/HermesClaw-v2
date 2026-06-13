@@ -267,8 +267,36 @@ export const apiClient = {
     apiFetch<{ quotations: unknown[] }>("/api/quotations"),
 
   // ---- 审计日志 ----
-  getAuditLogs: (limit = 100) =>
-    apiFetch<{ logs: unknown[] }>(`/api/audit?limit=${limit}`),
+  getAuditLogs: (
+    limitOrParams?:
+      | number
+      | {
+          page?: number
+          limit?: number
+          actor?: string
+          action?: string
+          status?: string
+          targetType?: string
+          riskLevel?: string
+          query?: string
+        },
+  ) => {
+    let queryStr = ""
+    if (typeof limitOrParams === "number") {
+      queryStr = `?limit=${limitOrParams}`
+    } else if (limitOrParams) {
+      const urlParams = new URLSearchParams()
+      Object.entries(limitOrParams).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) {
+          urlParams.set(k, String(v))
+        }
+      })
+      queryStr = `?${urlParams.toString()}`
+    }
+    return apiFetch<{ logs: unknown[]; total?: number; page?: number; limit?: number }>(
+      `/api/audit${queryStr}`,
+    )
+  },
 
   // ---- 工具注册表 ----
   getTools: () =>

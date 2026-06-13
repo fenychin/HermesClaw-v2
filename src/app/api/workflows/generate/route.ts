@@ -16,6 +16,9 @@ import { validateBody } from "@/lib/validators"
 import { rateLimit } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
 import { withRBAC } from "@/lib/server/api-handler"
+import { auditedWrite } from "@/lib/server/audited-write"
+import { actorFromSession } from "@/lib/server/audit"
+import type { WorkspaceContext } from "@/lib/workspace"
 
 export const runtime = "nodejs"
 // AI 调用可能稍慢
@@ -35,7 +38,7 @@ const WorkflowGenerateSchema = z.object({
  * 生成外贸行业 DAG 工作流，状态为 draft。
  * 生成后需人工在 Review 页面确认并手动激活，不可直接执行。
  */
-export const POST = withRBAC(async (request: Request) => {
+export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => {
   try {
     // 频率限制：每分钟最多 5 次（AI 调用成本高）
     const ip =
@@ -52,8 +55,42 @@ export const POST = withRBAC(async (request: Request) => {
     if (parsed instanceof Response) return parsed
     const { intent, industryContext } = parsed
 
-    // 2. 调用 WorkflowGenerator Agent
-    const result = await generateWorkflow({ intent, industryContext })
+    const workflowId = crypto.randomUUID()
+    const actor = await actorFromSession()
+
+    // 2. 调用 WorkflowGenerator Agent，并通过 auditedWrite 记录审计日志
+    const result = await auditedWrite(
+      {
+        actor,
+        action: "workflow.generate",
+        targetType: "workflow",
+        targetId: workflowId,
+        detail: `生成工作流: ${intent.slice(0, 100)}`,
+        riskLevel: "low",
+        workspaceId: ctx.workspaceId,
+        automationLevel: "L2",
+        triggeredBy: "user",
+        contextSnapshot: { intent, industryContext, workflowId },
+      },
+      () => generateWorkflow({
+        intent,
+        industryContext,
+        actor,
+        workspaceId: ctx.workspaceId,
+        workflowId,
+      }),
+      {
+        onSuccess: (res) => ({
+          detail: `成功生成工作流 "${res.name}" (节点数: ${res.nodes.length})`,
+          contextSnapshot: {
+            workflowId: res.workflowId,
+            name: res.name,
+            nodeCount: res.nodes.length,
+            edgeCount: res.edges.length,
+          },
+        }),
+      }
+    )
 
     // 3. 返回生成结果
     return successResponse({
