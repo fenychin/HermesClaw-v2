@@ -168,3 +168,20 @@ export type {
   AnalysisTrace,
   ProposalSummary,
 } from "./evaluation-report"
+
+// Task payloads
+export {
+  HandleInquiryPayloadSchema,
+  GenerateDevLetterPayloadSchema,
+  GenerateQuotationPayloadSchema,
+  GenericPayloadSchema,
+  TypedTaskInputSchema,
+  isCriticalActionType,
+} from "./task-payloads"
+export type {
+  HandleInquiryPayload,
+  GenerateDevLetterPayload,
+  GenerateQuotationPayload,
+  GenericPayload,
+  TypedTaskInput,
+} from "./task-payloads"

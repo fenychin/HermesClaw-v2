@@ -2,6 +2,8 @@ import { TRADE_AGENT_PROMPTS } from "@/lib/system-prompts";
 import { writeAgentLog } from "@/lib/server/agent-log";
 import { rateLimit } from "@/lib/rate-limit";
 import { TaskExecuteSchema, validateBody } from "@/lib/validators";
+import { TypedTaskInputSchema, isCriticalActionType } from "@/contracts";
+import { logger } from "@/lib/logger";
 import type { WorkspaceContext } from "@/lib/workspace";
 import { withRBAC } from "@/lib/server/api-handler";
 import { selectModel } from "@/lib/server/model-router";
@@ -156,6 +158,29 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
   const parsed = validateBody(rawBody, TaskExecuteSchema);
   if (parsed instanceof Response) return parsed;
   const { taskType, input } = parsed;
+
+  let parsedInput: unknown = null;
+  try {
+    parsedInput = JSON.parse(input);
+  } catch {
+    // 忽略非 JSON 文本输入，向下兼容
+  }
+
+  if (parsedInput && typeof parsedInput === "object") {
+    const actionType = typeof (parsedInput as any)._type === "string" ? (parsedInput as any)._type : "";
+    const typedInput = TypedTaskInputSchema.safeParse(parsedInput);
+    if (!typedInput.success && isCriticalActionType(actionType)) {
+      logger.warn('快捷任务输入被拦截：任务输入不符合 actionType 要求', {
+        taskType,
+        actionType,
+        errors: typedInput.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      });
+      return Response.json(
+        { error: "任务输入不符合 actionType 要求" },
+        { status: 400 },
+      );
+    }
+  }
 
   const systemPrompt = TRADE_AGENT_PROMPTS[taskType as TaskType];
   if (!systemPrompt) {

@@ -15,6 +15,7 @@ import { ApiResponse } from '@/lib/server/api-response'
 import { logger } from '@/lib/logger'
 import { rateLimit } from '@/lib/rate-limit'
 import { withRBAC, type RouteContext } from '@/lib/server/api-handler'
+import { TypedTaskInputSchema, isCriticalActionType } from '@/contracts'
 import { validateBody, WorkflowRunSchema } from '@/lib/validators'
 import {
   runWorkflow,
@@ -52,6 +53,17 @@ export const POST = withRBAC(
       if (parsed instanceof Response) return parsed
 
       const input = parsed.input
+
+      const actionType = typeof input._type === 'string' ? input._type : ''
+      const typedInput = TypedTaskInputSchema.safeParse(input)
+      if (!typedInput.success && isCriticalActionType(actionType)) {
+        logger.warn('指定工作流执行被拦截：任务输入不符合 actionType 要求', {
+          workflowId: id,
+          actionType,
+          errors: typedInput.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+        })
+        return ApiResponse.error('任务输入不符合 actionType 要求', 400)
+      }
 
       logger.info('POST /api/workflows/[id]/run', { workflowId: id, userId: ctx.userId })
 
