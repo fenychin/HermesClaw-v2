@@ -48,6 +48,7 @@ async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
   const taskName = (req.inputs?.taskName as string) ?? '未命名任务'
   const agentId = (req.inputs?.agentId as string) ?? 'mock-agent'
   const workflowRunId = (req.inputs?.workflowRunId as string) ?? `mock-run-${Date.now()}`
+  const parentWorkflowRunId = req.inputs?.parentRunId as string | undefined
   const shouldFail = req.inputs?.mockForceFail === true
     ? true
     : (req.inputs?.mockForceSuccess === true ? false : Math.random() < MOCK_TASK_FAILURE_RATE)
@@ -56,6 +57,7 @@ async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
     eventId: `evt-${crypto.randomUUID()}`,
     taskId,
     workflowRunId,
+    parentWorkflowRunId,
     runtimeId: 'openclaw-mock-runtime',
     eventType: 'tool.call.started',
     status: 'started',
@@ -79,6 +81,7 @@ async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
         eventId: `evt-${crypto.randomUUID()}`,
         taskId,
         workflowRunId,
+        parentWorkflowRunId,
         runtimeId: 'openclaw-mock-runtime',
         eventType: 'tool.call.started',
         status: 'progress',
@@ -115,6 +118,7 @@ async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
         eventId: `evt-${crypto.randomUUID()}`,
         taskId,
         workflowRunId,
+        parentWorkflowRunId,
         runtimeId: 'openclaw-mock-runtime',
         eventType: 'tool.call.failed',
         status: 'failed',
@@ -154,6 +158,7 @@ async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
       eventId: `evt-${crypto.randomUUID()}`,
       taskId,
       workflowRunId,
+      parentWorkflowRunId,
       runtimeId: 'openclaw-mock-runtime',
       eventType: 'tool.call.completed',
       status: 'completed',

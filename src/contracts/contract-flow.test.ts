@@ -80,6 +80,30 @@ const events: ExecutionEvent[] = [
     version: CONTRACT_VERSION,
   },
   {
+    eventId: "evt_e2e_sub_001",
+    taskId: "task_sub_001",
+    workflowRunId: "run_sub_001",
+    parentWorkflowRunId: RUN_ID,
+    runtimeId: "runtime_1",
+    eventType: "run.created",
+    status: "started",
+    timestamp: "2026-06-13T10:00:02Z",
+    payload: {},
+    version: CONTRACT_VERSION,
+  },
+  {
+    eventId: "evt_e2e_sub_002",
+    taskId: "task_sub_001",
+    workflowRunId: "run_sub_001",
+    parentWorkflowRunId: RUN_ID,
+    runtimeId: "runtime_1",
+    eventType: "run.completed",
+    status: "completed",
+    timestamp: "2026-06-13T10:00:04Z",
+    payload: {},
+    version: CONTRACT_VERSION,
+  },
+  {
     eventId: "evt_e2e_004",
     taskId: TASK_ID,
     workflowRunId: RUN_ID,
@@ -121,11 +145,15 @@ describe("跨域契约 e2e 流程（TaskEnvelope → Events → Summary → Rece
     expect(TaskEnvelopeSchema.parse(envelope)).toEqual(envelope)
   })
 
-  it("全部 ExecutionEvent 通过 schema 校验且 taskId/workflowRunId 一致", () => {
+  it("全部 ExecutionEvent 通过 schema 校验且主工作流事件 taskId/workflowRunId 一致", () => {
     for (const evt of events) {
       const parsed = ExecutionEventSchema.parse(evt)
-      expect(parsed.taskId).toBe(TASK_ID)
-      expect(parsed.workflowRunId).toBe(RUN_ID)
+      if (!parsed.parentWorkflowRunId) {
+        expect(parsed.taskId).toBe(TASK_ID)
+        expect(parsed.workflowRunId).toBe(RUN_ID)
+      } else {
+        expect(parsed.parentWorkflowRunId).toBe(RUN_ID)
+      }
     }
   })
 
@@ -151,7 +179,7 @@ describe("跨域契约 e2e 流程（TaskEnvelope → Events → Summary → Rece
   })
 
   it("状态机流转合法：started → progress → completed → completed", () => {
-    const statuses = events.map((e) => e.status)
+    const statuses = events.filter(e => !e.parentWorkflowRunId).map((e) => e.status)
     expect(statuses).toEqual(["started", "progress", "completed", "completed"])
   })
 
@@ -177,5 +205,26 @@ describe("跨域契约 e2e 流程（TaskEnvelope → Events → Summary → Rece
     }
     expect(ExecutionSummarySchema.parse(restored.summary)).toEqual(summary)
     expect(ActionReceiptSchema.parse(restored.receipt)).toEqual(receipt)
+  })
+
+  it("可通过 parentWorkflowRunId 建立父子调用链并构建完整调用树", () => {
+    // 过滤出父运行是 RUN_ID 的子工作流事件
+    const childEvents = events.filter(e => e.parentWorkflowRunId === RUN_ID)
+    expect(childEvents.length).toBe(2)
+    expect(childEvents.every(e => e.parentWorkflowRunId === RUN_ID)).toBe(true)
+    
+    // 构建关系树：父 RUN_ID -> 子运行列表
+    const relationshipTree = new Map<string, string[]>()
+    for (const evt of events) {
+      if (evt.parentWorkflowRunId) {
+        const children = relationshipTree.get(evt.parentWorkflowRunId) || []
+        if (!children.includes(evt.workflowRunId)) {
+          children.push(evt.workflowRunId)
+        }
+        relationshipTree.set(evt.parentWorkflowRunId, children)
+      }
+    }
+    
+    expect(relationshipTree.get(RUN_ID)).toContain("run_sub_001")
   })
 })

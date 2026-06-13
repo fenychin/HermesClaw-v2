@@ -40,6 +40,8 @@ export const ExecutionEventSchema = z.object({
   deviceId: IdSchema.optional(),
   /** 对应回执哈希（可选，用于与 ActionReceipt 对账）。 */
   receiptHash: z.string().optional(),
+  /** 父工作流运行 ID（可选，子工作流执行时携带，用于重建完整执行追踪链，AGENTS.md §5.2）。 */
+  parentWorkflowRunId: IdSchema.optional(),
   /** 事件版本。 */
   version: VersionSchema,
 })
