@@ -1,177 +1,59 @@
 "use client";
 
-import { useState } from "react";
-import { Mic, Play, Upload, Pause } from "lucide-react";
-import { PageHeader } from "@/components/common/page-header";
+import { Mic, Phone, Globe } from "lucide-react";
 import { PageTransition } from "@/components/common/PageTransition";
-import { cn } from "@/lib/utils";
+import {
+  BrainAssetPlaceholderPage,
+  type BrainAssetColumn,
+} from "@/components/common/brain-asset-placeholder";
 
-/** 模拟语音资产数据 */
-interface VoiceAsset {
-  id: string;
-  name: string;
-  language: string;
-  purpose: string;
-  duration: string;
-  status: "ready" | "generating";
-  previewUrl?: string;
-}
-
-const VOICE_DATA: VoiceAsset[] = [
+const COLUMNS: [BrainAssetColumn, BrainAssetColumn, BrainAssetColumn] = [
   {
-    id: "voice-001",
-    name: "品牌声音 · 知性女声",
-    language: "中文普通话",
-    purpose: "品牌宣传片配音、企业介绍",
-    duration: "0:48",
-    status: "ready",
+    title: "品牌声音",
+    icon: Mic,
+    emptyTitle: "品牌声音模型",
+    emptyDescription:
+      "上传企业声音样本，生成专属品牌音色。支持单人多声线、情感语调调节与实时预览。",
   },
   {
-    id: "voice-002",
-    name: "客服播报 · 温暖男声",
-    language: "中文普通话 / 英语",
-    purpose: "客服场景自动播报、订单确认",
-    duration: "0:32",
-    status: "ready",
+    title: "外呼模板",
+    icon: Phone,
+    emptyTitle: "多语种外呼模板",
+    emptyDescription:
+      "预置 8 种语言的电商外呼脚本模板，覆盖询盘跟进、订单确认、节日关怀等场景。",
   },
   {
-    id: "voice-003",
-    name: "英语外呼 · 商务女声",
-    language: "英语（美式）",
-    purpose: "海外客户外呼、展会邀请",
-    duration: "1:15",
-    status: "ready",
+    title: "多语种语音资产",
+    icon: Globe,
+    emptyTitle: "语音资产管理",
+    emptyDescription:
+      "按语种、场景、音色标签检索与管理全部语音资产，支持版本回溯与 A/B 测试。",
   },
 ];
 
-/** 智慧大脑 → 语音库页 */
+/** 语音库 —— 品牌声音与多语种语音资产管理 */
 export default function VoicePage() {
-  const [playingId, setPlayingId] = useState<string | null>(null);
-
   return (
     <PageTransition>
-    <div className="space-y-6">
-      <PageHeader
-        icon={Mic}
+      <BrainAssetPlaceholderPage
         title="语音库"
-        description="品牌声音、外呼模板与多语种语音资产"
-        actions={
-          <button
-            type="button"
-            className="bg-brand text-white hover:bg-brand/80 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors"
-          >
-            <Upload className="size-4" />
-            上传语音
-          </button>
-        }
+        description="品牌声音与多语种语音资产"
+        featureIcon={Mic}
+        featureIconColor="text-brand"
+        featureIconBg="bg-brand/10"
+        featureTitle="关于语音库"
+        featureText="PRD §9.3：语音库是 HermesClaw 多模态资产体系的核心组件，承载品牌声音模型、多语种外呼模板、TTS 音色管理等能力。
+支持上传企业管理者的声音样本，生成专属品牌音色；内置中/英/日/韩/西/法/德/阿 8 种语言的电商场景外呼模板；
+所有语音资产可按语种、场景、音色标签检索与版本管理。"
+        columns={COLUMNS}
+        phase2Text="该模块已规划，Phase 2 启动。届时将集成 TTS 引擎与声音克隆模型，敬请期待。"
+        phase2IconColor="text-brand"
+        phase2IconBg="bg-brand/10"
+        breadcrumb={[
+          { label: "智慧大脑", href: "/brain" },
+          { label: "语音库" },
+        ]}
       />
-
-      {/* 表格 */}
-      <div className="bg-card border-border overflow-hidden rounded-2xl border">
-        <table className="w-full">
-          <thead>
-            <tr className="border-border border-b">
-              <th className="text-muted-foreground px-5 py-3 text-left text-xs font-medium uppercase tracking-wide">
-                名称
-              </th>
-              <th className="text-muted-foreground px-5 py-3 text-left text-xs font-medium uppercase tracking-wide">
-                语种
-              </th>
-              <th className="text-muted-foreground px-5 py-3 text-left text-xs font-medium uppercase tracking-wide">
-                用途
-              </th>
-              <th className="text-muted-foreground px-5 py-3 text-left text-xs font-medium uppercase tracking-wide">
-                试听
-              </th>
-              <th className="text-muted-foreground px-5 py-3 text-left text-xs font-medium uppercase tracking-wide">
-                时长
-              </th>
-              <th className="text-muted-foreground px-5 py-3 text-left text-xs font-medium uppercase tracking-wide">
-                状态
-              </th>
-              <th className="text-muted-foreground px-5 py-3 text-left text-xs font-medium uppercase tracking-wide">
-                操作
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {VOICE_DATA.map((voice) => (
-              <tr
-                key={voice.id}
-                className="border-border hover:bg-accent/50 border-b transition-colors last:border-0"
-              >
-                <td className="px-5 py-3.5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="bg-warning/10 flex size-8 shrink-0 items-center justify-center rounded-lg">
-                      <Mic className="text-warning size-4" />
-                    </div>
-                    <span className="text-foreground text-sm font-medium">
-                      {voice.name}
-                    </span>
-                  </div>
-                </td>
-                <td className="text-foreground px-5 py-3.5 text-sm">
-                  {voice.language}
-                </td>
-                <td className="text-muted-foreground px-5 py-3.5 text-sm">
-                  {voice.purpose}
-                </td>
-                <td className="px-5 py-3.5">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPlayingId(playingId === voice.id ? null : voice.id)
-                    }
-                    className={cn(
-                      "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                      playingId === voice.id
-                        ? "bg-brand/10 text-brand"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                    )}
-                  >
-                    {playingId === voice.id ? (
-                      <>
-                        <Pause className="size-3.5" />
-                        暂停
-                      </>
-                    ) : (
-                      <>
-                        <Play className="size-3.5" />
-                        试听
-                      </>
-                    )}
-                  </button>
-                </td>
-                <td className="text-muted-foreground px-5 py-3.5 text-sm font-mono">
-                  {voice.duration}
-                </td>
-                <td className="px-5 py-3.5">
-                  <span className="bg-success/10 text-success inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-medium">
-                    就绪
-                  </span>
-                </td>
-                <td className="px-5 py-3.5">
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md px-2.5 py-1 text-xs transition-colors"
-                    >
-                      编辑
-                    </button>
-                    <button
-                      type="button"
-                      className="text-danger hover:bg-danger/10 rounded-md px-2.5 py-1 text-xs transition-colors"
-                    >
-                      删除
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </PageTransition>
+    </PageTransition>
   );
 }

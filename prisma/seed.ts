@@ -5,8 +5,6 @@
  * 用法：pnpm exec prisma db seed
  */
 import 'dotenv/config'
-import { PrismaClient } from '../src/generated/prisma/client'
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import bcrypt from 'bcryptjs'
 import {
   mockAgents,
@@ -16,15 +14,10 @@ import {
   mockMemories,
   mockHarnessProposals,
 } from '../src/lib/mock-data'
+import { createSeedPrisma } from './seed-utils'
+import { foreignTradeSkillTemplates, toSkillDbRecord } from './seed-skills'
 
-const adapter = new PrismaBetterSqlite3({
-  url: process.env['DATABASE_URL'] ?? 'file:./dev.db',
-})
-
-const prisma = new PrismaClient({
-  adapter,
-  log: ['error', 'warn'],
-})
+const prisma = createSeedPrisma()
 
 async function main() {
   console.log('🌱 开始填充种子数据...\n')
@@ -43,8 +36,9 @@ async function main() {
     },
   })
 
-  // ---- 技能 ----
-  console.log('→ 写入技能（12 条）...')
+  // ---- 技能（通用 + 外贸行业模板）----
+  const totalSkills = mockSkills.length + foreignTradeSkillTemplates.length
+  console.log(`→ 写入技能（${totalSkills} 条：通用 ${mockSkills.length} + 外贸 ${foreignTradeSkillTemplates.length}）...`)
   for (const s of mockSkills) {
     await prisma.skill.create({
       data: {
@@ -61,6 +55,17 @@ async function main() {
         scenarios: JSON.stringify(s.scenarios),
         updatedAt: new Date(s.updatedAt),
       },
+    })
+  }
+
+  // 外贸行业技能模板 —— 源自 .claude/skills/ft-*/SKILL.md（Claude Code Skills 规范）
+  for (const tmpl of foreignTradeSkillTemplates) {
+    const skillId = `skill-${tmpl.commandName}`
+    const data = toSkillDbRecord(tmpl)
+    await prisma.skill.upsert({
+      where: { id: skillId },
+      update: data,
+      create: { id: skillId, ...data },
     })
   }
 
@@ -161,9 +166,10 @@ async function main() {
         triggeredBy: h.triggeredBy,
         problemStatement: h.problemStatement,
         evidence: JSON.stringify(h.evidence),
-        targetComponent: h.targetComponent,
-        proposedChange: h.proposedChange,
-        riskLevel: h.riskLevel,
+        targetComponent: h.proposedChange.targetComponent,
+        proposedChange: h.proposedChange.description,
+        riskLevel: h.proposedChange.riskLevel,
+        automationLevel: h.proposedChange.automationLevel,
         status: h.status,
         estimatedImpact: h.estimatedImpact,
         reviewedBy: h.reviewedBy ?? null,
@@ -176,7 +182,7 @@ async function main() {
   console.log('\n✅ 种子数据填充完成！')
   console.log('   - 用户：admin@hermesclaw.ai（密码：hermesclaw2026）')
   console.log(`   - 智能体：${mockAgents.length} 条`)
-  console.log(`   - 技能：${mockSkills.length} 条`)
+  console.log(`   - 技能：${mockSkills.length} 条通用 + ${foreignTradeSkillTemplates.length} 条外贸模板`)
   console.log(`   - 连接器：${mockConnectors.length} 条`)
   console.log(`   - 项目：${mockProjects.length} 条`)
   console.log(`   - 记忆：${mockMemories.length} 条`)
