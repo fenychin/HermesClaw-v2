@@ -9,6 +9,7 @@ import {
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { MemoryCreateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
+import { guardOutput } from "@/lib/server/output-guard"
 
 /** GET /api/memory?type=short|mid|long —— 获取记忆列表，支持类型过滤 */
 export async function GET(request: Request) {
@@ -43,6 +44,12 @@ export async function POST(request: Request) {
     const parsed = validateBody(rawBody, MemoryCreateSchema)
     if (parsed instanceof Response) return parsed
     const body = parsed
+
+    // 引入安全护栏扫描（AGENTS.md 第五章：防注入与安全边界）
+    const guard = guardOutput(body.content, { minLength: 3, maxLength: 8000 })
+    if (!guard.ok) {
+      return errorResponse(`知识库文本不合规：${guard.reason}`, 400)
+    }
 
     const memory = await prisma.memory.create({
       data: {

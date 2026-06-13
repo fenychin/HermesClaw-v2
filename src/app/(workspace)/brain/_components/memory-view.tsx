@@ -52,60 +52,101 @@ function formatTime(iso: string): string {
 function MemoryCard({ memory }: { memory: Memory }) {
   const { archiveMemory, freezeMemory, upgradeMemory } = useMemoryStore();
 
+  const displayTime = useMemo(() => {
+    if (memory.updatedAt && memory.updatedAt !== memory.createdAt) {
+      return `更新于: ${formatTime(memory.updatedAt)}`;
+    }
+    return formatTime(memory.createdAt);
+  }, [memory]);
+
+  const friendlySource = useMemo(() => {
+    if (memory.relatedAgent) return `智能体: ${memory.relatedAgent}`;
+    if (memory.relatedProject) return `项目: ${memory.relatedProject}`;
+    if (memory.source === "manual") return "人工录入 SOP";
+    if (memory.source === "system") return "自演化引擎";
+    return memory.source === "auto" ? "工作流捕获" : memory.source;
+  }, [memory]);
+
   return (
-    <div className="bg-card border-border rounded-xl border p-4">
-      <div className="mb-2 flex items-center gap-2">
-        <span className="text-muted-foreground shrink-0 text-xs">
-          {formatTime(memory.createdAt)}
-        </span>
-        <span className="bg-accent text-muted-foreground rounded-full px-2 py-0.5 text-[10px] font-medium">
-          {memory.source}
-        </span>
-        {memory.version && memory.version > 1 ? (
-          <span className="bg-brand/10 text-brand rounded-full px-2 py-0.5 text-[10px] font-mono font-medium">
-            v{memory.version}
+    <div className="bg-card border-border rounded-xl border p-4 flex flex-col justify-between min-h-[160px]">
+      <div>
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-muted-foreground shrink-0 text-xs">
+            {displayTime}
           </span>
-        ) : null}
-        <div className="flex-1" />
-        <span
-          className={cn(
-            "shrink-0 text-xs font-medium",
-            confidenceColor(memory.confidence),
-          )}
-        >
-          {Math.round(memory.confidence * 100)}%
-        </span>
-        {memory.frozen && <Lock className="text-brand size-3.5 shrink-0" />}
+          <span className="bg-accent text-muted-foreground rounded-full px-2 py-0.5 text-[10px] font-medium max-w-[120px] truncate">
+            {friendlySource}
+          </span>
+          {memory.version && memory.version > 1 ? (
+            <span className="bg-brand/10 text-brand rounded-full px-2 py-0.5 text-[10px] font-mono font-medium">
+              v{memory.version}
+            </span>
+          ) : null}
+          <div className="flex-1" />
+          <span
+            className={cn(
+              "shrink-0 text-xs font-medium",
+              confidenceColor(memory.confidence),
+            )}
+          >
+            {Math.round(memory.confidence * 100)}%
+          </span>
+          {memory.frozen && <Lock className="text-brand size-3.5 shrink-0" />}
+        </div>
+
+        <p className="text-foreground mb-3 line-clamp-3 text-sm leading-relaxed">
+          {memory.summary}
+        </p>
+
+        {memory.tags.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {memory.tags.map((tag) => (
+              <span
+                key={tag}
+                className="bg-accent text-hint rounded-md px-2 py-0.5 text-[10px]"
+              >
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
-      <p className="text-foreground mb-3 line-clamp-3 text-sm leading-relaxed">
-        {memory.summary}
-      </p>
-
-      {memory.tags.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {memory.tags.map((tag) => (
-            <span
-              key={tag}
-              className="bg-accent text-hint rounded-md px-2 py-0.5 text-[10px]"
+      <div className="border-border flex items-center gap-1 border-t pt-2.5 mt-2">
+        {/* 短期记忆可以一键提升为中期或长期 */}
+        {memory.type === "short" && (
+          <>
+            <button
+              type="button"
+              onClick={() => upgradeMemory(memory.id, "mid")}
+              className="text-brand-blue hover:bg-brand-blue/10 inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors"
             >
-              #{tag}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="border-border flex items-center gap-1 border-t pt-2.5">
-        {memory.type !== "long" && (
+              <ArrowUp className="size-3" />
+              升至中期
+            </button>
+            <button
+              type="button"
+              onClick={() => upgradeMemory(memory.id, "long")}
+              className="text-brand hover:bg-brand/10 inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors"
+            >
+              <ArrowUp className="size-3" />
+              升至长期
+            </button>
+          </>
+        )}
+        
+        {/* 中期记忆可以一键提升为长期 */}
+        {memory.type === "mid" && (
           <button
             type="button"
-            onClick={() => upgradeMemory(memory.id)}
-            className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors"
+            onClick={() => upgradeMemory(memory.id, "long")}
+            className="text-brand hover:bg-brand/10 inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors"
           >
             <ArrowUp className="size-3" />
-            升级
+            升至长期
           </button>
         )}
+
         <button
           type="button"
           onClick={() => {
@@ -113,16 +154,17 @@ function MemoryCard({ memory }: { memory: Memory }) {
               archiveMemory(memory.id, true).catch(() => {});
             }
           }}
-          className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors"
+          className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors"
         >
           <Archive className="size-3" />
           归档
         </button>
+
         <button
           type="button"
           onClick={() => freezeMemory(memory.id, !memory.frozen)}
           className={cn(
-            "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors",
+            "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors",
             memory.frozen
               ? "text-brand hover:bg-brand/10"
               : "text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -140,7 +182,9 @@ function MemoryCard({ memory }: { memory: Memory }) {
             </>
           )}
         </button>
+        
         <div className="flex-1" />
+        
         <button
           type="button"
           onClick={() => {
@@ -148,7 +192,7 @@ function MemoryCard({ memory }: { memory: Memory }) {
               archiveMemory(memory.id, true).catch(() => {});
             }
           }}
-          className="text-danger hover:bg-danger/10 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors"
+          className="text-danger hover:bg-danger/10 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors"
         >
           <Trash2 className="size-3" />
           删除

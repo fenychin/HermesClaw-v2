@@ -187,6 +187,27 @@ function SkillDetail({ skill }: { skill: Skill }) {
         {skill.description}
       </p>
 
+      {/* 统计指标 */}
+      {skill.stats && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-accent/30 border border-border/50 rounded-xl p-3 flex flex-col">
+            <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wide">最近执行统计</span>
+            <span className="text-foreground text-lg font-bold mt-1">
+              {skill.stats.callCount} 次调用
+            </span>
+          </div>
+          <div className="bg-accent/30 border border-border/50 rounded-xl p-3 flex flex-col">
+            <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wide">执行成功率</span>
+            <span className={cn(
+              "text-lg font-bold mt-1",
+              skill.stats.successRate >= 0.9 ? "text-success" : "text-warning"
+            )}>
+              {(skill.stats.successRate * 100).toFixed(0)}%
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* 输入规格 */}
       <div>
         <h3 className="text-foreground mb-2 text-xs font-semibold uppercase tracking-wide">

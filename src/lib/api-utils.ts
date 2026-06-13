@@ -87,24 +87,38 @@ export function serializeProject(project: Record<string, unknown>) {
   }
 }
 
+import type { Connector, Memory, Skill } from "@/types"
+
 /**
  * 记忆共享序列化 —— 将 DB 中的 JSON 字符串 tags 反序列化。
  * 消除 memory/route.ts、memory/[id]/route.ts、projects/[id]/memory/route.ts 中的重复定义。
  */
-export function serializeMemory(m: Record<string, unknown>) {
+export function serializeMemory(m: Record<string, unknown>): Memory {
+  const serialized = serializeDates(m, ["createdAt", "updatedAt"])
   return {
-    ...m,
-    tags: parseJsonField(m.tags as string, []),
-  }
+    ...serialized,
+    tags: parseJsonField(serialized.tags as string, []),
+  } as unknown as Memory
 }
 
 /** 序列化 Connector，将 JSON 字符串字段反序列化 */
-export function serializeConnector(connector: Record<string, unknown>) {
+export function serializeConnector(connector: Record<string, unknown>): Connector {
+  const serialized = serializeDates(connector, ["createdAt", "updatedAt"])
   return {
-    ...connector,
-    permissions: parseJsonField(connector.permissions as string, []),
-    usedByAgents: parseJsonField(connector.usedByAgents as string, []),
-  }
+    ...serialized,
+    permissions: parseJsonField(serialized.permissions as string, []),
+    usedByAgents: parseJsonField(serialized.usedByAgents as string, []),
+  } as unknown as Connector
+}
+
+/** 序列化 DB 中的 Skill 实体 */
+export function serializeSkill(skill: Record<string, unknown>): Skill {
+  const serialized = serializeDates(skill, ["createdAt", "updatedAt"])
+  return {
+    ...serialized,
+    usedByAgents: parseJsonField(serialized.usedByAgents as string, []),
+    scenarios: parseJsonField(serialized.scenarios as string, []),
+  } as unknown as Skill
 }
 
 /** 统一错误响应 */
