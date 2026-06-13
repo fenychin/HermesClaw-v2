@@ -9,6 +9,23 @@ import {
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { checkConfirmQuery } from "@/lib/server/guardrail"
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
+import { z } from "zod"
+import { validateBody } from "@/lib/validators"
+
+/** PATCH /api/projects/[id] 请求体 schema（全部字段可选） */
+const ProjectPatchSchema = z.object({
+  name: z.string().optional(),
+  type: z.string().optional(),
+  status: z.string().optional(),
+  owner: z.string().optional(),
+  relatedClient: z.string().optional(),
+  country: z.string().optional(),
+  productLine: z.string().optional(),
+  activeAgents: z.unknown().optional(),
+  riskPoints: z.unknown().optional(),
+  nextActions: z.unknown().optional(),
+  tags: z.unknown().optional(),
+})
 
 /** GET /api/projects/[id] —— 获取项目详情（含关联记忆，workspaceId 隔离） */
 export async function GET(
@@ -51,10 +68,9 @@ export async function PATCH(
     const ctx = await buildWorkspaceContext(request)
     requireWritable(ctx.role)
 
-    const body = await request.json()
-    if (!body || typeof body !== "object" || Array.isArray(body)) {
-      return errorResponse("请求体必须为 JSON 对象", 400)
-    }
+    const raw = await request.json()
+    const body = validateBody(raw, ProjectPatchSchema)
+    if (body instanceof Response) return body
 
     const existing = await prisma.project.findFirst({
       where: { id, workspaceId: ctx.workspaceId },

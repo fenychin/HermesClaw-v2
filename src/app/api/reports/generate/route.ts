@@ -10,6 +10,12 @@ import {
 import { ApiResponse } from "@/lib/server/api-response"
 import { selectModel } from "@/lib/server/model-router"
 import { callAnthropicText } from "@/lib/server/llm-provider"
+import { z } from "zod"
+
+/** POST /api/reports/generate 请求体 schema（type 可选，默认 MORNING） */
+const ReportGenerateSchema = z.object({
+  type: z.enum(["MORNING", "EVENING", "WEEKLY"]).optional(),
+})
 
 /** DeepSeek Chat API 端点 */
 const DEEPSEEK_CHAT_URL = "https://api.deepseek.com/v1/chat/completions"
@@ -112,11 +118,10 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
   // 解析请求体中的报告类型（默认晨报）
   let reportType: ReportType = "MORNING"
   try {
-    const body = await request.json()
-    if (body && typeof body === "object" && !Array.isArray(body)) {
-      if (body.type === "EVENING" || body.type === "WEEKLY" || body.type === "MORNING") {
-        reportType = body.type
-      }
+    const raw = await request.json()
+    const parsed = ReportGenerateSchema.safeParse(raw)
+    if (parsed.success && parsed.data.type) {
+      reportType = parsed.data.type
     }
   } catch (parseError) {
     // body 为空或 JSON 格式错误，使用默认 MORNING

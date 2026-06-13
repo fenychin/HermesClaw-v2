@@ -5,11 +5,18 @@ import { type WorkspaceContext } from "@/lib/workspace"
 import { withRBAC, type RouteContext } from "@/lib/server/api-handler"
 import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
 import { ApiResponse } from "@/lib/server/api-response"
+import { z } from "zod"
 
 /** 任务状态允许值 */
 const VALID_STATUSES = ["OPEN", "IN_PROGRESS", "DONE", "CANCELLED"] as const
 /** 任务优先级允许值 */
 const VALID_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const
+
+/** PATCH /api/tasks/[id] 请求体 schema */
+const TaskPatchSchema = z.object({
+  status: z.enum(VALID_STATUSES).optional(),
+  priority: z.enum(VALID_PRIORITIES).optional(),
+})
 
 /**
  * PATCH /api/tasks/[id] —— 更新任务状态 / 优先级
@@ -23,22 +30,25 @@ export const PATCH = withRBAC(async (
 ) => {
   const { id } = await routeContext.params
   const rawBody = await request.json()
-  const { status, priority } = rawBody as {
-    status?: string
-    priority?: string
+
+  // zod 校验请求体
+  const parsed = TaskPatchSchema.safeParse(rawBody)
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+    const firstPath = issues[0]?.path[0]
+    if (firstPath === "status") {
+      return errorResponse(`status 无效，允许值: ${VALID_STATUSES.join(", ")}`, 400)
+    }
+    if (firstPath === "priority") {
+      return errorResponse(`priority 无效，允许值: ${VALID_PRIORITIES.join(", ")}`, 400)
+    }
+    return errorResponse("请求体格式错误", 400)
   }
+  const { status, priority } = parsed.data
 
   // 参数校验：至少提供一个更新字段
   if (!status && !priority) {
     return errorResponse("至少提供 status 或 priority 字段", 400)
-  }
-
-  if (status && !VALID_STATUSES.includes(status as typeof VALID_STATUSES[number])) {
-    return errorResponse(`status 无效，允许值: ${VALID_STATUSES.join(", ")}`, 400)
-  }
-
-  if (priority && !VALID_PRIORITIES.includes(priority as typeof VALID_PRIORITIES[number])) {
-    return errorResponse(`priority 无效，允许值: ${VALID_PRIORITIES.join(", ")}`, 400)
   }
 
   const actor = await actorFromSession()
