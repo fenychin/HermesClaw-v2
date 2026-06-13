@@ -49,6 +49,12 @@ const REQUIRED_SCHEMA_EXPORTS = [
   "ApprovalPayloadSchema",
   "ArtifactPayloadSchema",
   "TypedExecutionEventSchema",
+  // P2 新增 Task Payloads
+  "HandleInquiryPayloadSchema",
+  "GenerateDevLetterPayloadSchema",
+  "GenerateQuotationPayloadSchema",
+  "GenericPayloadSchema",
+  "TypedTaskInputSchema",
   // 公共基础
   "VersionSchema",
   "VersionRangeSchema",
@@ -123,6 +129,12 @@ const REQUIRED_TYPE_EXPORTS = [
   "ApprovalPayload",
   "ArtifactPayload",
   "TypedExecutionEvent",
+  // P2 新增 Task Payloads
+  "HandleInquiryPayload",
+  "GenerateDevLetterPayload",
+  "GenerateQuotationPayload",
+  "GenericPayload",
+  "TypedTaskInput",
 ]
 
 describe("index.ts 导出完整性", () => {
@@ -175,6 +187,13 @@ describe("index.ts 导出完整性", () => {
   it("工具函数 typedPayload 已导出且可调用（Payload 收窄工厂）", () => {
     expect("typedPayload" in index).toBe(true)
     expect(typeof (index as Record<string, unknown>).typedPayload).toBe(
+      "function",
+    )
+  })
+
+  it("辅助函数 isCriticalActionType 已导出且可调用", () => {
+    expect("isCriticalActionType" in index).toBe(true)
+    expect(typeof (index as Record<string, unknown>).isCriticalActionType).toBe(
       "function",
     )
   })

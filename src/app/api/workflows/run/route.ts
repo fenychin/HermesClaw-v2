@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { hermesClient } from '@/lib/server/adapters/hermes'
 import { ApiResponse } from '@/lib/server/api-response'
+import { TypedTaskInputSchema, isCriticalActionType } from '@/contracts'
 import { withRBAC } from '@/lib/server/api-handler'
 import { validateBody } from '@/lib/validators'
 import { writeAuditLog, actorFromSession } from '@/lib/server/audit'
@@ -28,6 +29,17 @@ export const POST = withRBAC(async (req: Request, ctx: WorkspaceContext) => {
     const parsed = validateBody(rawBody, WorkflowRunSchema)
     if (parsed instanceof Response) return parsed
     body = parsed
+
+    const inputs = body.inputs
+    const actionType = typeof inputs._type === 'string' ? inputs._type : ''
+    const typedInput = TypedTaskInputSchema.safeParse(inputs)
+    if (!typedInput.success && isCriticalActionType(actionType)) {
+      logger.warn('工作流执行被拦截：任务输入不符合 actionType 要求', {
+        actionType,
+        errors: typedInput.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      })
+      return ApiResponse.error('任务输入不符合 actionType 要求', 400)
+    }
 
     const result = await hermesClient.runWorkflow(body)
 
