@@ -26,6 +26,7 @@ import { guardOutput } from '@/lib/server/output-guard'
 import { executeSkillNode } from '@/lib/server/workflow/skill-executor'
 import { executeDataWriteNode } from '@/lib/server/workflow/data-write-executor'
 import { emitOpenClawEvent } from '@/lib/server/adapters/openclaw/event-emitter'
+import { createSubworkflowHandler } from './subworkflow-executor'
 import type {
   WorkflowNode,
   WorkflowEdge,
@@ -206,45 +207,8 @@ export async function runWorkflow(
     }
   }
 
-  // 内置 subworkflow handler：递归调用 runWorkflow
-  // 注意：此 handler 在闭包中捕获 options.handlers，所有嵌套层级共享同一份引用
-  handlers['subworkflow'] = async (node, execCtx) => {
-    const config = node.config ?? {}
-    const childWorkflowId = typeof config.workflowId === 'string' ? config.workflowId : null
-    if (!childWorkflowId) {
-      return {
-        status: 'failed',
-        error: `子流程节点 ${node.id} 缺少 config.workflowId`,
-      }
-    }
-
-    // 子流程继承当前 ctx.variables + 上游节点输出（排除内部标记键和 null/undefined 值）
-    const childInput: Record<string, unknown> = { ...execCtx.variables }
-    for (const [key, val] of Object.entries(execCtx.nodeOutputs)) {
-      if (key.startsWith('__skipped__')) continue
-      if (val === null || val === undefined) continue
-      childInput[key] = val
-    }
-
-    try {
-      const childResult = await runWorkflow(childWorkflowId, childInput, {
-        parentRunId: runId,
-        depth: depth + 1,
-        maxDepth,
-        trigger: 'subworkflow',
-        handlers: options?.handlers,
-      })
-      return {
-        status: 'completed',
-        output: childResult.output,
-      }
-    } catch (error) {
-      return {
-        status: 'failed',
-        error: `子流程 ${childWorkflowId} 执行失败：${error instanceof Error ? error.message : '未知错误'}`,
-      }
-    }
-  }
+  // 内置 subworkflow handler：调用解耦的外部处理器，依赖注入以规避循环导入
+  handlers['subworkflow'] = createSubworkflowHandler(runWorkflow)
 
   // 5. 定义生命周期钩子
 
@@ -391,10 +355,27 @@ export async function runWorkflow(
     }
   }
 
+  const onWorkflowComplete = async (runCtx: WorkflowRunContext, status: RunStatus) => {
+    if (status === 'failed') {
+      logger.info(`[dag-runner] 工作流 ${runCtx.runId} 执行失败，异步触发 Harness 降级评估`)
+      runHarnessEvaluation('auto').catch((err) => {
+        logger.error('[dag-runner] onWorkflowComplete Harness 降级评估 Promise 失败', {
+          error: err instanceof Error ? err.message : '未知',
+          runId: runCtx.runId,
+        })
+      })
+    }
+  }
+
   // 6. 执行 DAG
   let finalStatus: RunStatus = 'completed'
   try {
-    finalStatus = await runDag(def, ctx, { handlers, maxDepth }, { onNodeStart, onNodeFinish })
+    finalStatus = await runDag(
+      def,
+      ctx,
+      { handlers, maxDepth },
+      { onNodeStart, onNodeFinish, onWorkflowComplete },
+    )
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : '未知错误'
     logger.error('[dag-runner] DAG 引擎执行异常（拓扑环路/致命错误）', {
@@ -439,6 +420,12 @@ export async function runWorkflow(
         riskLevel: 'high',
         workspaceId: workflow.workspaceId ?? 'default',
       })
+    }
+
+    try {
+      await onWorkflowComplete(ctx, 'failed')
+    } catch {
+      // 忽略错误
     }
   }
 

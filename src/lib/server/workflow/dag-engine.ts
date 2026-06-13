@@ -27,18 +27,65 @@ import type {
 /** 跳过标记前缀，存入 ctx.nodeOutputs 以避免与正常输出键冲突 */
 const SKIPPED_PREFIX = '__skipped__'
 
-/** 安全调用生命周期钩子：异常静默吞食，不阻断引擎主流程 */
+/** 安全调用生命周期钩子：异常日志警告但吞食，不阻断引擎主流程 */
 async function safeHook(fn: () => Promise<void>): Promise<void> {
   try {
     await fn()
-  } catch {
-    // 钩子异常不阻断引擎执行；失败由 runner 层的 onNodeFinish catch 兜底
+  } catch (error) {
+    // 钩子异常记录警告，不阻断引擎执行
+    console.warn('[dag-engine] 引擎生命周期钩子执行失败：', error)
   }
 }
 
 /** 在上下文中标记节点已被跳过 */
 function markNodeSkipped(ctx: WorkflowRunContext, nodeId: string): void {
   ctx.nodeOutputs[`${SKIPPED_PREFIX}${nodeId}`] = true
+}
+
+/**
+ * 递归传播跳过状态。
+ * 将指定的节点及其所有后继节点从 activeNodes 中移除，并在 ctx 中标记为 skipped，
+ * 同时对尚未被跳过/执行的节点触发 onNodeFinish 钩子。
+ */
+async function propagateSkip(
+  startNodeIds: string[],
+  activeNodes: Set<string>,
+  ctx: WorkflowRunContext,
+  edgeTable: Map<string, Map<string | undefined, string[]>>,
+  hooks: DagEngineHooks,
+  reason: string,
+): Promise<void> {
+  const visited = new Set<string>()
+  const queue = [...startNodeIds]
+
+  while (queue.length > 0) {
+    const curr = queue.shift()!
+    if (visited.has(curr)) continue
+    visited.add(curr)
+
+    if (activeNodes.has(curr)) {
+      activeNodes.delete(curr)
+      markNodeSkipped(ctx, curr)
+      await safeHook(() =>
+        hooks.onNodeFinish?.(curr, ctx, {
+          status: 'skipped',
+          output: null,
+          error: reason,
+        }) ?? Promise.resolve(),
+      )
+    }
+
+    const inner = edgeTable.get(curr)
+    if (inner) {
+      for (const [, tos] of inner) {
+        for (const to of tos) {
+          if (!visited.has(to)) {
+            queue.push(to)
+          }
+        }
+      }
+    }
+  }
 }
 
 // ---- 内置 handler ----
@@ -57,11 +104,19 @@ const conditionHandler: NodeHandler = async (node, ctx) => {
   const expected = config.expected
 
   if (!varName) {
-    return { status: 'failed', error: `条件节点 ${node.id} 缺少 config.variable` }
+    return { status: 'failed', error: `条件节点 ${node.id} 缺少 config.variable 配置` }
+  }
+
+  // 变量缺失检测：必须在 ctx.variables 中存在且不能为 undefined
+  if (!(varName in ctx.variables) || ctx.variables[varName] === undefined) {
+    return {
+      status: 'failed',
+      error: `条件节点 ${node.id} 执行失败：无法在上下文中找到变量 ctx.variables.${varName}`,
+    }
   }
 
   const actual = ctx.variables[varName]
-  const actualStr = actual === undefined || actual === null ? 'null' : String(actual)
+  const actualStr = actual === null ? 'null' : String(actual)
   const expectedStr = expected === undefined || expected === null ? 'null' : String(expected)
 
   const matched = actualStr === expectedStr
@@ -329,17 +384,23 @@ export async function runDag(
     for (const { nodeId, result } of layerResults) {
       if (result.status === 'failed') {
         anyFailed = true
-        // 失败节点的下游全部移除执行资格（不扩散故障）
-        const downstream = resolveDownstream(edgeTable, nodeId, undefined)
-        for (const ds of downstream) {
-          activeNodes.delete(ds)
-          markNodeSkipped(ctx, ds)
-          await safeHook(() =>
-            hooks.onNodeFinish?.(ds, ctx, {
-              status: 'skipped',
-              output: null,
-              error: `上游节点 ${nodeId} 失败，跳过执行`,
-            }) ?? Promise.resolve(),
+        // 收集失败节点的所有直接下游（包含所有分支，防止故障扩散）
+        const allDownstream: string[] = []
+        const inner = edgeTable.get(nodeId)
+        if (inner) {
+          for (const [, tos] of inner) {
+            allDownstream.push(...tos)
+          }
+        }
+        // 递归传播 skip 状态到所有可达后继节点
+        if (allDownstream.length > 0) {
+          await propagateSkip(
+            allDownstream,
+            activeNodes,
+            ctx,
+            edgeTable,
+            hooks,
+            `上游节点 ${nodeId} 失败，跳过执行`,
           )
         }
         continue
@@ -348,26 +409,23 @@ export async function runDag(
       // 6a. 条件分支路由：仅 condition 节点走分支裁剪逻辑
       if (result.branch !== undefined) {
         const branch = result.branch
-        const downstream = resolveDownstream(edgeTable, nodeId, branch)
-        // 该节点可能存在的所有下游
-        const allDownstream = new Set<string>()
         const inner = edgeTable.get(nodeId)
         if (inner) {
-          for (const [, tos] of inner) {
-            for (const to of tos) allDownstream.add(to)
+          const unactivatedDownstream: string[] = []
+          for (const [when, tos] of inner) {
+            if (when !== undefined && when !== branch) {
+              unactivatedDownstream.push(...tos)
+            }
           }
-        }
-        // 未被激活的下游 → skipped
-        for (const ds of allDownstream) {
-          if (!downstream.includes(ds) && activeNodes.has(ds)) {
-            activeNodes.delete(ds)
-            markNodeSkipped(ctx, ds)
-            await safeHook(() =>
-              hooks.onNodeFinish?.(ds, ctx, {
-                status: 'skipped',
-                output: null,
-                error: `条件分支未命中（上游 ${nodeId} → ${branch}），跳过执行`,
-              }) ?? Promise.resolve(),
+          // 对未激活的分支进行递归 skip 传播
+          if (unactivatedDownstream.length > 0) {
+            await propagateSkip(
+              unactivatedDownstream,
+              activeNodes,
+              ctx,
+              edgeTable,
+              hooks,
+              `条件分支未命中（上游 ${nodeId} → ${branch}），跳过执行`,
             )
           }
         }
@@ -381,6 +439,7 @@ export async function runDag(
     const covered = layers.some((l) => l.nodeIds.includes(n.id))
     const skipKey = `${SKIPPED_PREFIX}${n.id}`
     if (!covered && !ctx.nodeOutputs[skipKey]) {
+      activeNodes.delete(n.id)
       markNodeSkipped(ctx, n.id)
       await safeHook(() =>
         hooks.onNodeFinish?.(n.id, ctx, {
@@ -392,5 +451,9 @@ export async function runDag(
     }
   }
 
-  return anyFailed ? 'failed' : 'completed'
+  const finalStatus = anyFailed ? 'failed' : 'completed'
+  // 调用工作流完成钩子，通知 runner 进行全局收尾
+  await safeHook(() => hooks.onWorkflowComplete?.(ctx, finalStatus) ?? Promise.resolve())
+
+  return finalStatus
 }
