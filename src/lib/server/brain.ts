@@ -40,7 +40,7 @@ const defaultDeps: BrainStatsDeps = {
  * @returns 智慧大脑聚合指标
  */
 export async function getBrainStats(
-  workspaceId = "default",
+  workspaceId: string,
   deps = defaultDeps,
 ): Promise<BrainStats> {
   const since = new Date(Date.now() - 72 * 60 * 60 * 1000);

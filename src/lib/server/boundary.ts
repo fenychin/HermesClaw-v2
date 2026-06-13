@@ -46,7 +46,7 @@ function toKeywords(rule: string): string[] {
 export async function assertWithinBoundary(
   agentId: string,
   action: string,
-  workspaceId = "default",
+  workspaceId: string,
 ): Promise<BoundaryCheckResult> {
   const text = action.toLowerCase()
 

@@ -96,6 +96,8 @@ export type HermesRiskLevel = Exclude<RiskLevel, 'critical'>
 
 /** Harness 评估触发请求 */
 export interface HermesHarnessEvaluateRequest {
+  /** 工作空间 ID */
+  workspaceId: string
   /** 目标 Agent ID */
   agentId: string
   /** 触发原因描述 */

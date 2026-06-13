@@ -185,7 +185,9 @@ const mockHandlers: Record<string, (body: unknown) => unknown | Promise<unknown>
       try {
         return mockExecuteTask(body)
       } catch (error) {
-        logger.error('[OpenClaw Mock] mockExecuteTask 同步异常', error)
+        logger.error('[OpenClaw Mock] mockExecuteTask 同步异常', {
+          error: error instanceof Error ? error.message : String(error)
+        })
         const req = (body || {}) as Record<string, any>
         const taskId = req.taskId ?? `mock-task-${Date.now()}`
       return {

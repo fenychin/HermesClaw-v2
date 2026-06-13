@@ -249,7 +249,7 @@ export async function rollbackHarnessProposal(
     //    使用动态 import 避免循环依赖；失败不阻断主流程
     import("@/lib/server/harness-eval")
       .then(({ runHarnessEvaluation }) =>
-        runHarnessEvaluation("auto").catch((err: unknown) =>
+        runHarnessEvaluation(proposal.workspaceId, "auto").catch((err: unknown) =>
           logger.warn("回滚后自动评估触发失败（已忽略）", {
             error: err instanceof Error ? err.message : "未知错误",
             proposalId,
