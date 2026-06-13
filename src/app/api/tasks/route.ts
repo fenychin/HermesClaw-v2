@@ -5,6 +5,18 @@ import { buildWorkspaceContext, type WorkspaceContext } from "@/lib/workspace"
 import { withRBAC } from "@/lib/server/api-handler"
 import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
 import { ApiResponse } from "@/lib/server/api-response"
+import { z } from "zod"
+
+/** POST /api/tasks 请求体 schema */
+const TaskCreateSchema = z.object({
+  title: z.string().min(1, "title 为必填字段"),
+  description: z.string().optional(),
+  priority: z.string().optional(),
+  source: z.string().optional(),
+  relatedType: z.string().optional(),
+  relatedId: z.string().optional(),
+  dueAt: z.string().optional(),
+})
 
 /**
  * GET /api/tasks —— 获取任务列表（按创建时间倒序）
@@ -44,20 +56,13 @@ export async function GET(request: Request) {
 export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => {
   const rawBody = await request.json()
 
-  // 参数校验
-  const { title, description, priority, source, relatedType, relatedId, dueAt } = rawBody as {
-    title?: string
-    description?: string
-    priority?: string
-    source?: string
-    relatedType?: string
-    relatedId?: string
-    dueAt?: string
+  // zod 参数校验
+  const parsed = TaskCreateSchema.safeParse(rawBody)
+  if (!parsed.success) {
+    const msg = parsed.error.issues[0]?.message || "请求体格式错误"
+    return errorResponse(msg, 400)
   }
-
-  if (!title || typeof title !== "string" || title.trim().length === 0) {
-    return errorResponse("title 为必填字段", 400)
-  }
+  const { title, description, priority, source, relatedType, relatedId, dueAt } = parsed.data
 
   const taskId = crypto.randomUUID()
   const actor = await actorFromSession()

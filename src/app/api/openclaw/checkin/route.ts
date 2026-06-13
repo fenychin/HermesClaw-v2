@@ -23,21 +23,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { z } from "zod"
 
 /** 签到频率限制：每个 IP 每分钟最多 3 次签到 */
 const CHECKIN_LIMIT = 3;
 const CHECKIN_WINDOW_MS = 60_000;
 
-/** 签到数据模式（用于运行时校验） */
-interface CheckinBody {
-  timezone?: string;
-  localTime?: string;
-  deviceType?: string;
-  userAgent?: string;
-  viewportWidth?: number;
-  viewportHeight?: number;
-  preferStandalone?: boolean;
-}
+/** 签到请求体 schema */
+const CheckinSchema = z.object({
+  timezone: z.string().min(1, "缺少必填字段：timezone"),
+  localTime: z.string().min(1, "缺少必填字段：localTime"),
+  deviceType: z.string().optional(),
+  userAgent: z.string().optional(),
+  viewportWidth: z.number().optional(),
+  viewportHeight: z.number().optional(),
+  preferStandalone: z.boolean().optional(),
+})
 
 /**
  * POST /api/openclaw/checkin
@@ -59,21 +60,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 解析请求体
-    let body: CheckinBody;
+    // 解析并校验请求体
+    let body: z.infer<typeof CheckinSchema>
     try {
-      body = (await req.json()) as CheckinBody;
+      const raw = await req.json()
+      const parsed = CheckinSchema.safeParse(raw)
+      if (!parsed.success) {
+        const msg = parsed.error.issues[0]?.message || "请求体格式错误"
+        return NextResponse.json(
+          { status: "error", message: msg },
+          { status: 400 },
+        )
+      }
+      body = parsed.data
     } catch {
       return NextResponse.json(
         { status: "error", message: "请求体格式错误，需要 JSON" },
-        { status: 400 },
-      );
-    }
-
-    // 基础字段校验
-    if (!body.timezone || !body.localTime) {
-      return NextResponse.json(
-        { status: "error", message: "缺少必填字段：timezone, localTime" },
         { status: 400 },
       );
     }

@@ -4,6 +4,12 @@ import { checkAutomationGate } from '@/lib/server/guardrail'
 import { withRBAC, type RouteContext } from '@/lib/server/api-handler'
 import { createAuditEntry, updateAuditEntry, writeAuditLog, actorFromSession } from '@/lib/server/audit'
 import type { WorkspaceContext } from '@/lib/workspace'
+import { z } from "zod"
+
+/** POST /api/harness/proposals/:id/approve 请求体——仅 confirmText 可选 */
+const ApproveProposalSchema = z.object({
+  confirmText: z.string().optional(),
+})
 
 // POST /api/harness/proposals/:id/approve
 // 批准提案（RBAC: 仅 ADMIN/OWNER；L4 硬拒绝 403 L4_FORBIDDEN；L3 缺确认 409）
@@ -13,12 +19,14 @@ export const POST = withRBAC(
     const actor = await actorFromSession()
 
     try {
-      // 处理空 body 的情况
+      // 处理空 body：safeParse 容错，无效 JSON 或 schema 不符时 default 为 {}
       let body: { confirmText?: string } = {}
       try {
-        body = await req.json()
+        const raw = await req.json()
+        const parsed = ApproveProposalSchema.safeParse(raw)
+        if (parsed.success) body = parsed.data
       } catch {
-        // 忽略解析错误，允许空 body
+        // 忽略 JSON 解析错误，允许空 body
       }
 
       // 从 mock/store 获取提案

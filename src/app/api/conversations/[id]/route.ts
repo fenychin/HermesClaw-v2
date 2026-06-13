@@ -8,6 +8,14 @@ import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/wo
 import { actorFromSession } from "@/lib/server/audit"
 import { auditedWrite } from "@/lib/server/audited-write"
 import { writeAgentLog } from "@/lib/server/agent-log"
+import { z } from "zod"
+import { validateBody } from "@/lib/validators"
+
+/** PATCH /api/conversations/[id] 请求体 schema */
+const ConversationPatchSchema = z.object({
+  projectId: z.string().nullable().optional(),
+  title: z.string().min(1).max(200).optional(),
+})
 
 /** GET /api/conversations/[id] —— 获取对话详情（含消息列表） */
 export async function GET(
@@ -73,8 +81,9 @@ export async function PATCH(
     const ctx = await buildWorkspaceContext(request)
     requireWritable(ctx.role)
 
-    const body = await request.json().catch(() => null)
-    if (!body) return errorResponse("请求体无效", 400)
+    const raw = await request.json()
+    const parsed = validateBody(raw, ConversationPatchSchema)
+    if (parsed instanceof Response) return parsed
 
     // workspaceId 隔离：仅允许操作当前工作空间内的对话（AGENTS.md §4.11）
     const existing = await prisma.conversation.findFirst({
@@ -82,13 +91,13 @@ export async function PATCH(
     })
     if (!existing) return errorResponse("对话不存在", 404)
 
-    // 仅允许更新 projectId 和 title；拒绝空/纯空白标题
+    // 仅允许更新 projectId 和 title
     const updateData: Record<string, unknown> = {}
-    if (typeof body.projectId === "string" || body.projectId === null) {
-      updateData.projectId = body.projectId
+    if (parsed.projectId !== undefined) {
+      updateData.projectId = parsed.projectId
     }
-    if (typeof body.title === "string" && body.title.trim().length > 0 && body.title.length <= 200) {
-      updateData.title = body.title
+    if (parsed.title !== undefined) {
+      updateData.title = parsed.title
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -123,7 +132,7 @@ export async function PATCH(
       taskName: "对话更新",
       status: "success",
       duration: elapsed(),
-      detail: `关联项目: ${body.projectId ?? "解除关联"}`,
+      detail: `关联项目: ${parsed.projectId ?? "解除关联"}`,
       riskLevel: "low",
     })
 
