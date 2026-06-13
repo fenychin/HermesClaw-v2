@@ -7,7 +7,7 @@
  * ⚠️ 仅在服务端调用，切勿在客户端引入（包含 API Key）。
  */
 import anthropic from "@/lib/anthropic"
-import { parseJsonLoose } from "@/lib/harness-llm"
+import { parseJsonLoose } from "@/lib/server/harness-llm"
 
 // ---- 类型 ----
 
@@ -188,6 +188,64 @@ export async function callAnthropicText(
   }
 
   return textBlock.text
+}
+
+// ---- Anthropic 结构化输出 ----
+
+/** Anthropic 结构化输出调用参数 */
+export interface AnthropicStructuredOptions {
+  systemPrompt: string
+  userPrompt: string
+  /** JSON Schema 定义（output_config.format.schema） */
+  schema: Record<string, unknown>
+  /** 模型 ID，默认 claude-sonnet-4-6 */
+  model?: string
+  /** 最大 token 数，默认 4096 */
+  maxTokens?: number
+  /** 是否启用 adaptive thinking（评估/分析类任务推荐开启） */
+  thinking?: boolean
+}
+
+/**
+ * 调用 Anthropic Messages API 的结构化输出（JSON Schema 模式）。
+ *
+ * —— 统一 hermes-suggestions / harness-llm / generate-spec 等
+ *    需要结构化 JSON 输出的场景，消除各处重复的 anthropic.messages.create。
+ *
+ * @returns 已解析的 JSON 对象（经 parseJsonLoose 处理）
+ */
+export async function callAnthropicStructured(
+  options: AnthropicStructuredOptions,
+): Promise<unknown> {
+  const {
+    systemPrompt,
+    userPrompt,
+    schema,
+    model = DEFAULT_ANTHROPIC_MODEL,
+    maxTokens = 4096,
+    thinking = false,
+  } = options
+
+  const response = await anthropic.messages.create({
+    model,
+    max_tokens: maxTokens,
+    ...(thinking ? { thinking: { type: "adaptive" as const } } : {}),
+    output_config: {
+      format: {
+        type: "json_schema" as const,
+        schema,
+      },
+    },
+    system: systemPrompt,
+    messages: [{ role: "user", content: userPrompt }],
+  })
+
+  const textBlock = response.content.find((b) => b.type === "text")
+  if (!textBlock || textBlock.type !== "text") {
+    throw new Error("Anthropic 结构化输出未返回文本内容")
+  }
+
+  return parseJsonLoose(textBlock.text)
 }
 
 // ---- 上游错误映射 ----

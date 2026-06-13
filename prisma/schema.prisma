@@ -472,6 +472,9 @@ model EvolutionLog {
   proposalId    String?  // 触发时生成的提案 proposalId
   reason        String?  // 未触发时的说明
   reportMd      String?  // AI 生成的 Markdown 评估报告
+  reportId      String?  // 关联的 EvaluationReport.reportId
+  logSample     String?  // JSON 数组：本次评估的日志样本摘要
+  analysisDurationSeconds Float? // AI 分析耗时（秒）
   createdAt     DateTime @default(now())
 
   @@index([workspaceId])

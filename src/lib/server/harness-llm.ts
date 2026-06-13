@@ -4,16 +4,18 @@
  * 职责：将「最近运行日志摘要 + 指标」交给大模型分析，产出一份结构化的
  *       Harness 升级提案草稿（对应 AGENTS.md 第三章 Level 2 评估层）。
  *
- * Provider 策略：
- *   1. 配置了 ANTHROPIC_API_KEY → 使用 Anthropic claude-opus-4-8
- *      （adaptive thinking + 结构化输出，分析质量最高）。
- *   2. 否则回退到已配置的 DeepSeek（与 /api/chat 一致），保证无 Anthropic
- *      key 时功能依然可用；拿到官方 key 后无需改代码即自动切回 Opus 4.8。
+ * 🔄 P0 重构（2026-06-13）：
+ *   - 移除内部 Provider 解析逻辑（analyzeHarnessLogs 不再自行决定用哪个 LLM），
+ *     改由调用方经 model-router.selectModel() 决策后传入 provider + model。
+ *   - 这确保了每次 Harness 评估的 LLM 调用都会产生 model.route 审计留痕。
+ *   - 文件从 src/lib/harness-llm.ts 迁至 src/lib/server/harness-llm.ts，
+ *     与服务端模块同目录，消除跨层引用。
  *
  * ⚠️ 仅在服务端（Route Handler / lib/server）调用，切勿在客户端引入。
  */
-import anthropic from "@/lib/anthropic"
 import type { RiskLevel, HarnessMetrics } from "@/types"
+import type { LlmProvider } from "@/lib/server/llm-provider"
+import { callAnthropicStructured, callDeepSeekJson } from "@/lib/server/llm-provider"
 
 /** AI 产出的 Harness 升级提案核心字段（写库前的草稿） */
 export interface HarnessProposalDraft {
@@ -30,8 +32,10 @@ export interface HarnessProposalDraft {
 /** 分析结果 + 溯源信息（呼应 AGENTS.md：决策须可溯源） */
 export interface HarnessAnalysis {
   draft: HarnessProposalDraft
-  provider: "anthropic" | "deepseek"
+  provider: LlmProvider
   model: string
+  /** AI 分析耗时（秒） */
+  durationSeconds: number
 }
 
 /** 分析输入 */
@@ -40,11 +44,11 @@ export interface HarnessAnalysisInput {
   logSummary: string
   /** 指标快照 */
   metrics: HarnessMetrics
+  /** 调用方经 selectModel() 决策后的 Provider */
+  provider: LlmProvider
+  /** 调用方经 selectModel() 决策后的 Model */
+  model: string
 }
-
-// 目标模型：拿到 ANTHROPIC_API_KEY 后自动启用 Opus 4.8；否则回退 DeepSeek
-const ANTHROPIC_MODEL = "claude-opus-4-8"
-const DEEPSEEK_MODEL = "deepseek-chat"
 
 /** 六大核心组件枚举（AGENTS.md 第四章），约束 AI 的 targetComponent */
 const TARGET_COMPONENTS = [
@@ -104,7 +108,7 @@ const SYSTEM_PROMPT = `你是 HermesClaw-v2 的 Harness 自演化引擎，正在
 - 这是一份升级建议，最终须经人工审批，不要假设会自动生效。`
 
 /** 构造用户提示词 */
-function buildUserPrompt({ logSummary, metrics }: HarnessAnalysisInput): string {
+function buildUserPrompt({ logSummary, metrics }: Omit<HarnessAnalysisInput, "provider" | "model">): string {
   return `运行日志（最近 ${metrics.windowHours} 小时，最多前 20 条）：
 ${logSummary}
 
@@ -178,53 +182,39 @@ export function parseJsonLoose(text: string): unknown {
   }
 }
 
-/** Anthropic 路径：claude-opus-4-8 + adaptive thinking + 结构化输出 */
-async function analyzeWithAnthropic(prompt: string): Promise<HarnessAnalysis> {
-  const response = await anthropic.messages.create({
-    model: ANTHROPIC_MODEL,
-    max_tokens: 8000,
-    thinking: { type: "adaptive" },
-    output_config: {
-      format: { type: "json_schema", schema: PROPOSAL_SCHEMA as Record<string, unknown> },
-    },
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: prompt }],
+/**
+ * Anthropic 路径：通过共享 llm-provider 调用结构化输出 + adaptive thinking。
+ * 🔄 消除直接 import anthropic SDK（P2 整改）。
+ */
+async function analyzeWithAnthropic(
+  prompt: string,
+  model: string,
+): Promise<Omit<HarnessAnalysis, "durationSeconds">> {
+  const raw = await callAnthropicStructured({
+    systemPrompt: SYSTEM_PROMPT,
+    userPrompt: prompt,
+    schema: PROPOSAL_SCHEMA as Record<string, unknown>,
+    model,
+    maxTokens: 8000,
+    thinking: true,
   })
-
-  const textBlock = response.content.find((b) => b.type === "text")
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("Anthropic 未返回文本内容")
-  }
-
   return {
-    draft: validateDraft(parseJsonLoose(textBlock.text)),
+    draft: validateDraft(raw),
     provider: "anthropic",
-    model: ANTHROPIC_MODEL,
+    model,
   }
 }
 
-/** DeepSeek 路径：兜底分析，使用 JSON 模式（与 /api/chat 同一服务） */
-async function analyzeWithDeepSeek(prompt: string): Promise<HarnessAnalysis> {
-  const apiKey = process.env.DEEPSEEK_API_KEY
-  if (!apiKey) {
-    throw new Error("DEEPSEEK_API_KEY 未配置")
-  }
-
-  const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: DEEPSEEK_MODEL,
-      max_tokens: 2048,
-      temperature: 0.4,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: `${SYSTEM_PROMPT}
+/**
+ * DeepSeek 路径：通过共享 llm-provider 调用 JSON 模式。
+ * 🔄 消除手写 fetch（P2 整改）。
+ */
+async function analyzeWithDeepSeek(
+  prompt: string,
+  model: string,
+): Promise<Omit<HarnessAnalysis, "durationSeconds">> {
+  const raw = await callDeepSeekJson({
+    systemPrompt: `${SYSTEM_PROMPT}
 
 只输出一个 JSON 对象，不要任何额外文字或 Markdown 包裹，字段如下：
 {
@@ -236,70 +226,42 @@ async function analyzeWithDeepSeek(prompt: string): Promise<HarnessAnalysis> {
   "estimatedImpact": string,             // 预期效果
   "reportMd": string                     // 面向维护者的 Markdown 评估报告（含指标解读、瓶颈、建议）
 }`,
-        },
-        { role: "user", content: prompt },
-      ],
-    }),
+    userPrompt: prompt,
+    model,
+    maxTokens: 2048,
+    temperature: 0.4,
   })
-
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => "")
-    throw new Error(`DeepSeek 请求失败 (${res.status})：${errBody.slice(0, 200)}`)
-  }
-
-  const data = (await res.json()) as {
-    choices?: { message?: { content?: string } }[]
-  }
-  const content = data.choices?.[0]?.message?.content
-  if (!content) {
-    throw new Error("DeepSeek 未返回内容")
-  }
-
   return {
-    draft: validateDraft(parseJsonLoose(content)),
+    draft: validateDraft(raw),
     provider: "deepseek",
-    model: DEEPSEEK_MODEL,
+    model,
   }
 }
 
 /**
  * 分析运行日志，产出 Harness 升级提案草稿。
  *
- * Provider 选择：
- *   - HARNESS_LLM_PROVIDER=anthropic|deepseek 时强制指定（便于在环境中已注入
- *     某个 key 但希望走另一路径时显式覆盖）。
- *   - 否则自动：有 ANTHROPIC_API_KEY 用 Anthropic（claude-opus-4-8），
- *     否则回退 DeepSeek。空字符串 / 纯空白的 key 视为未配置。
+ * 🔄 P0 变更：provider + model 由调用方传入（调用方应先经 model-router.selectModel()
+ * 决策，确保审计留痕），本函数不再自行解析环境变量选择 Provider。
+ *
+ * 请求失败时抛出错误，由上层 harness-eval.ts 捕获并写入 evolutionLog。
  */
 export async function analyzeHarnessLogs(
   input: HarnessAnalysisInput,
 ): Promise<HarnessAnalysis> {
   const prompt = buildUserPrompt(input)
+  const startTime = Date.now()
 
-  const override = process.env.HARNESS_LLM_PROVIDER?.toLowerCase().trim()
-  const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY?.trim())
-  const hasDeepSeek = Boolean(process.env.DEEPSEEK_API_KEY?.trim())
+  let result: Omit<HarnessAnalysis, "durationSeconds">
 
-  if (override === "deepseek") {
-    if (!hasDeepSeek) {
-      throw new Error("HARNESS_LLM_PROVIDER=deepseek 但未配置 DEEPSEEK_API_KEY")
-    }
-    return analyzeWithDeepSeek(prompt)
-  }
-  if (override === "anthropic") {
-    if (!hasAnthropic) {
-      throw new Error("HARNESS_LLM_PROVIDER=anthropic 但未配置 ANTHROPIC_API_KEY")
-    }
-    return analyzeWithAnthropic(prompt)
+  if (input.provider === "anthropic") {
+    result = await analyzeWithAnthropic(prompt, input.model)
+  } else {
+    result = await analyzeWithDeepSeek(prompt, input.model)
   }
 
-  if (hasAnthropic) {
-    return analyzeWithAnthropic(prompt)
+  return {
+    ...result,
+    durationSeconds: Math.round((Date.now() - startTime) / 100) / 10,
   }
-  if (hasDeepSeek) {
-    return analyzeWithDeepSeek(prompt)
-  }
-  throw new Error(
-    "未配置 ANTHROPIC_API_KEY 或 DEEPSEEK_API_KEY，无法执行 Harness AI 分析",
-  )
 }

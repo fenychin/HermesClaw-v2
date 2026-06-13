@@ -230,6 +230,10 @@ export interface HarnessEvaluateResult {
   reason?: string
   /** AI 生成的 Markdown 评估报告（触发时） */
   reportMd?: string
+  /** 完整的 EvaluationReport 契约对象（P0 新增：对齐 contracts/evaluation-report.ts） */
+  evaluationReport?: import('@/contracts').EvaluationReport
+  /** AI 分析失败时的错误信息（P0 新增：区分"未触发"与"触发但分析失败"） */
+  error?: string
 }
 
 /**

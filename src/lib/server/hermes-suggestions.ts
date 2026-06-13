@@ -6,18 +6,20 @@
  * LLM 生成 3 条结构化今日工作建议，而非渲染静态文案。
  *
  * Provider/Model 选择经 selectModel() 策略路由决策并自动写入 AuditLog（§4.12），
- * 不再自行实现 Provider 选择逻辑。
+ * LLM 调用统一通过 llm-provider.ts 共享工具层（callAnthropicStructured / callDeepSeekJson），
+ * 不在本模块直接 import anthropic SDK 或手写 fetch。
  *
  * ⚠️ 仅服务端（Route Handler / lib/server）调用，切勿在客户端引入。
  */
-import anthropic from "@/lib/anthropic"
 import { prisma } from "@/lib/prisma"
 import { isErrorStatus } from "@/lib/server/harness-eval"
-import { parseJsonLoose } from "@/lib/harness-llm"
+import { parseJsonLoose } from "@/lib/server/harness-llm"
 import { selectModel } from "@/lib/server/model-router"
 import {
-  classifyUpstreamError,
+  callAnthropicStructured,
+  callDeepSeekJson,
   isProviderAvailable,
+  DEFAULT_ANTHROPIC_MODEL,
 } from "@/lib/server/llm-provider"
 import type {
   HermesSuggestion,
@@ -32,7 +34,7 @@ const WINDOW_HOURS = 24
 /** 目标建议条数 */
 const TARGET_COUNT = 3
 
-/** 结构化输出 JSON Schema（Anthropic structured outputs 使用） */
+/** 结构化输出 JSON Schema（Anthropic / DeepSeek 共用） */
 const SUGGESTIONS_SCHEMA = {
   type: "object",
   properties: {
@@ -188,57 +190,37 @@ function fallbackSuggestions(snapshot: HermesSystemSnapshot): HermesSuggestion[]
   return suggestions;
 }
 
-/** Anthropic 路径：结构化输出 */
+/**
+ * 通过共享 llm-provider 调用 Anthropic 结构化输出生成建议。
+ * 🔄 消除直接 import anthropic SDK（P1 整改）。
+ */
 async function generateWithAnthropic(
   prompt: string,
   model: string,
 ): Promise<{ suggestions: HermesSuggestion[]; model: string }> {
-  const response = await anthropic.messages.create({
+  const raw = await callAnthropicStructured({
+    systemPrompt: SYSTEM_PROMPT,
+    userPrompt: prompt,
+    schema: SUGGESTIONS_SCHEMA as Record<string, unknown>,
     model,
-    max_tokens: 2048,
-    output_config: {
-      format: {
-        type: "json_schema",
-        schema: SUGGESTIONS_SCHEMA as Record<string, unknown>,
-      },
-    },
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: prompt }],
+    maxTokens: 2048,
   })
-
-  const textBlock = response.content.find((b) => b.type === "text")
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("Anthropic 未返回文本内容")
-  }
   return {
-    suggestions: validateSuggestions(parseJsonLoose(textBlock.text)),
+    suggestions: validateSuggestions(raw),
     model,
   }
 }
 
-/** DeepSeek 路径：JSON 模式 */
+/**
+ * 通过共享 llm-provider 调用 DeepSeek JSON 模式生成建议。
+ * 🔄 消除手写 fetch（P1 整改）。
+ */
 async function generateWithDeepSeek(
   prompt: string,
   model: string,
 ): Promise<{ suggestions: HermesSuggestion[]; model: string }> {
-  const apiKey = process.env.DEEPSEEK_API_KEY
-  if (!apiKey) throw new Error("DEEPSEEK_API_KEY 未配置")
-
-  const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 1024,
-      temperature: 0.5,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: `${SYSTEM_PROMPT}
+  const raw = await callDeepSeekJson({
+    systemPrompt: `${SYSTEM_PROMPT}
 
 只输出一个 JSON 对象，不要任何额外文字或 Markdown 包裹，格式如下：
 {
@@ -246,29 +228,13 @@ async function generateWithDeepSeek(
     { "priority": "high|mid|low", "title": "建议标题", "action": "具体行动", "relatedTo": "agents|projects|harness" }
   ]
 }`,
-        },
-        { role: "user", content: prompt },
-      ],
-    }),
+    userPrompt: prompt,
+    model,
+    maxTokens: 1024,
+    temperature: 0.5,
   })
-
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => "")
-    const classified = classifyUpstreamError(res.status)
-    throw Object.assign(
-      new Error(`DeepSeek 请求失败 (${res.status})：${errBody.slice(0, 200)}`),
-      { upstreamStatus: res.status, classified },
-    )
-  }
-
-  const data = (await res.json()) as {
-    choices?: { message?: { content?: string } }[]
-  }
-  const content = data.choices?.[0]?.message?.content
-  if (!content) throw new Error("DeepSeek 未返回内容")
-
   return {
-    suggestions: validateSuggestions(parseJsonLoose(content)),
+    suggestions: validateSuggestions(raw),
     model,
   }
 }
