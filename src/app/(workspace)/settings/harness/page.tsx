@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { HarnessProposal } from "@/types";
@@ -52,8 +52,12 @@ function filterByTab(
  *    所有 Harness 变更均须经由人类审批（§3.1），此页面为审批操作的唯一 UI 入口
  */
 export default function HarnessApprovalPage() {
-  const { proposals, approveProposal, rejectProposal } = useHarnessProposalStore();
+  const { proposals, fetchProposals, approveProposal, rejectProposal } = useHarnessProposalStore();
   const [activeTab, setActiveTab] = useState<TabValue>("pending");
+
+  useEffect(() => {
+    fetchProposals();
+  }, [fetchProposals]);
 
   /* 详情弹窗状态 */
   const [detailTarget, setDetailTarget] = useState<HarnessProposal | null>(

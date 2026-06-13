@@ -1,5 +1,5 @@
 import { ApiResponse } from '@/lib/server/api-response'
-import { getMockProposal, updateMockProposalStatus } from '@/lib/server/mock-store'
+import { prisma } from '@/lib/prisma'
 import { withRBAC, type RouteContext } from '@/lib/server/api-handler'
 import { checkAutomationGate } from '@/lib/server/guardrail'
 import { createAuditEntry, updateAuditEntry, actorFromSession } from '@/lib/server/audit'
@@ -13,20 +13,31 @@ export const POST = withRBAC(
   async (_req: Request, ctx: WorkspaceContext, routeCtx: RouteContext<{ id: string }>) => {
     const { id } = await routeCtx.params
     try {
-      const proposal = getMockProposal(id)
+      // 从 Prisma 获取提案
+      const queryWhere = id.startsWith("HEP-")
+        ? { proposalId: id, workspaceId: ctx.workspaceId }
+        : { id, workspaceId: ctx.workspaceId }
+
+      const proposal = await prisma.harnessProposal.findFirst({
+        where: queryWhere,
+      })
       if (!proposal) return ApiResponse.error('提案不存在', 404)
+
+      const propChange = proposal.proposedChange as any
+      const riskLevelRaw = propChange?.riskLevel
+      const automationLevelRaw = propChange?.automationLevel
 
       const actor = await actorFromSession()
       // 使用统一解析函数，禁止自行重算（AGENTS.md §4.7）
       const resolvedLevel = resolveAutomationLevel(
-        proposal.proposedChange.automationLevel,
-        proposal.proposedChange.riskLevel,
+        automationLevelRaw,
+        riskLevelRaw,
       )
 
       // 自动化授权分级门禁（AGENTS.md §4.7）—— L4 硬拒绝
       const gate = await checkAutomationGate({
-        automationLevel: proposal.proposedChange.automationLevel ?? null,
-        riskLevel: proposal.proposedChange.riskLevel,
+        automationLevel: automationLevelRaw ?? null,
+        riskLevel: riskLevelRaw,
         confirmed: true, // 拒绝操作无需二次确认
         actionName: "拒绝",
       })
@@ -39,21 +50,29 @@ export const POST = withRBAC(
         actor,
         action: 'proposal.reject',
         targetType: 'proposal',
-        targetId: id,
+        targetId: proposal.id,
         detail: `拒绝提案 ${proposal.proposalId}`,
-        riskLevel: proposal.proposedChange.riskLevel,
+        riskLevel: riskLevelRaw,
         workspaceId: ctx.workspaceId,
         automationLevel: resolvedLevel,
         triggeredBy: 'user',
         contextSnapshot: {
           proposalId: proposal.proposalId,
           status: proposal.status,
-          riskLevel: proposal.proposedChange.riskLevel,
-          automationLevel: proposal.proposedChange.automationLevel,
+          riskLevel: riskLevelRaw,
+          automationLevel: automationLevelRaw,
         },
       })
 
-      updateMockProposalStatus(id, 'rejected')
+      // 更新数据库状态
+      await prisma.harnessProposal.update({
+        where: { id: proposal.id },
+        data: {
+          status: 'rejected',
+          reviewedBy: actor,
+          reviewedAt: new Date(),
+        },
+      })
 
       // 执行成功 → 更新预记录为 success
       await updateAuditEntry({
@@ -66,7 +85,7 @@ export const POST = withRBAC(
         },
       })
 
-      return ApiResponse.ok({ proposalId: id, rejectedAt: new Date().toISOString() })
+      return ApiResponse.ok({ proposalId: proposal.proposalId, rejectedAt: new Date().toISOString() })
     } catch (error) {
       const message = error instanceof Error ? error.message : '未知错误'
       return ApiResponse.error(message, 500)

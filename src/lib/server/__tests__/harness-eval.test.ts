@@ -11,6 +11,8 @@ export const mockWriteAuditLog = vi.fn()
 vi.mock("@/lib/server/audit", () => ({
   writeAuditLog: (...args: any[]) => mockWriteAuditLog(...args),
   actorFromSession: vi.fn().mockResolvedValue("SYSTEM"),
+  createAuditEntry: vi.fn().mockResolvedValue({ auditId: "test-audit-id" }),
+  updateAuditEntry: vi.fn().mockResolvedValue({}),
 }))
 
 import { runHarnessEvaluation } from "../harness-eval"
@@ -33,15 +35,24 @@ describe("Harness 评估系统单元测试", () => {
         create: vi.fn().mockResolvedValue({
           id: "proposal-1",
           proposalId: "HEP-1234",
+          workspaceId: "test-workspace-999",
           triggeredBy: "auto",
+          triggerReason: "检测到零日志",
           problemStatement: "检测到零日志",
-          targetComponent: "workflow",
-          proposedChange: "无变化",
-          riskLevel: "low",
-          automationLevel: "L2",
-          status: "pending",
+          evidence: ["证据 1"],
+          proposedChange: {
+            targetComponent: "反馈闭环",
+            description: "无变化",
+            riskLevel: "low",
+            automationLevel: "L2",
+          },
+          requiresHumanApproval: true,
           estimatedImpact: "无影响",
+          affectedAgents: [],
+          rollbackPlan: "回退配置",
+          status: "pending",
           createdAt: new Date(),
+          updatedAt: new Date(),
         }),
       },
     } as unknown as typeof prisma
@@ -121,15 +132,24 @@ describe("Harness 评估系统单元测试", () => {
         create: vi.fn().mockResolvedValue({
           id: "proposal-1",
           proposalId: "HEP-1234",
+          workspaceId: "test-workspace-err-1",
           triggeredBy: "auto",
+          triggerReason: "测试",
           problemStatement: "测试",
-          targetComponent: "workflow",
-          proposedChange: "测试",
-          riskLevel: "low",
-          automationLevel: "L2",
-          status: "pending",
+          evidence: ["证据 1"],
+          proposedChange: {
+            targetComponent: "反馈闭环",
+            description: "测试",
+            riskLevel: "low",
+            automationLevel: "L2",
+          },
+          requiresHumanApproval: true,
           estimatedImpact: "测试",
+          affectedAgents: [],
+          rollbackPlan: "回退配置",
+          status: "pending",
           createdAt: new Date(),
+          updatedAt: new Date(),
         }),
       },
     } as unknown as typeof prisma
