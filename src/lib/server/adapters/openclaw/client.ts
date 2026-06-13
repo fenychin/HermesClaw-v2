@@ -17,6 +17,9 @@ import type {
   OpenClawSyncResult,
 } from './types'
 import { openclawMock } from './mock'
+import type { TaskEnvelope } from '@/contracts/task-envelope'
+import type { ActionReceipt } from '@/contracts/action-receipt'
+import { ACTION_RECEIPT_VERSION } from '@/contracts/action-receipt'
 
 /**
  * OpenClaw 统一 HTTP 客户端
@@ -65,15 +68,37 @@ class OpenClawClient {
 
   /**
    * 执行任务
-   * @param taskId - 任务 ID
-   * @param inputs - 任务输入参数
+   * @param envelope - 任务封装契约对象
    */
   async executeTask(
-    taskId: string,
-    inputs: Record<string, unknown>
-  ): Promise<OpenClawTaskResult> {
-    const req: OpenClawExecuteTaskRequest = { taskId, inputs }
-    return this.request('/tasks/execute', req)
+    envelope: TaskEnvelope
+  ): Promise<ActionReceipt> {
+    const req: OpenClawExecuteTaskRequest = {
+      taskId: envelope.taskId,
+      inputs: {
+        ...envelope.input,
+        workflowRunId: envelope.workflowRunId,
+        workspaceId: envelope.workspaceId,
+        agentId: envelope.agentId,
+        actionType: envelope.actionType,
+      },
+    }
+
+    const rawResult = await this.request<OpenClawTaskResult>('/tasks/execute', req)
+    const outcome: 'success' | 'failure' = rawResult.status === 'succeeded' ? 'success' : 'failure'
+
+    return {
+      receiptId: `rcpt-${crypto.randomUUID()}`,
+      taskId: envelope.taskId,
+      workflowRunId: envelope.workflowRunId,
+      connectorId: envelope.actionType.split('.')[0] || 'openclaw',
+      idempotencyKey: envelope.idempotencyKey,
+      outcome,
+      executedAt: new Date().toISOString(),
+      response: rawResult.outputs || {},
+      errorCode: rawResult.error,
+      version: ACTION_RECEIPT_VERSION,
+    }
   }
 
   /**
@@ -109,3 +134,4 @@ class OpenClawClient {
 
 /** OpenClaw 客户端单例 */
 export const openclawClient = new OpenClawClient()
+

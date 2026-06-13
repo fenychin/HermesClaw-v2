@@ -5,9 +5,11 @@ import { useUiStore } from "@/stores/ui-store";
 import type { AgentExecutionState } from "@/stores/ui-store";
 import { parseSSEStream } from "@/lib/sse-parser";
 
-/** SSE 事件负载结构（与服务端 OpenClawEvent 对齐） */
+/** SSE 事件负载结构（兼容服务端旧 OpenClawEvent 与新 ExecutionEvent 契约） */
 interface SSERawEvent {
-  type: string
+  type?: string        // 旧版本类型
+  eventType?: string   // 新契约类型
+  status?: string      // 新契约状态
   agentId: string
   payload: Record<string, unknown>
   timestamp: string
@@ -44,14 +46,17 @@ export interface UseOpenClawStreamReturn {
 }
 
 /**
- * 将 SSE 事件类型映射为 AgentExecutionState.status
- * —— 使用 --success / --warning / --danger token 对齐的色彩语义：
- *     executing → warning（进行中）
- *     succeeded → success（成功）
- *     failed    → danger（失败）
- *     cancelled → muted-foreground（已取消）
+ * 将 SSE 事件类型和状态映射为 AgentExecutionState.status
+ * —— 支持新状态字段 status 并兼顾旧 type 映射。
  */
-function eventTypeToStatus(type: string): AgentExecutionState['status'] {
+function eventTypeToStatus(type: string, status?: string): AgentExecutionState['status'] {
+  if (status) {
+    if (status === 'progress' || status === 'started') return 'executing'
+    if (status === 'completed') return 'succeeded'
+    if (status === 'failed') return 'failed'
+    if (status === 'cancelled') return 'cancelled'
+  }
+  // 旧版本 fallback 映射
   if (type.startsWith('task:started') || type === 'task:progress') return 'executing'
   if (type === 'task:completed') return 'succeeded'
   if (type === 'task:failed') return 'failed'
@@ -62,17 +67,6 @@ function eventTypeToStatus(type: string): AgentExecutionState['status'] {
 /**
  * OpenClaw SSE 实时事件流 Hook
  * —— 订阅指定 agentId 的执行事件，自动更新 Zustand ui-store 中的 AgentExecutionState。
- *
- * 使用示例：
- *   const { connected } = useOpenClawStream({ agentId: 'agent-001' })
- *   const execState = useUiStore(s => s.agentExecutionStates['agent-001'])
- *   // execState.status → 'executing' | 'succeeded' | 'failed' | ...
- *
- * 状态指示色（遵守 CLAUDE.md 颜色系统）：
- *   executing → text-warning
- *   succeeded → text-success
- *   failed    → text-danger
- *   idle/cancelled → text-muted-foreground
  */
 export function useOpenClawStream(
   options: UseOpenClawStreamOptions = {},
@@ -131,8 +125,21 @@ export function useOpenClawStream(
         await parseSSEStream(reader, {
           doneMarker: null, // OpenClaw 事件流无 [DONE] 标记，靠连接关闭自然结束
           onData: (data) => {
-            const event = data as SSERawEvent
-            if (event.type === 'heartbeat') return
+            const raw = data as any
+            const type = raw.eventType || raw.type || ''
+            if (type === 'heartbeat') return
+
+            const eventAgentId = raw.payload?.agentId || raw.agentId || 'unknown'
+            const status = eventTypeToStatus(type, raw.status)
+
+            const event: SSERawEvent = {
+              type,
+              eventType: type,
+              status: raw.status || status,
+              agentId: eventAgentId,
+              payload: raw.payload || {},
+              timestamp: raw.timestamp,
+            }
 
             // 追加到最近事件列表（保留最近 50 条）
             if (mountedRef.current) {
@@ -143,13 +150,13 @@ export function useOpenClawStream(
 
             // 更新 Zustand 中的智能体执行状态
             updateAgentExecutionState({
-              agentId: event.agentId,
-              status: eventTypeToStatus(event.type),
-              currentTask: event.payload.taskName as string | undefined,
-              progress: event.payload.progress as number | undefined,
-              lastEventAt: event.timestamp,
-              lastError: event.type === 'task:failed'
-                ? (event.payload.error as string | undefined) ?? '未知错误'
+              agentId: eventAgentId,
+              status,
+              currentTask: raw.payload?.taskName as string | undefined,
+              progress: raw.payload?.progress as number | undefined,
+              lastEventAt: raw.timestamp,
+              lastError: type === 'tool.call.failed' || type === 'task:failed'
+                ? (raw.payload?.error as string | undefined) ?? '未知错误'
                 : undefined,
             })
           },
@@ -198,8 +205,6 @@ export function useOpenClawStream(
   }, [onDisconnect])
 
   /** 手动重连 */
-  // TODO: 当前 200ms 固定延迟存在竞态窗口——disconnect 清理 abortController 后
-  // connectRef 的 effect 尚未同步。生产环境可改用 state machine 管理连接生命周期。
   const reconnect = useCallback(() => {
     disconnect()
     setTimeout(() => {
