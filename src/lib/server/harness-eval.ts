@@ -19,6 +19,7 @@
  *   - classifyZeroLogScenario 合并两次 DB 查询
  */
 import { prisma } from "@/lib/prisma"
+import { writeAuditLog } from "@/lib/server/audit"
 import { stringifyJsonField } from "@/lib/api-utils"
 import { analyzeHarnessLogs } from "@/lib/server/harness-llm"
 import type { HarnessAnalysis } from "@/lib/server/harness-llm"
@@ -191,6 +192,7 @@ export function buildEvaluationReport(input: {
 async function writeEvolutionLog(
   db: typeof prisma,
   input: {
+    workspaceId: string
     triggeredBy: "auto" | "manual"
     triggered: boolean
     metrics: HarnessMetrics
@@ -207,6 +209,7 @@ async function writeEvolutionLog(
   try {
     await db.evolutionLog.create({
       data: {
+        workspaceId: input.workspaceId,
         triggeredBy: input.triggeredBy,
         triggered: input.triggered,
         errorRate: input.metrics.errorRate,
@@ -228,14 +231,27 @@ async function writeEvolutionLog(
       { triggeredBy: input.triggeredBy, triggered: input.triggered, proposalId: input.proposalId },
       error,
     )
+    try {
+      await writeAuditLog({
+        actor: "SYSTEM",
+        action: "evolution.log.fail",
+        targetType: "system",
+        targetId: input.proposalId ?? "unknown",
+        detail: `写入进化日志失败：${error instanceof Error ? error.message : "未知错误"}`,
+        riskLevel: "medium",
+        workspaceId: input.workspaceId,
+      })
+    } catch (auditErr) {
+      console.error("[writeEvolutionLog] 写入进化审计日志也失败：", auditErr)
+    }
   }
 }
 
 /** 从 DB 查询最近 N 次进化日志的 errorRate 序列。失败返回空数组。 */
-async function fetchRecentErrorRates(db: typeof prisma): Promise<number[]> {
+async function fetchRecentErrorRates(db: typeof prisma, workspaceId: string): Promise<number[]> {
   try {
     const recentLogs = await db.evolutionLog.findMany({
-      where: { triggered: true },
+      where: { workspaceId, triggered: true },
       orderBy: { createdAt: "desc" },
       take: TREND_LOOKBACK,
       select: { errorRate: true },
@@ -254,11 +270,12 @@ async function fetchRecentErrorRates(db: typeof prisma): Promise<number[]> {
 async function classifyZeroLogScenario(
   db: typeof prisma,
   since: Date,
+  workspaceId: string,
 ): Promise<"never-run" | "recently-silent" | null> {
   try {
     const [lastEver, lastRecent] = await Promise.all([
-      db.agentLog.findFirst({ orderBy: { createdAt: "desc" }, select: { id: true } }),
-      db.agentLog.findFirst({ where: { createdAt: { gte: since } }, select: { id: true } }),
+      db.agentLog.findFirst({ where: { workspaceId }, orderBy: { createdAt: "desc" }, select: { id: true } }),
+      db.agentLog.findFirst({ where: { workspaceId, createdAt: { gte: since } }, select: { id: true } }),
     ])
     if (!lastEver) return "never-run"
     if (!lastRecent) return "recently-silent"
@@ -351,8 +368,8 @@ function buildTriggerReason(params: {
  * @param deps 可注入依赖（默认使用真实 Prisma / selectModel / analyzeHarnessLogs），供测试 mock
  */
 export async function runHarnessEvaluation(
+  workspaceId: string,
   triggeredBy: "auto" | "manual" = "auto",
-  workspaceId = "default",
   deps: HarnessEvalDeps = defaultDeps,
 ): Promise<HarnessEvaluateResult> {
   const { prisma: db, selectModel: routeModel, analyzeHarnessLogs: analyze } = deps
@@ -360,7 +377,7 @@ export async function runHarnessEvaluation(
   // --- 1. 读取评估窗口内的运行日志 ---
   const since = new Date(Date.now() - EVAL_WINDOW_HOURS * 60 * 60 * 1000)
   const logs = await db.agentLog.findMany({
-    where: { createdAt: { gte: since } },
+    where: { workspaceId, createdAt: { gte: since } },
     select: {
       id: true,
       status: true,
@@ -385,13 +402,13 @@ export async function runHarnessEvaluation(
   const isZeroLogs = metrics.total === 0
 
   // 趋势检测（纯函数计算）
-  const recentRates = await fetchRecentErrorRates(db)
+  const recentRates = await fetchRecentErrorRates(db, workspaceId)
   const trendingUp = isTrendingUp(recentRates)
 
   const shouldTrigger = thresholdExceeded || isZeroLogs || trendingUp
 
   // 零日志场景分类（仅 zeroLogs 时执行）
-  const zeroLogScenario = isZeroLogs ? await classifyZeroLogScenario(db, since) : null
+  const zeroLogScenario = isZeroLogs ? await classifyZeroLogScenario(db, since, workspaceId) : null
 
   const { logSample } = buildLogSummary(logs)
 
@@ -418,6 +435,7 @@ export async function runHarnessEvaluation(
     })
 
     await writeEvolutionLog(db, {
+      workspaceId,
       triggeredBy,
       triggered: false,
       metrics,
@@ -470,6 +488,7 @@ export async function runHarnessEvaluation(
     console.error("[runHarnessEvaluation] AI 分析失败", error)
 
     await writeEvolutionLog(db, {
+      workspaceId,
       triggeredBy,
       triggered: true,
       metrics,
@@ -509,6 +528,7 @@ export async function runHarnessEvaluation(
   const created = await db.harnessProposal.create({
     data: {
       id: crypto.randomUUID(),
+      workspaceId,
       proposalId: `HEP-${Date.now()}`,
       triggeredBy,
       problemStatement: draft.problemStatement,
@@ -579,6 +599,7 @@ export async function runHarnessEvaluation(
 
   // --- 11. 进化日志（reportId/logSample/durationSeconds 实际写入）---
   await writeEvolutionLog(db, {
+    workspaceId,
     triggeredBy,
     triggered: true,
     metrics,

@@ -324,7 +324,7 @@ export async function runWorkflow(
       // 节点失败 → 触发 Harness 降级评估（fire-and-forget，不阻断主流程）
       logger.info(`[dag-runner] 节点 ${nodeId} 失败，已触发 Harness 降级评估`)
       try {
-        runHarnessEvaluation('auto').catch((err) => {
+        runHarnessEvaluation(runCtx.workspaceId, 'auto').catch((err) => {
           logger.error('[dag-runner] Harness 降级评估 Promise 失败', {
             error: err instanceof Error ? err.message : '未知',
             nodeId,
@@ -358,7 +358,7 @@ export async function runWorkflow(
   const onWorkflowComplete = async (runCtx: WorkflowRunContext, status: RunStatus) => {
     if (status === 'failed') {
       logger.info(`[dag-runner] 工作流 ${runCtx.runId} 执行失败，异步触发 Harness 降级评估`)
-      runHarnessEvaluation('auto').catch((err) => {
+      runHarnessEvaluation(runCtx.workspaceId, 'auto').catch((err) => {
         logger.error('[dag-runner] onWorkflowComplete Harness 降级评估 Promise 失败', {
           error: err instanceof Error ? err.message : '未知',
           runId: runCtx.runId,
