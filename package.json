@@ -15,6 +15,7 @@
     "seed:skills": "tsx prisma/seed-skills.ts",
     "seed:tools": "tsx prisma/seed-tools.ts",
     "test": "vitest",
+    "contracts:check": "tsx scripts/check-contract-usage.ts",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage"
   },
