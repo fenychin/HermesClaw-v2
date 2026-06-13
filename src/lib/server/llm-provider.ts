@@ -8,11 +8,15 @@
  */
 import anthropic from "@/lib/anthropic"
 import { parseJsonLoose } from "@/lib/server/harness-llm"
+import type { ModelProvider } from "@/types"
 
 // ---- 类型 ----
 
 /** LLM Provider 标识 */
 export type LlmProvider = "anthropic" | "deepseek"
+
+// 校验 LlmProvider 必须可被赋值给 ModelProvider (Assignable)
+const _assert: LlmProvider extends ModelProvider ? true : never = true
 
 /** Provider 选择结果 */
 export interface LlmProviderSelection {

@@ -70,6 +70,8 @@ const HIGH_CAPABILITY_MODEL = DEFAULT_ANTHROPIC_MODEL
 const COST_OPTIMIZED_MODEL = DEFAULT_DEEPSEEK_MODEL
 /** 兜底默认模型 */
 const FALLBACK_MODEL = DEFAULT_DEEPSEEK_MODEL
+/** 系统中允许参与评估及决策调度的 Provider 降级链（按顺序降级） */
+const ALL_PROVIDERS: LlmProvider[] = ["anthropic", "deepseek"]
 
 // ==============================
 // 工作空间模型配置
@@ -121,9 +123,11 @@ export async function getWorkspaceModelSettings(
 // 辅助函数
 // ==============================
 
-/** 由模型 ID 推断 Provider（claude* → anthropic，其余 → deepseek） */
+/** 由模型 ID 推断 Provider */
 function providerOf(model: string): LlmProvider {
-  return model.toLowerCase().startsWith("claude") ? "anthropic" : "deepseek"
+  const m = model.toLowerCase()
+  if (m.startsWith("claude")) return "anthropic"
+  return "deepseek"
 }
 
 // isProviderAvailable() 从 llm-provider.ts 共享导入，此处不重复实现。
@@ -134,7 +138,7 @@ function toAuditRiskLevel(level: RouteRiskLevel): AuditRiskLevel {
 }
 
 /**
- * Provider 可用性降级：选中 Provider 不可用时切换到另一可用 Provider。
+ * Provider 可用性降级：选中 Provider 不可用时，遍历降级链切换到另一可用 Provider。
  * 返回最终 provider/model 及是否发生降级（用于审计留痕）。
  */
 function reconcileAvailability(
@@ -144,14 +148,16 @@ function reconcileAvailability(
   if (isProviderAvailable(provider)) {
     return { provider, model, degraded: false }
   }
-  // 降级到另一个 Provider，并切换为其对应的默认模型
-  const fallbackProvider: LlmProvider = provider === "anthropic" ? "deepseek" : "anthropic"
-  if (isProviderAvailable(fallbackProvider)) {
-    const fallbackModel =
-      fallbackProvider === "anthropic" ? HIGH_CAPABILITY_MODEL : COST_OPTIMIZED_MODEL
-    return { provider: fallbackProvider, model: fallbackModel, degraded: true }
+  
+  // 遍历降级链中除当前 provider 外第一个可用的 Provider
+  for (const p of ALL_PROVIDERS) {
+    if (p !== provider && isProviderAvailable(p)) {
+      const fallbackModel = p === "anthropic" ? HIGH_CAPABILITY_MODEL : COST_OPTIMIZED_MODEL
+      return { provider: p, model: fallbackModel, degraded: true }
+    }
   }
-  // 两个 Provider 均不可用：保持原决策，由调用方在实际请求时报错处理
+  
+  // 均不可用：保持原决策，由调用方在实际请求时报错处理
   return { provider, model, degraded: false }
 }
 

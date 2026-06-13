@@ -52,8 +52,8 @@ export type EvaluationTrigger = z.infer<typeof EvaluationTriggerSchema>
  * 记录实际承担分析的 LLM Provider 与模型，确保决策可溯源（AGENTS.md 原则）。
  */
 export const AnalysisTraceSchema = z.object({
-  /** LLM Provider（anthropic / deepseek）。 */
-  provider: z.enum(["anthropic", "deepseek"]).nullable(),
+  /** LLM Provider。 */
+  provider: z.enum(["anthropic", "deepseek", "openai", "gemini", "minimax"]).nullable(),
   /** 实际使用的模型 ID。 */
   model: z.string().nullable(),
   /** 分析耗时（秒）。 */
