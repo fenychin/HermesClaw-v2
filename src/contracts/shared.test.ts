@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest"
+import { z } from "zod"
 import {
   AutomationLevelSchema,
   RiskLevelSchema,
@@ -8,6 +9,8 @@ import {
   TimestampSchema,
   IdSchema,
   CONTRACT_VERSION,
+  typedPayload,
+  roundTrip,
 } from "./shared"
 
 describe("shared enums & primitives", () => {
@@ -68,5 +71,35 @@ describe("shared enums & primitives", () => {
     expect(IdSchema.safeParse("\t\n").success).toBe(false)
     expect(IdSchema.parse("task_1")).toBe("task_1")
     expect(IdSchema.parse("  foo  ")).toBe("foo") // trim
+  })
+
+  it("typedPayload 构造器：必须字段通过、缺字段被拒、额外键宽容", () => {
+    const EmailPayload = typedPayload({
+      to: z.string().email(),
+      subject: z.string(),
+    })
+    // 合法
+    const parsed = EmailPayload.parse({
+      to: "a@b.com",
+      subject: "hi",
+      extra: true,
+    })
+    expect(parsed.to).toBe("a@b.com")
+    expect(parsed.subject).toBe("hi")
+    expect(parsed.extra).toBe(true)
+    // 缺必须字段被拒
+    expect(EmailPayload.safeParse({ to: "a@b.com" }).success).toBe(false)
+    // 必须字段类型错误被拒
+    expect(
+      EmailPayload.safeParse({ to: "not-an-email", subject: "hi" }).success,
+    ).toBe(false)
+  })
+
+  it("roundTrip：JSON 序列化后 schema 可恢复（undefined 键被丢弃属正常行为）", () => {
+    const s = z.object({ a: z.number(), b: z.string().optional() })
+    const v = { a: 1 }
+    const restored = roundTrip(s, v)
+    expect(restored.a).toBe(1)
+    expect("b" in restored).toBe(false) // undefined 键被 JSON.stringify 丢弃
   })
 })

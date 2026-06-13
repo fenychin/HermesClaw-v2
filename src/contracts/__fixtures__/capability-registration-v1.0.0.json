@@ -5,6 +5,6 @@
   "actionTypes": ["email.send", "email.read"],
   "connectorIds": ["conn_email"],
   "maxRiskLevel": "high",
-  "compatibleHermesApi": "1.0.0",
+  "compatibleHermesApi": { "min": "1.0.0", "max": "2.0.0" },
   "version": "1.0.0"
 }

@@ -136,7 +136,12 @@
       "Bash(git commit -m 'chore: 备份 — 项目空间模块全链路补齐：PATCH RBAC+审计+ws隔离修复 + serializeProject/Memory提取 + findProjectOrThrow helper + Tasks/Memory新端点 + 详情页五标签Tabs + 风险面板 + 列表分类筛选 + AGENTS.md §4.16登记 *)",
       "Bash(git push *)",
       "Bash(git rm *)",
-      "Bash(rm -rf src/generated/prisma)"
+      "Bash(rm -rf src/generated/prisma)",
+      "Bash(pnpm test *)",
+      "Bash(pnpm contracts:check)",
+      "Bash(echo \"门禁 exit: $?\")",
+      "Bash(git commit *)",
+      "Bash(echo \"commit: $?\")"
     ],
     "additionalDirectories": [
       "/Users/Feng/Desktop/Hermesclaw-v2/src/components/pages",

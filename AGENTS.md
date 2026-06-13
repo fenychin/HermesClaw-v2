@@ -133,7 +133,7 @@ Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私
 - `TaskEnvelope`（任务封装）  
 - `ExecutionEvent`（执行事件）  
 - `ActionReceipt`（动作回执）  
-- `ExecutionSummary`（执行摘要）  
+- `ExecutionSummary`（执行摘要；工程中增加 `summaryId` 字段用于去重与索引，§3.3 最小清单未列此项）  
 - `CapabilityRegistration`（能力注册）  
 - `ConnectorLease`（连接器使用租约）  
 - `HumanApprovalCheckpoint`（人工审批检查点）

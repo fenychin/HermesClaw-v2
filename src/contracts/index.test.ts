@@ -21,6 +21,7 @@ const REQUIRED_SCHEMA_EXPORTS = [
   "HumanApprovalCheckpointSchema",
   // 公共基础
   "VersionSchema",
+  "VersionRangeSchema",
   "TimestampSchema",
   "IdSchema",
   "PayloadSchema",
@@ -54,6 +55,7 @@ const REQUIRED_TYPE_EXPORTS = [
   "EventType",
   "ExecutionStatus",
   "Payload",
+  "VersionRange",
   "ReceiptOutcome",
   "FinalStatus",
   "LeaseStatus",
@@ -105,5 +107,12 @@ describe("index.ts 导出完整性", () => {
       (k) => k.endsWith("VERSION") || k === "CONTRACT_VERSION",
     ).length
     expect(versionCount).toBeGreaterThanOrEqual(REQUIRED_VERSION_EXPORTS.length)
+  })
+
+  it("工具函数 typedPayload 已导出且可调用（Payload 收窄工厂）", () => {
+    expect("typedPayload" in index).toBe(true)
+    expect(typeof (index as Record<string, unknown>).typedPayload).toBe(
+      "function",
+    )
   })
 })

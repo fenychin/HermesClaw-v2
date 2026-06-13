@@ -21,6 +21,8 @@ export type FinalStatus = z.infer<typeof FinalStatusSchema>
  * ExecutionSummary —— 执行摘要（一次任务执行的汇总裁定）。
  *
  * 最终任务状态由 Hermes 依据 ExecutionEvent 轨迹与 ActionReceipt 汇总产出（AGENTS §3.2）。
+ *
+ * **注意**：`summaryId` 为工程扩展字段（AGENTS §3.1 最小清单未列此项），用于摘要去重与索引。
  */
 export const ExecutionSummarySchema = z.object({
   /** 摘要唯一 ID。 */

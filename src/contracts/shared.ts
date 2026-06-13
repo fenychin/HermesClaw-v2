@@ -18,6 +18,20 @@ export const VersionSchema = z
   .string()
   .regex(/^\d+\.\d+\.\d+$/, "version 必须为 semver，如 1.0.0")
 
+/**
+ * API 兼容性范围（替代单点 version，用于 CapabilityRegistration/IndustryManifest
+ * 声明兼容的 Hermes API 版本区间，AGENTS §6.3）。
+ *
+ * min ≤ version ≤ max；min 与 max 各自为 semver。
+ * CapabilityRegistration.compatibleHermesApi 使用此 schema，
+ * 避免每次 Hermes 小版本升级都需所有 Runtime 重新注册。
+ */
+export const VersionRangeSchema = z.object({
+  min: VersionSchema,
+  max: VersionSchema,
+})
+export type VersionRange = z.infer<typeof VersionRangeSchema>
+
 /** ISO-8601 时间戳（带时区偏移），用于事件/回执的发生时刻。 */
 export const TimestampSchema = z.iso.datetime({ offset: true })
 
@@ -90,6 +104,39 @@ export type ExecutionStatus = z.infer<typeof ExecutionStatusSchema>
  *
  * P2 待办：按 actionType / eventType 叠加 discriminatedUnion 做二级 content-type 校验，
  * 而非长期保持最大化宽容。消费者侧可对具体字段叠加 .refine() 收窄。
+ * 使用 `typedPayload({...})` 构造已知形状的窄 payload。
  */
 export const PayloadSchema = z.record(z.string(), z.unknown())
 export type Payload = z.infer<typeof PayloadSchema>
+
+/**
+ * 类型化 Payload 构造器 —— P2 discriminatedUnion 的预备构件。
+ *
+ * 产出 schema：必须包含 shape 中声明的字段（类型安全），同时允许额外任意键
+ * （保持 PayloadSchema 的宽容性，不因新增字段拒绝旧 payload）。
+ *
+ * P2 计划用法：
+ *   const ActionPayload = z.discriminatedUnion("actionType", [
+ *     z.object({ actionType: z.literal("email.send") }).and(typedPayload({ to: z.string().email(), subject: z.string() })),
+ *     z.object({ actionType: z.literal("wechat.send") }).and(typedPayload({ openId: z.string(), content: z.string() })),
+ *   ])
+ */
+export function typedPayload<Shape extends z.ZodRawShape>(
+  shape: Shape,
+): z.ZodIntersection<z.ZodObject<Shape>, typeof PayloadSchema> {
+  return z.object(shape).and(PayloadSchema)
+}
+
+// ─── 测试工具（不参与生产导出） ───────────────────────────────────────
+
+/**
+ * 契约的 JSON round-trip 测试工具：序列化 → 反序列化 → schema 校验。
+ *
+ * 由于 JSON.stringify 会丢弃 undefined 值，此函数仅对比有效字段而非全等。
+ * 使用方式：在测试中 `const restored = roundTrip(schema, valid)`。
+ *
+ * 非测试代码不应导入此函数。
+ */
+export function roundTrip<T>(schema: z.ZodType<T>, value: T): T {
+  return schema.parse(JSON.parse(JSON.stringify(value)))
+}

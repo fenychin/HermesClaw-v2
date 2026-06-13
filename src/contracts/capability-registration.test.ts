@@ -12,7 +12,7 @@ const valid: CapabilityRegistration = {
   actionTypes: ["email.send", "email.read"],
   connectorIds: ["conn_email"],
   maxRiskLevel: "high",
-  compatibleHermesApi: "1.0.0",
+  compatibleHermesApi: { min: "1.0.0", max: "2.0.0" },
   version: CONTRACT_VERSION,
 }
 
@@ -61,16 +61,28 @@ describe("CapabilityRegistration（能力注册 AGENTS §2.2）", () => {
     }
   })
 
-  it("非法 maxRiskLevel / version 被拒", () => {
+  it("非法 maxRiskLevel / compatibleHermesApi / version 被拒", () => {
     expect(
       CapabilityRegistrationSchema.safeParse({ ...valid, maxRiskLevel: "x" })
         .success,
     ).toBe(false)
+    // 单点 version 字符串被拒（必须为 VersionRangeSchema 对象）
     expect(
       CapabilityRegistrationSchema.safeParse({
         ...valid,
-        compatibleHermesApi: "1.x",
+        compatibleHermesApi: "1.0.0",
+      } as unknown as CapabilityRegistration).success,
+    ).toBe(false)
+    // range 内非法 semver 被拒
+    expect(
+      CapabilityRegistrationSchema.safeParse({
+        ...valid,
+        compatibleHermesApi: { min: "1.x", max: "2.0.0" },
       }).success,
+    ).toBe(false)
+    // version 本身非法被拒
+    expect(
+      CapabilityRegistrationSchema.safeParse({ ...valid, version: "1" }).success,
     ).toBe(false)
   })
 })

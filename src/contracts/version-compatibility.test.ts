@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { z } from "zod"
 
 import { TaskEnvelopeSchema } from "./task-envelope"
 import { ExecutionEventSchema } from "./execution-event"
@@ -16,6 +17,7 @@ import { ExecutionSummarySchema } from "./execution-summary"
 import { CapabilityRegistrationSchema } from "./capability-registration"
 import { ConnectorLeaseSchema } from "./connector-lease"
 import { HumanApprovalCheckpointSchema } from "./human-approval-checkpoint"
+import { roundTrip } from "./shared"
 
 const FIXTURES = join(__dirname, "__fixtures__")
 
@@ -79,4 +81,47 @@ describe("契约版本兼容性 —— v1.0.0 快照全部可通过当前 schema
       expect(raw.version).toBe("1.0.0")
     }
   })
+})
+
+/**
+ * Fixture 完整性检查（审计项 6.2）：
+ * 防止新人给 schema 加 .default() 后忘记更新 fixture → safeParse 依旧绿但 fixture 变成了子集。
+ *
+ * 检查逻辑：fixture 中的每个顶层 key 在解析后的 data 中必须存在且值一致。
+ * 当 schema 新增 default 字段时，此测试提醒同步更新 fixture。
+ */
+describe("fixture 快照完整性 —— 防字段漂移", () => {
+  for (const c of CONTRACTS) {
+    it(`${c.name} fixture 所有键在解析后均保留且值一致`, () => {
+      const raw = loadFixture(c.fixture) as Record<string, unknown>
+      const parsed = c.schema.parse(raw) as Record<string, unknown>
+
+      for (const key of Object.keys(raw)) {
+        expect(
+          key in parsed,
+          `fixture 键 "${key}" 在 ${c.name} 解析后缺失 —— 可能新增了 .default() 字段，请同步更新 fixture`,
+        ).toBe(true)
+
+        // 值一致性：允许 zod 的 trim/coerce 做等价变换
+        const rawVal = raw[key]
+        const parsedVal = parsed[key]
+        if (typeof rawVal === "string" && typeof parsedVal === "string") {
+          expect(parsedVal.trim()).toBe(rawVal.trim())
+        }
+      }
+    })
+  }
+})
+
+describe("roundTrip —— JSON 序列化 → 反序列化 → schema 校验闭环", () => {
+  for (const c of CONTRACTS) {
+    it(`${c.name} v1.0.0 fixture round-trip 完整`, () => {
+      const raw = loadFixture(c.fixture) as Record<string, unknown>
+      const restored = roundTrip(c.schema as z.ZodType<unknown>, raw)
+      // 所有 fixture 键在 round-trip 后必须存在
+      for (const key of Object.keys(raw)) {
+        expect(key in (restored as Record<string, unknown>)).toBe(true)
+      }
+    })
+  }
 })
