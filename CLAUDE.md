@@ -1,245 +1,264 @@
-# CLAUDE.md — HermesClaw-v2 项目说明
-
-> 本文件为项目工程说明与协作规范。**最高行为规则见 [AGENTS.md](./AGENTS.md)**，本文档与之冲突时以 AGENTS.md 为准。
-> 完整产品需求见 [prd.md](./prd.md)。
-
----
-
-## 1. 项目简介
-
-**HermesClaw-v2** 是面向中小企业（小 B 场景）的 **AI 数字员工基础平台**，首个优先切入行业为**外贸**。
-
-- **Hermes** — 云端规划与记忆控制面（工作流编排、记忆管理、策略路由、动态 Harness 评估与升级审批）。
-- **OpenClaw** — 移动端执行与连接器数据面（任务执行、数据采集、连接器调用、事件回传）。
-- **主交互入口** — Web 工作台（深色专业控制台风格）。
-
-平台目标：让 AI 从一次性辅助工具，升级为可管理、可执行、可记忆、可进化的企业数字员工系统。
-
-> 当前仓库为 **Web 工作台前端 + 全栈基础脚手架**，对应 PRD Phase 1：基础工作台框架 + 外贸行业 MVP + 智慧大脑/项目空间/动态大盘基础版。
+# CLAUDE.md — HermesClaw 工程协作与实现约束
+## 版本：v1.2
+## 日期：2026-06-12
 
 ---
 
-## 2. 技术栈
+# 1. 文档目的
 
-| 分类 | 选型 | 版本 | 说明 |
-|------|------|------|------|
-| 框架 | Next.js（App Router） | 16.x | React 全栈框架，Turbopack 默认开启 |
-| 语言 | TypeScript | 5.x | 全量类型化，禁用隐式 any |
-| 运行时 | React | 19.x | Server / Client Components |
-| 样式 | Tailwind CSS | **v4（CSS-first）** | 主题走 `globals.css` 的 CSS 变量 + `@theme inline`，**无 tailwind.config 的 theme.extend** |
-| 组件库 | shadcn/ui | — | 基于 `@base-ui/react`，组件位于 `src/components/ui` |
-| 图标 | Lucide（lucide-react） | 1.x | 统一图标体系 |
-| 客户端状态 | Zustand | 5.x | UI / 客户端交互态 |
-| 服务端状态 | TanStack Query | 5.x | 请求缓存、失效、重试 |
-| 动画 | Framer Motion | 12.x | 交互动效 |
-| 图表 | Recharts | 3.x | 大盘与数据可视化，配色用 `--chart-1..5` |
-| 包管理 | **pnpm** | — | 统一使用 pnpm，勿混用 npm/yarn |
+本文件用于约束 Claude Code / 其他 AI Coding Agent / 人类工程师在 HermesClaw 仓库内的实现方式。  
+它不定义产品愿景（以 PRD 为准）；不定义最高治理规则（以 AGENTS.md 为准）。
 
-**常用命令**：
-
-```bash
-pnpm dev      # 启动开发服务器（Turbopack）→ http://localhost:3000
-pnpm build    # 生产构建
-pnpm lint     # ESLint 检查
-pnpm exec tsc --noEmit   # 类型检查
-pnpm dlx shadcn@latest add <component>   # 新增 shadcn 组件
-```
+本文件只解决一个问题：  
+**如何把 HermesClaw 正确地实现出来，而不是写成一个耦合失控的大项目。**
 
 ---
 
-## 3. 目录结构规范
+# 2. 系统实现总原则
 
-```
-src/
-  app/
-    layout.tsx              # 根布局：强制深色(dark class)、字体、<Providers>
-    providers.tsx           # 'use client' — TanStack Query + Tooltip Provider
-    page.tsx                # 根路由 → 重定向到 /new
-    globals.css             # ★ 颜色系统单一落点（Tailwind v4 @theme inline）
-    api/                    # 后端 Route Handlers（全栈）
-      health/route.ts       #   GET 健康检查
-      openclaw/events/
-        route.ts            #   GET SSE 实时事件流（text/event-stream）
-      workspace/settings/
-        route.ts            #   GET/PATCH 模型路由配置
-    (workspace)/            # 工作台路由组：共享左侧导航外壳
-      layout.tsx            #   AppShell 包裹
-      foreign-trade/        #   外贸
-      new/                  #   新话题（超级入口）
-      dashboard/            #   动态大盘
-      agents/               #   智能体（含 [id] 详情）
-      projects/             #   项目空间（含 [id] 详情）
-      brain/                #   智慧大脑（layout 提供二级导航）
-        short-memory/ mid-memory/ long-memory/
-        skills/ connectors/ voice/ images/ videos/
-      files/ recent/ settings/
-  components/
-    ui/                     # shadcn 生成组件（勿手改，用 CLI 更新）
-    layout/                 # AppShell / Sidebar / SidebarNavItem / BrainSubnav
-    common/                 # PageHeader / EmptyState / StatCard 等通用业务组件
-  config/
-    navigation.ts           # ★ 导航单一数据源（mainNav / bottomNav / brainNav）
-    site.ts                 # 站点级常量
-  lib/
-    utils.ts                # cn() 等工具函数
-    sse-parser.ts           # 通用 SSE 流解析器（parseSSEStream）
-    server/                 # 服务端逻辑
-      llm-provider.ts       # 共享 LLM 工具层（Provider 选择 + 流式/非流式调用）
-      model-router.ts       # ★ 策略路由（selectModel）—— 按 risk/taskType/WS 配置决策 Provider
-      adapters/openclaw/
-        event-emitter.ts    # SSE 事件广播（全局 pub/sub）
-        mock.ts             # Mock 模式（含事件发射集成）
-  stores/                   # Zustand stores（ui-store 等）
-  hooks/                    # 自定义 hooks
-    use-openclaw-stream.ts  # OpenClaw SSE 事件流订阅 Hook
-    use-model-routing.ts    # 模型路由配置 Hook（TanStack Query + Mutation）
-    use-workspace.ts        # 工作空间数据 Hook
-  types/                    # 全局 TS 类型
-```
+## 2.1 三域优先
 
-**约定**：
+任何功能开发前，必须先判断它属于哪一个运行域：
 
-- 路由分组 `(workspace)` 不影响 URL，仅用于共享布局。
-- 信息架构（一级 / 二级导航）以 `src/config/navigation.ts` 为**唯一数据源**，新增模块在此登记，勿在多处硬编码。
-- 后端逻辑放 `app/api/<resource>/route.ts`；复杂业务逻辑后续下沉至 `src/lib/server/*`，Route Handler 只做 I/O 与校验。
-- **Prisma Client 生成路径**：`prisma/schema.prisma` 中 generator `output` 指向 `../src/generated/prisma-v2`（全仓库唯一生成目标，**勿改回**过时的 `prisma` 目录）。运行 `pnpm exec prisma generate` 后客户端位于 `src/generated/prisma-v2/`。
-- **技能（Skill）**遵循 Claude Code Skills 规范（[Agent Skills](https://agentskills.io) 开放标准），存放于 `.claude/skills/<name>/SKILL.md`（详见 [AGENTS.md §4.0](./AGENTS.md#40-技能规范claude-code-skills-标准)）。**项目中的"Skill"均指此格式，非传统功能模块。**
+- Hermes Control Kernel  
+- OpenClaw Execution Runtime  
+- Industry Pack Layer
+
+若一个功能同时跨越两个以上运行域，必须先定义契约对象与边界，再开始写代码（通常是 event contracts / harness schema / Industry Pack manifest）。
+
+## 2.2 Contract-First
+
+所有跨域协作先定义 schema，再写 handler。
+
+- 禁止先写页面、后补接口。  
+- 禁止先写业务逻辑、后补状态机。  
+- 禁止把 runtime contract 混进 UI 组件。  
+- 跨域调用必须通过 `packages/event-contracts` / `packages/harness-schema` 等公共契约层完成，而不是直接 import 其他服务内部实现。  
+- 与上游 Hermes / OpenClaw 的交互必须通过公开的 CLI / HTTP / WebSocket / MCP 接口完成，不得依赖其内部私有模块与未文档化的结构。
+
+## 2.3 Runtime-First Evolution
+
+自进化优先修改：
+
+- `WorkflowTemplate`  
+- `AgentPolicy`  
+- `SkillBinding`  
+- `ContextPolicy`  
+- `MemoryPolicy`  
+- `ConnectorPolicy`（非高危部分）  
+- `EvalRuleSet`
+
+不要把「自动改源码」作为默认实现路径。  
+只有当 runtime 对象无法解决问题时，才生成工程变更建议（包含上下文与失败证据），并进入人工研发流程（PR / Code Review / 回滚机制）。
+
+## 2.4 上游原则继承
+
+- **Hermes Core 必须保持窄核心**：核心只负责会话管理、工具编排、记忆与策略，能力扩展应优先通过 skills、plugins 与外部服务实现。  
+- **会话前缀缓存不可破坏**：禁止在单次会话生命周期内随意重写系统 Prompt 或插入不必要的中间消息，避免破坏现有的 prompt cache 与压缩策略。  
+- **OpenClaw Runtime 必须保持事件驱动模型**：执行必须通过标准 run / event / artifact / approval 流程进行，而不是通过「一把梭」式阻塞调用。  
+- 禁止在 Hermes / OpenClaw 上游仓库中直接加入项目专用分支逻辑；必要修改应以向上游提交通用 PR 为主，本仓库通过配置与兼容层使用。
 
 ---
 
-## 4. 代码风格规范
+# 3. 仓库结构约定
 
-- **注释用中文**，**标识符（组件 / 函数 / 变量 / 类型）用英文**。
-- **组件**：函数式组件 + TypeScript，PascalCase 命名（如 `SidebarNavItem`）；文件名 kebab-case（如 `sidebar-nav-item.tsx`）。
-- **客户端组件**：用到 `useState` / `usePathname` / 事件等浏览器能力的组件，文件首行加 `"use client"`；默认保持 Server Component。
-- **类型优先**：props 显式声明 interface；避免 `any`，必要时用 `unknown` + 收窄。
-- **样式**：一律用 Tailwind 工具类 + 语义化 token（见第 5 节），避免裸写十六进制颜色；多类名合并用 `cn()`（`@/lib/utils`）。
-- **导入路径**：统一使用 `@/*` 别名（指向 `src/`）。
-- 提交前确保 `pnpm lint` 与 `pnpm exec tsc --noEmit` 通过。
+建议采用 monorepo 目录结构：
 
----
+- `apps/web`  
+- `services/hermes-core`  
+- `services/openclaw-runtime`  
+- `packages/event-contracts`  
+- `packages/harness-schema`  
+- `packages/industry-pack-sdk`  
+- `packages/shared-types`  
+- `infra/docker`  
 
-## 5. 颜色系统（深色主题）
+约束：
 
-全站强制深色。颜色在 [src/app/globals.css](./src/app/globals.css) 的 `:root, .dark` 中以 hex 定义，并经 `@theme inline` 注册为 Tailwind 工具类。**禁止裸写色值**，一律使用下列 token。
-
-| 用途 | 色值 | shadcn / 自定义 token | Tailwind 工具类 |
-|------|------|----------------------|------------------|
-| 页面主背景 | `#0B0B0C` | `--background` | `bg-background` |
-| 侧边栏背景 | `#111112` | `--sidebar` | `bg-sidebar` |
-| 卡片背景 | `#18181B` | `--card` | `bg-card` |
-| 浮层背景 | `#202024` | `--popover` | `bg-popover` |
-| hover 背景 | `#24242A` | `--accent` | `bg-accent` |
-| 分隔线 | `#2A2A31` | `--border` / `--input` | `border-border` |
-| 一级文字 | `#F5F5F7` | `--foreground` | `text-foreground` |
-| 二级文字 | `#A1A1AA` | `--muted-foreground` | `text-muted-foreground` |
-| 弱提示文字 | `#71717A` | `--hint` | `text-hint` |
-| 品牌主色 | `#7C5CFF` | `--primary` / `--brand` / `--ring` | `bg-primary` / `bg-brand` |
-| 品牌辅助蓝 | `#4DA3FF` | `--brand-blue` | `text-brand-blue` |
-| 成功色 | `#37C99A` | `--success` | `text-success` |
-| 警告色 | `#F0A43B` | `--warning` | `text-warning` |
-| 风险色 | `#FF6B6B` | `--destructive` / `--danger` | `text-danger` |
-
-- **圆角**：基准 `--radius: 0.875rem`（PRD 大圆角），梯度 `rounded-lg / -xl / -2xl`。
-- **图表**：Recharts 用 `--chart-1..5`（主色 / 蓝 / 成功 / 警告 / 风险）。
-- 新增语义色：先在 `globals.css` 的 `:root, .dark` 加 CSS 变量，再在 `@theme inline` 加 `--color-*` 映射，方可作为工具类使用。
+- `apps/web` 不得包含核心业务规则，只作为视图层与 API 调用方。  
+- `services/hermes-core` 负责控制逻辑与治理，只通过 `packages/*` 访问公共契约，不直接依赖 `services/openclaw-runtime` 的内部模块。  
+- `services/openclaw-runtime` 负责执行与事件，只通过 `packages/event-contracts` 与 `packages/shared-types` 与 Hermes 通信，不反向依赖 `services/hermes-core`。  
+- `packages/event-contracts` 只放协议 schema（TaskEnvelope / ExecutionEvent / ExecutionSummary / CapabilityRegistration 等）。  
+- `packages/harness-schema` 只放 Harness Runtime 对象定义（AgentPolicy / WorkflowTemplate / EvalRuleSet 等）。  
+- `packages/industry-pack-sdk` 只放行业包装载与校验逻辑，不写任何具体业务实现。  
+- `packages/shared-types` 放通用类型，不放具体服务端依赖。  
+- `infra/docker` 仅包含部署脚本与镜像打包配置，不放业务逻辑。
 
 ---
 
-## 6. 组件规范
+# 4. Hermes Core 实现规则
 
-- **优先复用 shadcn/ui**（`src/components/ui`）；其组件由 CLI 生成，**勿手动改源码**，需要变体时在业务层封装。
-- **分层**：
-  - `components/ui` — 基础组件（shadcn）。
-  - `components/layout` — 框架级布局（侧边栏、外壳、二级导航）。
-  - `components/common` — 跨模块复用的业务组件（页头、空状态、指标卡）。
-  - 模块私有组件就近放在对应路由目录下。
-- **占位约定**：未实现模块统一用 `EmptyState`；页头统一用 `PageHeader`；指标卡用 `StatCard`。
-- 组件 props 用 interface 显式声明；可选回退用默认值（如 `EmptyState` 的默认图标）。
-- 图标统一从 `lucide-react` 导入；图像图标用别名 `ImageIcon` 避免与 `next/image` 混淆。
+## 4.1 Hermes 的职责
 
----
+Hermes 必须实现：
 
-## 7. 状态管理规范
+- Intent parsing（意图解析与目标结构化）。  
+- Workflow generation（DAG Workflow 生成与节点配置）。  
+- Model routing（模型与推理策略路由）。  
+- Memory orchestration（多层记忆协同与压缩策略调用）。  
+- Policy enforcement（策略与自动化等级执行）。  
+- Evaluation engine（执行与进化评估）。  
+- Proposal engine（提案生成引擎）。  
+- Approval / canary / rollback（审批 / 灰度 / 回滚流程）。  
+- Audit trail 记录（以 Hermes 为治理真相源）。
 
-职责边界清晰，避免混用：
+Hermes 不应实现：
 
-- **Zustand（`src/stores`）** — 仅承载 **UI / 客户端交互态**（侧边栏折叠、弹层开关、本地草稿等）。store 用 `use<Name>Store` 命名。
-- **TanStack Query** — 承载**所有服务端状态**（远程数据的获取、缓存、失效、重试、乐观更新）。全局 `QueryClient` 在 `src/app/providers.tsx` 用 `useState` 惰性单例创建（默认 `staleTime: 60s`、关闭窗口聚焦重取）。
-- **React 局部 state** — 仅组件内一次性 UI 状态。
-- ❌ 不要把服务端数据塞进 Zustand；❌ 不要用 Query 管理纯 UI 开关。
+- 所有渠道连接（这属于 OpenClaw 与 channel / node 系统）。  
+- 所有设备在线状态常驻（presence 由 OpenClaw Gateway 管理）。  
+- 连接器底层适配细节（由 openclaw-runtime + connectors 实现）。  
+- 行业包内部具体业务逻辑（由 Industry Pack 实现）。
 
----
+## 4.2 Hermes 的真相源
 
-## 8. Git 提交规范
+Hermes 是以下数据的 Source of Truth：
 
-采用 **Conventional Commits**：`<type>(<scope>): <subject>`
-
-| type | 含义 |
-|------|------|
-| `feat` | 新功能 |
-| `fix` | 缺陷修复 |
-| `docs` | 文档变更 |
-| `style` | 格式（不影响逻辑） |
-| `refactor` | 重构（非功能、非修复） |
-| `perf` | 性能优化 |
-| `test` | 测试 |
-| `chore` | 构建 / 依赖 / 工具链 |
-
-- `scope` 建议用模块名：`trade` / `dashboard` / `agents` / `brain` / `files` / `ui` / `config`。
-- subject 用中文、祈使语气、不加句号。例：`feat(brain): 新增连接器授权状态卡片`。
-- 涉及 Harness 规则或 AGENTS.md 变更，须遵循 AGENTS.md 第三/七章的 HEP 审批流程。
+- Task definition（任务定义）。  
+- Policy snapshot（策略快照）。  
+- Harness bundle version（Harness 版本）。  
+- Approval status（审批状态）。  
+- Audit trail（审计记录）。  
+- Proposal lifecycle（提案生命周期）。  
 
 ---
 
-## 9. 功能完成后的代码健康检查
+# 5. OpenClaw Runtime 实现规则
 
-**触发时机**：每在一个新会话窗口中完成一个功能的开发（新模块 / 新 API / 重构）后，**必须**自动执行一次代码健康检查。检查与诊断报告覆盖以下 5 个维度：
+## 5.1 OpenClaw 的职责
 
-1. **AGENTS.md 规则合规性**：逐条检查新增/变更代码是否违反 AGENTS.md 中的硬性约束（如 §5 禁止行为清单、§4.5 安全护栏、§2.3 无日志禁止静默执行等），列出每一项违规及具体位置。
-2. **重复逻辑识别**：对比项目中已有代码，检查是否有可提取为公共函数/共享模块的重复逻辑（如多处相同的校验链、序列化/反序列化样板、L4/L3 门禁等）。
-3. **TODO 遗留扫描**：搜索新增文件中的 `TODO` / `FIXME` / `HACK` / `XXX` 注释，列出所有未完成事项及其位置。
-4. **错误处理完整性**：沿 Policy Engine 调用链路逐层检查 try/catch 覆盖、异常传播、回滚语义、边界条件（TOCTOU、并发冲突、快照缺失等）。
-5. **AGENTS.md 更新需求**：如果本次开发引入了新的架构约定、状态值、API 模式、目录结构，列出需在 AGENTS.md 中记录的条目及建议位置。
+OpenClaw 必须实现：
 
-**执行规则**：
+- Channel / device presence（通道与设备在线状态）。  
+- Connector execution（连接器执行）。  
+- Event emission（ExecutionEvent 事件发出）。  
+- Action receipts（回执收集与存储）。  
+- Runtime capability registration（能力注册）。  
+- Local/mobile execution context（本地与移动执行上下文）。  
+- Sandbox 运行模式（非主会话的受限执行模式）。
 
-- 检查形式为**只读诊断报告**，不要修改任何代码。
-- 诊断报告须按优先级分档：🔴 高危（违反 AGENTS.md 硬性规则）/ 🟡 中危（重复逻辑、不完整错误处理）/ 🟢 建议（代码风格、可维护性）。
-- 诊断报告末尾附「最优先修复项」汇总。
-- 用户确认报告后，再执行修复；修复完成后重新跑 `pnpm exec tsc --noEmit` + `pnpm lint` 确保零错误。
+OpenClaw 不得：
 
----
+- 绕过 Hermes 做策略决策。  
+- 修改 Harness 规则。  
+- 自行批准高危动作。  
+- 直接调用 Hermes 内部模块，只能通过契约事件与 API。  
 
-## 10. Git 备份推送规范
+## 5.2 Runtime 事件设计
 
-**触发时机**：每完成一个功能 → 代码健康检查通过 → 修复执行完毕 → 类型检查与 lint 全量通过后，**必须**将当前工作推送到 GitHub 仓库做备份。
+所有执行动作都必须至少触发：
 
-**分支规则**：
+- `started`  
+- `progress`（可选）  
+- `completed` 或 `failed`  
+- `summary`
 
-- 备份分支命名：`backup/feature-{NNN}`，编号从 `001` 起按顺序叠加。
-- 新建分支前，先 `git fetch origin` 获取远端已有备份分支列表，找到当前最大编号 N，新建分支编号为 N+1（左补零至 3 位）。
-- 当前会话的功能代码全部在该备份分支上提交并推送。
+所有事件必须携带：
 
-**操作流程**：
+- `taskId`  
+- `workflowRunId`  
+- `runtimeId`  
+- `timestamp`  
+- `status`  
+- `payload`  
+- `receipt` / `error`（如适用）  
+- `version`（事件版本）
 
-```bash
-# 1. 获取远端备份分支，计算下一个编号
-git fetch origin
-git branch -r | grep 'origin/backup/feature-' | sed 's/.*feature-//' | sort -n | tail -1
-# 2. 切出新备份分支并推送
-git checkout -b backup/feature-{NNN}
-git add -A
-git commit -m "chore: 备份 — {功能简述}"
-git push -u origin backup/feature-{NNN}
-```
-
-**约束**：
-
-- 仅在新功能完整开发 + 代码健康检查修复完成后才推送，不要在开发中途推送不完整代码。
-- commit message 遵循 Conventional Commits（见第 8 节），`type` 使用 `chore`。
-- 推送后向用户报告分支名和 GitHub 链接。
+对于长流程任务，推荐对齐 OpenClaw 的事件族（如 `run.created` / `run.started` / `tool.call.*` / `approval.requested` / `artifact.created`），再映射为 HermesClaw 内部 `ExecutionEvent` 类型。
 
 ---
 
-*本文档随项目演进持续更新；结构性约定变更请同步修订本文件与 `src/config/navigation.ts`。*
+# 6. Industry Pack 实现规则
+
+## 6.1 行业包原则
+
+行业包是插件，不是业务分支。  
+新增行业时，优先新增 pack，不优先修改 Hermes 核心代码或 openclaw-runtime 核心代码。
+
+## 6.2 每个行业包必须提供
+
+- `manifest.yaml`  
+- `agents/`  
+- `workflows/`  
+- `skills/`  
+- `knowledge/`  
+- `connectors/`  
+- `schemas/`  
+- `dashboards/`  
+- `eval-rules/`  
+
+## 6.3 兼容性
+
+每个行业包必须声明：
+
+- `compatibleHermesApi`  
+- `compatibleRuntimeApi`  
+- `migrationRules`  
+
+不兼容的行业包禁止装载，必须在装载阶段就被拒绝。
+
+---
+
+# 7. Schema 设计规则
+
+## 7.1 必须使用类型系统
+
+- TypeScript 类型 + zod（或同等）schema 双定义或单源生成。  
+- 所有外部输入必须校验。  
+- 所有 runtime event 必须版本化（包含 `version` 字段）。  
+
+## 7.2 必须版本化的对象
+
+- TaskEnvelope  
+- ExecutionEvent  
+- ExecutionSummary  
+- CapabilityRegistration  
+- HarnessBundle  
+- IndustryManifest  
+- EvaluationReport  
+- EvolutionProposal  
+
+---
+
+# 8. 数据与审计规则
+
+## 8.1 必须留痕
+
+以下行为必须写 AuditLog：
+
+- `workflow.generate`  
+- `task.dispatch`  
+- `task.cancel`  
+- `model.route`  
+- `connector.execute`（尤其是写操作）  
+- `proposal.create` / `proposal.approve` / `proposal.reject` / `proposal.rollback`  
+- `industry.pack.install` / `industry.pack.activate` / `industry.pack.rollback`  
+- `automation.level.change`（尤其是 L3/L4）  
+
+## 8.2 日志分层
+
+- **AuditLog**：治理与审计留痕（审批、策略、提案、回滚）。  
+- **AgentLog**：执行行为与风险记录。  
+- **WorkflowRun / NodeRun**：结构化运行记录。  
+- **Receipt Store**：外部动作回执（与 OpenClaw 事件对应）。
+
+---
+
+# 9. 开发顺序约束
+
+建议统一开发顺序（特别是对 AI Coding Agent）：
+
+1. **归类运行域**：先判断需求属于 Hermes / OpenClaw / Industry Pack 哪一层。  
+2. **补齐契约**：在 `packages/event-contracts` / `packages/harness-schema` 中定义或修改必要的类型与 schema。  
+3. **编写最小用例**：为新契约编写最小 e2e 测试（从 TaskEnvelope 到 ExecutionEvent 的闭环）。  
+4. **实现服务端逻辑**：在对应 `services/*` 中实现 handler，保持边界清晰。  
+5. **再做前端**：最后补充 `apps/web` 的配置 UI / 监控视图 / 审批界面。  
+6. **禁止跳步**：不得在未定义契约与测试的情况下直接堆叠业务逻辑与 UI。
+
+---
+
+# 10. 测试与 CI 要求
+
+- 所有新增 runtime 契约必须有单元测试（schema 校验 + 反序列化 + 版本兼容测试）。  
+- Hermes ↔ OpenClaw 之间的关键路径必须有 e2e 测试（模拟真实事件与回执）。  
+- 所有与高危动作相关的改动，必须在测试中覆盖：拒绝路径、审批路径、回滚路径。  
+- CI 流水线必须执行：类型检查 + 单元测试 + e2e 测试 + lint + schema 断言。

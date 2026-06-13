@@ -50,4 +50,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-/src/generated/prisma
+# Prisma client 为生成代码，不入库；装包时由 postinstall (prisma generate) 自动重建
+/src/generated/
