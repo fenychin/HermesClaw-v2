@@ -34,6 +34,7 @@ import type {
   AutomationLevel,
   ProposalStatus,
   TargetComponent,
+  ModelProvider,
 } from "@/types"
 import type {
   EvaluationReport,
@@ -196,7 +197,7 @@ async function writeEvolutionLog(
     triggeredBy: "auto" | "manual"
     triggered: boolean
     metrics: HarnessMetrics
-    provider: "anthropic" | "deepseek" | null
+    provider: ModelProvider | null
     model: string | null
     proposalId?: string
     reason?: string

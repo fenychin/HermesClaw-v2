@@ -12,6 +12,7 @@ import type {
   ProposalStatus,
   TargetComponent,
 } from "@/contracts"
+import type { ModelProvider } from "./chat"
 
 export type { AutomationLevel }
 // ⚠️ RiskLevel 使用 compat 子集（不含 'critical'，Harness 不处理 catastrophic 级事件）
@@ -220,8 +221,9 @@ export interface HarnessEvaluateResult {
   triggered: boolean
   /** 本次评估的指标快照 */
   metrics: HarnessMetrics
-  /** 实际承担分析的 Provider（无 key 时回退 deepseek） */
-  provider: 'anthropic' | 'deepseek' | null
+  // ModelProvider 单源在 src/lib/server/llm-provider.ts (LlmProvider)
+  // 新增 Provider 时只需修改该文件，此处类型自动同步
+  provider: ModelProvider | null
   /** 实际使用的模型 ID */
   model: string | null
   /** 触发时生成的提案（未触发则缺省） */
@@ -247,7 +249,9 @@ export interface EvolutionLogEntry {
   errorRate: number
   successRate: number
   totalLogs: number
-  provider: 'anthropic' | 'deepseek' | null
+  // ModelProvider 单源在 src/lib/server/llm-provider.ts (LlmProvider)
+  // 新增 Provider 时只需修改该文件，此处类型自动同步
+  provider: ModelProvider | null
   model: string | null
   proposalId: string | null
   reason: string | null
