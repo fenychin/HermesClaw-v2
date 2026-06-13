@@ -116,6 +116,10 @@ model Session {
 
 // ============================================================
 // 智能体
+//
+// [未来外贸 Industry Pack 扩展建议]：
+//   1. 增加 templateId 字段 (String, 可空)，关联行业通用岗位智能体模板 (如 'agent-sales-rep')。
+//   2. 规范化 category 存储，以便快速区分外贸专属岗位 ('foreign-trade' / 'trade') 和通用智能体。
 // ============================================================
 model Agent {
   id              String   @id
@@ -523,6 +527,10 @@ model ToolGrant {
 
 // ============================================================
 // 工作流（DAG 编排）—— nodes/edges 以 JSON 字符串列存图（沿用 Agent.canDo 惯例）
+//
+// [未来外贸 Industry Pack 扩展建议]：
+//   1. 增加 category 字段 (String, 默认为 'custom')，用于标明是否为外贸专属 ('foreign-trade') 或其它行业包，替换模糊名称检索。
+//   2. 增加 templateId 字段 (String, 可空)，用以关联特定的行业模版 (如 'trade-inquiry-followup')，追踪衍生的工作流运行指标。
 // ============================================================
 model Workflow {
   id          String        @id
