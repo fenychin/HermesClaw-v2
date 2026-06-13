@@ -69,7 +69,7 @@ function inferSource(record: RecentRecordItem): string {
       return "文件上传";
     case "upgrade": {
       const risk = record.meta?.riskLevel as string | undefined;
-      return `Harness 升级 · ${risk === "high" ? "高风险" : risk === "mid" ? "中风险" : "低风险"}`;
+      return `Harness 升级 · ${risk === "high" ? "高风险" : risk === "medium" ? "中风险" : "低风险"}`;
     }
     default:
       return "未知来源";

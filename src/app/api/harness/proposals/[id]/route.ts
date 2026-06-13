@@ -6,6 +6,7 @@ import {
   errorResponse,
 } from "@/lib/api-utils"
 import { createAuditEntry, updateAuditEntry } from "@/lib/server/audit"
+import { writeAgentLog } from "@/lib/server/agent-log"
 import { checkConfirmQuery, checkAutomationGate } from "@/lib/server/guardrail"
 import { resolveAutomationLevel } from "@/types"
 import { HarnessProposalUpdateSchema, validateBody } from "@/lib/validators"
@@ -82,7 +83,7 @@ export async function PATCH(
 
       const automationLevel = resolveAutomationLevel(
         existing.automationLevel,
-        existing.riskLevel as "low" | "mid" | "high",
+        existing.riskLevel as "low" | "medium" | "high",
       )
 
       // AGENTS.md §5 #3 禁止静默执行：执行前写入预记录审计
@@ -92,7 +93,7 @@ export async function PATCH(
         targetType: "proposal",
         targetId: id,
         detail: `${existing.proposalId} · ${automationLevel}`,
-        riskLevel: existing.riskLevel as "low" | "mid" | "high",
+        riskLevel: existing.riskLevel as "low" | "medium" | "high",
         workspaceId: ctx.workspaceId,
         automationLevel: (existing.automationLevel as "L1" | "L2" | "L3" | "L4") ?? undefined,
         triggeredBy: "user",
@@ -127,6 +128,18 @@ export async function PATCH(
           reviewedAt: data.reviewedAt,
         },
       })
+
+      // P0-③ 人工修正事件埋点：提案被拒绝时记录 AgentLog（供 Harness 评估引擎追踪人工纠偏频率）
+      if (body.action === "reject") {
+        void writeAgentLog({
+          source: 'human-correction',
+          taskName: `提案已拒绝：${existing.proposalId}`,
+          status: 'success',
+          duration: '0s',
+          detail: `提案 ${existing.proposalId}（目标：${existing.targetComponent ?? '未知'}，自动化等级：${existing.automationLevel}）已被 ${body.reviewedBy ?? 'system'} 拒绝`,
+          riskLevel: 'medium',
+        })
+      }
 
       return successResponse({
         proposal: serializeProposal(proposal as unknown as Record<string, unknown>),
@@ -178,7 +191,7 @@ export async function DELETE(
       targetType: "proposal",
       targetId: id,
       detail: existing.proposalId,
-      riskLevel: "mid",
+      riskLevel: "medium",
       workspaceId: ctx.workspaceId,
       automationLevel: "L3",
       triggeredBy: "user",

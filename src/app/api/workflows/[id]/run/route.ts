@@ -15,6 +15,7 @@ import { ApiResponse } from '@/lib/server/api-response'
 import { logger } from '@/lib/logger'
 import { rateLimit } from '@/lib/rate-limit'
 import { withRBAC, type RouteContext } from '@/lib/server/api-handler'
+import { validateBody, WorkflowRunSchema } from '@/lib/validators'
 import {
   runWorkflow,
   WorkflowNotFoundError,
@@ -36,18 +37,21 @@ export const POST = withRBAC(
     }
 
     try {
-      // 解析请求体（容错空 body）
-      let body: Record<string, unknown> = {}
+      // P1-③ zod schema 校验请求体（空 body 容错仍保留）
+      let rawBody: unknown = {}
       try {
         const text = await req.text()
         if (text && text.trim().length > 0) {
-          body = JSON.parse(text)
+          rawBody = JSON.parse(text)
         }
       } catch {
         return ApiResponse.error('请求体 JSON 解析失败', 400)
       }
 
-      const input = (body.input as Record<string, unknown>) ?? body
+      const parsed = validateBody(rawBody, WorkflowRunSchema)
+      if (parsed instanceof Response) return parsed
+
+      const input = parsed.input
 
       logger.info('POST /api/workflows/[id]/run', { workflowId: id, userId: ctx.userId })
 

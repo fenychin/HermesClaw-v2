@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       targetType: "connector",
       targetId: connector.id,
       detail: `创建连接器 ${body.name}（${body.category}）`,
-      riskLevel: "mid",
+      riskLevel: "medium",
       workspaceId: ctx.workspaceId,
     })
 

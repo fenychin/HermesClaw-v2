@@ -72,7 +72,7 @@ const PROPOSAL_SCHEMA = {
       description: "升级目标组件",
     },
     proposedChange: { type: "string", description: "具体变更建议" },
-    riskLevel: { type: "string", enum: ["low", "mid", "high"], description: "风险等级" },
+    riskLevel: { type: "string", enum: ["low", "medium", "high"], description: "风险等级" },
     estimatedImpact: { type: "string", description: "预期效果" },
     reportMd: {
       type: "string",
@@ -99,7 +99,7 @@ const SYSTEM_PROMPT = `你是 HermesClaw-v2 的 Harness 自演化引擎，正在
 - targetComponent 必须落在六大核心组件之一：任务边界 / 上下文供给 / 工具接入 / 反馈闭环 / 安全护栏 / 进化调度器。
 - evidence 必须引用具体日志或指标，禁止空泛套话。
 - 若日志为空（最近窗口无任何运行记录），按 AGENTS.md 第五章「无日志的执行属严重违规」给出反馈闭环 / 进化调度器方向的提案。
-- riskLevel 仅取 low / mid / high；涉及边界或安全护栏变更倾向 mid 或 high。
+- riskLevel 仅取 low / medium / high；涉及边界或安全护栏变更倾向 medium 或 high。
 - 所有文本字段用中文。
 - 这是一份升级建议，最终须经人工审批，不要假设会自动生效。`
 
@@ -117,11 +117,11 @@ ${logSummary}
 请基于以上数据生成一份 Harness 升级提案。`
 }
 
-/** 归一化风险等级：兼容模型可能返回的 medium / 中 等写法 */
+/** 归一化风险等级：兼容模型可能返回的 mid / 中 等旧写法 */
 function normalizeRiskLevel(value: unknown): RiskLevel {
   const v = String(value ?? "").toLowerCase().trim()
   if (v === "high" || v === "高") return "high"
-  if (v === "mid" || v === "medium" || v === "中") return "mid"
+  if (v === "mid" || v === "medium" || v === "中") return "medium"
   return "low"
 }
 
@@ -232,7 +232,7 @@ async function analyzeWithDeepSeek(prompt: string): Promise<HarnessAnalysis> {
   "evidence": string[],                  // 证据列表
   "targetComponent": string,             // 任务边界|上下文供给|工具接入|反馈闭环|安全护栏|进化调度器 之一
   "proposedChange": string,              // 具体变更建议
-  "riskLevel": "low" | "mid" | "high",   // 风险等级
+  "riskLevel": "low" | "medium" | "high",   // 风险等级
   "estimatedImpact": string,             // 预期效果
   "reportMd": string                     // 面向维护者的 Markdown 评估报告（含指标解读、瓶颈、建议）
 }`,

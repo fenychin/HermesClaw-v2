@@ -968,7 +968,7 @@ export const mockHarnessProposals: HarnessProposal[] = [
     proposedChange: {
       targetComponent: '上下文供给',
       description: '为 agent-003 新增"渠道感知"能力：自动识别沟通渠道（邮件/WhatsApp/微信），动态调整消息长度与语气风格。同时将中期记忆中沉淀的客户渠道偏好纳入上下文供给链。',
-      riskLevel: 'mid',
+      riskLevel: 'medium',
       automationLevel: 'L2',
     },
     requiresHumanApproval: true,

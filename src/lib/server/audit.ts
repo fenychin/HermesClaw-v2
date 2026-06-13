@@ -19,7 +19,7 @@ import { auth } from "@/lib/auth"
 // 类型定义
 // ==============================
 
-export type AuditRiskLevel = "low" | "mid" | "high"
+export type AuditRiskLevel = "low" | "medium" | "high"
 
 /** 自动化授权等级（AGENTS.md §4.7） */
 export type AutomationLevel = "L1" | "L2" | "L3" | "L4"

@@ -80,7 +80,7 @@ export function withRBAC<C = unknown>(
         targetType: "rbac",
         targetId: new URL(request.url).pathname,
         detail: `角色 ${ctx.role} 不满足最低要求 ${requiredRole}（${request.method}）`,
-        riskLevel: "mid",
+        riskLevel: "medium",
         workspaceId: ctx.workspaceId,
       })
       // 同时写入带增强字段的审计（AGENTS.md §1.2 数据主权）
@@ -92,7 +92,7 @@ export function withRBAC<C = unknown>(
             targetType: "rbac",
             targetId: new URL(request.url).pathname,
             detail: `角色 ${ctx.role} 不满足最低要求 ${requiredRole}（${request.method}）`,
-            riskLevel: "mid",
+            riskLevel: "medium",
             workspaceId: ctx.workspaceId,
             contextSnapshot: {
               currentRole: ctx.role,

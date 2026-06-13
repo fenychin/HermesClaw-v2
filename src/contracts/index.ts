@@ -23,6 +23,13 @@ export {
   RiskLevelSchema,
   EventTypeSchema,
   ExecutionStatusSchema,
+  // P2 类型化 Payload（按 eventType discriminatedUnion）
+  RunPayloadSchema,
+  SessionPayloadSchema,
+  ToolCallPayloadSchema,
+  ApprovalPayloadSchema,
+  ArtifactPayloadSchema,
+  TypedExecutionEventSchema,
 } from "./shared"
 export type {
   AutomationLevel,
@@ -31,6 +38,12 @@ export type {
   ExecutionStatus,
   Payload,
   VersionRange,
+  RunPayload,
+  SessionPayload,
+  ToolCallPayload,
+  ApprovalPayload,
+  ArtifactPayload,
+  TypedExecutionEvent,
 } from "./shared"
 
 // TaskEnvelope
@@ -82,3 +95,76 @@ export type {
   HumanApprovalCheckpoint,
   ApprovalStatus,
 } from "./human-approval-checkpoint"
+
+// HarnessProposal
+export {
+  HarnessProposalSchema,
+  ProposalStatusSchema,
+  TargetComponentSchema,
+  HARNESS_PROPOSAL_VERSION,
+} from "./harness-proposal"
+export type {
+  HarnessProposal,
+  ProposalStatus,
+  TargetComponent,
+} from "./harness-proposal"
+
+// HarnessBundle
+export {
+  HarnessBundleSchema,
+  WorkflowTemplateSchema,
+  AgentPolicySchema,
+  SkillBindingSchema,
+  ContextPolicySchema,
+  MemoryPolicySchema,
+  ConnectorPolicySchema,
+  EvalRuleSetSchema,
+  HARNESS_BUNDLE_VERSION,
+} from "./harness-bundle"
+export type {
+  HarnessBundle,
+  WorkflowTemplate,
+  AgentPolicy,
+  SkillBinding,
+  ContextPolicy,
+  MemoryPolicy,
+  ConnectorPolicy,
+  EvalRuleSet,
+} from "./harness-bundle"
+
+// IndustryManifest
+export {
+  IndustryManifestSchema,
+  IndustryDirectorySchema,
+  MigrationRuleSchema,
+  INDUSTRY_MANIFEST_VERSION,
+} from "./industry-manifest"
+export type {
+  IndustryManifest,
+  IndustryDirectory,
+  MigrationRule,
+} from "./industry-manifest"
+
+// EvolutionProposal
+export {
+  EvolutionProposalSchema,
+  EVOLUTION_PROPOSAL_VERSION,
+} from "./evolution-proposal"
+export type { EvolutionProposal } from "./evolution-proposal"
+
+// EvaluationReport
+export {
+  EvaluationReportSchema,
+  HarnessMetricsSchema,
+  EvaluationTriggerSchema,
+  AnalysisTraceSchema,
+  ProposalSummarySchema,
+  EVALUATION_REPORT_VERSION,
+} from "./evaluation-report"
+export type {
+  EvaluationReport,
+  HarnessMetrics,
+  EvaluationTrigger,
+  AnalysisTrace,
+  ProposalSummary,
+} from "./evaluation-report"

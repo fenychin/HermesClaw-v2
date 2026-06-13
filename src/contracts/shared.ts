@@ -127,6 +127,218 @@ export function typedPayload<Shape extends z.ZodRawShape>(
   return z.object(shape).and(PayloadSchema)
 }
 
+// ─── P2 类型化 Payload（按 eventType 收窄） ─────────────────────────────
+
+/**
+ * Run 族事件 Payload。
+ *
+ * 覆盖 eventType：run.created / run.started / run.progress /
+ * run.completed / run.failed / run.cancelled
+ */
+export const RunPayloadSchema = typedPayload({
+  /** 工作流运行 ID。 */
+  runId: IdSchema,
+  /** 工作流名称。 */
+  workflowName: z.string().optional(),
+  /** 运行状态。 */
+  status: ExecutionStatusSchema.optional(),
+  /** 运行输出（completed 时）。 */
+  output: z.unknown().optional(),
+  /** 错误信息（failed 时）。 */
+  error: z.string().optional(),
+  /** 执行耗时（毫秒）。 */
+  durationMs: z.number().nonnegative().optional(),
+})
+export type RunPayload = z.infer<typeof RunPayloadSchema>
+
+/**
+ * Session 族事件 Payload。
+ *
+ * 覆盖 eventType：session.created / session.resumed /
+ * session.ended / session.expired
+ */
+export const SessionPayloadSchema = typedPayload({
+  /** 会话 ID。 */
+  sessionId: IdSchema,
+  /** 用户 ID。 */
+  userId: IdSchema.optional(),
+  /** 会话来源。 */
+  source: z.enum(["web", "mobile", "api", "cron"]).optional(),
+  /** 会话过期时间（ISO-8601）。 */
+  expiresAt: z.string().optional(),
+})
+export type SessionPayload = z.infer<typeof SessionPayloadSchema>
+
+/**
+ * Tool Call 族事件 Payload。
+ *
+ * 覆盖 eventType：tool.call.started / tool.call.completed / tool.call.failed
+ */
+export const ToolCallPayloadSchema = typedPayload({
+  /** 工具调用 ID。 */
+  callId: IdSchema,
+  /** 工具名称。 */
+  toolName: z.string().min(1),
+  /** 工具调用参数。 */
+  parameters: z.record(z.string(), z.unknown()).optional(),
+  /** 工具调用结果（completed 时）。 */
+  result: z.unknown().optional(),
+  /** 错误信息（failed 时）。 */
+  error: z.string().optional(),
+  /** 工具调用耗时（毫秒）。 */
+  durationMs: z.number().nonnegative().optional(),
+})
+export type ToolCallPayload = z.infer<typeof ToolCallPayloadSchema>
+
+/**
+ * Approval 族事件 Payload。
+ *
+ * 覆盖 eventType：approval.requested / approval.resolved /
+ * approval.rejected / approval.expired
+ */
+export const ApprovalPayloadSchema = typedPayload({
+  /** 审批 ID。 */
+  approvalId: IdSchema,
+  /** 审批动作类型。 */
+  action: z.string().min(1),
+  /** 审批目标类型。 */
+  targetType: z.string().min(1).optional(),
+  /** 审批目标 ID。 */
+  targetId: IdSchema.optional(),
+  /** 审批请求原因。 */
+  reason: z.string().optional(),
+  /** 审批人。 */
+  reviewer: z.string().optional(),
+  /** 审批决议（resolved/rejected 时）。 */
+  decision: z.enum(["approved", "rejected"]).optional(),
+  /** 审批备注。 */
+  comment: z.string().optional(),
+})
+export type ApprovalPayload = z.infer<typeof ApprovalPayloadSchema>
+
+/**
+ * Artifact 族事件 Payload。
+ *
+ * 覆盖 eventType：artifact.created / artifact.updated / artifact.deleted
+ */
+export const ArtifactPayloadSchema = typedPayload({
+  /** 产物 ID。 */
+  artifactId: IdSchema,
+  /** 产物类型。 */
+  artifactType: z.string().min(1),
+  /** 产物名称。 */
+  name: z.string().optional(),
+  /** 产物内容引用（URL / 路径）。 */
+  contentRef: z.string().optional(),
+  /** 产物大小（字节）。 */
+  sizeBytes: z.number().nonnegative().optional(),
+  /** 产物 MIME 类型。 */
+  mimeType: z.string().optional(),
+})
+export type ArtifactPayload = z.infer<typeof ArtifactPayloadSchema>
+
+/**
+ * 按 eventType 的 discriminatedUnion —— ExecutionEvent 的类型安全变体。
+ *
+ * 用法：
+ *   const event = TypedExecutionEventSchema.parse(raw)
+ *   // event 被收窄为对应的 payload 类型
+ *   if (event.eventType === 'tool.call.completed') {
+ *     event.payload.result // ← 类型安全
+ *   }
+ *
+ * 注意：此 schema 是 ExecutionEventSchema 的严格超集（拒绝非法 payload），
+ * 适用于需要类型安全 payload 的新代码；向后兼容的场景应继续使用 ExecutionEventSchema。
+ */
+export const TypedExecutionEventSchema = z.discriminatedUnion("eventType", [
+  // run 族
+  z.object({
+    eventType: z.literal("run.created"),
+    payload: RunPayloadSchema,
+  }),
+  z.object({
+    eventType: z.literal("run.started"),
+    payload: RunPayloadSchema,
+  }),
+  z.object({
+    eventType: z.literal("run.progress"),
+    payload: RunPayloadSchema,
+  }),
+  z.object({
+    eventType: z.literal("run.completed"),
+    payload: RunPayloadSchema,
+  }),
+  z.object({
+    eventType: z.literal("run.failed"),
+    payload: RunPayloadSchema,
+  }),
+  z.object({
+    eventType: z.literal("run.cancelled"),
+    payload: RunPayloadSchema,
+  }),
+  // session 族
+  z.object({
+    eventType: z.literal("session.created"),
+    payload: SessionPayloadSchema,
+  }),
+  z.object({
+    eventType: z.literal("session.resumed"),
+    payload: SessionPayloadSchema,
+  }),
+  z.object({
+    eventType: z.literal("session.ended"),
+    payload: SessionPayloadSchema,
+  }),
+  z.object({
+    eventType: z.literal("session.expired"),
+    payload: SessionPayloadSchema,
+  }),
+  // tool 族
+  z.object({
+    eventType: z.literal("tool.call.started"),
+    payload: ToolCallPayloadSchema,
+  }),
+  z.object({
+    eventType: z.literal("tool.call.completed"),
+    payload: ToolCallPayloadSchema,
+  }),
+  z.object({
+    eventType: z.literal("tool.call.failed"),
+    payload: ToolCallPayloadSchema,
+  }),
+  // approval 族
+  z.object({
+    eventType: z.literal("approval.requested"),
+    payload: ApprovalPayloadSchema,
+  }),
+  z.object({
+    eventType: z.literal("approval.resolved"),
+    payload: ApprovalPayloadSchema,
+  }),
+  z.object({
+    eventType: z.literal("approval.rejected"),
+    payload: ApprovalPayloadSchema,
+  }),
+  z.object({
+    eventType: z.literal("approval.expired"),
+    payload: ApprovalPayloadSchema,
+  }),
+  // artifact 族
+  z.object({
+    eventType: z.literal("artifact.created"),
+    payload: ArtifactPayloadSchema,
+  }),
+  z.object({
+    eventType: z.literal("artifact.updated"),
+    payload: ArtifactPayloadSchema,
+  }),
+  z.object({
+    eventType: z.literal("artifact.deleted"),
+    payload: ArtifactPayloadSchema,
+  }),
+])
+export type TypedExecutionEvent = z.infer<typeof TypedExecutionEventSchema>
+
 // ─── 测试工具（不参与生产导出） ───────────────────────────────────────
 
 /**

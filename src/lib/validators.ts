@@ -161,7 +161,7 @@ export const ToolCreateSchema = z.object({
   description: z.string().max(500).optional().default(""),
   category: z.string().max(50).optional().default("system"),
   scopes: z.array(z.string()).optional().default([]),
-  riskLevel: z.enum(["low", "mid", "high"]).optional().default("low"),
+  riskLevel: z.enum(["low", "medium", "high"]).optional().default("low"),
   enabled: z.boolean().optional().default(true),
 });
 
@@ -188,7 +188,7 @@ export const HarnessProposalCreateSchema = z.object({
   evidence: z.array(z.unknown()).optional().default([]),
   targetComponent: z.string().min(1).max(100),
   proposedChange: z.string().min(1).max(2000),
-  riskLevel: z.enum(["low", "mid", "high"]).optional().default("low"),
+  riskLevel: z.enum(["low", "medium", "high"]).optional().default("low"),
   automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional(),
   status: z.enum(["pending", "approved", "rejected", "implemented"]).optional().default("pending"),
   estimatedImpact: z.string().max(500).optional().default(""),
@@ -271,6 +271,16 @@ export const QuotationCreateSchema = z.object({
   totalAmount: z.string().min(1).max(100),
   currency: z.string().min(1).max(10).optional().default("USD"),
   version: z.number().int().min(1).max(999).optional().default(1),
+});
+
+// ==============================
+// 工作流
+// ==============================
+
+/** 工作流执行请求（POST /api/workflows/[id]/run） */
+export const WorkflowRunSchema = z.object({
+  /** 工作流输入变量（可选，键为字符串，值限于基础 JSON 类型） */
+  input: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
 // ==============================

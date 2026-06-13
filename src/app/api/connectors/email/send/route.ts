@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     targetType: "email",
     targetId: to,
     detail: `发送邮件至 ${to}，主题: ${subject.slice(0, 100)}`,
-    riskLevel: "mid",
+    riskLevel: "medium",
     workspaceId: ctx.workspaceId,
     automationLevel: "L2",
     triggeredBy: "user",
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
         targetType: "email",
         targetId: to,
         detail: `发送失败: ${result.error}`,
-        riskLevel: "mid",
+        riskLevel: "medium",
         workspaceId: ctx.workspaceId,
       })
 

@@ -16,7 +16,7 @@ interface AuditLogEntry {
   targetType: string;
   targetId: string;
   detail?: string;
-  riskLevel?: "low" | "mid" | "high";
+  riskLevel?: "low" | "medium" | "high";
   automationLevel?: string;
   triggeredBy: string;
   status: string;
@@ -25,7 +25,7 @@ interface AuditLogEntry {
 
 const RISK_CONFIG: Record<string, { label: string; className: string }> = {
   low: { label: "低", className: "bg-success/10 text-success border-success/30" },
-  mid: { label: "中", className: "bg-warning/10 text-warning border-warning/30" },
+  medium: { label: "中", className: "bg-warning/10 text-warning border-warning/30" },
   high: { label: "高", className: "bg-danger/10 text-danger border-danger/30" },
 };
 

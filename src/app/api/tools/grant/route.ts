@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       targetType: "tool",
       targetId: body.toolId,
       detail: `授予 Agent ${body.agentId}`,
-      riskLevel: "mid",
+      riskLevel: "medium",
       workspaceId: ctx.workspaceId,
       automationLevel: "L2",
       triggeredBy: "user",

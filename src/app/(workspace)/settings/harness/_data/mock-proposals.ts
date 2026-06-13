@@ -54,7 +54,7 @@ export const mockProposals: HarnessProposal[] = [
       targetComponent: "工具接入",
       description:
         "将 SMTP 连接器的连接池上限从 50 提升至 100，超时时间从 5s 调整为 8s，并启用连接预热。",
-      riskLevel: "mid",
+      riskLevel: "medium",
       automationLevel: "L2",
     },
     requiresHumanApproval: true,
@@ -114,7 +114,7 @@ export const mockProposals: HarnessProposal[] = [
       targetComponent: "上下文供给",
       description:
         "将产品目录知识库（v1.2）注册到客户画像 Agent 的上下文供给链中，配置自动同步策略（每 6 小时增量更新）。",
-      riskLevel: "mid",
+      riskLevel: "medium",
       automationLevel: "L2",
     },
     requiresHumanApproval: true,
