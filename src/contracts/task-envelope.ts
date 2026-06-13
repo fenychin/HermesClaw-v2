@@ -7,6 +7,9 @@ import {
   VersionSchema,
 } from "./shared"
 
+/** TaskEnvelope 独立契约版本（per-object versioning），独立于 CONTRACT_VERSION。 */
+export const TASK_ENVELOPE_VERSION = "1.0.0"
+
 /**
  * TaskEnvelope —— 任务封装（Hermes → OpenClaw 的任务契约）。
  *

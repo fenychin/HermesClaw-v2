@@ -8,6 +8,9 @@ import {
   VersionSchema,
 } from "./shared"
 
+/** ExecutionEvent 独立契约版本，独立于 CONTRACT_VERSION。 */
+export const EXECUTION_EVENT_VERSION = "1.0.0"
+
 /**
  * ExecutionEvent —— 执行事件（OpenClaw → Hermes 的执行轨迹）。
  *

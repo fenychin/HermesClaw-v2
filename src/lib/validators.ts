@@ -3,6 +3,7 @@
  * —— 使用 Zod 对所有 POST/PATCH 接口的请求体做严格校验，防止恶意输入。
  */
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 // ==============================
 // 智能体
@@ -286,6 +287,12 @@ export const QuotationCreateSchema = z.object({
 export function validateBody<T>(body: unknown, schema: z.ZodSchema<T>): T | Response {
   const result = schema.safeParse(body);
   if (!result.success) {
+    logger.warn("请求体 schema 校验失败（validateBody）", {
+      issues: result.error.issues.map((i) => ({
+        path: i.path.join("."),
+        message: i.message,
+      })),
+    });
     return Response.json(
       {
         success: false,

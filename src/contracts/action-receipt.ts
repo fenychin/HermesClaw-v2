@@ -6,6 +6,9 @@ import {
   VersionSchema,
 } from "./shared"
 
+/** ActionReceipt 独立契约版本。 */
+export const ACTION_RECEIPT_VERSION = "1.0.0"
+
 /** 回执结果（外部动作是否成功）。 */
 export const ReceiptOutcomeSchema = z.enum(["success", "failure"])
 export type ReceiptOutcome = z.infer<typeof ReceiptOutcomeSchema>

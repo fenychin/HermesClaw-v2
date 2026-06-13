@@ -5,6 +5,9 @@ import {
   VersionSchema,
 } from "./shared"
 
+/** ExecutionSummary 独立契约版本。 */
+export const EXECUTION_SUMMARY_VERSION = "1.0.0"
+
 /** 最终任务状态（由 Hermes 汇总裁定，AGENTS §3.2）。 */
 export const FinalStatusSchema = z.enum([
   "completed",

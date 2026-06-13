@@ -1,0 +1,14 @@
+{
+  "eventId": "evt_fixture_1",
+  "taskId": "task_fixture_1",
+  "workflowRunId": "run_fixture_1",
+  "runtimeId": "runtime_1",
+  "eventType": "tool.call.completed",
+  "status": "completed",
+  "timestamp": "2026-06-13T10:00:00Z",
+  "payload": { "tool": "email.send", "ok": true },
+  "connectorId": "conn_email",
+  "deviceId": "device_1",
+  "receiptHash": "sha256:def456",
+  "version": "1.0.0"
+}

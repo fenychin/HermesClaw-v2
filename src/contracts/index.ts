@@ -31,33 +31,49 @@ export type {
 } from "./shared"
 
 // TaskEnvelope
-export { TaskEnvelopeSchema } from "./task-envelope"
+export { TaskEnvelopeSchema, TASK_ENVELOPE_VERSION } from "./task-envelope"
 export type { TaskEnvelope } from "./task-envelope"
 
 // ExecutionEvent
-export { ExecutionEventSchema } from "./execution-event"
+export { ExecutionEventSchema, EXECUTION_EVENT_VERSION } from "./execution-event"
 export type { ExecutionEvent } from "./execution-event"
 
 // ActionReceipt
-export { ActionReceiptSchema, ReceiptOutcomeSchema } from "./action-receipt"
+export {
+  ActionReceiptSchema,
+  ReceiptOutcomeSchema,
+  ACTION_RECEIPT_VERSION,
+} from "./action-receipt"
 export type { ActionReceipt, ReceiptOutcome } from "./action-receipt"
 
 // ExecutionSummary
-export { ExecutionSummarySchema, FinalStatusSchema } from "./execution-summary"
+export {
+  ExecutionSummarySchema,
+  FinalStatusSchema,
+  EXECUTION_SUMMARY_VERSION,
+} from "./execution-summary"
 export type { ExecutionSummary, FinalStatus } from "./execution-summary"
 
 // CapabilityRegistration
-export { CapabilityRegistrationSchema } from "./capability-registration"
+export {
+  CapabilityRegistrationSchema,
+  CAPABILITY_REGISTRATION_VERSION,
+} from "./capability-registration"
 export type { CapabilityRegistration } from "./capability-registration"
 
 // ConnectorLease
-export { ConnectorLeaseSchema, LeaseStatusSchema } from "./connector-lease"
+export {
+  ConnectorLeaseSchema,
+  LeaseStatusSchema,
+  CONNECTOR_LEASE_VERSION,
+} from "./connector-lease"
 export type { ConnectorLease, LeaseStatus } from "./connector-lease"
 
 // HumanApprovalCheckpoint
 export {
   HumanApprovalCheckpointSchema,
   ApprovalStatusSchema,
+  HUMAN_APPROVAL_CHECKPOINT_VERSION,
 } from "./human-approval-checkpoint"
 export type {
   HumanApprovalCheckpoint,
