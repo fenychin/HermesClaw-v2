@@ -19,7 +19,7 @@ import { PageTransition } from "@/components/common/PageTransition";
 import { WorkflowCard } from "./_components/workflow-card";
 import { InquiryQuickEntry } from "./_components/inquiry-quick-entry";
 import { WorkflowHealthMonitor } from "./_components/workflow-health-monitor";
-import { TRADE_WORKFLOWS } from "./_data/workflows";
+import { useForeignTradeCapabilities } from "@/hooks/use-foreign-trade-capabilities";
 import {
   useDashboardStats,
   useQuotations,
@@ -250,6 +250,7 @@ function AIMorningReportCard() {
 // 页面主体
 // ============================================================
 export default function ForeignTradePage() {
+  const workflows = useForeignTradeCapabilities();
   // 大盘统计数据（TanStack Query，staleTime: 30s）
   const { stats, isLoading: statsLoading } = useDashboardStats();
   // 报价数据（用于计算本月成交金额及漏斗转化数）
@@ -357,7 +358,7 @@ export default function ForeignTradePage() {
               <span className="text-xs text-hint">一键启动，自动通过底层 DAG 运行引擎执行</span>
             </div>
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-              {TRADE_WORKFLOWS.map((wf) => (
+              {workflows.map((wf) => (
                 <WorkflowCard key={wf.id} workflow={wf} />
               ))}
             </div>

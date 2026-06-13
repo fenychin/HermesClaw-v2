@@ -64,9 +64,47 @@ export type MigrationRule = z.infer<typeof MigrationRuleSchema>
  * 不兼容的行业包禁止装载（CLAUDE.md §6.3），
  * 装载阶段即应被 Industry Pack SDK 拒绝。
  */
-export const IndustryManifestSchema = z.object({
+export const IndustryManifestSchema = z.preprocess((val: any) => {
+  if (val && typeof val === "object") {
+    const packId = val.packId || val.id;
+    const id = val.id || val.packId;
+
+    let directories = val.directories;
+    if (val.directory && !directories) {
+      directories = {
+        agents: Array.isArray(val.directory.agents) && val.directory.agents.length > 0,
+        workflows: Array.isArray(val.directory.workflows) && val.directory.workflows.length > 0,
+        skills: Array.isArray(val.directory.skills) && val.directory.skills.length > 0,
+        connectors: Array.isArray(val.directory.connectors) && val.directory.connectors.length > 0,
+        knowledge: false,
+        schemas: false,
+        dashboards: false,
+        evalRules: false,
+      };
+    }
+
+    const industry = val.industry || packId;
+    const createdAt = val.createdAt || new Date().toISOString();
+    const updatedAt = val.updatedAt || new Date().toISOString();
+    const version_field = val.version_field || val.version || "1.0.0";
+
+    return {
+      ...val,
+      packId,
+      id,
+      industry,
+      directories,
+      createdAt,
+      updatedAt,
+      version_field,
+    };
+  }
+  return val;
+}, z.object({
   /** 行业包唯一标识。 */
   packId: IdSchema,
+  /** 兼容简版 id 属性 */
+  id: IdSchema.optional(),
   /** 行业包人类可读名称。 */
   name: z.string().min(1),
   /** 行业包语义版本。 */
@@ -96,6 +134,13 @@ export const IndustryManifestSchema = z.object({
     dashboards: false,
     evalRules: false,
   }),
+  /** 具体的资源目录（包含具体的资源 ID 列表）。 */
+  directory: z.object({
+    agents: z.array(z.string()).default([]),
+    workflows: z.array(z.string()).default([]),
+    skills: z.array(z.string()).default([]),
+    connectors: z.array(z.string()).default([]),
+  }).optional(),
   /** 支持的语言列表。 */
   languages: z.array(z.string()).default(["zh-CN"]),
   /** 行业包激活状态。 */
@@ -106,5 +151,5 @@ export const IndustryManifestSchema = z.object({
   updatedAt: z.string(),
   /** 契约版本。 */
   version_field: VersionSchema,
-})
+}))
 export type IndustryManifest = z.infer<typeof IndustryManifestSchema>

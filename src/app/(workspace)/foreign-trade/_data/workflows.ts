@@ -1,3 +1,5 @@
+// ⚠️ STATIC FALLBACK — 正常路径应通过 GET /api/industry/foreign-trade/capabilities 获取
+// 仅作为 API 不可用时的降级数据，不应新增业务字段到此处
 /**
  * 外贸工作流静态数据源
  * 作为工作流入口卡片的唯一数据来源
