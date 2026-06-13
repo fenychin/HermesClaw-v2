@@ -4,19 +4,17 @@
  * 开发阶段使用，模拟 OpenClaw API 的响应行为。
  * 当 ADAPTER_CONFIG.openclaw.useMock 为 true 时自动启用。
  *
- * ★ 已集成事件发射器：任务执行时通过 emitOpenClawEvent 广播实时事件，
- *   替换原有的假状态直接返回模式。SSE 端点 /api/openclaw/events 可订阅这些事件。
- *
- * TODO: 生产环境替换为真实 OpenClaw API 调用，届时删除本文件
- * TODO: 模拟失败率/失败原因类型应抽取为可配置项（环境变量 / 配置文件）
+ * ★ 已集成事件发射器：任务执行时通过 emitExecutionEvent 广播实时事件，
+ *   SSE 端点 /api/openclaw/events 可订阅这些事件。
  */
 import type {
   OpenClawTaskResult,
   OpenClawConnectorStatus,
   OpenClawSyncResult,
 } from './types'
-import { emitOpenClawEvent } from './event-emitter'
+import { emitExecutionEvent } from './event-emitter'
 import { writeAgentLog } from '@/lib/server/agent-log'
+import { EXECUTION_EVENT_VERSION } from '@/contracts/execution-event'
 
 /** 模拟任务执行延迟范围（毫秒） */
 const MOCK_TASK_DELAY_MIN = 400
@@ -41,8 +39,7 @@ const FAILURE_REASONS = [
 ]
 
 /**
- * 模拟任务执行：通过事件发射器广播实时状态变更，
- * 替代原有的假状态直接返回。
+ * 模拟任务执行：通过事件发射器广播实时状态变更。
  *
  * 遵守 AGENTS.md §4.4 闭环反馈与 §5 "无日志禁止静默执行"：
  * —— 每次任务执行均写入 AgentLog。
@@ -52,15 +49,29 @@ async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
   const taskId = req.taskId ?? `mock-task-${Date.now()}`
   const taskName = (req.inputs?.taskName as string) ?? '未命名任务'
   const agentId = (req.inputs?.agentId as string) ?? 'mock-agent'
+  const workflowRunId = (req.inputs?.workflowRunId as string) ?? `mock-run-${Date.now()}`
   const shouldFail = Math.random() < MOCK_TASK_FAILURE_RATE
   const startTime = Date.now()
   const elapsed = () => `${((Date.now() - startTime) / 1000).toFixed(1)}s`
 
   // 1. 广播任务开始事件 + 写入运行日志
-  emitOpenClawEvent(agentId, {
-    type: 'task:started',
-    payload: { taskId, taskName, progress: 0 },
+  emitExecutionEvent({
+    eventId: `evt-${crypto.randomUUID()}`,
+    taskId,
+    workflowRunId,
+    runtimeId: 'openclaw-mock-runtime',
+    eventType: 'tool.call.started',
+    status: 'started',
+    timestamp: new Date().toISOString(),
+    payload: {
+      taskId,
+      taskName,
+      progress: 0,
+      agentId,
+    },
+    version: EXECUTION_EVENT_VERSION,
   })
+
   await writeAgentLog({
     agentId,
     source: 'agent',
@@ -76,15 +87,23 @@ async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
   for (let i = 1; i <= steps; i++) {
     await new Promise((resolve) => setTimeout(resolve, Math.floor(delay / steps)))
     try {
-      emitOpenClawEvent(agentId, {
-        type: 'task:progress',
+      emitExecutionEvent({
+        eventId: `evt-${crypto.randomUUID()}`,
+        taskId,
+        workflowRunId,
+        runtimeId: 'openclaw-mock-runtime',
+        eventType: 'tool.call.started',
+        status: 'progress',
+        timestamp: new Date().toISOString(),
         payload: {
           taskId,
           taskName,
           progress: Math.round((i / steps) * 90), // 留 10% 给最终完成
           step: i,
           totalSteps: steps,
+          agentId,
         },
+        version: EXECUTION_EVENT_VERSION,
       })
     } catch {
       // 事件广播失败不阻断模拟执行主流程
@@ -104,15 +123,22 @@ async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
     }
 
     try {
-      emitOpenClawEvent(agentId, {
-        type: 'task:failed',
+      emitExecutionEvent({
+        eventId: `evt-${crypto.randomUUID()}`,
+        taskId,
+        workflowRunId,
+        runtimeId: 'openclaw-mock-runtime',
+        eventType: 'tool.call.failed',
+        status: 'failed',
+        timestamp: new Date().toISOString(),
         payload: {
           taskId,
           taskName,
-          progress: Math.round((steps / (steps + 1)) * 90),
           error: failureReason,
           durationMs: delay,
+          agentId,
         },
+        version: EXECUTION_EVENT_VERSION,
       })
     } catch {
       console.warn(`[OpenClaw Mock] 失败事件广播失败 (taskId=${taskId})`)
@@ -136,7 +162,6 @@ async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
     status: 'succeeded',
     outputs: {
       summary: `模拟任务「${taskName}」执行完成`,
-      // TODO: 魔术数字 — processedItems 与 quality 应从任务定义中派生，或作为 inputs 传入
       processedItems: 42,
       quality: 'high',
       timestamp: new Date().toISOString(),
@@ -146,15 +171,23 @@ async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
   }
 
   try {
-    emitOpenClawEvent(agentId, {
-      type: 'task:completed',
+    emitExecutionEvent({
+      eventId: `evt-${crypto.randomUUID()}`,
+      taskId,
+      workflowRunId,
+      runtimeId: 'openclaw-mock-runtime',
+      eventType: 'tool.call.completed',
+      status: 'completed',
+      timestamp: new Date().toISOString(),
       payload: {
         taskId,
         taskName,
         progress: 100,
         summary: result.outputs?.summary,
         durationMs: delay,
+        agentId,
       },
+      version: EXECUTION_EVENT_VERSION,
     })
   } catch {
     console.warn(`[OpenClaw Mock] 完成事件广播失败 (taskId=${taskId})`)
@@ -178,7 +211,7 @@ async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
  */
 const mockHandlers: Record<string, (body: unknown) => unknown | Promise<unknown>> = {
   '/tasks/execute': (body) => {
-    // 外层 try/catch：确保 emitOpenClawEvent 的序列化异常不会导致 handle 抛出未捕获 rejection
+    // 外层 try/catch：确保 emitExecutionEvent 的序列化异常不会导致 handle 抛出未捕获 rejection
     try {
       return mockExecuteTask(body)
     } catch (error) {
@@ -246,3 +279,4 @@ export const openclawMock = {
     return handler(body)
   },
 }
+

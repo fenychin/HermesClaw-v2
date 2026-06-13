@@ -2,13 +2,13 @@
  * OpenClaw Adapter 统一出口
  *
  * 使用方式：
- *   import { openclawClient, emitOpenClawEvent } from '@/lib/server/adapters/openclaw'
- *   import type { OpenClawTaskResult } from '@/lib/server/adapters/openclaw'
+ *   import { openclawClient, emitExecutionEvent } from '@/lib/server/adapters/openclaw'
  */
 
 export { openclawClient } from './client'
 
 export {
+  emitExecutionEvent,
   emitOpenClawEvent,
   subscribeOpenClawEvents,
   unsubscribeOpenClawEvents,
@@ -17,7 +17,6 @@ export {
 } from './event-emitter'
 
 export type {
-  OpenClawEvent,
   EventSubscriptionFilter,
 } from './event-emitter'
 
@@ -31,3 +30,4 @@ export type {
   OpenClawSyncResult,
   OpenClawSyncStatus,
 } from './types'
+

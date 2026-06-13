@@ -13,6 +13,7 @@ import { successResponse, errorResponse } from "@/lib/api-utils"
 import { createAuditEntry, updateAuditEntry, writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { createEmailConnector } from "@/lib/server/connectors/email/email-connector"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
+import { writeAgentLog } from "@/lib/server/agent-log"
 
 export const runtime = "nodejs"
 
@@ -89,6 +90,7 @@ export async function POST(request: Request) {
   })
 
   const connector = createEmailConnector()
+  const startTime = Date.now()
 
   try {
     const result = await connector.send({
@@ -105,11 +107,23 @@ export async function POST(request: Request) {
       })),
     })
 
+    const duration = `${((Date.now() - startTime) / 1000).toFixed(1)}s`
+
     if (!result.ok) {
       logger.error("Email send: 发送失败", {
         to,
         subject,
         error: result.error,
+      })
+
+      // 写入连接器运行日志（用作成功率评估输入）
+      void writeAgentLog({
+        source: "connector",
+        taskName: "Email SMTP 发信",
+        status: "failed",
+        duration,
+        detail: `发送失败至 ${to}: ${result.error}`,
+        riskLevel: "medium",
       })
 
       // 发送失败 → 更新预记录为 failed + 补充失败日志
@@ -130,6 +144,16 @@ export async function POST(request: Request) {
 
       return errorResponse(`邮件发送失败: ${result.error}`, 502)
     }
+
+    // 写入连接器运行日志（用作成功率评估输入）
+    void writeAgentLog({
+      source: "connector",
+      taskName: "Email SMTP 发信",
+      status: "success",
+      duration,
+      detail: `已发送至 ${to}：主题: ${subject}`,
+      riskLevel: "medium",
+    })
 
     // 发送成功 → 更新预记录为 success
     await updateAuditEntry({
@@ -155,10 +179,21 @@ export async function POST(request: Request) {
       message: "邮件已发送",
     })
   } catch (error) {
+    const duration = `${((Date.now() - startTime) / 1000).toFixed(1)}s`
     const message =
       error instanceof Error ? error.message : "发送异常"
 
     logger.error("Email send: 异常", { error: message })
+
+    // 写入连接器运行日志（用作成功率评估输入）
+    void writeAgentLog({
+      source: "connector",
+      taskName: "Email SMTP 发信",
+      status: "failed",
+      duration,
+      detail: `发送异常: ${message}`,
+      riskLevel: "medium",
+    })
 
     // 发送异常 → 更新预记录为 failed
     await updateAuditEntry({
@@ -181,3 +216,4 @@ export async function POST(request: Request) {
     await connector.dispose()
   }
 }
+

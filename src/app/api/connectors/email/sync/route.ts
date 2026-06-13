@@ -13,6 +13,7 @@ import { createAuditEntry, updateAuditEntry, writeAuditLog, actorFromSession } f
 import { createEmailConnector } from "@/lib/server/connectors/email/email-connector"
 import { parseInquiriesFromEmails } from "@/lib/server/connectors/email/inquiry-parser"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
+import { writeAgentLog } from "@/lib/server/agent-log"
 
 export const runtime = "nodejs"
 
@@ -40,10 +41,22 @@ export async function POST(request: Request) {
   })
 
   const connector = createEmailConnector()
+  const startTime = Date.now()
 
   try {
     // ① 拉取未读邮件
     const emails = await connector.fetchUnseen(50)
+    const duration = `${((Date.now() - startTime) / 1000).toFixed(1)}s`
+
+    // 记录连接器运行日志（用于评估连接器成功率）
+    void writeAgentLog({
+      source: "connector",
+      taskName: "Email IMAP 收信",
+      status: "success",
+      duration,
+      detail: `拉取 ${emails.length} 封未读邮件`,
+    })
+
     logger.info("Email sync: 拉取完成", { count: emails.length, actor })
 
     if (emails.length === 0) {
@@ -88,9 +101,19 @@ export async function POST(request: Request) {
         uids.push(email.uid)
         synced++
       } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : "未知错误"
         logger.error("Email sync: Inquiry 写入失败", {
           subject: email.subject,
-          error: err instanceof Error ? err.message : "未知错误",
+          error: errorMsg,
+        })
+
+        // 记录局部失败至 AgentLog 以补强可观测性
+        void writeAgentLog({
+          source: "connector",
+          taskName: "Email 询盘入库",
+          status: "failed",
+          duration: "0s",
+          detail: `询盘入库失败 (邮件主题: ${email.subject.slice(0, 50)}): ${errorMsg}`,
         })
         // 单条失败不阻断整体流程
       }
@@ -123,9 +146,19 @@ export async function POST(request: Request) {
       message: `成功入库 ${synced} 条询盘`,
     })
   } catch (error) {
+    const duration = `${((Date.now() - startTime) / 1000).toFixed(1)}s`
     const message =
       error instanceof Error ? error.message : "同步失败"
     logger.error("Email sync: 失败", { error: message })
+
+    // 记录连接器运行日志（用于评估连接器成功率）
+    void writeAgentLog({
+      source: "connector",
+      taskName: "Email IMAP 收信",
+      status: "failed",
+      duration,
+      detail: `IMAP 拉取失败: ${message}`,
+    })
 
     // 同步失败 → 更新预记录为 failed + 补充失败日志
     await updateAuditEntry({
@@ -148,3 +181,4 @@ export async function POST(request: Request) {
     await connector.dispose()
   }
 }
+
