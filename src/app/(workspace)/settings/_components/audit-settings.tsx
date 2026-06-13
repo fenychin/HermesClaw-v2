@@ -1,8 +1,17 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ScrollText, Search, Filter, ChevronDown, RefreshCw, AlertCircle } from "lucide-react";
+import {
+  ScrollText,
+  Search,
+  Filter,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+  AlertCircle,
+} from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
 import { SkeletonList } from "@/components/common/skeleton-list";
@@ -44,43 +53,55 @@ function formatTime(iso: string): string {
 }
 
 export function AuditSettings() {
+  const [searchText, setSearchText] = useState("");
   const [filterText, setFilterText] = useState("");
   const [riskFilter, setRiskFilter] = useState<string>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const limit = 20;
+
+  // 搜索关键字输入防抖 (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilterText(searchText);
+      setPage(1); // 搜索词变更时，重置到第一页
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchText]);
 
   const {
-    data: logs = [],
+    data,
     isLoading,
     isError,
     error,
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ["audit-logs"],
+    queryKey: ["audit-logs", page, filterText, riskFilter],
     queryFn: async () => {
-      const data = await apiClient.getAuditLogs(200);
-      return (data.logs ?? []) as AuditLogEntry[];
+      const params = {
+        page,
+        limit,
+        query: filterText.trim() || undefined,
+        riskLevel: riskFilter !== "all" ? riskFilter : undefined,
+      };
+      const res = await apiClient.getAuditLogs(params);
+      return {
+        logs: (res.logs ?? []) as AuditLogEntry[],
+        total: res.total ?? 0,
+      };
     },
-    staleTime: 30_000,
+    staleTime: 10_000,
   });
 
-  const filteredLogs = useMemo(() => {
-    let result = logs;
-    if (riskFilter !== "all") {
-      result = result.filter((l) => l.riskLevel === riskFilter);
-    }
-    if (filterText.trim()) {
-      const q = filterText.toLowerCase();
-      result = result.filter(
-        (l) =>
-          l.action.toLowerCase().includes(q) ||
-          l.actor.toLowerCase().includes(q) ||
-          l.targetType.toLowerCase().includes(q) ||
-          (l.detail ?? "").toLowerCase().includes(q),
-      );
-    }
-    return result;
-  }, [logs, riskFilter, filterText]);
+  const logs = data?.logs ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.ceil(total / limit);
+
+  const handleRiskChange = (val: string) => {
+    setRiskFilter(val);
+    setPage(1); // 筛选条件变更时，重置到第一页
+  };
 
   if (isError && logs.length === 0) {
     return (
@@ -105,7 +126,7 @@ export function AuditSettings() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full pb-6">
       {/* 顶部工具栏 */}
       <div className="flex items-center gap-3 mb-5 shrink-0">
         {/* 搜索框 */}
@@ -113,8 +134,8 @@ export function AuditSettings() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-hint" />
           <input
             type="text"
-            value={filterText}
-            onChange={(e) => setFilterText(e.target.value)}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
             placeholder="搜索动作 / 操作者 / 目标类型…"
             className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-hint focus:outline-none focus:ring-2 focus:ring-ring/40 transition-colors"
           />
@@ -125,12 +146,12 @@ export function AuditSettings() {
           <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-hint pointer-events-none" />
           <select
             value={riskFilter}
-            onChange={(e) => setRiskFilter(e.target.value)}
+            onChange={(e) => handleRiskChange(e.target.value)}
             className="appearance-none bg-background border border-border rounded-lg pl-7.5 pr-8 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 transition-colors cursor-pointer"
           >
             <option value="all">全部风险</option>
             <option value="low">低风险</option>
-            <option value="mid">中风险</option>
+            <option value="medium">中风险</option>
             <option value="high">高风险</option>
           </select>
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-3.5 text-hint pointer-events-none" />
@@ -149,7 +170,7 @@ export function AuditSettings() {
 
         {/* 总数 */}
         <span className="text-hint text-xs ml-auto">
-          共 {filteredLogs.length} 条{filteredLogs.length !== logs.length ? ` / ${logs.length}` : ""}
+          共 {total} 条
         </span>
       </div>
 
@@ -159,15 +180,15 @@ export function AuditSettings() {
           <SkeletonList count={8}>
             {() => <div className="h-14 bg-accent/40 rounded-xl animate-pulse" />}
           </SkeletonList>
-        ) : filteredLogs.length === 0 ? (
+        ) : logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <ScrollText className="size-10 text-hint mb-3" />
             <p className="text-muted-foreground text-sm">
-              {filterText || riskFilter !== "all" ? "无匹配的审计记录" : "暂无审计日志"}
+              {searchText || riskFilter !== "all" ? "无匹配的审计记录" : "暂无审计日志"}
             </p>
           </div>
         ) : (
-          filteredLogs.map((log) => (
+          logs.map((log) => (
             <button
               key={log.id}
               type="button"
@@ -268,6 +289,31 @@ export function AuditSettings() {
           ))
         )}
       </div>
+
+      {/* 分页控制 */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-5 shrink-0">
+          <button
+            type="button"
+            disabled={page === 1}
+            onClick={() => setPage((p) => Math.max(p - 1, 1))}
+            className="inline-flex items-center justify-center size-8 rounded-lg border border-border bg-card hover:bg-accent disabled:opacity-40 transition-colors"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          <span className="text-xs text-muted-foreground select-none">
+            第 {page} / {totalPages} 页 (共 {total} 条)
+          </span>
+          <button
+            type="button"
+            disabled={page === totalPages}
+            onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+            className="inline-flex items-center justify-center size-8 rounded-lg border border-border bg-card hover:bg-accent disabled:opacity-40 transition-colors"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

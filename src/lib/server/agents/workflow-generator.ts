@@ -50,6 +50,12 @@ export interface WorkflowGenerateInput {
   intent: string
   /** 行业上下文 */
   industryContext: string
+  /** 当前操作者，默认为 "system" */
+  actor?: string
+  /** 工作空间 ID，默认为 "default" */
+  workspaceId?: string
+  /** 预生成的工作流 ID */
+  workflowId?: string
 }
 
 /** 生成结果 */
@@ -383,35 +389,17 @@ export async function generateWorkflow(
   }
 
   // 写入 DB：状态为 'draft'（符合 AGENTS.md L3 约束，不可直接执行）
-  const workflowId = crypto.randomUUID()
+  const workflowId = input.workflowId ?? crypto.randomUUID()
   const created = await prisma.workflow.create({
     data: {
       id: workflowId,
+      workspaceId: input.workspaceId ?? "default",
       name: workflowName,
       description: JSON.stringify(schema.metadata),
       status: "draft",
       nodes: stringifyJsonField(schema.nodes),
       edges: stringifyJsonField(schema.edges),
     },
-  })
-
-  // 审计日志（AGENTS.md §5 #3：任何执行须留下可溯源记录）
-  const auditDetail = JSON.stringify({
-    provider,
-    model,
-    nodeCount: schema.nodes.length,
-    edgeCount: schema.edges.length,
-    industry: schema.metadata.industry,
-    sensitiveWarnings: sensitiveWarnings.length > 0 ? sensitiveWarnings : undefined,
-  })
-  await writeAuditLog({
-    actor: "system",
-    action: "workflow.generate",
-    targetType: "workflow",
-    targetId: created.id,
-    detail: auditDetail,
-    riskLevel: "low",
-    workspaceId: "default",
   })
 
   logger.info("WorkflowGenerator 生成成功", {

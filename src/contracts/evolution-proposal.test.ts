@@ -100,11 +100,7 @@ describe("EvolutionProposal（AGENTS §3.3 演化提案）", () => {
   })
 
   it("可选字段缺失仍通过", () => {
-    const minimal = { ...valid }
-    delete minimal.harnessProposalId
-    delete minimal.evaluationMetrics
-    delete minimal.reportMd
-    delete minimal.previousState
+    const { harnessProposalId, evaluationMetrics, reportMd, previousState, ...minimal } = valid
     expect(() => EvolutionProposalSchema.parse(minimal)).not.toThrow()
   })
 
