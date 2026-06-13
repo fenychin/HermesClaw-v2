@@ -6,13 +6,6 @@
  * 绝不在 'use client' 组件中导入。
  */
 
-function requireEnv(key: string): string {
-  const value = process.env[key];
-  if (!value || value.trim() === "") {
-    throw new Error(`缺少必需的环境变量: ${key}`);
-  }
-  return value;
-}
 
 /**
  * 运行时验证——在 API route handler 内部调用，确保关键变量已配置。

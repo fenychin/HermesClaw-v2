@@ -1,0 +1,11 @@
+{
+  "summaryId": "sum_fixture_1",
+  "taskId": "task_fixture_1",
+  "workflowRunId": "run_fixture_1",
+  "finalStatus": "completed",
+  "startedAt": "2026-06-13T10:00:00Z",
+  "completedAt": "2026-06-13T10:00:06Z",
+  "eventCount": 4,
+  "receiptHashes": ["sha256:def456"],
+  "version": "1.0.0"
+}

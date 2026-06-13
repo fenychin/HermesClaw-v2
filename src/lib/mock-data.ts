@@ -41,6 +41,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"subject":"string","body":"string","abVersion":"string","confidence":"number"}',
     usedByAgents: ['agent-001', 'agent-007'],
     scenarios: ['新客户触达', '展会后续跟进', '沉睡客户激活'],
+    automationLevel: 'L2',
     updatedAt: '2026-05-20T10:30:00Z',
   },
   {
@@ -55,6 +56,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"intent":"string","priority":"string","genuineScore":"number","recommendedReply":"string"}',
     usedByAgents: ['agent-002', 'agent-007'],
     scenarios: ['询盘初筛', 'B2B 平台询盘处理', '邮件询盘分类'],
+    automationLevel: 'L2',
     updatedAt: '2026-06-01T08:15:00Z',
   },
   {
@@ -69,6 +71,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"unitPrice":"number","totalAmount":"number","validityDays":"number","termsText":"string"}',
     usedByAgents: ['agent-004'],
     scenarios: ['FOB 报价', 'CIF 报价', '阶梯报价', '样品报价'],
+    automationLevel: 'L2',
     updatedAt: '2026-05-28T14:00:00Z',
   },
   {
@@ -83,6 +86,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"profile":"object","persona":"string","buyingSignals":"array","riskFlags":"array"}',
     usedByAgents: ['agent-003', 'agent-007'],
     scenarios: ['新客户建档', '老客户画像更新', '流失预警'],
+    automationLevel: 'L2',
     updatedAt: '2026-04-15T09:00:00Z',
   },
   {
@@ -97,6 +101,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"category":"string","sentiment":"string","assignedAgent":"string","priority":"string"}',
     usedByAgents: ['agent-010'],
     scenarios: ['日常邮件分拣', '大促期间邮件洪峰', '多语种邮件路由'],
+    automationLevel: 'L2',
     updatedAt: '2026-05-10T16:45:00Z',
   },
   {
@@ -111,6 +116,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"report":"string","keyFindings":"array","charts":"array","recommendations":"array"}',
     usedByAgents: ['agent-006'],
     scenarios: ['新市场进入评估', '季度市场复盘', '竞品动态监控'],
+    automationLevel: 'L2',
     updatedAt: '2026-03-22T11:00:00Z',
   },
   {
@@ -125,6 +131,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"riskItems":"array","missingClauses":"array","overallScore":"number"}',
     usedByAgents: ['agent-008'],
     scenarios: ['销售合同审查', '采购合同审查', '代理协议审查'],
+    automationLevel: 'L2',
     updatedAt: '2026-02-18T13:30:00Z',
   },
   {
@@ -139,6 +146,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"translated":"string","confidence":"number","termMapping":"object"}',
     usedByAgents: ['agent-001', 'agent-004', 'agent-007'],
     scenarios: ['产品描述翻译', '邮件翻译', '合同双语对照'],
+    automationLevel: 'L2',
     updatedAt: '2026-05-05T07:00:00Z',
   },
   {
@@ -153,6 +161,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"title":"string","description":"string","bulletPoints":"array","keywords":"array"}',
     usedByAgents: ['agent-005'],
     scenarios: ['阿里巴巴产品发布', '亚马逊 Listing', '独立站产品页'],
+    automationLevel: 'L2',
     updatedAt: '2026-04-08T10:00:00Z',
   },
   {
@@ -167,6 +176,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"leads":"array","hotLeads":"array","followUpSchedule":"array","summary":"string"}',
     usedByAgents: ['agent-009'],
     scenarios: ['广交会线索整理', '海外展会跟进', '线上展会线索提取'],
+    automationLevel: 'L2',
     updatedAt: '2026-05-12T15:20:00Z',
   },
   {
@@ -181,6 +191,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"status":"array","anomalies":"array","suggestions":"array","onTimeRate":"number"}',
     usedByAgents: ['agent-003'],
     scenarios: ['海运追踪', '空运追踪', '多式联运监控'],
+    automationLevel: 'L2',
     updatedAt: '2026-06-03T09:45:00Z',
   },
   {
@@ -195,6 +206,7 @@ export const mockSkills: Skill[] = [
     outputSchema: '{"priceChanges":"array","promotions":"array","trendAnalysis":"string"}',
     usedByAgents: ['agent-006'],
     scenarios: ['竞品定价跟踪', '促销季价格策略', '新品市场定价参考'],
+    automationLevel: 'L2',
     updatedAt: '2026-05-30T12:00:00Z',
   },
 ]
@@ -442,6 +454,7 @@ export const mockAgents: Agent[] = [
     bindConnectors: ['conn-001', 'conn-014'],
     memoryPermission: 'read-write',
     harnessVersion: '2.1.3',
+    automationLevel: 'L2',
     canDo: ['撰写多语种开发信', 'A/B 版本对比测试', '调用客户画像数据', '记录触达结果到中期记忆'],
     cannotDo: ['直接发送未经人工审核的邮件', '修改客户核心数据', '调用支付相关连接器'],
     stats: { todayTasks: 23, successRate: 0.94, avgDuration: '2m 18s' },
@@ -460,6 +473,7 @@ export const mockAgents: Agent[] = [
     bindConnectors: ['conn-001', 'conn-004', 'conn-017'],
     memoryPermission: 'read-write',
     harnessVersion: '2.0.1',
+    automationLevel: 'L1',
     canDo: ['分析入站询盘意图', '评分与优先级排序', '检测虚假询盘模式', '自动分配至对应销售'],
     cannotDo: ['直接回复客户', '修改报价数据', '访问 ERP 财务模块'],
     stats: { todayTasks: 47, successRate: 0.91, avgDuration: '45s' },
@@ -478,6 +492,7 @@ export const mockAgents: Agent[] = [
     bindConnectors: ['conn-001', 'conn-005', 'conn-007', 'conn-008'],
     memoryPermission: 'read-write',
     harnessVersion: '2.0.5',
+    automationLevel: 'L2',
     canDo: ['管理客户跟进周期', '生成个性化跟进内容', '客户流失预警', '同步跟进记录至 CRM'],
     cannotDo: ['修改合同条款', '自行决定报价折扣', '删除客户记录'],
     stats: { todayTasks: 18, successRate: 0.88, avgDuration: '3m 05s' },
@@ -496,6 +511,7 @@ export const mockAgents: Agent[] = [
     bindConnectors: ['conn-002', 'conn-008', 'conn-010', 'conn-018', 'conn-019'],
     memoryPermission: 'read-write',
     harnessVersion: '2.2.0',
+    automationLevel: 'L3',
     canDo: ['多币种报价计算', '阶梯数量报价', '报价版本管理', '调用实时汇率与运费数据'],
     cannotDo: ['绕过审批直接发送报价', '修改底价策略', '自行决定付款条款'],
     stats: { todayTasks: 12, successRate: 0.96, avgDuration: '4m 30s' },
@@ -514,6 +530,7 @@ export const mockAgents: Agent[] = [
     bindConnectors: ['conn-004', 'conn-013', 'conn-014', 'conn-015'],
     memoryPermission: 'read',
     harnessVersion: '2.0.2',
+    automationLevel: 'L2',
     canDo: ['生成多平台产品描述', '产品资料版本管理', '从技术文档提取产品参数', '管理产品图片与附件'],
     cannotDo: ['修改产品定价', '发布至未经审核的平台', '删除已归档产品资料'],
     stats: { todayTasks: 8, successRate: 0.92, avgDuration: '5m 12s' },
@@ -532,6 +549,7 @@ export const mockAgents: Agent[] = [
     bindConnectors: ['conn-010', 'conn-013', 'conn-016', 'conn-018'],
     memoryPermission: 'read-write',
     harnessVersion: '2.1.0',
+    automationLevel: 'L1',
     canDo: ['采集行业与竞品数据', '生成市场周报/月报', '识别市场机会与风险', '生成情报分发建议'],
     cannotDo: ['执行交易操作', '修改客户数据', '对外发布未经审阅的情报'],
     stats: { todayTasks: 5, successRate: 0.95, avgDuration: '12m 40s' },
@@ -550,6 +568,7 @@ export const mockAgents: Agent[] = [
     bindConnectors: ['conn-002', 'conn-005', 'conn-007', 'conn-008', 'conn-017', 'conn-019'],
     memoryPermission: 'read-write',
     harnessVersion: '2.3.1',
+    automationLevel: 'L2',
     canDo: ['全流程销售辅助', '协调各专项智能体', '汇总客户全渠道互动记录', '销售预测与建议'],
     cannotDo: ['直接签署合同', '单独决定大额折扣', '绕过合规审查流程'],
     stats: { todayTasks: 31, successRate: 0.89, avgDuration: '5m 50s' },
@@ -568,6 +587,7 @@ export const mockAgents: Agent[] = [
     bindConnectors: ['conn-016'],
     memoryPermission: 'read',
     harnessVersion: '1.9.2',
+    automationLevel: 'L3',
     canDo: ['审查合同风险条款', '评估客户信用风险', '检查贸易合规性', '出具风险报告供审批'],
     cannotDo: ['自行决定通过/驳回交易', '修改合同条款', '绕过法务审批流程'],
     stats: { todayTasks: 3, successRate: 0.97, avgDuration: '18m 20s' },
@@ -586,6 +606,7 @@ export const mockAgents: Agent[] = [
     bindConnectors: ['conn-008', 'conn-013'],
     memoryPermission: 'read-write',
     harnessVersion: '1.5.0',
+    automationLevel: 'L1',
     canDo: ['整理展会碎片化信息', '线索结构化与评分', '生成跟进计划', '关联已有客户画像'],
     cannotDo: ['自行联系客户', '修改客户主数据', '外发展会报告'],
     stats: { todayTasks: 0, successRate: 0.86, avgDuration: '8m 00s' },
@@ -604,6 +625,7 @@ export const mockAgents: Agent[] = [
     bindConnectors: ['conn-001'],
     memoryPermission: 'read-write',
     harnessVersion: '1.8.0',
+    automationLevel: 'L1',
     canDo: ['自动分类入站邮件', '按规则路由至对应处理人/Agent', '垃圾邮件过滤', '生成邮件处理报表'],
     cannotDo: ['阅读标记为私密的邮件', '删除邮件', '修改邮件规则（需审批）'],
     stats: { todayTasks: 156, successRate: 0.98, avgDuration: '8s' },
@@ -909,17 +931,22 @@ export const mockHarnessProposals: HarnessProposal[] = [
     id: 'hep-001',
     proposalId: 'HEP-20260601-001',
     triggeredBy: 'auto',
+    triggerReason: '假阳性率偏高',
     problemStatement: '询盘分拣员（agent-002）在过去 7 天中共处理 320 条询盘，其中 12 条被标记为虚假询盘但实际为真实客户（假阳性率 3.75%），高于 2% 的阈值。虚假询盘检测模型的置信度阈值需要微调。',
     evidence: [
       '6 月 1 日：尼日利亚客户 Lifemate 被误判为虚假询盘，实际为当地知名连锁',
       '6 月 3 日：印尼客户两次询盘被标记，手动复核确认真实',
       'agent-002 上周假阳性率从 1.8% 升至 3.75%',
     ],
-    targetComponent: '任务边界 — 询盘分析技能（skill-002）的虚假询盘检测阈值',
-    proposedChange: '将虚假询盘判定置信度阈值从 0.80 调整为 0.75，同时新增西非与东南亚地区的"白名单域名"规则，对来自企业域名的询盘降低可疑权重',
-    riskLevel: 'low',
-    automationLevel: 'L1',
-    requiresApproval: true,
+    proposedChange: {
+      targetComponent: '任务边界',
+      description: '将虚假询盘判定置信度阈值从 0.80 调整为 0.75，同时新增西非与东南亚地区的"白名单域名"规则，对来自企业域名的询盘降低可疑权重',
+      riskLevel: 'low',
+      automationLevel: 'L1',
+    },
+    requiresHumanApproval: true,
+    affectedAgents: ['agent-002'],
+    rollbackPlan: '恢复置信度阈值为 0.80，移除白名单规则',
     status: 'approved',
     estimatedImpact: '预计假阳性率可降至 2% 以下，不影响真阳性检出率；影响约 5% 的低置信度询盘路由路径',
     createdAt: '2026-06-01T08:00:00Z',
@@ -930,6 +957,7 @@ export const mockHarnessProposals: HarnessProposal[] = [
     id: 'hep-002',
     proposalId: 'HEP-20260603-002',
     triggeredBy: 'auto',
+    triggerReason: '渠道跟进回复率下降',
     problemStatement: '客户跟进员（agent-003）在 Whatsapp 渠道的跟进成功率从 4 月的 68% 下降到 5 月的 51%。分析发现 agent-003 的跟进内容模板未适配即时通讯场景——内容过长、语气过于正式，与 WhatsApp 用户期望的简洁沟通风格不匹配。',
     evidence: [
       'WhatsApp 渠道跟进回复率：4 月 68% → 5 月 51%',
@@ -937,11 +965,15 @@ export const mockHarnessProposals: HarnessProposal[] = [
       '对比测试：短版（<100字）消息回复率 72%，长版（>200字）仅 38%',
       '竞品调研：同行在 WhatsApp 上平均消息长度约 80 字',
     ],
-    targetComponent: '上下文供给 — agent-003 的跟进内容生成模板与渠道适配规则',
-    proposedChange: '为 agent-003 新增"渠道感知"能力：自动识别沟通渠道（邮件/WhatsApp/微信），动态调整消息长度与语气风格。同时将中期记忆中沉淀的客户渠道偏好纳入上下文供给链。',
-    riskLevel: 'mid',
-    automationLevel: 'L2',
-    requiresApproval: true,
+    proposedChange: {
+      targetComponent: '上下文供给',
+      description: '为 agent-003 新增"渠道感知"能力：自动识别沟通渠道（邮件/WhatsApp/微信），动态调整消息长度与语气风格。同时将中期记忆中沉淀的客户渠道偏好纳入上下文供给链。',
+      riskLevel: 'medium',
+      automationLevel: 'L2',
+    },
+    requiresHumanApproval: true,
+    affectedAgents: ['agent-003'],
+    rollbackPlan: '恢复原版跟进内容模板，关闭"渠道感知"特性',
     status: 'pending',
     estimatedImpact: '预计 WhatsApp 渠道跟进回复率可回升至 65%+，邮件渠道效率不受影响；需 3-5 天开发 + 1 天回归测试',
     createdAt: '2026-06-03T14:00:00Z',
@@ -950,6 +982,7 @@ export const mockHarnessProposals: HarnessProposal[] = [
     id: 'hep-003',
     proposalId: 'HEP-20260605-003',
     triggeredBy: 'manual',
+    triggerReason: 'API 延迟导致损失风险',
     problemStatement: '报价代理（agent-004）目前使用的汇率数据来源为单一 API（conn-018 XE），近期发现该 API 在亚洲交易时段（UTC+8 上午）存在 5-15 分钟的延迟，导致报价与实际汇率产生偏差。在 6 月 4 日的一次报价中，因汇率延迟导致 CIF 报价比实际成本低了 0.8%，若成交将造成约 $1,200 的汇兑损失。',
     evidence: [
       '6 月 4 日 09:35 报价：XE 汇率 7.1823，实际银行间汇率 7.2410，偏差 0.81%',
@@ -957,11 +990,15 @@ export const mockHarnessProposals: HarnessProposal[] = [
       'agent-004 5 月共生成 67 份报价，其中 4 份因汇率偏差需要事后修正',
       '已确认备用数据源：中国银行外汇牌价 API 实时性更优（北京时间）',
     ],
-    targetComponent: '工具接入 — agent-004 的汇率数据供给链与故障切换策略',
-    proposedChange: '1) 将汇率数据源从单一 XE API 改为双源容灾（XE + 中国银行外汇牌价），增加数据源健康检查；2) 当双源偏差 >0.3% 时自动暂停报价并告警；3) 报价单强制标注汇率基准时间与来源。涉及修改 agent-004 的任务边界（canDo 新增"调用多汇率源交叉验证"）。',
-    riskLevel: 'high',
-    automationLevel: 'L3',
-    requiresApproval: true,
+    proposedChange: {
+      targetComponent: '工具接入',
+      description: '1) 将汇率数据源从单一 XE API 改为双源容灾（XE + 中国银行外汇牌价），增加数据源健康检查；2) 当双源偏差 >0.3% 时自动暂停报价并告警；3) 报价单强制标注汇率基准时间与来源。涉及修改 agent-004 的任务边界（canDo 新增"调用多汇率源交叉验证"）。',
+      riskLevel: 'high',
+      automationLevel: 'L3',
+    },
+    requiresHumanApproval: true,
+    affectedAgents: ['agent-004'],
+    rollbackPlan: '将汇率源切换回单节点 XE API，暂时关闭容灾策略并人工复核报价',
     status: 'pending',
     estimatedImpact: '直接避免汇兑损失，但变更涉及 Agent 任务边界修改（HEP 流程要求）和 connector 注册表更新，需全量回归测试报价生成链路。预计开发 5 天 + 测试 3 天。',
     createdAt: '2026-06-05T11:00:00Z',
@@ -1227,4 +1264,21 @@ export const mockQuotations: Quotation[] = [
     status: 'draft',
     createdAt: '2026-06-02T11:00:00Z',
   },
+]
+
+// ============================================================
+// 汇率 ExchangeRates（外贸页汇率监测卡片种子数据）
+// ============================================================
+export interface ExchangeRateSeed {
+  id: string
+  pair: string
+  value: number
+  change24h: number
+}
+
+export const mockExchangeRates: ExchangeRateSeed[] = [
+  { id: 'rate-001', pair: 'USD/CNY', value: 7.2431, change24h: -0.08 },
+  { id: 'rate-002', pair: 'EUR/CNY', value: 7.8902, change24h: 0.12 },
+  { id: 'rate-003', pair: 'GBP/CNY', value: 9.2156, change24h: 0.05 },
+  { id: 'rate-004', pair: 'JPY/CNY', value: 0.0478, change24h: -0.23 },
 ]
