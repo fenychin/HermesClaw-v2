@@ -14,9 +14,11 @@
 export {
   CONTRACT_VERSION,
   VersionSchema,
+  VersionRangeSchema,
   TimestampSchema,
   IdSchema,
   PayloadSchema,
+  typedPayload,
   AutomationLevelSchema,
   RiskLevelSchema,
   EventTypeSchema,
@@ -28,6 +30,7 @@ export type {
   EventType,
   ExecutionStatus,
   Payload,
+  VersionRange,
 } from "./shared"
 
 // TaskEnvelope

@@ -36,7 +36,7 @@ export const HumanApprovalCheckpointSchema = z.object({
   automationLevel: AutomationLevelSchema,
   /** 触发审批的动作风险等级。 */
   riskLevel: RiskLevelSchema,
-  /** 触发审批的原因说明。 */
+  /** 触发审批的原因说明（应为面向人类审批者的自然语言描述，中文优先，由 Agent 在提案阶段填充）。 */
   reason: z.string().min(1),
   /** 发起请求时刻（ISO-8601）。 */
   requestedAt: TimestampSchema,

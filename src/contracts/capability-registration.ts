@@ -2,6 +2,7 @@ import { z } from "zod"
 import {
   IdSchema,
   RiskLevelSchema,
+  VersionRangeSchema,
   VersionSchema,
 } from "./shared"
 
@@ -13,6 +14,8 @@ export const CAPABILITY_REGISTRATION_VERSION = "1.0.0"
  *
  * Runtime 向 Hermes 注册其可执行的能力（AGENTS §2.2 / CLAUDE §5.1 Runtime capability registration）。
  * Hermes 据此路由动作；不得绕过此注册直接调用未声明能力。
+ *
+ * **设计说明**：能力注册为 Runtime 级，不绑定 Workspace（不同于 ConnectorLease 的租户级授权）。
  */
 export const CapabilityRegistrationSchema = z.object({
   /** 能力唯一 ID。 */
@@ -27,8 +30,8 @@ export const CapabilityRegistrationSchema = z.object({
   connectorIds: z.array(IdSchema).default([]),
   /** 该能力可承载的最高风险等级。 */
   maxRiskLevel: RiskLevelSchema,
-  /** 兼容的 Hermes API 版本（AGENTS §6.x / IndustryPack 兼容性同构）。 */
-  compatibleHermesApi: VersionSchema,
+  /** 兼容的 Hermes API 版本区间（AGENTS §6.3 / IndustryPack 兼容性同构；min ≤ version ≤ max，避免单点匹配导致每次 Hermes 升级都需重注册）。 */
+  compatibleHermesApi: VersionRangeSchema,
   /** 契约版本。 */
   version: VersionSchema,
 })

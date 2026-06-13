@@ -23,7 +23,7 @@ export const ConnectorLeaseSchema = z.object({
   leaseId: IdSchema,
   /** 关联任务 ID。 */
   taskId: IdSchema,
-  /** 租户 / 工作区 ID。 */
+  /** 租户 / 工作区 ID（租约是 Workspace 级授权，见 AGENTS §6.1 RBAC 与租户边界；不同于 CapabilityRegistration 的 Runtime 级作用域）。 */
   workspaceId: IdSchema,
   /** 被租用的连接器 ID。 */
   connectorId: IdSchema,
