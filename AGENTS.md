@@ -1,1193 +1,337 @@
-# AGENTS.md — HermesClaw-v2 项目最高规则文档
+# AGENTS.md — HermesClaw-v3 项目最高规则文档
 
-> **版本**: v2.22.0-alpha  
-> **项目**: HermesClaw-v2（空间项目）  
-> **状态**: 🟢 生效中  
-> **最后更新**: 2026-06-12
+> 版本: v3.0.0  
+> 项目: HermesClaw  
+> 状态: 生效中  
+> 最后更新: 2026-06-12
 
-***
+---
 
 ## 第〇层：元规则（Meta-Rules）
 
-> 本文档是 HermesClaw-v2 的最高行为准则。所有 Agent、子系统、工具链均须以本文档为最终裁决依据。
-> 任何与本文档冲突的局部配置，以本文档为准。
+1. 本文档是 HermesClaw 的最高行为准则，适用于：  
+   - 所有控制内核（Hermes 变体或其他符合规范的控制核）  
+   - 所有执行运行时（OpenClaw 变体或其他符合规范的执行核）  
+   - 所有 Industry Pack、Workflow、Connector、审批流与自动化策略  
 
-***
+2. 任意以下对象，一旦与本文件冲突，均以本文件为准：  
+   - 本仓库内其他文档（含 PRD、CLAUDE.md 等）  
+   - 任意 Prompt / Skill / 行业模板 / 连接器适配层 / 运行时配置  
+   - 上游 Hermes / OpenClaw 工作区中的本地 AGENTS/SOUL/TOOLS 约定  
 
-## 第一章：项目哲学 — AI-First 系统工程
+3. HermesClaw 允许替换控制核与执行核实现（例如：  
+   - 使用 Hermes Agent 作为 Hermes Control Kernel  
+   - 使用 OpenClaw 作为 Execution Runtime  
+   - 或自研内核），前提是必须完整满足本文件的契约、边界与安全治理要求。
 
-### 1.1 核心信条
+4. 组织级 AGENTS.md 与上游工作区 AGENTS/SOUL/TOOLS 的关系：  
+   - 本文件为「组织级 / 多租户级」约束，定义系统级边界。  
+   - 上游 runtime 的 `AGENTS.md / SOUL.md / TOOLS.md / SKILL.md` 视为「节点级实现细则」，可在本规则允许的范围内自由扩展，但不得削弱或绕过本规则。  
+   - 出现冲突时，必须通过配置与兼容层调整上游行为，而不是直接修改本文件。
 
-HermesClaw-v2 是一个 **AI-First 的自演化空间系统工程**，而非传统意义上的"AI 辅助软件"。
+---
 
-- **AI 不是工具，是第一工程主体**：系统的设计、执行、优化均以 AI Agent 为主角，人类工程师扮演策略制定者和最终审批者。
-- **代码是输出，不是核心**：系统的真正价值在于 Harness 结构本身的稳定性与进化能力，代码只是它的一种表达形式。
-- **环境决定表现**：同一个模型，在优质 Harness 和劣质 Harness 中，表现可能相差巨大。HermesClaw-v2 的核心投资在于 Harness 质量，而非模型选型。
+## 第一章：系统重新定义
 
-### 1.2 AI-First 三原则
+### 1.1 一句话定义
 
-| 原则 | 含义 | 违禁行为 |
-|------|------|----------|
-| **主体优先** | Agent 拥有完整执行权，人类不干预过程，只审批边界 | 在 Agent 执行中途强行接管、改写中间状态 |
-| **环境驱动** | 系统行为由 Harness 环境定义，而非硬编码逻辑 | 绕过 Harness 直接调用底层 API |
-| **数据主权** | Agent 的所有决策均须留下可溯源的上下文快照 | 无日志的静默执行 |
+HermesClaw 不是「简单把 Hermes Agent 与 OpenClaw 打包」的工程项目。
 
-***
+HermesClaw 是面向中小企业的 AI 数字员工操作系统，由三大运行域组成：
 
-## 第二章：Harness 核心定义
+- **Hermes Control Kernel**：控制内核，负责意图理解、规划、记忆、编排、策略、治理与进化。  
+- **OpenClaw Execution Runtime**：执行运行时，负责多通道会话、连接器动作、设备协作、现场数据采集与事件回传。  
+- **Industry Pack Layer**：行业插件层，负责行业模板、岗位技能、知识包、工作流模板、指标模型与连接器映射。
 
-### 2.1 什么是 HermesClaw-v2 中的 Harness
+### 1.2 三域原则
 
-> **Harness = 驾驭层**
-> 它是连接模型能力与真实世界交付物之间的全部工程结构。
+- Hermes 不直接承担具体渠道 / 设备的常驻执行职责。  
+- OpenClaw 不拥有最终策略解释权与治理权。  
+- Industry Pack 不得侵入 Hermes / OpenClaw 核心代码，仅通过公开 schema 注入资产。  
+- 任一行业能力必须可装载、可停用、可升级、可回滚。  
+- 所有高风险动作必须经治理门禁，不得因执行便利绕过 Hermes。
 
-**公式**：
+### 1.3 AI-First 再定义
 
-```
-Agent = Model + Harness
-HermesClaw-v2 = ∑(Agent) + 动态进化引擎
-```
+HermesClaw 的 AI-First 不是「AI 直接改代码」，而是：
 
-Harness 不是一段配置文件，不是一套 Prompt 模板。它是一个**有生命的系统**，包含：
+- AI 优先完成：规划 → 执行 → 反馈 → 评估 → 提案。  
+- 人类负责：边界设定 → 审批 → 复盘 → 追责。  
+- 系统进化优先作用于 Harness Runtime 对象（策略 / 工作流 / 记忆 / 连接器策略等），源码变更必须经过人工工程流程。
 
-- 任务边界定义（Agent 能做什么、不能碰什么）
-- 上下文供给链（知识版本化管理）
-- 工具接入层（权限受控、可审计）
-- 反馈闭环（执行结果回流 → 下次决策）
-- 安全护栏（高危操作人工审批）
-- 进化调度器（Harness 自身的升级机制）
+---
 
-### 2.2 静态 Harness vs 动态 Harness
+## 第二章：三域架构与所有权
 
-HermesClaw-v2 **明确拒绝静态 Harness 设计**。
+### 2.1 Hermes Control Kernel
 
-| 维度 | 静态 Harness（禁止） | 动态 Harness（HermesClaw-v2 标准） |
-|------|---------------------|-------------------------------------|
-| 配置方式 | 写死在代码或配置文件中 | 运行时可加载、热更新 |
-| 知识更新 | 需要人工重新部署 | Agent 可自主触发知识库同步 |
-| 规则迭代 | 版本发布才能生效 | 经过审批后实时生效 |
-| 失败响应 | 报错后等待人工处理 | 自动触发降级策略 + 上报 |
-| 进化机制 | 无 | 内置自我评估 + 升级提案 |
+Hermes 是唯一控制内核，拥有以下所有权：
 
-### 2.3 DAG 工作流引擎
-
-HermesClaw-v2 内置轻量级 DAG（有向无环图）任务调度引擎，位于 `src/lib/server/workflow/`，用于编排多步骤工作流。
-
-**设计原则**：
-- **纯编排**：引擎仅负责拓扑排序、分层并行调度、条件分支路由和 handler 分派，不直接依赖 Prisma
-- **审计注入**：所有状态扭转、审计日志、AgentLog 写入通过 `DagEngineHooks` 回调由 dag-runner 注入，引擎自身不写日志
-- **失败不扩散**：节点失败后其直接下游被自动跳过（skipped），非失败分支的独立节点继续执行
-- **可插拔 handler**：节点按 `kind`（task | condition | subworkflow | skill | noop）派发到 handler 注册表，task 类节点由调用方注册真实执行器，skill 节点由内置 `executeSkillNode` 处理
-
-**约束**：
-- **无日志禁止静默执行**：每个节点的 start / finish 至少写入一条 `AgentLog(source='workflow')` + 一条 `AuditLog`
-- **条件分支安全**：仅支持 `ctx.variables.<key> === <value>` 字符串字面比对，**禁止 eval 任意表达式**
-- **子流程嵌套上限**：默认 `maxDepth = 5`，防无限递归
-- **环路检测**：Kahn 拓扑排序阶段检测循环依赖，拒绝执行并记录审计
-- **输出校验**：节点输出经 `guardOutput()` 拦截敏感声明（如「已发送邮件」），拦截不阻断但记录审计
-- **Harness 降级**：任一节点 failed 自动异步触发 `runHarnessEvaluation('auto')`，纳入 72h 评估窗口
-- **节点状态机**：`pending → running → completed | failed | skipped`；失败节点的下游自动划为 skipped
-
-**存储模型**（Prisma）：
-- `Workflow`：工作流定义，`nodes` / `edges` 以 JSON 字符串列存图
-- `WorkflowRun`：一次运行的整体状态（pending → running → completed | failed）
-- `WorkflowNodeRun`：单节点运行记录，承载结构化输入/输出/错误
-
-***
-
-## 第三章：动态 Harness — 自演化架构
-
-这是 HermesClaw-v2 区别于一切传统 Agent 框架的核心能力。
-
-### 3.1 自演化的四个层次
-
-```
-Level 0 — 执行层：Agent 按 Harness 规则完成当前任务
-Level 1 — 反馈层：执行结果回流，更新上下文记忆
-Level 2 — 评估层：系统定期自评，识别 Harness 瓶颈
-Level 3 — 进化层：提交 Harness 升级提案，经审批后部署
-```
-
-- **Level 0-1** 完全自主，无需人工介入。
-- **Level 2** 自主运行，产生评估报告，推送给项目维护者。
-- **Level 3** 必须经由人类审批（Harness 变更不可绕过审批门禁）。
-
-### 3.2 进化触发条件
-
-以下任一条件满足，系统自动进入 Level 2 评估：
-
-- 连续 3 次任务失败（同类型任务）
-- 工具调用成功率低于 85%
-- 上下文供给缺口导致任务中断超过 2 次/天
-- 新工具/新模型接入后首次全量运行完成
-- 人类维护者手动触发（`/harness evaluate`）
-
-### 3.3 进化提案格式（Evolution Proposal）
-
-每一份 Harness 升级提案须包含：
-
-```yaml
-proposal_id: HEP-{timestamp}
-triggered_by: [自动评估 | 手动触发]
-problem_statement: |
-  描述当前 Harness 瓶颈
-evidence:
-  - 失败日志引用
-  - 性能数据
-proposed_change:
-  target_component: [任务边界 | 上下文供给 | 工具接入 | 反馈闭环 | 安全护栏]
-  description: |
-    具体变更内容
-  risk_level: [低 | 中 | 高]
-requires_human_approval: true  # 永远为 true
-estimated_impact: |
-  预期效果描述
-```
-
-***
-
-## 第四章：六大核心组件规范
-
-### 4.0 技能规范（Claude Code Skills 标准）
-
-> ⚠️ **重要声明**：本项目中所有"技能（Skill）"均指 **Claude Code Skills**（遵循 [Agent Skills](https://agentskills.io) 开放标准），
-> **不是**传统意义上的"功能模块"或"微服务"。每个 Skill 都是一个可通过 `/skill-name` 调用的 Claude Code 扩展，
-> 其格式为 YAML frontmatter + Markdown 正文。
-
-- **规范文档**：<https://code.claude.com/docs/zh-CN/skills>
-- **文件格式**：`SKILL.md` = YAML frontmatter（`---` 包裹）+ Markdown 正文
-- **存放位置**：`.claude/skills/<skill-name>/SKILL.md`
-- **命令名称**：目录名即为 `/` 后的调用名（如 `.claude/skills/ft-inquiry-sorter/SKILL.md` → `/ft-inquiry-sorter`）
-- **必选字段**：`description`（Claude 据此自动判定何时加载该 Skill）
-- **任务边界映射**：
-  - Skill 正文 `## 能力清单 (can_do)` → Agent 的 `can_do` 列表
-  - Skill 正文 `## 约束条件 (cannot_do)` → Agent 的 `cannot_do` 列表
-  - Skill 正文 `## 所需工具 / 连接器` → 工具需求声明
-- **自动化授权等级**：Prisma `Skill` 模型新增 `automationLevel` 字段（默认 `L2`），用于 DAG 工作流执行时的门禁控制（§4.7 / §4.13）。种子脚本 `seed-skills.ts` 默认写入 `L2`，特定技能可手动覆写。
-- **数据库镜像**：Prisma `Skill` 表为 Claude Code Skills 的数据库投影：
-  - `inputSchema` 存储 `{ role, capabilities, commandName, allowedTools }`
-  - `outputSchema` 存储 `{ constraints, disableModelInvocation }`
-  - `scenarios` 存储所需工具/连接器列表
-  - `category` 存储 `foreign-trade:{角色名}`
-- **种子脚本**：`prisma/seed-skills.ts` 负责扫描 `.claude/skills/ft-*/SKILL.md`，解析 YAML frontmatter 与 Markdown 正文，幂等同步至 Prisma `Skill` 表
-- **命名约定**：
-  - 外贸行业技能模板统一以 `ft-` 前缀命名，位于 `.claude/skills/ft-*/` 目录下
-  - 未来新增行业须先在本文档登记前缀（如 `fin-` 金融、`med-` 医疗），未经登记的前缀不会被 `seed-skills.ts` 识别
-- **allowed-tools 与 ToolRegistry 的关系**：SKILL.md frontmatter 中的 `allowed-tools` 声明的是 **Claude Code 原生工具**（如 `Read`、`Grep`、`WebFetch`），由 IDE 层管理权限；业务连接器（如 Gmail、CRM）走 Prisma `ToolRegistry` + `ToolGrant` 管理体系（§4.3）。两者是**不同层次的工具体系**，不可混用
-- **数据库映射函数**：`toSkillDbRecord(tmpl)`（`prisma/seed-skills.ts`）是 Claude Code Skills 文件 ↔ Prisma `Skill` 表的**唯一映射桥梁**，`seed-skills.ts` 和 `seed.ts` 均通过此函数写入，禁止在调用方重复序列化逻辑
-- **种子脚本审计豁免**：`prisma/seed-*.ts` 作为开发工具，**豁免 §4.3 审计日志（AuditLog）写入要求**。种子数据填充不视为"系统运行操作"，无需记录审计轨迹。此豁免仅适用于本地开发环境，生产环境的数据变更仍须通过受控 API 执行并记录审计日志
-
-### 4.1 任务边界（Task Boundary）
-
-- **必须声明**：每个 Agent 的 `can_do` 和 `cannot_do` 列表
-- **边界冲突处理**：优先拒绝执行，记录冲突日志，上报维护者
-- **边界热更新**：边界变更须附带 HEP 提案编号
-
-```yaml
-# 示例：空间数据 Agent 的任务边界
-agent_id: spatial-data-agent-v2
-can_do:
-  - 读取空间坐标数据
-  - 执行几何计算
-  - 生成可视化报告（草稿）
-cannot_do:
-  - 直接写入生产数据库
-  - 修改其他 Agent 的配置
-  - 调用未注册工具
-```
-
-### 4.2 上下文供给链（Context Supply Chain）
-
-- 所有知识文档须版本化（`knowledge-base/v{N}/`）
-- Agent 只能引用**当前激活版本**的知识
-- 知识更新须通过 `知识变更日志（KCL）` 记录，不允许静默替换
-- 禁止将关键上下文散落在 Slack、注释、口头约定中
-
-### 4.3 受控工具接入（Controlled Tool Access）
-
-- 所有工具须在 `tools/registry.yaml` 中注册
-- 生产环境工具调用使用**短期 Token**（≤ 1小时有效期）
-- 高危工具（删除、写入生产环境、外部 API 调用）须双重审批
-- 工具调用全程记录至审计日志
-
-### 4.4 闭环反馈（Closed-Loop Feedback）
-
-- Agent 必须接收每次执行的结果快照（日志、状态码、输出摘要）
-- 禁止"盲飞执行"（Agent 发出指令后不检查结果）
-- 反馈数据须结构化存储，供 Level 2 评估使用
-- **AgentLog.riskLevel**：AgentLog 模型新增 `riskLevel` 字段（`low` / `medium` / `high`），Skill 节点执行时由 `automationLevel` 映射填充（L1/L2→low，L3→medium，L4→high），供 Harness 评估引擎按风险分级统计
-- **AgentLogSource 来源枚举**：`agent` / `hermes-chat` / `quick-task` / `hermes-suggestions` / `workflow` / `conversation` / `morning-brief` / `evening-brief` / `weekly-brief`。新增执行来源须在 `src/lib/server/agent-log.ts` 的 `AgentLogSource` 联合类型登记，禁止裸写字符串。
-
-### 4.5 安全护栏（Safety Guardrails）
-
-- **人机切换阈值**：置信度 < 0.7 时，自动暂停并请求人工确认
-- **高危操作门禁**：以下操作永远需要人工审批：
-  - 删除任何持久化数据
-  - 修改 AGENTS.md 本身
-  - 变更另一个 Agent 的任务边界
-  - 外部资金或资源调度
-- 护栏规则本身的变更须经 Level 3 进化流程
-
-### 4.6 进化调度器（Evolution Scheduler）
-
-- 每 72 小时自动运行一次 Level 2 全系统评估
-- 评估报告推送至项目维护者（Markdown 格式）
-- 历史进化记录存档于 `harness/evolution-log/`
-
-### 4.7 自动化授权分级（L1–L4 Automation Levels）
-
-> 本节细化 4.5 安全护栏，为每一个 Agent **业务动作**与每一份 **Harness 升级提案** 标注自动化授权等级。
-> 与第三章「Level 0-3 自演化层次」是**两个不同维度**：Level 0-3 描述 Harness *演化阶段*；L1-L4 描述单次*动作*能否自动执行。两者不可混用。
-
-| 等级 | 含义 | 执行约束 |
-|------|------|----------|
-| **L1** | 全自动执行 | 无需审批，直接执行 |
-| **L2** | 建议执行（默认） | 可自动执行，但系统留痕，事后可审查 |
-| **L3** | 需人工确认 | 高风险操作，必须人工二次确认后才执行，确认后立即生效且不可撤销 |
-| **L4** | 绝对禁止自动 | 系统永不自动执行；必须由人工在源业务系统发起，审批通道亦不得放行 |
-
-- **L4 不可绕过**：任何带密码、带 Token、带二次确认的「自动批准 L4」均属违规——L4 的语义是*禁止自动*，而非*提高自动门槛*。审批 API 对 L4 动作的 `approve` 必须硬拒绝（403）。
-- **L4 规范化拒绝体**：所有治理路由对 L4 动作的拒绝，统一返回 `{ success:false, error:'L4_FORBIDDEN', message:'L4 动作禁止系统自动审批，须在源业务系统人工发起' }`（HTTP 403）。该响应体由 `checkAutomationGate` 统一产出，**禁止在路由层旁路复制 L4 判定/自建拒绝体**（避免与共享门禁逻辑分叉）。
-- **L3 强制二次确认**：审批 API 缺少显式确认时返回 409，前端弹确认对话框，复用 4.5 高危操作护栏机制。
-- **派生规则**：未显式标注 `automationLevel` 的 Harness 提案，按 `riskLevel` 派生（high→L3 / mid→L2 / low→L1）。
-- **统一解析**：`resolveAutomationLevel(automationLevel, riskLevel)` 封装了「显式标注优先，否则派生」的逻辑（`src/types/harness.ts`），供 Route Handler / guardrail / harness-eval 等所有调用方复用。
-- **统一门禁**：`checkAutomationGate({ automationLevel, riskLevel, confirmed, actionName })`（`src/lib/server/guardrail.ts`）封装了 L4 硬拒绝（403）、L3 二次确认拦截（409）的完整判定链，供 approve / reject / rollback 等治理路由复用，避免在多处重复 L4/L3 检查逻辑。其返回结果（`GuardrailResult`）统一携带解析出的 `level` 字段，调用方据此审计/分支（如对 L4 写 `proposal.approve.l4_blocked` 审计），**无需自行重算 `resolveAutomationLevel`**。
-- 授权分级本身的变更须经 HEP 流程（见第七章）。
-- **Agent 模型映射**：Prisma `Agent` 模型新增 `automationLevel` 字段（`String @default("L2")`），对应 AGENTS.md §4.7 L1-L4 等级。创建/更新 Agent 时可在请求体中传入 `automationLevel`（`AgentCreateSchema` / `AgentUpdateSchema` 校验），由 `checkAutomationGate` 在边界变更、回滚等治理路由中统一拦截。
-- **`assertWithinBoundary` 接入 workspaceId**：边界校验函数新增可选 `workspaceId` 参数（默认 `"default"` 向后兼容），内部 Prisma 查询强制带 `workspaceId` 过滤（§4.11 隔离）。
-
-### 4.8 OpenClaw SSE 实时事件管道
-
-> 本节定义 OpenClaw 执行层与 Web 工作台之间的实时事件回传机制，基于 Server-Sent Events（SSE）。
-
-**架构**：
-
-```
-OpenClaw 执行层（mock / 真实 API）
-  ↓ emitOpenClawEvent(agentId, event)
-event-emitter.ts（全局 pub/sub — 单进程内存广播）
-  ↓ enqueue SSE frame → 匹配的 subscriber
-/api/openclaw/events（ReadableStream + text/event-stream）
-  ↓ 客户端 fetch → parseSSEStream()
-useOpenClawStream Hook → Zustand ui-store.agentExecutionStates
-  ↓ 响应式订阅（selector）
-UI 组件（状态指示色）
-```
-
-**事件类型规范**（`OpenClawEvent.type`）：
-
-| 事件 | 含义 | 状态映射 |
-|------|------|----------|
-| `task:started` | 任务开始执行 | `executing` |
-| `task:progress` | 任务执行中（含进度） | `executing` |
-| `task:completed` | 任务执行成功 | `succeeded` |
-| `task:failed` | 任务执行失败 | `failed` |
-| `task:cancelled` | 任务被取消 | `cancelled` |
-| `connector:connected` / `connector:disconnected` / `connector:error` | 连接器状态变更 | — |
-| `heartbeat` | 连接保活（30s 间隔） | — |
-
-**事件广播**：
-- 服务端通过 `emitOpenClawEvent(agentId, event)` 推送至所有匹配的 SSE 订阅者，位于 `src/lib/server/adapters/openclaw/event-emitter.ts`
-- 支持按 `agentId` / `workflowRunId` 过滤订阅
-
-**客户端订阅**：
-- `useOpenClawStream({ agentId })` Hook（`src/hooks/use-openclaw-stream.ts`）自动连接 `/api/openclaw/events` 并更新 Zustand `agentExecutionStates`
-- 断开自动重连（默认 3s 间隔）
-- 通用 SSE 流解析器 `parseSSEStream()` 位于 `src/lib/sse-parser.ts`，供所有 SSE 端点复用
-
-**状态指示色**（遵守 CLAUDE.md 颜色系统）：
-
-| 状态 | CSS 工具类 | 颜色 token |
-|------|-----------|------------|
-| `executing` | `text-warning` | `--warning` (#F0A43B) |
-| `succeeded` | `text-success` | `--success` (#37C99A) |
-| `failed` | `text-danger` | `--danger` (#FF6B6B) |
-| `idle` / `cancelled` | `text-muted-foreground` | `--muted-foreground` (#A1A1AA) |
-
-**约束**：
-- 任何任务执行（含 Mock 模式）必须在 `task:started` / `task:completed`（或 `task:failed`）事件前后写入 `writeAgentLog`，不得形成无日志的执行路径（§5 #3）
-- SSE 端点须接入频率限制（`rateLimit`），单 IP 每分钟最多 5 个连接
-- 事件 payload 不得包含敏感操作细节（L4 动作的执行参数不应直接推送到浏览器）
-- 全局 pub/sub 基于内存 Map，适用于单进程开发环境；生产环境须替换为 Redis Pub/Sub 或等价的分布式方案
-- **AgentSSEStatus 类型**：`src/components/common/agent-status-badge.tsx` 导出 `AgentSSEStatus` 类型（`"executing" | "succeeded" | "failed" | "cancelled" | "idle"`），统一 SSE 执行状态语义。`eventTypeToStatus()`（`use-openclaw-stream.ts`）负责将 SSE 原始事件类型映射为此状态。
-
-### 4.9 Harness 提案一键回滚机制
-
-> 本节定义已批准提案的回滚流程，遵循 §4.5 安全护栏 + §4.7 授权分级。
-
-**回滚触发条件**：
-
-- 人工手动发起（`POST /api/harness/proposals/[id]/rollback`）
-- 必须携带有效的 `x-approval-token` 请求头
-
-**回滚快照（`previousSnapshot`）**：
-
-- 存储在 `HarnessProposal` 模型的 `previousSnapshot` 字段（JSON 字符串）
-- 包含变更前 Agent 的完整任务边界与工具访问状态：
-
-  ```json
-  { "agentId", "canDo", "cannotDo", "bindConnectors", "bindSkills", "harnessVersion", "snapshotAt" }
-  ```
-
-- 提案被批准时写入快照（由 approve 流程负责）；回滚时从快照恢复
-
-**回滚执行流程**：
-
-1. 校验 `x-approval-token` → 401
-2. 频率限制（单提案 60s 冷却 + 全局每分钟 ≤ 3 次）→ 429
-3. 自动化授权门禁（`checkAutomationGate`：L4 → 403，L3 缺确认 → 409）
-4. L3 `confirmationToken` 须与预期值匹配（环境变量 `HARNESS_L3_CONFIRMATION_TOKEN`，默认 `"确认回滚"`）
-5. Prisma 事务：Agent 字段恢复 + 提案状态更新为 `rolled-back` + AuditLog（riskLevel=high）
-6. 事务成功后：写入 AgentLog + 异步触发 Harness 降级评估
-
-**约束**：
-
-- 仅 `status === 'approved'` 的提案可回滚
-- 回滚全程在 Prisma 事务中完成，任一步骤失败即整体回滚
-- 审计日志在事务内写入（高风险操作的审计绝不可丢失，事务失败则回滚整体操作）
-- 回滚后自动异步触发 `runHarnessEvaluation('auto')`，将变更纳入 72h 评估窗口
-
-**核心实现**：
-
-- 回滚逻辑：`src/lib/server/harness/harness-rollback.ts`（`rollbackHarnessProposal`）
-- API 端点：`src/app/api/harness/proposals/[id]/rollback/route.ts`
-
-***
-
-## 第五章：禁止行为清单（Anti-Patterns）
-
-以下行为在 HermesClaw-v2 中被视为**严重违规**，触发自动回滚并告警：
-
-1. ❌ 静默绕过 Harness 直接调用底层能力
-2. ❌ 未注册工具的调用
-3. ❌ 无日志的执行（任何执行必须留下可溯源记录）
-4. ❌ 上下文知识的静默替换（未经 KCL 记录）
-5. ❌ Harness 规则的单方面修改（未经 HEP 流程）
-6. ❌ 模型输出直接进入生产环境（未经校验层）
-7. ❌ 忽略置信度阈值强行执行高风险任务
-
-***
-
-## 第六章：工程师角色定义
-
-在 AI-First 体系下，人类工程师的角色**从"写代码"转向"设计系统"**。
-
-| 角色 | 职责 | 不应做的事 |
-|------|------|------------|
-| **Harness 架构师** | 设计组件结构、进化机制、审批流 | 微观干预 Agent 执行过程 |
-| **知识策展人** | 维护知识库版本、确保上下文质量 | 让知识散落在非结构化介质中 |
-| **审批者** | 审核 Level 3 进化提案 | 无条件拒绝或无条件批准 |
-| **监控员** | 阅读 Level 2 评估报告，识别趋势 | 忽略系统上报的瓶颈信号 |
-
-***
-
-## 第七章：文档维护规则
-
-- **本文档（AGENTS.md）是最高规则**，优先级高于所有子系统配置
-- 任何对本文档的修改，须提交 HEP 提案并经人工审批
-- 每次版本更新须在文档顶部更新版本号和日期
-- 本文档须对所有 Agent 可读，是 Agent 启动时加载的第一份上下文
-
-### 4.10 WorkflowGenerator Agent（AI 驱动 DAG 生成）
-
-> 本节定义首个内置 AI Agent —— WorkflowGenerator —— 的模块约定与约束。
-
-**目录**：`src/lib/server/agents/` — AI 驱动的业务 Agent 模块目录，每个 Agent 为独立文件（如 `workflow-generator.ts`）。
-
-**WorkflowGenerator 职责**：
-- 接收用户**自然语言意图** + **行业上下文**，调用 LLM 将意图解析为结构化 DAG 工作流
-- 输出 Schema：`{ nodes: WorkflowNode[], edges: WorkflowEdge[], metadata: { industry, generatedBy, version } }`
-- 生成结果写入 `Workflow` 表，状态为 `draft`（不可直接执行）
-
-**约束**：
-- **不可直接执行**：生成的工作流 `status = 'draft'`，需人工 Review 节点配置和自动化授权等级后，手动激活为 `active` 方可执行（符合 §4.7 L3 约束）
-- **DAG 结构校验**：生成阶段即执行 Kahn 环路检测、孤立节点检测，在入库前拦截非法 DAG（与 §2.3 运行时检测互补）
-- **输出安全扫描**：LLM 生成的节点名称/描述经 `guardOutput()` 扫描（§5 #6），敏感声明不阻断但记录审计
-- **审计日志**：每次生成写入 `AuditLog(action='workflow.generate')`，记录 Provider、节点数、敏感声明告警等溯源信息（§5 #3）
-- **Provider 复用**：LLM 调用走 `src/lib/server/llm-provider.ts` 共享工具层，不自行实现 Provider 选择逻辑
-
-**API 端点**：`POST /api/workflows/generate`（见 CLAUDE.md 或 API 文档）
-
-**Workflow 状态流转**：
-```
-draft（AI 生成，待审核）→ active（人工激活，可执行）→ archived（归档）
-```
-
-**共享 LLM 工具层**：`src/lib/server/llm-provider.ts`
-- 提供 `resolveLlmProvider()` — 统一的 Provider 选择（HARNESS_LLM_PROVIDER → Anthropic → DeepSeek 回退）
-- 提供 `callAnthropicText()` / `callDeepSeekJson()` — 标准化的 LLM 调用模板
-- JSON 解析复用 `parseJsonLoose`（`src/lib/harness-llm.ts`，已 export）
-- 新 Agent 应优先使用此共享层，避免重复实现
-
-### 4.11 多租户 Workspace 与 RBAC
-
-> 本节定义多租户工作空间模型、细粒度 RBAC 权限体系及数据隔离约定。
-
-**数据模型**（Prisma）：
-
-| 模型 | 关键字段 | 说明 |
-|------|---------|------|
-| `Workspace` | `id`, `name`, `plan` | 工作空间（租户），`plan` 取值 `free` / `pro` / `enterprise` |
-| `WorkspaceMember` | `workspaceId`, `userId`, `role` | 成员关系，复合主键 `(workspaceId, userId)`，级联删除 |
-| `WorkspaceSettings` | `workspaceId`(PK), `defaultModel`, `taskProviderMap` | 模型路由配置：默认模型 + 各 taskType Provider 偏好（JSON），级联删除 |
-
-**角色体系**（`WorkspaceRole`，TEXT 列存）：
-
-| 角色 | 优先级 | 写权限 | 审批 L3 | 修改 Harness | 管理成员 |
-|------|--------|--------|---------|-------------|---------|
-| `OWNER` | 4 | ✅ | ✅ | ✅ | ✅ |
-| `ADMIN` | 3 | ✅ | ✅ | ✅ | ✅ |
-| `MEMBER` | 2 | ✅ | ✅ | ❌ | ❌ |
-| `VIEWER` | 1 | ❌ | ❌ | ❌ | ❌ |
+- Intent 解释权（将自然语言目标结构化为 Task / Workflow）  
+- Workflow 生成与编排权（DAG Workflow + Node 配置）  
+- Memory 管理权（会话 / 项目 / 组织三级记忆）  
+- Model Router 策略权（模型与推理参数路由）  
+- Harness Evaluation / Proposal / Approval / Rollback 治理权  
+- Agent Policy 最终解释权与冲突裁决权  
+- Audit 真相源（治理与策略变更的 Source of Truth）
 
-**数据隔离规则**：
+Hermes 不负责：
 
-- **Prisma 查询层强制隔离**：所有 `findMany` / `findFirst` / `create` / `count` 必须带 `workspaceId` 过滤，**禁止依赖应用层过滤**
-- **向后兼容**：系统初始化时创建 `id='default'` 的默认 Workspace，所有现有数据自动归属，现有用户自动授予 `OWNER` 角色
-- **AuditLog 强制 workspaceId**：`WriteAuditLogInput.workspaceId` 为**必填字段**（TypeScript 编译期强制），禁止绕过 `writeAuditLog()` 直接调用 `prisma.auditLog.create()`
-- **审计日志直接写入事务的场景**（如 `harness-rollback.ts`）也必须显式写入 `workspaceId` 字段，从事务上下文中的 proposal 记录派生
-- **统一写操作审计封装 `auditedWrite`**（`src/lib/server/audited-write.ts`）：收敛「`createAuditEntry` 预记录 → 执行写操作 → `updateAuditEntry` 成功/失败回填」这一在写路由（conversations / messages / inquiries / quotations 等）重复的样板。约定：
-  - `targetId` 须由调用方**预生成**并传入（保证审计从预记录起即可溯源，§4.3）；封装不生成 ID。
-  - 失败时**re-throw 原始错误**，由调用方 catch 决定 HTTP 响应（封装不吞错、不决定响应、不写 HTTP 体）。
-  - 成功后需依赖执行结果回填 `detail` / `contextSnapshot` 时，用 `options.onSuccess(result)` 返回补充字段。
-  - **不纳入**流式/非预记录路由：`/api/chat` 为 SSE 流式 + `writeAgentLog` 模式，结构异构，保留独立实现，**勿强行套入** `auditedWrite`。
+- 直接托管所有外部渠道会话（交由 Runtime）  
+- 直接承担设备常驻代理与在线状态维护  
+- 在未注册执行能力的情况下发起盲目动作
 
-**RBAC 门禁体系**（`src/lib/workspace.ts`）：
+### 2.2 OpenClaw Execution Runtime
 
-| 函数 | 用途 | 行为 |
-|------|------|------|
-| `buildWorkspaceContext(request)` | 构建请求上下文 | 返回 `{ workspaceId, role, userId }`，仅调用 `auth()` 一次 |
-| `requireWritable(role)` | 写保护 | VIEWER 抛出 `ForbiddenError` |
-| `requireRole(role, minRole)` | 最低角色检查 | 不满足抛出 `ForbiddenError` |
-| `requireHarnessAdmin(role)` | Harness 修改保护 | 非 ADMIN/OWNER 抛出 `ForbiddenError` |
-| `guardRole(role, minRole, msg?)` | RBAC 门禁便捷封装 | 不满足返回 `Response(403)`，满足返回 `null` |
-| `withRBAC(handler, requiredRole)` | 统一 RBAC 包裹器（`src/lib/server/api-handler.ts`） | 构建 ctx → 校验 `requiredRole` → 不满足写 `AuditLog(action='RBAC_DENIED')` 并返回 403 → 满足则把已解析 ctx 注入 handler |
+OpenClaw 是执行运行时，拥有以下所有权：
 
-**「审批 L3」语义澄清**（消除角色矩阵与接入约定的歧义）：
+- Channel / Device / Connector 的在线状态与路由决策  
+- 执行动作的现场上下文（设备状态、网络环境、渠道特性）  
+- 任务执行过程状态（排队、执行中、重试、退避等）  
+- Action Receipt 与 ExecutionEvent 的事实回传  
+- 本地 / 移动端代理动作与事件缓冲（例如移动端节点、桌面节点）
 
-- 角色矩阵中「审批 L3」一栏指 **L3 业务动作**（如发送报价单等 `TRADE_ACTIONS`），`MEMBER` 及以上可审批。
-- **Harness 升级提案**的审批/拒绝/回滚属于「修改 Harness」，仅 `ADMIN/OWNER` 可执行——以矩阵「修改 Harness」列为准。
+OpenClaw 不负责：
 
-**RBAC 接入约定**：
+- 修改 Agent Policy 或任何 Harness 治理对象  
+- 独立变更风险等级与自动化等级设定  
+- 决定是否放行高危动作（如资金、删除、对外承诺）  
+- 越过 Hermes 直接执行未授权动作
 
-- 所有 POST/PATCH/DELETE API 路由**必须**经 RBAC 门禁。两种等价接入方式（择一，勿混用于同一路由）：
-  - **包裹式（推荐新路由）**：`export const POST = withRBAC(async (req, ctx, routeCtx) => {...}, '<最低角色>')`——拒绝时自动写 `RBAC_DENIED` 审计并返回统一 403 体 `{ success:false, error:'RBAC_DENIED', message }`。
-  - **内联式（既有路由）**：handler 开头 `const ctx = await buildWorkspaceContext(request)` 后立即 `requireWritable(ctx.role)` / `requireHarnessAdmin(ctx.role)`。
-- Harness 审批/拒绝/回滚路由要求 `ADMIN`（`withRBAC(..., 'ADMIN')` 或 `requireHarnessAdmin`）。
-- 写操作通用最低角色为 `MEMBER`（即非 VIEWER）。
-- Workspace 成员管理路由使用 `guardRole()` 便捷封装（直接返回 403 Response）。
-- **禁止**在应用层做 `if (role !== 'VIEWER')` 等裸判断——必须通过上述门禁函数统一校验。
-- **审计动作枚举**：RBAC 拒绝写 `RBAC_DENIED`；提案治理写 `proposal.approve` / `proposal.reject` / `proposal.approve.l4_blocked`（L4 硬拦截留痕）；工作流执行写 `workflow.run` / `workflow.run.fail`（失败须同等留痕）；策略路由写 `model.route`；模型路由配置变更写 `update.model-routing`；询盘创建写 `inquiry.create`；报价创建写 `quotation.create`；对话创建写 `conversation.create`；对话更新写 `conversation.update`（关联项目空间、重命名）；话题创建写 `topic.create`（/new 超级入口）；对话消息追加写 `conversation.message`；文件上传写 `file.upload`；大盘活动流读取写 `dashboard.feed.read`；沉默预警读取写 `dashboard.silence-alerts.read`；智能体创建写 `agent.create`；智能体边界变更写 `update.agent.boundary`（riskLevel=high）；边界越界拦截写 `boundary.block`（riskLevel=high）；智能体删除写 `delete.agent`；项目创建写 `project.create`（L2, low）；项目更新写 `project.update`（L2, low）；项目删除写 `delete.project`（riskLevel=high）；记忆创建写 `create.memory`（L2, low）；记忆删除写 `delete.memory`（riskLevel=mid）；技能测试写 `skill.test`（L2, low）；连接器授权写 `connector.authorize`（L2, mid）；连接器创建写 `connector.create`（L2, mid）；连接器状态变更写 `connector.connect` / `connector.disconnect`（L2, mid/low）；连接器删除写 `delete.connector`（riskLevel=high）。
-
-**Session 约定**：
-
-- Auth.js v5 JWT 中携带 `workspaceId`（标记当前活跃 workspace），由 JWT callback 注入
-- `getWorkspaceId(request)` 解析优先级：`x-workspace-id` 请求头 → session 中的 workspaceId → 默认 `"default"`
-- `buildWorkspaceContext()` 内对默认 workspace 做存在性校验，不存在时记录 error 日志
-
-**Middleware（Edge Runtime）**：
-
-- 写操作（POST/PUT/PATCH/DELETE）要求有效 session token，无 token 返回 401
-- 系统路由（`/api/maintenance/`、`/api/harness/cron`）免 session 检查
-- 粗粒度 VIEWER 角色拦截（从 JWT payload 解码 `role` 字段）
-- 细粒度 RBAC 由 Route Handler 层执行（`requireWritable` 等）
-
-**客户端安全导入约定**：
-
-- 纯角色判定函数（`isAdmin` / `isWritable` / `canApproveL3` / `canModifyHarness` / `hasMinRole`）与 `WorkspaceRole` 类型已提取至 `src/lib/workspace-roles.ts`（零服务端依赖，不导入 prisma/auth/logger）。
-- 客户端组件（如 settings 页、"use client" hooks）**必须**从 `@/lib/workspace-roles` 导入角色判定函数，禁止从 `@/lib/workspace` 导入——后者依赖 prisma→better-sqlite3→fs 链，会触发 webpack 客户端打包失败。
-- `@/lib/workspace` 仍可重导出这些函数以保持服务端代码向后兼容，但客户端代码须走 `workspace-roles` 直接导入。
-
-**DEV_BYPASS_AUTH 开发免认证机制**：
-
-- `.env` 中设置 `DEV_BYPASS_AUTH=true` 时，Edge Middleware 对 `/api/chat`、`/api/task`、`/api/conversations` 路径放行写操作，无需 session token。
-- 此机制**仅限本地开发环境**，生产环境不得启用。被放行的路由仍需经过 Route Handler 层的 RBAC 门禁（若使用了 `withRBAC` 或内联 `requireWritable`，仍需有效 session）。
-
-### 4.12 策略路由（Model Router）
-
-> 本节定义 Harness 策略路由环境层——依据任务类型、风险等级、估算预算，决定单次 LLM 调用应使用的 Provider 与模型，并将决策留痕至审计日志。
-
-**核心模块**：`src/lib/server/model-router.ts` — 业务逻辑下沉，仅服务端调用（读取环境变量 + 数据库）。
-
-**路由上下文**（`ModelRouteContext`）：
-
-- `taskType`：`chat` | `workflow` | `analysis` | `generation`
-- `riskLevel`：`low` | `medium` | `high`（注意：审计日志用 `mid`，函数 `toAuditRiskLevel` 负责映射）
-- `estimatedTokens`：预估 token 数（供后续预算扩展）
-- `workspaceId`：多租户隔离定位
-
-**路由优先级**（`selectModel(ctx)`）：
+### 2.3 Industry Pack Layer
 
-1. `riskLevel === 'high'` → 高能力模型（`claude-sonnet-4-6` / anthropic），绕过工作空间配置
-2. `taskType === 'workflow'` 且非 high → 成本优化模型（`deepseek-chat` / deepseek）
-3. 其余 → 读 `WorkspaceSettings` 的可配置默认模型 + per-taskType Provider 偏好（fallback `deepseek-chat`）
+Industry Pack 是行业插件层，不是业务代码散装集合。
 
-**Provider 可用性降级**（§2.3 失败自动降级）：选中 Provider 的 API Key 缺失时，自动切换到另一可用 Provider（含模型映射），降级原因写入 audit detail。
+每个 Industry Pack 必须通过标准 manifest 装载，仅能通过公开 runtime schema 注入以下资产：
 
-**约束**：
+- Agent Template  
+- Workflow Template  
+- Skill Pack  
+- Knowledge Pack  
+- Connector Mapping  
+- Dashboard Schema  
+- Eval Rules  
+- Domain KPI Model
 
-- **禁止硬编码模型**：所有 LLM 调用方必须经 `selectModel()` 决策，不得自行写死 Provider/模型（§1.2 环境驱动）
-- **强制审计留痕**：每次路由决策必须写入 `AuditLog(action='model.route', targetType='model')`，`riskLevel` 继承上下文（§1.2 数据主权；无日志静默执行属违规）
-- **配置权限**：`WorkspaceSettings` 的修改仅限 OWNER/ADMIN（API `PATCH /api/workspace/settings` 经 `guardRole(ADMIN)` 门禁）
-- **配置读取失败安全降级**：`getWorkspaceModelSettings()` 读取失败不抛异常，降级返回缺省值并 warn
+禁止行业包直接修改：
+
+- Hermes 核心治理逻辑与执行顺序  
+- OpenClaw 核心事件协议与 Gateway 配置结构  
+- RBAC 机制与租户 / Workspace 边界  
+- 审批门禁规则与高危动作白名单
 
-**共享 LLM 工具层扩展**（`src/lib/server/llm-provider.ts`）：
+---
 
-- 新增导出：`DEFAULT_ANTHROPIC_MODEL`、`DEFAULT_DEEPSEEK_MODEL`、`isProviderAvailable(provider)` — 统一 key 可用性判定，供 model-router 等复用
-- 新增导出：`openChatStream(options, onDelta)` — 共享流式调用，收敛 DeepSeek SSE 透传与 Anthropic `messages.stream` 为同一接口，供 chat / workflow-generator 等流式端点复用
-- 新增导出：`classifyUpstreamError(httpStatus)` — 上游错误码→友好降级信息，DeepSeek + Anthropic 对齐
+## 第三章：运行时契约（Runtime Contracts）
+
+### 3.1 核心契约对象
 
-**管理 API**：`GET/PATCH /api/workspace/settings` — 仅 OWNER/ADMIN 可写，写时记录 `AuditLog(action='update.model-routing')`
+Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私有模块耦合。
 
-**UI**：`/settings?section=model-routing` — 默认模型下拉 + 4× taskType Provider 偏好下拉；非管理员只读（保存按钮禁用 + 警示条）。
+最小契约对象包括：
 
-**前端模型选择器配置**：
+- `TaskEnvelope`（任务封装）  
+- `ExecutionEvent`（执行事件）  
+- `ActionReceipt`（动作回执）  
+- `ExecutionSummary`（执行摘要）  
+- `CapabilityRegistration`（能力注册）  
+- `ConnectorLease`（连接器使用租约）  
+- `HumanApprovalCheckpoint`（人工审批检查点）
 
-- `src/components/pages/new/command-box.tsx` 导出 `SELECTABLE_MODELS: SelectableModel[]` 常量——定义前端可选模型列表（Provider + 具体型号 → API modelId 映射），替代旧的 `AVAILABLE_MODELS` 常量。
-- 每条模型记录包含：`id`（唯一标识）、`provider`（anthropic|deepseek）、`label`（显示名）、`version`（型号版本，如「V4 Pro」「Sonnet 4.6」）、`color`（状态色标）、`modelId`（传给 `/api/chat` 的实际模型名）、`available`（是否可用）。
-- 默认模型为 `deepseek-v4-pro`（`DEFAULT_MODEL_ID` 常量）。
-- 页面通过 `localStorage`（键 `hermes-selected-model`）持久化用户选择，刷新或退出对话不丢失。
+### 3.2 任务真相与执行真相
 
-### 4.13 DAG Skill 节点执行器
+- Hermes 是 **Task Truth Source**：任务定义、策略、风险等级、自动化等级、审批状态。  
+- OpenClaw 是 **Execution Truth Source**：动作是否执行、执行到哪一步、设备 / 连接器在线状态。  
+- 最终任务状态由 Hermes 汇总裁定，但不得篡改 OpenClaw 回传的原始执行回执与事件轨迹。
 
-> 本节定义 DAG 工作流中 `kind='skill'` 节点的执行语义——从数据库加载 Skill 并通过 LLM 真实执行（非 noop）。
+### 3.3 必备字段（最小集）
 
-**核心模块**：`src/lib/server/workflow/dag-runner.ts` — `executeSkillNode()` 函数，作为内置 `skill` handler 注册到 DAG 引擎。
+所有 `TaskEnvelope` 至少必须包含：
 
-**执行流程**：
+- `taskId`  
+- `workflowRunId`  
+- `workspaceId`  
+- `industryId`  
+- `agentId`  
+- `actionType`  
+- `input`  
+- `automationLevel`  
+- `riskLevel`  
+- `idempotencyKey`  
+- `callbackTarget`  
+- `policySnapshotVersion`  
+- `version`（契约版本）
 
-```text
-1. 从节点 config.skillId 加载 DB Skill 记录（含 workspaceId 数据隔离校验）
-     ↓
-2. automationLevel 门禁
-   ├── L4 → 直接拒绝（L4_FORBIDDEN）
-   ├── L3 → 查当前 workspace 内已审批 HarnessProposal（targetComponent=skillId 或 skill:<id>），缺则拒绝
-   └── L1/L2 → 放行
-     ↓
-3. 读取 .claude/skills/<skill.name>/SKILL.md（缺失时回退为 DB 元数据 + 通用约束）
-     ↓
-4. 注入 AGENTS.md 治理规则（loadAgentsMd()）→ 拼入 system prompt
-     ↓
-5. selectModel({ taskType:'workflow', ... }) 策略路由 → Provider/Model（§4.12）
-     ↓
-6. 调用 LLM（Anthropic / DeepSeek）执行技能
-     ↓
-7. 校验 confidence 阈值（§4.5：< 0.7 时升格 riskLevel 为 high 并标记待人工确认）
-     ↓
-8. 返回 NodeExecutionResult（含 riskLevel），由 onNodeFinish 钩子统一写入 AgentLog + AuditLog
-```
+所有 `ExecutionEvent` 至少必须包含：
 
-**共享映射函数**（`src/types/harness.ts`，供 dag-runner / guardrail / 所有 Skill 调用方复用）：
+- `eventId`  
+- `taskId`  
+- `workflowRunId`  
+- `runtimeId`  
+- `eventType`（需映射到标准事件族，如 `run.*` / `session.*` / `tool.*`）  
+- `status`  
+- `timestamp`  
+- `payload`  
+- `connectorId`（可选）  
+- `deviceId`（可选）  
+- `receiptHash`（可选）  
+- `version`（事件版本）
 
-| 函数 | 用途 |
-|------|------|
-| `mapAutomationToLogRisk(level)` | AutomationLevel → AgentLog riskLevel（L1/L2→low, L3→medium, L4→high） |
-| `mapAutomationToAuditRisk(level)` | AutomationLevel → AuditLog riskLevel（L1/L2→low, L3→mid, L4→high） |
-| `mapAutomationToRouteRisk(level)` | AutomationLevel → selectModel() RouteRiskLevel（L1/L2→low, L3→medium, L4→high） |
-| `resolveAutomationLevel(level, risk)` | 显式标注优先，否则由 riskLevel 派生（已有，§4.7） |
+### 3.4 幂等与补偿
 
-**约束**：
+- 所有动作必须具备幂等键（`idempotencyKey`）。  
+- 所有对外写操作的连接器必须返回清晰的 `receipt` 或错误码。  
+- 对外部系统的不可逆写操作必须声明 `compensationStrategy`。  
+- 无回执的写操作默认视为高风险，必须走审批流或被禁止。  
+- OpenClaw Gateway 如发现事件重放或序列缺口时，必须依靠幂等键保护下游系统。
 
-- **禁止硬编码模型**：Skill 节点必须经 `selectModel()` 路由，不得写死 Provider/模型（§1.2 环境驱动 / §4.12）
-- **禁止双写日志**：AgentLog / AuditLog 统一由 `onNodeFinish` 生命周期钩子写入，`executeSkillNode` 自身不写日志（避免与钩子重复）
-- **输出校验单次执行**：`guardOutput()` 仅在 `onNodeFinish` 钩子中执行一次，handler 内不重复校验（Skill 节点输出为结构化对象，非纯文本时由钩子跳过）
-- **数据隔离**：Skill 查询和 HarnessProposal 查询必须带 `workspaceId` 过滤（§4.11），Skill 不属于当前 workspace 时拒绝并标记 `riskLevel='high'`
-- **L4 不可绕过**：与 §4.7 一致，L4 技能的自动执行被绝对禁止，错误消息含 `L4_FORBIDDEN`
-- **L3 审批范围**：L3 技能的执行审批限于当前 workspace 内的 HarnessProposal（`status='approved'`，`targetComponent` 为 `skillId` 或 `skill:<id>`）
-- **置信度阈值**：LLM 输出 `confidence < 0.7` 时自动升格 riskLevel 为 `high` 并注入警示信息到输出 `_meta.warnings`，不阻断执行但要求下游/操作者进行人工审核（§4.5）
-- **AgentLog 风险标签**：Skill 节点执行结果通过 `NodeExecutionResult.riskLevel` 传递给 `onNodeFinish`，钩子据此写入 AgentLog 和 AuditLog 的 riskLevel
+---
 
-### 4.14 工具端点和共享库
+## 第四章：Harness Runtime 定义
 
-> 本节记录本次 /new 板块重构引入的新端点与共享工具模块。
+### 4.1 Harness 不是 Prompt
 
-**`/api/fetch-meta` — URL 元数据抓取**：
+HermesClaw 中的 Harness 是可运行时加载的治理对象集合，而不是一段提示词。
 
-- 服务端代理抓取目标 URL 的 `<title>` 与 `<meta name="description">`，避免浏览器端 CORS 限制。
-- GET 端点，参数 `?url=<encoded_url>`，仅允许 http/https 协议。
-- 已接入频率限制（单 IP 每分钟 ≤30 次），超频返回 429。
-- 5 秒超时保护（AbortController），抓取失败时返回 URL 本身作为 title，不阻断用户流程。
+Harness Runtime 至少由以下对象组成：
 
-**`src/lib/date-utils.ts` — 共享时间格式化**：
+- `AgentPolicy`  
+- `WorkflowTemplate`  
+- `SkillBinding`  
+- `ContextPolicy`  
+- `MemoryPolicy`  
+- `ConnectorPolicy`  
+- `GuardrailPolicy`  
+- `EvalRuleSet`  
+- `IndustryBinding`  
 
-- 导出 `classifyTimeGroup(iso)` / `relativeTime(iso)` / `formatTime(iso, group)` 三个函数，供 `recent-panel.tsx` 与 `recent-page-client.tsx` 共用。
-- 导出 `formatRelativeDay(iso)` — 天级相对日期（今天/昨天/X天前/X周前/X月X日），供文件列表等场景使用。
-- 导出 `formatFullDateTime(iso)` — 完整日期时间（yyyy/M/d HH:mm），供卡片视图等场景使用。
-- 禁止在组件中重复定义时间格式化逻辑，统一从此文件导入。
+### 4.2 可进化对象边界
 
-**`src/lib/sse-parser.ts` — SSE 流解析器**：
+允许被 Level 2/3 评估与提案系统自动修改的对象：
 
-- `parseSSEStream(reader, { onData, onDone })` 消费 ReadableStream，按行解析 SSE 格式并回调。
-- `useChat.ts` 的流式消息接收已接入此解析器，替换原有的手写 ReadableStream 读取样板。
+- `WorkflowTemplate`  
+- `SkillBinding`  
+- `ContextPolicy`  
+- `MemoryPolicy`  
+- `EvalRuleSet`  
+- `ConnectorPolicy`（非高危部分）
 
-**`src/lib/utils.ts` — 通用工具扩展**：
+默认禁止自动修改的对象：
 
-- 导出 `formatFileSize(bytes)` — 使用 `Intl.NumberFormat("zh-CN")` 格式化文件大小（B/KB/MB/GB 自动选单位），全项目唯一入口，禁止在组件中重复定义。
+- 本文件（AGENTS.md）  
+- L4 Guardrail 与高危动作策略白名单  
+- 核心 RBAC 规则与 Workspace 权限结构  
+- 资金 / 删除 / 外部承诺类动作的执行策略  
+- OpenClaw / Hermes 源码和上游仓库配置
 
-**`src/components/ui/select.tsx` — Select 下拉组件**：
+### 4.3 版本与灰度
 
-- 基于 `@base-ui/react/select` 的 shadcn 风格封装，禁用态由 base-ui 原生支持。
-- 导出 `Select` / `SelectTrigger` / `SelectValue` / `SelectContent` / `SelectList` / `SelectItem`。
-- 样式遵循 CLAUDE.md 颜色系统（`bg-card`、`bg-popover`、`border-border`、`text-foreground`、ring 焦点态）。
-- 接入约定：触发 `onValueChange` 时回调值可能为 `null`（base-ui 语义），调用方须做 `null ?? fallback` 处理。
+每个 Harness Bundle 必须支持如下生命周期状态：
 
-**`src/hooks/use-query-factory.ts` — 查询工厂筛选支持**：
+- `draft`  
+- `canary`  
+- `active`  
+- `deprecated`  
+- `rolled-back`
 
-- `createQueryListHook<T>` 生成的 hook 现支持 `useList(params?: QueryParams)` 传参。
-- `QueryParams = Record<string, string | undefined>` — 键值对映射，跳过 `undefined` 和空字符串值。
-- 导出 `buildUrl(baseUrl, params)` — 将参数序列化为 URL query string 的共享函数，供所有数据层复用。
-- 参数自动纳入 TanStack Query `queryKey`（`[...queryKey, params]`），确保不同筛选条件缓存隔离。
+任何提案生效流程必须经过：
 
-**`src/lib/pending-conversations.ts` — 本地对话备份队列**：
+1. Proposal 生成  
+2. Previous Snapshot 记录  
+3. 审批（可多级）  
+4. Canary 灰度发布  
+5. 指标观察窗口  
+6. 全量激活或回滚
 
-- 对话历史是核心数据，每次落库失败（403/500/离线）时自动写入 localStorage（key `hermes-pending-conversations`），等待网络/权限恢复后原子回放。
-- 导出：
-  - `queuePendingConversation(entry)` — 入队一条保存失败的对话（`userContent + assistantContent + time`）。
-  - `flushPendingConversations()` — 逐条回放队列（`POST /api/conversations` 带 `messages[]` 原子导入），成功一条立即从 localStorage 移除并落盘；任一条失败即停止保留剩余项，**确保不丢数据**。
-  - `getPendingCount()` — 当前积压条数。
-  - `getFlushFailures()` — 连续回放失败计数（≥3 时 `useChat` 弹出 toast 提醒用户）。
-- 队列上限 50 条，超出按 FIFO 丢弃最旧（仅在极端持续失败时触发）。
-- 并发保护：`isFlushing` 模块级变量防止挂载/online/保存成功后同时触发重复回放。
-- `safeContent()` 兜底：空串补占位符、超 100k 裁剪，避免回放永久卡在校验失败。
+---
 
-**`conversation-saved` 自定义事件**：
+## 第五章：动态进化机制
 
-- `useChat` 在对话成功持久化后广播 `window.dispatchEvent(new CustomEvent("conversation-saved"))`。
-- `SidebarRecent` / `RecentPanel` 监听该事件自动刷新对话列表，无需手动刷新页面。
-- 挂载时也会初次加载；`window.online` 事件触发时额外刷新计数并回放积压队列（三触点自动同步）。
+### 5.1 进化闭环
 
-**`src/hooks/use-recent-conversations.ts` — 共享 Hook**：
+进化闭环固定为：
 
-- `useRecentConversations()` — sidebar-recent 与 recent-panel 共用的 API 对话加载 hook。封装 `apiClient.getConversations()` + `conversation-saved` 事件监听 + 自动刷新。
-- `mapApiConversations(convs, includeTimeGroup?)` — API 响应 → `RecentRecord[]` 映射函数。
-- `RecentRecord` / `RecentType` — 统一定义在此 hook 中，`sidebar-recent` / `recent-panel` / `page.tsx` 均从此导入，消除重复定义。
+> 执行 → 反馈 → 评估 → 提案 → 审批 → 灰度 → 生效 → 复盘
 
-**`src/lib/recent-utils.ts` — 共享记录构建**：
+### 5.2 Level 与 Automation 分离
 
-- `buildRecentRecords(projects, inquiries)` — sidebar-recent / recent-panel 共用的混合最近记录构建函数（项目 + 询盘 + mock 任务 → 合并排序）。
-- `MOCK_TASKS` — mock 任务基线常量，两处统一引用，消除硬编码重复。
+- **Level 0–3**：描述系统在某一领域的进化阶段与成熟度（会不会根据数据提出合理提案）。  
+- **L1–L4**：描述单个动作的自动化授权等级（能不能自动执行）。
 
-**`POST /api/conversations` 新增 `messages[]` 字段**：
+两者严禁混用。
 
-- 原子导入模式：携带 `{role: "user"|"assistant", content: string}[]` 数组，一次事务创建对话 + 全部消息 (Prisma 嵌套 `create`)。
-- 替代原有 `createConversation(title)` + 二次 `addMessage(role, content)` 的两阶段容易产生孤对话的模式。
-- `apiClient.importConversation(title, messages)` 封装此调用。
-- 校验：单条消息 `content.max(100000)`，数组上限 100 条（`ConverseationCreateSchema.messages.max(100)`）。
+授权等级示例（建议）：
 
-**消息内容上限调整**：
+- **L1**：仅建议级，AI 生成方案，人类手工执行。  
+- **L2**：半自动，AI 生成，人工点按触发执行。  
+- **L3**：自动执行低风险动作，高风险动作需审批。  
+- **L4**：全部动作自动执行，仅在异常时告警（默认禁止，仅在极少数可证明安全的场景启用）。
 
-- `ConverseationCreateSchema` / `ConverseationMessageSchema` 中 `content` 从 `max(10000)` 提升至 `max(100000)`，适配长篇 AI 报告/分析不被校验拦截。
+### 5.3 评估输入
 
-**`/api/topics` — 话题 CRUD（超级入口）**：
+评估引擎至少读取以下数据：
 
-- `GET /api/topics?limit=N` — 获取话题列表（映射自 Conversation 模型，返回 `{ topics: [{ id, title, projectId, lastMessage, messageCount, ... }] }`）。limit 默认 20，最大 100，NaN 安全兜底。
-- `POST /api/topics` — 创建新话题（接收 `{ content, attachments, agentId?, projectId?, meta? }`），写入 Conversation + 初始消息，经 `auditedWrite` + `writeAgentLog` 双重审计（AGENTS.md §4.3/§5 #3）。ForbiddenError → 403。
+- `WorkflowRun / WorkflowNodeRun`  
+- `AgentLog / AuditLog`  
+- `Connector success rate`  
+- `Human correction events`  
+- `Memory miss events`  
+- `Knowledge gap records`  
+- `Industry KPI drift`  
+- Canary / Rollback 结果与原因
 
-**`POST /api/files/upload` — 文件附件上传**：
+### 5.4 提案输出
 
-- multipart/form-data 端点，接收 `file` 字段（最大 50MB）。
-- 文件保存至 `public/uploads/<workspaceId>/`（多租户隔离，§4.11），URL 路径 `/uploads/<workspaceId>/<uniqueName>`。
-- 预记录审计（`action: "file.upload"`，targetType: `"file"`，预生成 fileId）+ 写入成功/失败回填 + `writeAgentLog` 闭环反馈。
-- 校验链：文件存在 → 大小 ≤50MB → 非空 → 扩展名白名单 → MIME 白名单 → 安全文件名。
-- 频率限制：20次/分钟/IP。仅 MEMBER+ 可上传（内联 RBAC）。
+评估引擎可以输出以下类型提案：
 
-**`src/types/speech-recognition.d.ts` — Web Speech API 类型声明**：
+- 调整 WorkflowTemplate（拆解方式 / 节点并发 / 超时与重试）  
+- 调整 SkillBinding（优先使用哪类技能 / 工具组合）  
+- 调整 MemoryPolicy（哪些事实需要持久化 / 哪些应被压缩）  
+- 调整 ConnectorPolicy（但不得调整高危白名单）  
+- 调整 EvalRuleSet（触发阈值、观察窗口、告警策略）  
 
-- 全局类型扩展：`SpeechRecognition`（含构造函数 declare const）、`SpeechRecognitionEvent`、`SpeechRecognitionErrorEvent`。
-- 供 `command-box.tsx` 语音输入功能使用。
+所有提案都必须通过 Hermes 的审批与灰度机制才能生效。
 
-**`src/components/pages/new/recent-panel.tsx` — 最近对话面板**：
+---
 
-- 展示最近对话列表（按时间分组：今天/昨天/本周/上月/更早），点击跳转 `/new?load=conversationId` 恢复会话。
-- 使用共享 Hook `useRecentConversations()`（`src/hooks/use-recent-conversations.ts`）加载 API 数据。
-- 集成至 `/new` 页面右侧边栏（SuggestionPanel 下方）。
+## 第六章：治理、安全与审计
 
-**`ui-store` 新话题输入态扩展**：
+### 6.1 RBAC 与租户边界
 
-- `newTopicInput: string` — 输入框内容（支持 `setNewTopicInput(value | updater)`）。
-- `newTopicModelId: string` — 选中模型 ID（默认 `deepseek-v4-pro`）。
-- `newTopicPendingSystemPrompt: string | undefined` — 待提交 system prompt。
-- `newTopicAttachments: TopicAttachment[]` — 附件列表（`TopicAttachment` 接口：`{ name, url, size?, type? }`）。
-- `clearNewTopicInput()` — 一键清空输入态。
+- 所有 Workspace 和 Industry Pack 的管理操作必须在 RBAC 体系下完成。  
+- 不允许通过行业包或连接器绕过 Workspace 边界修改他人数据。  
+- 多租户部署必须在配置层显式声明租户隔离策略。
 
-**`TopicAttachment` 接口**：
+### 6.2 审计必备
 
-- 定义于 `src/stores/ui-store.ts`，供新话题附件列表与 `/api/topics` 请求体共用。
-- 字段：
-  - `name: string` — 附件文件名（必填，1-255 字）。
-  - `url: string` — 附件可访问 URL（必填，上传后返回的相对路径或外部链接）。
-  - `size?: number` — 文件大小（字节，可选，上限 100 MB）。
-  - `type?: string` — MIME 类型或扩展名描述（可选，≤100 字）。
-- 附件列表上限 20 个（`TopicCreateSchema.attachments.max(20)`），超量由 zod 校验拦截。
+以下行为必须记录在 AuditLog 中：
 
-**`src/components/pages/new/command-box.tsx` — SLASH_COMMANDS 技能命令列表**：
+- `workflow.generate`  
+- `task.dispatch` / `task.cancel`  
+- `model.route` / 高危模型变更  
+- `connector.execute`（高危写操作）  
+- `proposal.create / approve / reject / rollback`  
+- `industry.pack.install / activate / rollback`  
+- `automation.level.change`（尤其是 L3/L4）  
 
-- `SLASH_COMMANDS` 数组定义了 `/new` 输入框中 `/` 触发的可用技能命令菜单，当前包含 13 个外贸技能命令（`/ft-inquiry-sorter` 至 `/ft-quote-generator`）。
-- 每个命令项结构：`{ name: string, label: string, desc: string }`，其中 `name` 为以 `/ft-` 开头的技能标识符，须与 `.claude/skills/ft-*/SKILL.md` 中的 skill name 对应。
-- 命令选中后自动注入对应 skill 的 system prompt 到消息发送上下文。
-- ⚠️ **同步义务**：新增或删除 `.claude/skills/ft-*/` 目录中的 skill 时，须同步更新此 `SLASH_COMMANDS` 列表（增删对应条目），确保斜杠命令菜单与实际可用技能一致。未被注册的 skill 无法通过 `/new` 输入框的 `/` 菜单调用。
+### 6.3 主会话与 Sandbox
 
-**`src/lib/server/extract-file-text.ts` — 文件文本提取引擎**：
+- 主会话（通常为系统管理员 / Owner）可在本机拥有完整工具权限，但仍须遵守高危动作审批与审计要求。  
+- 非主会话默认运行于 sandbox（容器、远程节点或受限环境），只能使用经过 allowlist 的工具。  
+- 不允许通过 OpenClaw 的 channel 配置直接为第三方用户开启与主会话等价的权限。
 
-- 统一的服务端文件文本提取入口，从上传文件 Buffer 中提取可读文本供 LLM 分析。
-- `extractFileText(buffer, mimeType, fileName): Promise<ExtractResult>` — 主入口，按 MIME 类型/扩展名自动路由到对应提取器。
-- `ExtractResult` 接口：`{ ok: boolean; content?: string; note?: string }`。
-- 支持格式：PDF（pdf-parse v2，`PDFParse` 类）、DOCX（mammoth `extractRawText`）、XLSX/XLS/CSV/TSV（xlsx `sheet_to_csv`，codepage 65001 UTF-8）、TXT/MD/JSON/HTML 等纯文本。
-- 提取上限：`MAX_CHARS = 12000`（`truncate()` 截断并附原始长度）。
-- 电子表格最多处理 3 个工作表（`MAX_SHEETS = 3`），多表时标注跳过数量。
-- 图片返回 `{ ok: false, note: "暂不支持文本提取" }`，其他未知类型同理。
-- **动态 import**：pdf-parse / mammoth / xlsx 均为按需 `await import()`，避免阻塞非文件上传请求的冷启动。
+---
 
-**`/api/fetch-content` — 网页全文内容抓取**：
+## 第七章：与上游项目的兼容性
 
-- GET 端点，服务端代理抓取目标 URL 的全文可读内容（纯文本），供 LLM 分析使用。
-- 参数：`?url=<encoded_url>`（必填），`&maxChars=N`（可选，默认 8000，上限 50000）。
-- 频率限制：15次/分钟/IP。8 秒超时保护（AbortController）。仅支持 http/https 协议，非 HTML 响应返回类型说明。
-- HTML 清洗链：移除 `<script>` / `<style>` / `<noscript>` / `<iframe>` / `<svg>` / `<head>` / 注释 → 块级元素换行 → 脱标签 → HTML 实体解码 → 合并空白 → 截断到 maxChars。
-- 返回格式：`{ title: string, content: string }`。抓取失败/超时时 `content` 为 `[无法访问...]` 前缀说明。
+1. HermesClaw 必须尊重并集成上游 Hermes Agent 与 OpenClaw 的既有机制：  
+   - Hermes 的 memory / skills / session / compression 等机制只能通过公开 API 与配置扩展，不能直接改私有实现。  
+   - OpenClaw Gateway 的事件协议与安全配置必须按其官方文档使用，仅通过配置与扩展点集成。
 
-**`/api/files/upload` 响应扩展**：
+2. HermesClaw 的任何实现，如需修改上游仓库源代码，必须满足：  
+   - 改动最小化且兼容上游发展路线。  
+   - 在本仓库 CLAUDE.md 中显式记录，并通过 Harness 层尽量吸收差异。  
 
-- 返回体 `file` 对象新增 `extracted` 字段：
-  - 成功时：`{ ok: true, content: string }` — 文本提取结果，前端可直接附到消息中供 AI 分析。
-  - 失败时：`{ ok: false, note: string }` — 提取失败原因（如图片、扫描 PDF 等）。
-- 前端 command-box.tsx 在上传成功后根据 `extracted.ok` 决定是否将文本内容注入消息。
-
-**`PATCH /api/conversations/[id]` — 对话更新端点**：
-
-- 更新对话的 `projectId`（关联项目空间）和 `title`（重命名）。
-- 使用内联 RBAC（`buildWorkspaceContext` + `requireWritable`）。
-- 数据隔离：查询对话时带 `workspaceId` 过滤（`findFirst({ where: { id, workspaceId } })`），防止跨租户修改。
-- title 校验：接受非空白字符串且 ≤200 字符，空字符串/纯空白不更新。
-- 审计：`auditedWrite(action: "conversation.update")` + `writeAgentLog(source: "conversation")`。
-
-**`useChat` — conversationId 暴露**：
-
-- `useChat()` 返回值新增 `conversationId: string | null` state。
-- 用途：跨页面关联（如 `/new` 创建项目时通过 `apiClient.updateConversation(conversationId, { projectId })` 将对话链接到新项目）。
-- 实现：`conversationIdRef`（useRef，供回调闭包）+ `conversationId`（useState，供组件消费），两者同步更新。
-
-**`ProjectChat` 组件统一约定**：
-
-- 项目空间对话组件（`src/app/(workspace)/projects/[id]/_components/project-chat.tsx`）与 `/new` 页面完全一致，复用同一套组件：
-  - `CommandBox`（含文件上传、语音、URL 粘贴、@/# 下拉、模型选择器）
-  - `useChat` Hook（SSE 流式对话、持久化、loadConversation）
-  - `ConversationArea`（消息气泡、Markdown 渲染、沉淀/创建项目操作栏）
-- 支持 `?load=conversationId` URL 参数：从 `/new` 创建项目后跳转时自动加载关联对话。
-- 输入态统一走 Zustand `ui-store`（`newTopicInput` / `newTopicModelId` / `newTopicPendingSystemPrompt`）。
-
-**模型选择 localStorage 持久化约定**：
-
-- 键名：`hermes-selected-model`，值为主键模型 ID（如 `"deepseek-v4-pro"`）。
-- 读写逻辑：`loadSavedModel()` 从 localStorage 恢复 → 校验是否在 `SELECTABLE_MODELS` 中且 `available` → 否则回退 `DEFAULT_MODEL_ID`。
-- `handleModelChange` 同步写入 localStorage + Zustand `newTopicModelId`。
-- `/new` 和 `project-chat` 共用此约定，已抽取为共享 Hook `useModelPreference()`（`src/hooks/use-model-preference.ts`），消除重复。
-
-**审计枚举新增**：
-
-- `topic.create` — 话题创建动作审计（L2, low）。写入 `AuditLog`，source 见 `auditedWrite` 封装。
-- `conversation.update` — 对话更新动作审计（L2, low）。关联项目空间、重命名等，`AgentLog` source 为 `conversation`。
-- `file.upload` — 文件上传动作审计（L2, low）。预记录 + 成功/失败回填，`AgentLog` source 为 `hermes-chat`。
-- `dashboard.silence-alerts.read` — 沉默预警读取审计（riskLevel: low），读数据溯源。
-
-**`src/components/common/agent-status-badge.tsx` — Agent SSE 状态与自动化等级组件**：
-
-- 导出 `AgentStatusBadge` — SSE 驱动的智能体执行状态标签。订阅 `/api/openclaw/events`（通过 `useOpenClawStream`），自动更新 Zustand `agentExecutionStates`。状态映射：executing→warning / succeeded→success / failed→danger / cancelled|idle→muted-foreground（AGENTS.md §4.8）。支持脉冲动画（executing 态）。
-- 导出 `AgentSSERawStatusBadge` — 纯展示变体，不订阅 SSE 流，由父组件传入已知 `AgentSSEStatus`。
-- 导出 `AutomationLevelBadge` — L1-L4 自动化授权等级标签（AGENTS.md §4.7）。L1=success / L2=brand-blue / L3=warning / L4=danger，支持 `showDesc` 显示等级说明。
-- 导出 `AUTOMATION_LEVEL_META` — L1-L4 共享元数据常量（`{ label, short, className, desc }`），供 Agent 详情页等所有需要展示等级的组件复用，消除重复定义。
-- 导出 `AgentSSEStatus` 类型 — `"executing" | "succeeded" | "failed" | "cancelled" | "idle"`，统一 SSE 执行状态语义。
-
-**`src/lib/server/agent-serializer.ts` — Agent 共享序列化**：
-
-- 导出 `serializeAgent(agent)` — 将数据库 JSON 字符串字段（category / bindSkills / bindConnectors / canDo / cannotDo / statsJson）反序列化。消除 `route.ts` 与 `[id]/route.ts` 中的重复定义。
-
-**`src/lib/api-utils.ts` — Workflow 共享序列化**：
-
-- 导出 `serializeWorkflow(wf)` — 将 Workflow 数据库记录的 `nodes`/`edges` JSON 字符串解析为结构化对象，**白名单过滤** `workspaceId` 等内部字段（仅透传 `id/name/description/status/nodes/edges/createdAt/updatedAt`）。消除 `workflows/route.ts` 与 `workflows/[id]/route.ts` 中的重复解析逻辑，杜绝 `{ ...wf }` 全量展开泄漏 `workspaceId` 的安全隐患。
-- 导出 `serializeProject(project)` — 将 Project 数据库记录的 JSON 字符串字段（`activeAgents` / `riskPoints` / `nextActions` / `tags`）反序列化。消除 `projects/route.ts` 与 `projects/[id]/route.ts` 中的重复定义。
-- 导出 `serializeMemory(m)` — 将 Memory 数据库记录的 JSON 字符串字段（`tags`）反序列化。消除 `memory/route.ts`、`memory/[id]/route.ts`、`projects/[id]/memory/route.ts` 中的重复定义。
-
-**`src/lib/server/project-helpers.ts` — 项目共享查询辅助**：
-
-- 导出 `findProjectOrThrow(projectId, ctx)` — 按 `id + workspaceId` 查找项目；不存在时返回 404 Response（调用方直接 return）。消除 `projects/[id]/route.ts` GET/PATCH/DELETE、`projects/[id]/tasks/route.ts`、`projects/[id]/memory/route.ts` 中的 5 处项目查找+404 样板。
-
-**`agents API` 事务与策略路由加固**：
-
-- `POST /api/agents`：创建 + 审计写入（`agent.create`）以 Prisma `$transaction` 原子执行，确保审计绝不可丢失（AGENTS.md §5 #3）。
-- `POST /api/agents/[id]/execute`：LLM 调用由 `selectModel()`（§4.12）决定 Provider/模型，不再硬编码 DeepSeek。新增 `AbortController` 超时保护（45s），超时写入 timeout 日志并返回 504。Provider 分发由 `callLlmByProvider()` 执行。AgentLog 写入在主 catch 块中以内层 try/catch 保护，防止日志失败覆盖原始错误。
-- `POST /api/agents/[id]/logs`：补上 RBAC 写门禁（`requireWritable`）+ `workspaceId` 隔离查询。
-- `PATCH /api/agents/[id]`：边界变更现经双重门禁——`checkAutomationGate`（L4 硬拒绝 + L3 确认）+ `checkConfirmValue`（§4.5 二次确认）。
-- `assertWithinBoundary`（`src/lib/server/boundary.ts`）：新增可选 `workspaceId` 参数，内部 Prisma 查询强制隔离。
-- **Validator 修复**：`AgentUpdateSchema.confirm` 与 `MemoryUpdateSchema.confirm` 从 `z.string()` 修正为 `z.boolean()`，使 `checkConfirmValue` 的 `confirm !== true` 判定正确工作。
-
-### 4.15 Dashboard 动态大盘数据管道
-
-> 本节记录 Dashboard（动态大盘）页面的 API 端点、客户端 Hooks 及共享类型，对应 PRD 10.3。
-
-**API 端点**：
-
-| 端点 | 方法 | RBAC | 说明 |
-|------|------|------|------|
-| `/api/dashboard/stats` | GET | `VIEWER`（`withRBAC`） | 大盘 KPI 聚合：今日询盘/变化量/客户数/待办/紧急待办/活跃项目/周工作流/近14天询盘趋势/活跃客户预警 |
-| `/api/dashboard/activity-feed` | GET | `VIEWER`（`withRBAC`） | 合并活动流：MarketIntelligence + AgentLog 按时间戳倒序，返回统一 `FeedItem` 列表。Query: `?limit=N`（默认 20，最大 100）。读写审计 `dashboard.feed.read`（riskLevel: low） |
-| `/api/reports/generate` | POST | `MEMBER`（`withRBAC`） | 生成 AI 报告：接收 `{ type: "MORNING" \| "EVENING" \| "WEEKLY" }`，经 `selectModel()` 调用 LLM，存储 Report + 写入 AuditLog + AgentLog。审计枚举：`report.generate`（L2, low） |
-| `/api/intelligence` | GET | `VIEWER`（`withRBAC`） | 市场情报列表。Query: `?impactLevel=` / `?type=`（品类筛选：currency\|tariff\|competitor\|market\|logistics） |
-
-**客户端 Hooks**（TanStack Query，`staleTime: 60s`）：
-
-| Hook | 文件 | queryKey | 返回 |
-|------|------|----------|------|
-| `useDashboardStats()` | `src/hooks/use-dashboard-stats.ts` | `['dashboard-stats', workspaceId]` | `{ stats: DashboardStats \| null, isLoading, error }` |
-| `useActivityFeed(limit?)` | `src/hooks/use-activity-feed.ts` | `['activity-feed', limit]` | `{ feed: FeedItem[], isLoading, error }` |
-
-**共享类型**（`src/types/dashboard.ts`）：
-
-| 类型 | 说明 |
-|------|------|
-| `FeedItem` | 活动流统一条目：`{ id, type, title, summary, timestamp, meta }`，服务端和客户端共享导入 |
-| `ActivitySeverity` | `"urgent" \| "important" \| "normal"` — 活动流展示用严重程度 |
-| `DailyInquiryPoint` | `{ date: string, count: number }` — 近 14 天单日询盘数据点（服务端 & 客户端共享） |
-| `ActiveClientAlert` | `{ companyName, countryFlag, country, recentCount, lastInquiryAt }` — 活跃客户预警条目（服务端 & 客户端共享） |
-| `ReportType` | `"MORNING" \| "EVENING" \| "WEEKLY"` — AI 报告类型（服务端 & 客户端共享） |
-| `mapImpactToSeverity(level)` | `ImpactLevel → ActivitySeverity` 映射（high→urgent, mid→important, low→normal） |
-| `mapRiskToSeverity(risk)` | `AgentLog.riskLevel → ActivitySeverity` 映射（high→urgent, medium→important） |
-
-**`DashboardStats` 字段扩展**：
-
-- 新增 `urgentCount: number` — 紧急待办数（`Inquiry.priority = 'high'` 且 `replied = false`），供待办任务卡片的紧急提示使用。
-- 新增 `dailyInquiryTrend: DailyInquiryPoint[]` — 近 14 天询盘日趋势（折线图数据），每日按 `createdAt` 聚合计数。
-- 新增 `activeClientAlerts: ActiveClientAlert[]` — 近 7 天高频询盘客户（≥2 条），按询盘数降序取前 5，供客户活跃预警卡片使用。
-
-**共享组件**：
-
-| 组件 | 文件 | 说明 |
-|------|------|------|
-| `SkeletonList` | `src/components/common/skeleton-list.tsx` | 骨架列表占位：`<SkeletonList count={N}>{(i) => <Skeleton ... />}</SkeletonList>` |
-| `InquiryTrendChart` | `src/app/(workspace)/dashboard/_components/inquiry-trend-chart.tsx` | 近 14 天询盘趋势 Recharts 折线图，懒加载（`next/dynamic(ssr:false)`），配色使用 CSS 变量 `var(--chart-1)` |
-| `ActiveClientAlerts` / `ActiveClientSection` | `src/app/(workspace)/dashboard/_components/active-client-alerts.tsx` | 客户活跃预警列表 + 独立卡片，展示近 7 天高频询盘客户，warning 色标记 |
-
-**数据流**：
-
-```
-Prisma（MarketIntelligence / AgentLog / Inquiry / Project / WorkflowRun）
-  ↓ workspaceId 过滤（§4.11 隔离）
-API Route（withRBAC(VIEWER) + AuditLog）
-  ↓ TanStack Query（staleTime: 30s-60s）
-Client Hook（useDashboardStats / useActivityFeed / useIntelligence / useExchangeRates）
-  ↓ React 组件
-Dashboard UI（StatCard / 自定义卡片 / SkeletonList 加载态 / 空状态提示）
-```
-
-**约束**：
-
-- **`GET /api/workflows`** — 工作流列表端点，支持 `?industry=foreign-trade`（名称+描述关键词匹配）与 `?status=active` 过滤，使用 `buildWorkspaceContext` 进行 workspaceId 隔离，返回经 `serializeWorkflow` 安全序列化后的列表。
-- Dashboard 所有 GET API 路由均使用 `withRBAC(VIEWER)` 统一门禁，确保 workspace 数据隔离与认证一致性。
-- `FeedItem` 类型定义在 `src/types/dashboard.ts`，禁止在服务端和客户端分别定义。
-- 活动流读取每次均写入 `AuditLog(action='dashboard.feed.read')`（§4.3 可溯源）。
-- `urgentCount` 统计遵循 Prisma 查询层 `workspaceId` 过滤，禁止应用层过滤。
-
-**API 查询参数扩展**（v2.12 新增，v2.20 扩展）：
-
-| 端点 | 新增参数 | 类型 | 说明 |
-|------|---------|------|------|
-| `GET /api/inquiries` | `fromCountry` | `string?` | 按国家代码筛选（如 `US`），Prisma where 层转为大写匹配 |
-| `GET /api/inquiries` | `stage` | `string?` | 按阶段筛选：`new`→`replied: false`、`replied`→`replied: true`、`closed`→待 Prisma `Inquiry.status` 字段迁移后启用 |
-| `GET /api/intelligence` | `impactLevel` | `string?` | 按影响力筛选（`high` / `mid` / `low`），Prisma where 层直接匹配 |
-| `GET /api/intelligence` | `type` | `string?` | 按品类筛选（`currency` / `tariff` / `competitor` / `market` / `logistics`），Prisma where 层直接匹配 |
-
-**Dashboard 筛选栏**（v2.12 新增）：
-
-- `DashboardFilterBar` 组件（`src/app/(workspace)/dashboard/_components/dashboard-filter-bar.tsx`）提供四个筛选维度：
-  - **国家**：动态下拉，选项来源于 `useInquiries()` 的去重 `fromCountry` 值
-  - **阶段**：固定选项 `all` / `new` / `replied` / `closed`
-  - **影响力**：固定选项 `all` / `high` / `medium` / `low`
-  - **品类**（v2.20 新增）：固定选项 `all` / `currency` / `tariff` / `competitor` / `market` / `logistics`，映射到 `GET /api/intelligence?type=`
-- **URL-driven 模式**：筛选值通过 `useSearchParams` 读写 URL，`router.replace()` 无刷新更新（`scroll: false`）
-- **Suspense 边界**：`DashboardPage` 以 `<Suspense>` 包裹 `DashboardContent`，满足 Next.js App Router `useSearchParams()` 的边界要求
-- **filter-to-API 映射约定**：
-  - UI `"medium"` → API `"mid"`（影响力等级；在 `DashboardContent` 内转换后传入 `useIntelligence`）
-  - 哨兵值 `"all"` 不发送给 API（删除 URL param / 跳过 queryKey）
-  - `"closed"` 已作为 URL param 发送，但 API 暂不执行过滤（待 Prisma schema 迁移）
-- **审计**：筛选变更为纯客户端 GET 操作，不写 `AuditLog`（符合 §5 #3 仅写操作需审计的原则）。后续可按需注册 `dashboard.filter.apply` 审计枚举用于使用频率追踪。
-
-**Dashboard 沉默预警管道**（v2.13 新增）：
-
-- `GET /api/dashboard/silence-alerts`：查找超 7 天未回复询盘，按 `fromCountry` 分组，取前 5 最严重沉默地区（`withRBAC(VIEWER)`）。
-- 审计枚举：`dashboard.silence-alerts.read`（riskLevel: low）— 读数据溯源。
-- `useSilenceAlerts` Hook（`src/hooks/use-silence-alerts.ts`）：queryKey `['silence-alerts', workspaceId]`，staleTime: 5min。
-- 类型 `SilenceAlert`：`{ country, countryFlag, silenceDays, count, sampleCompany }`。
-
-**Task 域实体**（v2.13 新增）：
-
-- Prisma `Task` 模型：状态 `OPEN | IN_PROGRESS | DONE | CANCELLED`，优先级 `LOW | MEDIUM | HIGH | URGENT`，来源 `intelligence | manual | inquiry`。
-- API 端点：
-  - `GET /api/tasks`：列表查询（VIEWER+），支持 `status`/`priority`/`source` 筛选。
-  - `POST /api/tasks`：创建（MEMBER+），审计 `task.create`（L2, low）。
-  - `PATCH /api/tasks/[id]`：更新状态/优先级（MEMBER+），审计 `task.update`（L2, low）。
-  - `DELETE /api/tasks/[id]`：软删除（设置 `CANCELLED`，MEMBER+），审计 `task.cancel`（L2, low）。
-- Hooks（`src/hooks/use-tasks.ts`）：`useTasks`, `useCreateTask`, `useUpdateTask`, `useCancelTask`。
-- 类型 `TaskItem`, `TaskStatus`, `TaskPriority`, `CreateTaskInput`, `UpdateTaskInput`。
-
-**情报→任务分发**（v2.13 新增）：
-
-- `CreateTaskDialog` 组件（`src/app/(workspace)/dashboard/_components/create-task-dialog.tsx`）：
-  - 标题预填（`suggestedAction` 兜底 `title`），优先级从 `impactLevel` 映射（high→URGENT, mid→HIGH, low→MEDIUM）。
-  - 客户端 RBAC：`useCurrentWorkspaceRole()` 检查，VIEWER 禁用按钮 + tooltip「需要成员权限」。
-  - `useCreateTask` mutation，成功后 toast 通知 + 自动 invalidate `['tasks']` 缓存。
-
-**AI 晨报管道**（v2.13 新增）：
-
-- Prisma `Report` 模型：类型 `MORNING | EVENING | WEEKLY`，`content`（Markdown），`dataSnapshot`（JSON 生成快照）。
-- API 端点：
-  - `GET /api/reports`：列表查询（VIEWER+），审计 `dashboard.reports.read`（low）。
-  - `POST /api/reports/generate`：LLM 生成晨报（MEMBER+），审计 `report.generate`（L2, low）。
-- LLM 调用链：`selectModel({ taskType: 'analysis', riskLevel: 'low' })` → `callAnthropicText()` / `callDeepSeekText()`（纯文本，非 JSON 模式）。
-- 内容质量校验（§4.5）：自由文本生成以长度 ≥50 字为代理置信度指标，低于阈值写入 `qualityWarning` 至 `dataSnapshot` 并 logger.warn。
-- AgentLog：`source: 'morning-brief'`，每次生成写入成功/失败记录（含 duration）。
-- Hooks（`src/hooks/use-reports.ts`）：`useReports`, `useGenerateReport`。
-- UI：Dashboard 顶部通栏"今日晨报"卡片（截断 150 字 + 展开/收起，VIEWER 禁用生成按钮）。
-
-**共享工具函数**（v2.13 新增）：
-
-- `src/lib/country-utils.ts`：导出 `countryCodeToFlag(code)` — ISO 两位国家代码→国旗 emoji，供 inquiries / silence-alerts 等路由复用。
-- `src/hooks/use-workspace-role.ts`：导出 `useCurrentWorkspaceRole()` — 组合 `useSession` + `useWorkspaceData`，返回 `{ role, isViewer, isMember, isAdmin, isOwner, canWrite, canApproveL3 }`，消除重复的 `members.find()` 模式。
-
-**Prisma 客户端路径**（v2.13 更新）：
-
-- 当前生成目标：`src/generated/prisma-v2/`，导入路径 `@/generated/prisma-v2/client`。
-- 迁移历史：`prisma-new` → `prisma-client` → `prisma-v2`（Windows 锁文件问题驱动）。
-
-### 4.16 项目空间（Projects）API 管道
-
-> 本节记录项目空间（PRD §10.5）的 API 端点、数据模型扩展与前端组件约定。
-
-**Task 模型扩展**：
-
-- Prisma `Task` 模型新增 `projectId String?` 字段及对应 `project Project?` 关系，支持任务关联项目空间并按 `projectId` 过滤。
-- `Project` 模型新增 `tasks Task[]` 反向关系。
-
-**API 端点**：
-
-| 端点 | 方法 | RBAC | 说明 |
-|------|------|------|------|
-| `/api/projects` | GET | `VIEWER`（内联 `buildWorkspaceContext`） | 项目列表，workspaceId 隔离，按创建时间倒序 |
-| `/api/projects` | POST | `MEMBER`（内联 `requireWritable`） | 创建项目（`auditedWrite` 审计 + 初始化中期 Memory） |
-| `/api/projects/[id]` | GET | `VIEWER`（内联 `buildWorkspaceContext`） | 项目详情，含关联记忆，workspaceId 隔离 |
-| `/api/projects/[id]` | PATCH | `MEMBER`（内联 `requireWritable`） | 更新项目，workspaceId 隔离 + AuditLog(`project.update`) |
-| `/api/projects/[id]` | DELETE | `MEMBER`（内联 `requireWritable`） | 删除项目（需 `?confirm=true`），高危审计 |
-| `/api/projects/[id]/tasks` | GET | `VIEWER`（`withRBAC`） | 项目关联任务列表，workspaceId + projectId 双隔离，支持 `?status=` / `?priority=` |
-| `/api/projects/[id]/memory` | GET | `VIEWER`（`withRBAC`） | 项目中期记忆列表，workspaceId + projectId 双隔离 |
-
-**审计枚举**：
-
-- `project.create`（L2, low）— 项目创建，经 `auditedWrite` 预记录+执行+回填
-- `project.update`（L2, low）— 项目更新
-- `delete.project`（riskLevel=high）— 项目删除（已有，复用）
-
-**前端组件**：
-
-| 组件 | 文件 | 说明 |
-|------|------|------|
-| `ProjectRiskPanel` | `src/app/(workspace)/projects/[id]/_components/project-risk-panel.tsx` | 风险点+下一步建议可折叠面板，支持高/中/低风险分级与紧急/常规/稍后优先级 |
-| `ProjectTabs` | `src/app/(workspace)/projects/[id]/_components/project-tabs.tsx` | 五标签容器（聊天/任务/文件/动态/智能体），使用 shadcn Tabs 组件 |
-| `ProjectCard` | `src/app/(workspace)/projects/_components/project-card.tsx` | 项目卡片，含分类标签（类型/客户/国家/产品线） |
-
-**共享序列化**：
-
-- `serializeProject(project)`（`src/lib/api-utils.ts`）— 项目 JSON 字段反序列化
-- `serializeMemory(m)`（`src/lib/api-utils.ts`）— 记忆 tags 字段反序列化
-
-**共享查询辅助**：
-
-- `findProjectOrThrow(projectId, ctx)`（`src/lib/server/project-helpers.ts`）— 项目查找 + workspaceId 隔离 + 404，供 tasks/memory 路由复用
-
-**约束**：
-
-- 所有项目 API 强制 `workspaceId` 隔离（`findFirst` where 含 `workspaceId`，update/delete 同样含 `workspaceId` 防 TOCTOU）
-- 写操作（POST/PATCH/DELETE）必须经 RBAC 门禁 + 写 AuditLog（§5 #3）
-- 项目创建时自动初始化一条中期记忆（`Memory(type='mid', projectId)`），失败不阻断创建但记录 error 日志
-- `project.create` / `project.update` 审计枚举已在 §4.11 审计动作枚举注册
-- 分类标签展示遵循 CLAUDE.md §5 颜色系统（Badge 使用 `variant="secondary"`）
-
-### 4.17 智慧大脑（Brain）API 管道
-
-> 本节记录智慧大脑（PRD §10.6）模块的 API 端点与前端组件约定。
-
-**技能（Skill）API 端点**：
-
-| 端点 | 方法 | RBAC | 说明 |
-|------|------|------|------|
-| `/api/skills` | GET | `VIEWER`（内联 `buildWorkspaceContext`） | 技能列表，workspaceId 隔离 |
-| `/api/skills` | POST | `MEMBER`（`withRBAC`） | 创建技能，预记录审计 + 频率限制 10次/分 |
-| `/api/skills/[id]/test` | POST | `MEMBER`（`withRBAC`） | 运行技能测试，L3 需 `?confirm=true` 二次确认，L4 硬拒绝（403），预记录审计 |
-
-**连接器（Connector）API 端点**：
-
-| 端点 | 方法 | RBAC | 说明 |
-|------|------|------|------|
-| `/api/connectors` | GET | `VIEWER`（内联 `buildWorkspaceContext`） | 连接器列表，CDN 缓存 60s，workspaceId 隔离 |
-| `/api/connectors` | POST | `MEMBER`（内联 `requireWritable`） | 创建连接器，审计 `connector.create` |
-| `/api/connectors/[id]` | GET/PATCH/DELETE | —（内联 RBAC） | 连接器详情/状态变更/删除，PATCH 写预记录审计 |
-| `/api/connectors/[id]/authorize` | POST | `MEMBER`（`withRBAC`） | 连接器授权回调（模拟 OAuth），接收 `{ code, state?, scopes? }`，预记录审计 `connector.authorize` |
-
-**记忆（Memory）API 端点**：
-
-| 端点 | 方法 | RBAC | 说明 |
-|------|------|------|------|
-| `/api/memory` | GET | `VIEWER`（内联 `buildWorkspaceContext`） | 记忆列表，支持 `?type=short\|mid\|long` 过滤 |
-| `/api/memory` | POST | `MEMBER`（内联 `requireWritable`） | 创建记忆，审计 `create.memory` |
-| `/api/memory/[id]` | GET/PATCH/DELETE | —（内联 RBAC） | 记忆详情/冻结升级/删除，DELETE 经 `checkAutomationGate(L3)` + `?confirm=true` 二次确认 |
-
-**共享序列化**：
-
-- `serializeConnector(connector)`（`src/lib/api-utils.ts`）— 连接器 `permissions`/`usedByAgents` JSON 字段反序列化。消除 `connectors/route.ts`、`connectors/[id]/route.ts`、`connectors/[id]/authorize/route.ts` 中的三处重复定义。
-
-**审计枚举**（已于 §4.11 登记）：
-
-- `skill.test`（L2, low）— 技能测试执行审计，预记录 `createAuditEntry` + `updateAuditEntry` 回填
-- `connector.authorize`（L2, mid）— 连接器授权回调审计，预记录模式
-- `connector.create` / `connector.connect` / `connector.disconnect` / `delete.connector` — 连接器生命周期审计
-
-**前端组件**：
-
-| 组件 | 文件 | 说明 |
-|------|------|------|
-| `MemoryView` | `src/app/(workspace)/brain/_components/memory-view.tsx` | 三级记忆统一视图，Tabs 切换，短期记忆含批量清理/合并操作 |
-| `BrainSubnav` | `src/components/layout/brain-subnav.tsx` | 智慧大脑二级导航，数据源 `brainNav`（`src/config/navigation.ts`） |
-| `SkillDetail` | `src/app/(workspace)/brain/skills/page.tsx` | 技能详情面板，含 `AutomationLevelBadge` + 测试按钮（L3 二次确认流程） |
-| `ConnectorDrawer` | `src/app/(workspace)/brain/connectors/page.tsx` | 连接器详情滑出面板，含状态/权限/关联智能体 |
-
-**约束**：
-
-- 技能测试端点为 stub 实现（配置校验），后续 Phase 2 接入真实 Skill 执行引擎
-- 连接器授权端点为模拟 OAuth 流程，生产环境须替换为真实 OAuth token exchange
-- 所有 Brain 子路由页面均存在（8/8），voice/images/videos 使用 `BrainAssetPlaceholderPage` 占位组件
-- `DELETE /api/memory/[id]` 强制 `checkAutomationGate(L3)` + `?confirm=true`（AGENTS.md §4.5 删除持久化数据永远需要人工审批）
-- Brain 二级导航数据源唯一：`src/config/navigation.ts` 的 `brainNav`（CLAUD.md §3）
-
-### 4.18 文件模块（Files）约定
-
-> 本节记录文件模块前端组件体系与共享工具约定。
-
-**组件清单**（`src/components/pages/files/`）：
-
-| 组件 | 文件 | 说明 |
-|------|------|------|
-| `FilesPageClient` | `files-page-client.tsx` | 文件主页面：左侧分类树 + 右侧表格/卡片双视图 + 详情 Drawer + 上传 Drawer |
-| `FileCategoryTree` | 同上（私有） | 8 类 PRD 分类侧边栏（客户资料/产品资料/报价单/合同/图像/视频/语音/归档），使用 Lucide 图标 |
-| `FileIcon` | 同上（私有） | 文件类型 → Lucide 图标静态映射组件（pdf→FileText, xlsx→ScrollText, png→ImageIcon 等），禁止 render 中创建组件 |
-| `FileDetailDrawer` | 同上（私有） | 右侧滑出详情面板：解析状态、向量索引、解析摘要、关联项目/智能体、标签、版本历史 |
-| `FileUploadSheet` | 同上（私有） | 上传 Drawer：真实文件 `<input>` + 拖拽（drag/drop）+ `POST /api/files/upload` 真实上传 + 客户端 50MB 预检 + 进度与结果展示 |
-| `ParseStatusBadge` / `VectorIndexBadge` / `FileTypeBadge` | 同上（私有） | 状态与类型标签组件 |
-
-**Mock 数据**（`src/components/pages/files/file-mock-data.ts`）：
-
-- 12 条文件记录，覆盖全部 8 类分类，关联项目 + 智能体 + 版本历史。
-- `FileItem.size` 类型为 `number`（字节），展示时统一使用 `formatFileSize()`（`@/lib/utils`）。
-- 仅导出 `mockFiles`，分类定义与图标映射已迁至 `files-page-client.tsx` 中（使用 Lucide 图标）。
-
-**类型定义**（`src/types/file.ts`）：
-
-- `FileCategory` — 8 类 + `"all"` 联合类型。
-- `FileParseStatus` — `"parsed" | "parsing" | "unparsed" | "failed"`。
-- `VectorIndexStatus` — `"indexed" | "unindexed"`。
-- `FileItem` — 文件实体，`size: number`（字节），`tags: string[]`，`versions: FileVersion[]`。
-- `FileVersion` — 版本记录，`size: number`（字节）。
-
-**共享工具**：
-
-- `formatFileSize(bytes)` → `@/lib/utils`（`Intl.NumberFormat` 格式化，唯一入口）。
-- `formatRelativeDay(iso)` / `formatFullDateTime(iso)` → `@/lib/date-utils`（天级相对日期 / 完整日期时间）。
-
-**API 端点**（当前仅上传）：
-
-- `POST /api/files/upload` — 见 §4.16（v2.16.0-alpha 登记）。
-- ⚠️ 列表/详情/删除/关联/向量索引等 CRUD 端点待后续补齐（当前前端使用 mock 数据渲染）。
-
-***
-
-### 4.19 最近（Recent）API 管道
-
-> 本节记录最近模块（PRD §10.8）的聚合 API 端点、前端组件与共享类型约定。
-
-**聚合端点**：
-
-| 端点 | 方法 | 最低角色 | 说明 |
-| --- | --- | --- | --- |
-| `/api/recent` | GET | `VIEWER`（内联 `buildWorkspaceContext`） | 聚合最近记录：并行查询 Conversation / Task / Project / File（AuditLog file.upload）/ HarnessProposal，各取最近 10 条，按时间戳降序合并。Query `?type=all`（按类型筛选），`?industry=`（项目类型匹配，仅过滤项目）。使用 `Promise.allSettled` 部分降级（单源失败不阻断其余数据源返回），失败 query 写入 `AgentLog(source='hermes-chat')` 闭环反馈。 |
-
-**数据隔离**：
-
-- 所有子查询经 `buildWorkspaceContext` 解析 `workspaceId` 并强制写入 `where` 子句（§4.11 Prisma 查询层隔离）。
-- 文件记录因无独立 File 模型，通过 `AuditLog(action='file.upload', status='success')` 查询已上传文件，标题从 `detail` 字段提取（去除文件大小后缀）。
-
-**前端组件与 Hook**：
-
-| 组件/Hook | 位置 | 说明 |
-| --- | --- | --- |
-| `RecentPageClient` | `src/components/pages/recent/recent-page-client.tsx` | /recent 主页面：类型筛选（对话/任务/项目/文件/升级建议）+ 时间筛选（全部/今天/昨天/本周/更早）+ 行业筛选（全部/外贸/家居/电子/机械），时间组分区展示，记录可点击跳转对应详情页 |
-| `useRecentRecords` | `src/hooks/use-recent-records.ts` | TanStack Query `useQuery` Hook（`queryKey: ["recent-records", type, industry]`，`staleTime: 30s`，`retry: 1`），返回 `RecentRecordEnriched[]`（附加 `timeGroup` + `source`） |
-| `RecentRecordItem` | `src/lib/api-client.ts` | 统合类型（单一数据源） |
-| `RecentRecordEnriched` | `src/hooks/use-recent-records.ts` | 扩展 `RecentRecordItem`：附加 `timeGroup: TimeGroup` + `source: string` |
-| `TimeFilter` | `src/hooks/use-recent-records.ts` | `"all" \| "today" \| "yesterday" \| "week" \| "earlier"` |
-| `matchTimeFilter` | `src/hooks/use-recent-records.ts` | 时间组 → TimeFilter 匹配函数 |
-| `INDUSTRY_OPTIONS` | `src/hooks/use-recent-records.ts` | 行业选项常量（当前硬编码，后续可从 Project.type 动态获取） |
-
-**类型收敛约定**：
-
-- `RecentType` 统一定义于 `RecentRecordItem.type`（`api-client.ts`），组件通过 `type RecentType = RecentRecordItem["type"]` 派生使用。
-- 旧版 `use-recent-conversations.ts` 中的 `RecentType`（仅 3 种）已标记 `@deprecated`，侧边栏迁移至新 API 后将移除。
-- `sidebar-recent.tsx` 暂使用旧数据管道（`useRecentConversations` + `buildRecentRecords`），后续应迁移至 `useRecentRecords` 确保侧边栏与 /recent 页面数据一致。
-
-**行业筛选说明**：
-
-- `industry` 参数仅对 Project 子查询生效（`where.type = industry`），Conversation / Task / File / Upgrade 不按行业过滤。后续若 Conversation/Task 关联 `projectId`，可通过项目关联做联动行业过滤。
-
-**审计**：
-
-- 纯读端点，不写 `AuditLog`（符合 §5 #3 仅写操作需审计的原则）。
-- 部分降级写入 `AgentLog(source='hermes-chat', status='success')`，全量失败写入 `AgentLog(status='error')`（§4.4 闭环反馈）。
-
-**已知限制**：
-
-- `API 端点`：文件记录数取决于 AuditLog 中 `file.upload` 成功记录数（无独立 File 模型，见 §4.18）。
-- `API 端点`：`Promise.allSettled` 部分降级后，仍可能因全部子查询失败返回空列表（不应返回 500）。
-- `前端`：类型筛选在客户端侧执行（仅首次加载时 `type=all` 从后端获取），切换 tab 不会触发新 API 调用。
-- `前端`：行业选项当前硬编码 5 个行业，后续应从 `GET /api/projects/types` 动态获取。
-
-***
-
-## 附录：版本历史
-
-| 版本 | 日期 | 变更摘要 |
-|------|------|----------|
-| v2.0.0-alpha | 2026-06-06 | 初始版本，确立动态 Harness 自演化架构与 AI-First 最高规则 |
-| v2.1.0-alpha | 2026-06-07 | HEP-004：新增 §4.7 L1-L4 自动化授权分级，L4 绝对禁止自动、L3 强制人工确认 |
-| v2.2.0-alpha | 2026-06-09 | 新增 §2.3 DAG 工作流引擎：轻量级拓扑分层并行调度、条件分支安全约束、子流程嵌套上限、输出校验层集成、Harness 降级自触发
-| v2.3.0-alpha | 2026-06-09 | 新增 §4.8 OpenClaw SSE 实时事件管道：事件发射器、SSE 端点、客户端 Hook、共享 SSE 解析器，替换 mock 轮询模式为事件驱动架构 |
-| v2.4.0-alpha | 2026-06-09 | 新增 §4.9 Harness 提案一键回滚机制；§4.7 补充 `resolveAutomationLevel` 与 `checkAutomationGate` 共享门禁函数；新增 `previousSnapshot` 字段契约与 `rolled-back` 状态 |
-| v2.5.0-alpha | 2026-06-09 | 新增 §4.10 WorkflowGenerator Agent（AI 驱动 DAG 生成引擎）；新增 `src/lib/server/agents/` 目录约定；新增 `src/lib/server/llm-provider.ts` 共享 LLM 工具层；Workflow 模型新增 `draft` 状态；新增 `/api/workflows/generate` 端点 |
-| v2.6.0-alpha | 2026-06-10 | 新增 §4.11 多租户 Workspace 与 RBAC：Workspace / WorkspaceMember 模型，OWNER/ADMIN/MEMBER/VIEWER 四级角色，Prisma 查询层强制数据隔离，`buildWorkspaceContext` + RBAC 门禁函数，Edge Middleware 写保护，`guardRole` 便捷封装，默认 Workspace 向后兼容策略 |
-| v2.7.0-alpha | 2026-06-10 | RBAC 统一守卫 + L4/L3 治理加固：§4.11 新增 `withRBAC` 统一包裹器（`RBAC_DENIED` 审计）+ 审批角色澄清；§4.7 新增 L4 规范化拒绝体 `L4_FORBIDDEN` + `checkAutomationGate` 携带 `level` + 消除双重 L4 判定；§4.3 注册新审计动作 `proposal.approve`/`reject`/`l4_blocked`/`workflow.run`；新增 `AlertDialog` 组件；审批中心 L3 高风险接真实 approve API |
-| v2.8.0-alpha | 2026-06-10 | 新增 §4.12 策略路由（Model Router）：`selectModel()` 按 risk/taskType/WorkspaceSettings 路由 Provider 与模型，强制审计留痕，Provider 不可用自动降级；共享 LLM 层新增 `openChatStream`/`isProviderAvailable`/`classifyUpstreamError` 导出；新增 `WorkspaceSettings` + `/api/workspace/settings`；chat API 移除硬编 DeepSeek，全面接入策略路由；generator output 对齐至 `prisma-new` |
-| v2.9.0-alpha | 2026-06-10 | 新增 §4.13 DAG Skill 节点执行器：`executeSkillNode()` 将 `kind='skill'` 节点通过 `selectModel()` 调用 LLM 真实执行（非 noop）；Skill 模型新增 `automationLevel` 字段（L1-L4 门禁）；AgentLog 新增 `riskLevel` 字段；L3 审批门禁查询含 workspaceId 隔离；置信度 < 0.7 自动升格 riskLevel；提取 `mapAutomationToLogRisk`/`mapAutomationToAuditRisk`/`mapAutomationToRouteRisk` 共享映射函数至 `src/types/harness.ts` |
-| v2.10.0-alpha | 2026-06-10 | §4.11 新增 `workspace-roles.ts` 分离约定 + `DEV_BYPASS_AUTH` 开发免认证机制 + `/api/conversations` 写操作审计豁免放行；§4.12 新增 `SELECTABLE_MODELS` 模型选择配置（Provider + 具体型号 → API modelId 映射）；§4.14 新增 `/api/fetch-meta` URL 元数据抓取端点 + `src/lib/date-utils.ts` 共享时间格式化工具；`hermes-suggestions.ts` 接入 `selectModel()` 策略路由；`useChat` SSE 流读取复用 `parseSSEStream`；`/api/skills` POST 补齐 AuditLog + 频率限制
-| v2.11.0-alpha | 2026-06-11 | 新增 §4.15 Dashboard 动态大盘数据管道：`/api/dashboard/stats` + `/api/dashboard/activity-feed` 端点（`withRBAC(VIEWER)`），`useActivityFeed` Hook，`FeedItem` / `ActivitySeverity` 共享类型（`src/types/dashboard.ts`），`SkeletonList` 通用骨架组件；`DashboardStats` 扩展 `urgentCount` 字段；审计枚举新增 `dashboard.feed.read`；stats 路由从内联 RBAC 迁移至 `withRBAC` 统一包裹；汇率监测迷你卡片接入 `useExchangeRates` 真实数据 |
-| v2.12.0-alpha | 2026-06-11 | §4.14 新增 `src/components/ui/select.tsx` 基于 `@base-ui/react/select` 的 shadcn 风格 Select 组件 + 查询工厂 `buildUrl` 导出 + `QueryParams` 类型；§4.15 新增 API 查询参数扩展（`/api/inquiries` 支持 `fromCountry`/`stage`，`/api/intelligence` 支持 `impactLevel`）+ `DashboardFilterBar` URL-driven 筛选栏（国家/阶段/影响力三维筛选 + Suspense 边界模式 + filter-to-API 映射约定） |
-| v2.13.0-alpha | 2026-06-11 | §4.15 新增 Task 域实体（Prisma 模型 + CRUD API + `useTasks` Hooks）+ 情报→任务分发（`CreateTaskDialog` 组件 + `impactLevel→TaskPriority` 映射）+ Dashboard 沉默预警管道（`/api/dashboard/silence-alerts` + `useSilenceAlerts`）+ AI 晨报管道（Report 模型 + `/api/reports/generate` LLM 调用 + 内容质量校验）+ 共享工具函数（`country-utils.ts`、`useCurrentWorkspaceRole` Hook）+ Prisma 客户端路径迁移至 `prisma-v2` + 响应格式统一（报表模块切换至 `ApiResponse`） |
-| v2.14.0-alpha | 2026-06-11 | /new 超级入口板块完善：`RecentPanel`（最近对话与任务）接入空状态中列（保持两栏布局）；`POST /api/conversations` 补齐预记录审计（新增审计枚举 `conversation.create`，`targetId` 预生成对话 ID 回填保溯源）+ `writeAgentLog`（`AgentLogSource` 新增 `conversation`）满足 §4.3/§5#3 写操作留痕；`POST /api/conversations/[id]/messages` 补齐 `conversation.message` 审计 + `workspaceId` 隔离查询（findFirst）；两路由统一 `ForbiddenError → 403`（VIEWER 写不再被吞为 500）；`new/` 组件裸写色值（`bg-violet-*`/`text-white`/`bg-orange-400`/失效 `text-danger-foreground`）全量替换为 CLAUDE.md §5 语义 token |
-| v2.15.0-alpha | 2026-06-11 | 对话持久化加固与代码健康修复：新增 `pending-conversations.ts` 本地备份队列（三触点自动回放：挂载/online/保存成功后）；`POST /api/conversations` 扩展 `messages[]` 原子导入消除两阶段写入孤对话；`SidebarRecent` 改从 API 加载真实对话 + 链接正确；消息内容上限 10k→100k；`window.dispatchEvent("conversation-saved")` 跨组件刷新约定；代码健康 8 项修复（重复逻辑提取→`use-recent-conversations`/`recent-utils`，类型统一，事务缺口修复，flush 连续失败感知）；dev.db 漂移修复（`prisma db push` + `seed-workspace`，Workspace/WorkspaceMember 表补齐） |
-| v2.16.0-alpha | 2026-06-12 | /new 超级入口全量补齐：新增 `POST /api/topics`（含审计+AgentLog）与 `GET /api/topics`（话题列表映射）；新增 `POST /api/files/upload`（multipart 文件上传，含预记录审计 + workspaceId 隔离目录）；`CommandBox` 语音输入升级为 Web Speech API（`SpeechRecognition`，isFinal 状态管理）+ 文件真实上传 /api/files/upload；`ConversationArea` 沉淀为技能/创建项目空间按钮就绪；`RecentPanel` 组件集成至 /new 侧边栏（时间分组展示）；`useUiStore` 扩展 `newTopicInput`/`newTopicModelId`/`newTopicPendingSystemPrompt`/`newTopicAttachments` 输入态；`page.tsx` 输入态迁移至 Zustand ui-store + handleSend 解析 @智能体/#项目 //命令；新增 `src/types/speech-recognition.d.ts` Web Speech API 类型声明；新增审计枚举 `file.upload`；文件上传支持 workspaceId 子目录隔离 |
-| v2.17.0-alpha | 2026-06-12 | 代码健康修复 M6：`PATCH /api/conversations/[id]` 补充 workspaceId 隔离过滤 + 空 title 拒绝 + AgentLog 错误日志；新增 `conversation.update` 审计枚举；`TopicCreateSchema` URL 校验支持相对路径；`useChat` SSE 中断时持久化部分 AI 回复；抽取 `useModelPreference` Hook 消除 `/new`/`project-chat` 重复代码；补齐项目空间 `handleSend` @/# 解析；`/api/chat` 补齐 `requireWritable` 写权限门禁；新增文档：`/api/fetch-content` 端点、`extract-file-text.ts` 引擎、`PATCH /api/conversations/[id]`、模型 localStorage 约定、`ProjectChat` 统一约定 |
-| v2.18.0-alpha | 2026-06-12 | 智能体板块代码健康修复：Agent 模型新增 `automationLevel` L1-L4 字段 + Agent 详情页六维度完善（连接器绑定 / L1-L4 等级面板 / 记忆权限分级 / 六大组件版本清单）+ AgentCard 接入 SSE 实时状态指示（头像圆点 + 卡片执行状态覆盖）+ 新建 `AgentStatusBadge` / `AutomationLevelBadge` / `AgentSSERawStatusBadge` 通用组件 + 提取 `AUTOMATION_LEVEL_META` 共享 L1-L4 元数据 + `serializeAgent` 提取至 `agent-serializer.ts` 消除重复 + execute 路由接入 `selectModel()` 策略路由（不再硬编码 DeepSeek）+ 新增 `AbortController` 超时保护 + AuditLog 事务原子写入 + RBAC 补齐（POST logs）+ `assertWithinBoundary` 接入 workspaceId 隔离 + `AgentUpdateSchema`/`MemoryUpdateSchema` confirm 从 `z.string()` 修正为 `z.boolean()` 修复门禁恒失败缺陷 |
-| v2.19.0-alpha | 2026-06-12 | 外贸板块全链路排查与代码健康修复：① 新建 `GET /api/workflows?industry=foreign-trade` 列表端点（workspaceId 隔离 + 行业关键词筛选）；② `POST /api/workflows/run` 补齐 `writeAgentLog(source='workflow')` + 失败路径 `AuditLog(action='workflow.run.fail')` + 错误状态码区分（Hermes 超时 → 502）；③ 提取共享 `serializeWorkflow(wf)` 白名单过滤序列化（`[id]/route.ts` 原 `{ ...wf }` 全量展开泄漏 `workspaceId` 高危已修复）；④ 新建 `ft-quote-generator` 技能（13 个 ft-* 技能）；⑤ SLASH_COMMANDS 同步新增 `/ft-quote-generator`；⑥ 审计动作枚举新增 `workflow.run.fail` |
-| v2.21.0-alpha | 2026-06-12 | 项目空间模块全链路补齐与代码健康修复：① Prisma Task 模型新增 `projectId` 字段+Project 反向关系；② POST /api/projects 接入 `auditedWrite` 审计 + 创建时初始化中期 Memory(`type='mid'`)；③ PATCH /api/projects/[id] 补齐 RBAC(`requireWritable`)+审计(`project.update`)+workspaceId 隔离（三高危修复）；④ DELETE 补 workspaceId 隔离（updateMany/delete）+ ForbiddenError 分类；⑤ 新建 GET /api/projects/[id]/tasks（`withRBAC(VIEWER)`，workspaceId+projectId 双隔离）；⑥ 新建 GET /api/projects/[id]/memory（同隔离模式）；⑦ 提取共享 `serializeProject`/`serializeMemory` 到 `api-utils.ts`（消除 2+3 处重复）；⑧ 新建 `findProjectOrThrow` 共享 helper（消除 5 处项目查找样板）；⑨ 前端列表页添加分类标签（类型/客户/国家/产品线）+ 筛选按钮组；⑩ 前端详情页多标签视图（shadcn Tabs：聊天/任务/文件/动态/智能体）+ 风险点与下一步建议面板；⑪ 审计枚举新增 `project.create`/`project.update`；⑫ 新增 AGENTS.md §4.16 项目空间 API 管道约定 |
-| v2.24.0-alpha | 2026-06-12 | 最近模块全链路排查修复与代码健康：① 新建 `GET /api/recent` 聚合端点（`buildWorkspaceContext` 隔离 + `Promise.allSettled` 部分降级 + AgentLog 闭环）；② `RecentRecordItem` 统合类型收敛至 `api-client.ts` 单一数据源（消除 route.ts 重复定义）；③ `RecentType` 收敛（组件通过 `RecentRecordItem["type"]` 派生，旧版 3 类型标记 `@deprecated`）；④ 新建 `useRecentRecords` Hook（TanStack Query `useQuery`，`staleTime: 30s`，`retry: 1`）；⑤ /recent 页面新增时间筛选（全部/今天/昨天/本周/更早）+ 行业筛选（全部/外贸/家居/电子/机械）；⑥ 所有记录可点击跳转对应详情页；⑦ 新增 AGENTS.md §4.19 最近 API 管道约定 |
-| v2.23.0-alpha | 2026-06-12 | 文件模块代码健康修复 M7：① `FileItem.size`/`FileVersion.size` 类型从 string 改为 number（字节）；② 提取 `formatFileSize(bytes)` 至 `@/lib/utils`（Intl.NumberFormat 统一入口），消除 files-page-client.tsx 与 project-context-panel.tsx 两处重复（旧版 `parseFloat+toFixed` 同步升级）；③ 提取 `formatRelativeDay(iso)`/`formatFullDateTime(iso)` 至 `@/lib/date-utils`，消除 files-page-client.tsx 中 `formatDate`/`formatFullDate` 独立副本（此前共 4 处重复）；④ 删除 `file-mock-data.ts` 中死代码（旧版 emoji `fileCategories`/`fileTypeIconMap`/`parseStatusLabel`/`FileCategoryDef`）；⑤ 分类树图标从 emoji 迁移至 Lucide（9 个图标组件）；⑥ 新增 `FileIcon` 静态映射组件替代 render 中 IIFE（通过 `react-hooks/static-components` 规则）；⑦ `FileUploadSheet` 上传 Drawer 从 mock 升级为真实文件选择+拖拽+`POST /api/files/upload` 上传+客户端 50MB 预检+拒绝提示 UI；⑧ 新增 AGENTS.md §4.18 文件模块约定 |
-| v2.22.0-alpha | 2026-06-12 | 智慧大脑模块全链路排查修复与代码健康：① 8 个子路由完整性确认（全部存在）；② Skill 前端类型新增 `automationLevel` + 详情页添加 `AutomationLevelBadge`；③ 新建 `POST /api/skills/[id]/test` 端点（withRBAC + L3/L4 门禁 + 预记录审计）；④ 新建 `POST /api/connectors/[id]/authorize` 授权回调端点（withRBAC + 预记录审计）；⑤ `DELETE /api/memory/[id]` 添加 `checkAutomationGate(L3)` 门禁（AGENTS.md §4.5）；⑥ 短期记忆页添加「清理全部」+「合并转入中期记忆」批量操作按钮（含失败收集反馈）；⑦ `serializeConnector` 提取至 `api-utils.ts`（消除 3 处重复）；⑧ 前端 L3 技能测试二次确认流程；⑨ 审计枚举新增 `skill.test`/`connector.authorize`/`connector.create`/`connector.connect`/`connector.disconnect`/`delete.connector`；⑩ 新增 AGENTS.md §4.17 智慧大脑 API 管道约定 |
-| v2.20.0-alpha | 2026-06-12 | Dashboard 模块补齐与代码健康修复：① `DashboardStats` 新增 `dailyInquiryTrend`（近14天日趋势）+ `activeClientAlerts`（近7天高频客户Top5）聚合；② 新建 `InquiryTrendChart` Recharts 折线图组件（ssr:false 懒加载，配色 CSS 变量）；③ 新建 `ActiveClientAlerts`/`ActiveClientSection` 客户活跃预警组件（正向监测）；④ AI 报告支持晨报/晚报/周报三档切换（`POST /api/reports/generate` 新增 `{ type }` 请求体）；⑤ `DashboardFilterBar` 新增品类（intelligence type）筛选维度；⑥ `GET /api/intelligence` 新增 `?type=` 参数并迁移至 `withRBAC(VIEWER)`；⑦ 类型统一：`DailyInquiryPoint`/`ActiveClientAlert`/`ReportType` 移至 `types/dashboard.ts` 单一数据源；⑧ AgentLogSource 新增 `evening-brief`/`weekly-brief`；⑨ 图表硬编码色值全量替换为 CSS 变量（`var(--border)`/`var(--hint)` 等） |
-
-***
-
-*本文档由 HermesClaw-v2 项目组制定，依据 AI-First 系统工程原则与动态 Harness 架构理念构建。*
+3. HermesClaw 不以「修改上游源码」作为首选路径，而是：  
+   - 优先通过配置、Industry Pack、Harness、Connector 等扩展点实现业务目标。  
+   - 仅在证明无法通过扩展层实现时，采用「上游贡献 PR + 本地兼容层」方案。

@@ -30,9 +30,13 @@ pnpm dev                   # 开发服务器（Turbopack）
 pnpm build                 # 生产构建
 pnpm lint                  # ESLint
 pnpm exec tsc --noEmit     # TypeScript 类型检查
+pnpm db:generate           # 重新生成 Prisma Client（改 prisma/schema.prisma 后必跑）
 pnpm dlx shadcn@latest add <component>  # 新增 shadcn 组件
 curl http://localhost:3000/api/health   # 健康检查
 ```
+
+> **Prisma 注意**：`src/generated/` 为生成代码，**不入库**，由 `postinstall`（`prisma generate`）在 `pnpm install` 时自动重建。
+> 改 `prisma/schema.prisma` 后，必须 `pnpm db:generate` **并重启 dev server**，否则运行实例持旧 Client，新表/新字段会静默失效。
 
 ## 技术栈
 
