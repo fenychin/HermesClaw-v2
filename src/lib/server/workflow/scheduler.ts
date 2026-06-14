@@ -67,15 +67,24 @@ export class WorkflowSchedulerService {
       throw new TaskInputValidationError(errorMsg, { errors: validationErrors })
     }
 
-    // 2. 路由决定逻辑（统一从 runtimeMode 获取，全局架构审查 P1-#6）
-    const envEngine = runtimeMode.workflow.engine
-    let engine: "local" | "hermes" = envEngine
-    // 当 env 未显式指定时，workspace 设定决定路由模式
-    if (envEngine !== "hermes" && envEngine !== "local") {
+    // 2. 路由决定逻辑（优先级：env 显式 > workspace 设定 > runtimeMode 默认）
+    const mode = process.env.WORKFLOW_ROUTING_MODE
+    let engine: "local" | "hermes"
+    if (mode === "hermes") {
+      engine = "hermes"
+    } else if (mode === "local") {
+      engine = "local"
+    } else {
+      // env 未显式指定 → 检查 workspace 级别配置
       const settings = await prisma.workspaceSettings.findUnique({
         where: { workspaceId },
       })
-      engine = (settings?.workflowEngine as "local" | "hermes") || "local"
+      if (settings?.workflowEngine === "hermes" || settings?.workflowEngine === "local") {
+        engine = settings.workflowEngine as "local" | "hermes"
+      } else {
+        // 最终 fallback → runtimeMode 统一默认值（dev→local, prod→hermes）
+        engine = runtimeMode.workflow.engine
+      }
     }
 
     logger.info(`[WorkflowScheduler] 工作流 ${workflowId} 路由决定为: ${engine} 执行器`, {

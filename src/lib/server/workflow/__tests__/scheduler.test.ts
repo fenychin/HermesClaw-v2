@@ -67,9 +67,8 @@ describe("WorkflowSchedulerService 统一调度路由测试", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     delete process.env.WORKFLOW_ROUTING_MODE
-    // 重置 runtimeMode 内部缓存的 workflow.engine（需要重新 require 或模块级重新计算）
-    // 注意：因为 runtimeMode 是模块级常量（at import time），改为 process.env 后需
-    // 确保 scheduler 内部不再直读 env，且测试通过 process.env 间接传入。
+    // 三优先级路由逻辑：env 显式 > workspace 配置 > runtimeMode 默认
+    // tests 1-2 走 env 直设；3-4 走 workspace；5 走 runtimeMode 兜底
   })
 
   it("当 WORKFLOW_ROUTING_MODE 环境变量配置为 hermes 时，直接走远程引擎", async () => {

@@ -52,8 +52,8 @@ export type RuntimeModeLabel =
   | "hermes-mock-openclaw-real"
 
 function resolveModeLabel(): RuntimeModeLabel {
-  const h = runtimeMode.hermes.useMock
-  const o = runtimeMode.openclaw.useMock
+  const h = resolveMock("HERMES_USE_MOCK")
+  const o = resolveMock("OPENCLAW_USE_MOCK")
   if (h && o) return "all-mock"
   if (!h && !o) return "all-real"
   if (!h && o) return "hermes-real-openclaw-mock"
