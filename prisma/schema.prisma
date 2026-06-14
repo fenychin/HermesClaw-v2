@@ -315,6 +315,7 @@ model HarnessProposal {
   problemStatement      String
   evidence              Json      @default("[]")
   proposedChange        Json                       // { targetComponent, description, riskLevel, automationLevel }
+  targetSkillId         String?                    // 关联具体 Skill（L3 审批门禁据此匹配；null 表示非 skill 类提案）
   requiresHumanApproval Boolean   @default(true)
   estimatedImpact       String
   affectedAgents        Json      @default("[]")
@@ -328,6 +329,7 @@ model HarnessProposal {
 
   @@index([workspaceId])
   @@index([status])
+  @@index([targetSkillId])
   @@index([createdAt])
 }
 

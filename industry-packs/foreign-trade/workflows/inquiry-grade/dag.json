@@ -22,6 +22,7 @@
         "field": "priority",
         "sourceNode": "n1-grading",
         "sourcePath": "result.grade",
+        "valueMap": { "A": "high", "B": "mid", "C": "low" },
         "automationLevel": "L1"
       }
     },

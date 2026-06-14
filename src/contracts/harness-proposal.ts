@@ -60,6 +60,8 @@ export const HarnessProposalSchema = z.object({
     riskLevel: RiskLevelSchema,
     automationLevel: AutomationLevelSchema,
   }),
+  /** 关联的具体 Skill ID（L3 审批门禁据此匹配；非 skill 类提案为 null/缺省） */
+  targetSkillId: z.string().nullable().optional(),
   /** 是否需要人工审批（§3.1） */
   requiresHumanApproval: z.boolean().default(true),
   /** 预期影响描述（中文） */

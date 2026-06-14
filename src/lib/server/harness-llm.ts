@@ -184,7 +184,6 @@ export function parseJsonLoose(text: string): unknown {
 
 /**
  * Anthropic 路径：通过共享 llm-provider 调用结构化输出 + adaptive thinking。
- * 🔄 消除直接 import anthropic SDK（P2 整改）。
  */
 async function analyzeWithAnthropic(
   prompt: string,
@@ -207,7 +206,6 @@ async function analyzeWithAnthropic(
 
 /**
  * DeepSeek 路径：通过共享 llm-provider 调用 JSON 模式。
- * 🔄 消除手写 fetch（P2 整改）。
  */
 async function analyzeWithDeepSeek(
   prompt: string,

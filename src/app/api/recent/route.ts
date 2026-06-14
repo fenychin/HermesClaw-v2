@@ -160,7 +160,7 @@ export async function GET(request: Request) {
               problemStatement: true,
               status: true,
               updatedAt: true,
-              riskLevel: true,
+              proposedChange: true,
             },
           })
           .then((proposals) =>
@@ -173,7 +173,8 @@ export async function GET(request: Request) {
               meta: {
                 proposalId: p.proposalId,
                 status: p.status,
-                riskLevel: p.riskLevel,
+                riskLevel:
+                  (p.proposedChange as { riskLevel?: string } | null)?.riskLevel ?? null,
               },
             })),
           ),

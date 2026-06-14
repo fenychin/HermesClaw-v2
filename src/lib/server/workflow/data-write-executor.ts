@@ -50,6 +50,11 @@ export function resolveNestedValue(obj: unknown, path: string): unknown {
  *   2. 通过 Prisma 更新目标模型字段（仅 Inquiry 单表）
  *   3. 通过 createAuditEntry() 预记录 → 写入 → updateAuditEntry() 标记成功（L2 审计留痕）
  *   4. 将写入的值同步到 ctx.variables（供下游 condition 节点读取）
+ *
+ * 行业包注入点：
+ *   - config.valueMap?: Record<string, string> —— 行业包声明的业务值映射
+ *     （如外贸 {A→high, B→mid, C→low}），有则查表转值，无则直写原始值
+ *   - config.field —— 目标字段，经白名单校验后直接用于 Prisma set
  */
 export async function executeDataWriteNode(
   node: WorkflowNode,
@@ -136,27 +141,37 @@ export async function executeDataWriteNode(
   try {
     // 将 grade 值映射为 Inquiry.priority 字段
     if (target === 'Inquiry') {
-      const gradeStr = String(value).trim().toUpperCase()
-      // A → high, B → mid, C → low（与 Inquiry.priority 对齐）
-      const priorityMap: Record<string, string> = { A: 'high', B: 'mid', C: 'low' }
-      const priority = priorityMap[gradeStr] ?? 'mid'
+      const valueMap = typeof config.valueMap === 'object' && config.valueMap !== null
+        ? (config.valueMap as Record<string, string>)
+        : null
+      const rawValue = String(value).trim()
+
+      // 有 valueMap → 查表转值（行业包声明的业务映射，如 A→high）；无 → 直写
+      let writeValue: string
+      if (valueMap) {
+        writeValue = valueMap[rawValue] ?? valueMap[rawValue.toUpperCase()] ?? rawValue
+      } else {
+        writeValue = rawValue
+      }
+
+      // 白名单 field，防止恶意注入（仅允许 Inquiry 模型字段）
+      const allowedFields = ['priority', 'status', 'assignee', 'note', 'grade'] as const
+      const writeField = (allowedFields as readonly string[]).includes(field) ? field : 'priority'
 
       await prisma.inquiry.update({
         where: { id: inquiryId },
-        data: {
-          priority,
-        },
+        data: { [writeField]: writeValue },
       })
 
-      logger.info(`[data-write-executor] Data-Write 已更新 Inquiry ${inquiryId}.priority = ${priority}（grade=${gradeStr}）`, {
-        nodeId: node.id,
-        sourceNode,
-        inquiryId,
-      })
+      logger.info(
+        `[data-write-executor] Data-Write 已更新 Inquiry ${inquiryId}.${writeField} = ${writeValue}` +
+        (valueMap ? `（valueMap: ${rawValue}→${writeValue}）` : ''),
+        { nodeId: node.id, sourceNode, inquiryId },
+      )
 
       // 7. 同步到 ctx.variables（供下游 condition 节点读取）
-      ctx.variables['grade'] = gradeStr
-      ctx.variables['priority'] = priority
+      ctx.variables['grade'] = rawValue.toUpperCase()
+      ctx.variables['priority'] = writeField === 'priority' ? writeValue : (ctx.variables['priority'] ?? null)
     }
 
     // 8. 审计状态更新为成功

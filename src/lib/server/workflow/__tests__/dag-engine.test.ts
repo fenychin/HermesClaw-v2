@@ -13,6 +13,7 @@ describe('DAG Engine 纯编排单元测试', () => {
     actor: 'test-actor',
     depth: 0,
     workspaceId: 'test-workspace',
+    industryId: 'foreign-trade',
   })
 
   // 1. 测试拓扑排序环路检测

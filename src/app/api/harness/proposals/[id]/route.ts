@@ -12,19 +12,6 @@ import { resolveAutomationLevel } from "@/types"
 import { HarnessProposalUpdateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireHarnessAdmin } from "@/lib/workspace"
 
-import { prisma } from "@/lib/prisma"
-import { logger } from '@/lib/logger';
-import {
-  successResponse,
-  errorResponse,
-} from "@/lib/api-utils"
-import { createAuditEntry, updateAuditEntry } from "@/lib/server/audit"
-import { writeAgentLog } from "@/lib/server/agent-log"
-import { checkConfirmQuery, checkAutomationGate } from "@/lib/server/guardrail"
-import { resolveAutomationLevel } from "@/types"
-import { HarnessProposalUpdateSchema, validateBody } from "@/lib/validators"
-import { buildWorkspaceContext, requireHarnessAdmin } from "@/lib/workspace"
-
 import { HarnessProposalSchema } from '@/contracts'
 import type { HarnessProposal } from '@/types'
 

@@ -183,7 +183,7 @@ async function main() {
   // 确保没有已审批的 HarnessProposal
   await prisma.harnessProposal.deleteMany({
     where: {
-      targetComponent: { in: [outreachEmailId, `skill:${outreachEmailId}`] },
+      targetSkillId: outreachEmailId,
       status: 'approved',
     },
   })
@@ -219,14 +219,19 @@ async function main() {
       workspaceId: 'default',
       proposalId,
       triggeredBy: 'manual',
+      triggerReason: 'E2E 验证手动创建',
       problemStatement: 'E2E 验证：为开发信生成技能创建审批',
       evidence: '[]',
-      targetComponent: outreachEmailId,
-      proposedChange: '允许开发信生成技能在 DAG 工作流中自动执行',
-      riskLevel: 'medium',
-      automationLevel: 'L3',
+      targetSkillId: outreachEmailId,
+      proposedChange: {
+        targetComponent: '工具接入',
+        description: '允许开发信生成技能在 DAG 工作流中自动执行',
+        riskLevel: 'medium',
+        automationLevel: 'L3',
+      },
       status: 'approved',
       estimatedImpact: 'E2E 测试用，无实际影响',
+      rollbackPlan: '回滚至升级前配置版本',
       reviewedBy: 'e2e-verify',
       reviewedAt: new Date().toISOString(),
     },

@@ -65,9 +65,8 @@ export class ToolGrantMissingException extends AppException {
 /**
  * Workflow 实体缺少 industryId 异常 (500 Internal Server Error)。
  *
- * P2-4：消除 `let industryId = 'foreign-trade'` 字面量。
- * 当一个 Workflow 既不存在、又无 industryId 字段时抛出此异常 ——
- * 它表示数据完整性破损，不能用任何静默默认值绕过，否则会把多包路由信号丢失。
+ * industryId 由 dag-runner 一次性注入 WorkflowRunContext，执行器读 ctx.industryId。
+ * 为 null 时抛此异常——表示数据完整性破损，不能用任何静默默认值绕过，否则会把多包路由信号丢失。
  */
 export class MissingIndustryIdError extends AppException {
   constructor(workflowId: string) {

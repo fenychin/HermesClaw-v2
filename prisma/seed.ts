@@ -41,6 +41,9 @@ const L4_DEMO_PROPOSAL = {
   rollbackPlan: "L4 动作不经审批通道执行，无系统级回滚；须由人工在源业务系统撤销。",
   status: "pending" as const,
   createdAt: "2026-06-09T10:00:00Z",
+  workspaceId: "default",
+  reviewedBy: null as string | null,
+  reviewedAt: null as string | null,
 }
 
 const seedProposals = [
