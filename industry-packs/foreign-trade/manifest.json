@@ -4,11 +4,40 @@
   "version": "1.0.0",
   "compatibleHermesApi": { "min": "1.0.0", "max": "2.0.0" },
   "compatibleRuntimeApi": { "min": "1.0.0", "max": "2.0.0" },
+  "directories": {
+    "agents": true,
+    "workflows": true,
+    "skills": true,
+    "knowledge": true,
+    "connectors": true,
+    "schemas": true,
+    "dashboards": true,
+    "evalRules": true,
+    "prompts": true
+  },
   "directory": {
     "agents": ["agent-001","agent-002","agent-003","agent-004","agent-005","agent-006","agent-007","agent-008"],
     "workflows": ["inquiry-grade","dev-letter","customer-profile","quote-gen","sample-mgmt","order-push","exhibition-leads","followup-remind"],
-    "skills": ["ft-inquiry-grading","ft-outreach-email","ft-quote-generator","ft-follow-up-crm"],
+    "skills": [
+      "ft-ab-testing",
+      "ft-auto-reply",
+      "ft-competitor-analysis",
+      "ft-cost-accounting",
+      "ft-customer-profiling",
+      "ft-document-parsing",
+      "ft-follow-up-crm",
+      "ft-inquiry-grading",
+      "ft-inquiry-priority",
+      "ft-inquiry-sorter",
+      "ft-outreach-email",
+      "ft-quotation-pdf",
+      "ft-quote-generator"
+    ],
     "connectors": ["email","crm"],
+    "knowledge": ["README"],
+    "schemas": ["README"],
+    "dashboards": ["foreign-trade"],
+    "evalRules": ["baseline"],
     "prompts": ["workflow-templates"]
   },
   "migrationRules": []

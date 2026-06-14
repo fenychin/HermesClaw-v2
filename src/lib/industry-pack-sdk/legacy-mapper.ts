@@ -28,6 +28,10 @@ interface LegacyManifest {
     skills?: string[]
     connectors?: string[]
     prompts?: string[]
+    knowledge?: string[]
+    schemas?: string[]
+    dashboards?: string[]
+    evalRules?: string[]
   }
   industry?: string
   createdAt?: string
@@ -54,10 +58,10 @@ export function mapLegacyManifest(val: unknown): Record<string, unknown> | unkno
         workflows: Array.isArray(obj.directory.workflows) && obj.directory.workflows.length > 0,
         skills: Array.isArray(obj.directory.skills) && obj.directory.skills.length > 0,
         connectors: Array.isArray(obj.directory.connectors) && obj.directory.connectors.length > 0,
-        knowledge: false,
-        schemas: false,
-        dashboards: false,
-        evalRules: false,
+        knowledge: Array.isArray(obj.directory.knowledge) && obj.directory.knowledge.length > 0,
+        schemas: Array.isArray(obj.directory.schemas) && obj.directory.schemas.length > 0,
+        dashboards: Array.isArray(obj.directory.dashboards) && obj.directory.dashboards.length > 0,
+        evalRules: Array.isArray(obj.directory.evalRules) && obj.directory.evalRules.length > 0,
         prompts: Array.isArray(obj.directory.prompts) && obj.directory.prompts.length > 0,
       }
     }

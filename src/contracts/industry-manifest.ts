@@ -109,6 +109,14 @@ export const IndustryManifestSchema = z.object({
     connectors: z.array(z.string()).default([]),
     /** Prompt 模板键列表（如 ['workflow-templates']） */
     prompts: z.array(z.string()).default([]).optional(),
+    /** 知识库文件键列表（CLAUDE.md §6.2）。 */
+    knowledge: z.array(z.string()).default([]).optional(),
+    /** Schema 文件键列表（CLAUDE.md §6.2）。 */
+    schemas: z.array(z.string()).default([]).optional(),
+    /** 仪表板配置键列表（CLAUDE.md §6.2）。 */
+    dashboards: z.array(z.string()).default([]).optional(),
+    /** 评估规则集键列表（CLAUDE.md §6.2）。 */
+    evalRules: z.array(z.string()).default([]).optional(),
   }).optional(),
   /** 支持的语言列表。 */
   languages: z.array(z.string()).default(["zh-CN"]),

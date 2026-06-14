@@ -158,3 +158,66 @@ export type PackAgentAsset = z.infer<typeof PackAgentAssetSchema>
  */
 export const PackWorkflowAssetSchema = WorkflowMetaSchema
 export type PackWorkflowAsset = WorkflowMeta
+
+// ─── §6.2 新增 4 类资产 schema ───────────────────────────────────
+
+/** Connector 资产（pack 自带连接器声明，industry-packs/<pack>/connectors/<name>/connector.json）。 */
+export const PackConnectorAssetSchema = z.object({
+  name: z.string().min(1),
+  kind: z.enum(["channel", "outbound", "inbound", "internal"]).default("outbound"),
+  industryPack: z.string().min(1),
+  description: z.string().default(""),
+  capabilities: z.array(z.string()).default([]),
+  implementation: z.object({
+    type: z.enum(["internal-reference", "external-http", "placeholder"]).default("placeholder"),
+    module: z.string().optional(),
+    endpoint: z.string().optional(),
+    note: z.string().optional(),
+  }).default({ type: "placeholder" }),
+  /** 连接器运行时配置 schema（字段类型描述） */
+  config: z.record(z.string(), z.unknown()).default({}),
+})
+export type PackConnectorAsset = z.infer<typeof PackConnectorAssetSchema>
+
+/** Dashboard 资产（pack 自带看板布局，industry-packs/<pack>/dashboards/<name>.json）。 */
+export const PackDashboardAssetSchema = z.object({
+  name: z.string().min(1),
+  title: z.string().min(1),
+  industryPack: z.string().min(1),
+  description: z.string().default(""),
+  layout: z.record(z.string(), z.unknown()).default({}),
+  renderedBy: z.string().optional(),
+})
+export type PackDashboardAsset = z.infer<typeof PackDashboardAssetSchema>
+
+/** EvalRule 资产（pack 自带评估规则集，Harness 评估引擎消费）。 */
+const EvalRuleSchema = z.object({
+  id: z.string().min(1),
+  metric: z.string().min(1),
+  scope: z.string().min(1),
+  threshold: z.number().optional(),
+  thresholdLow: z.number().optional(),
+  thresholdHigh: z.number().optional(),
+  windowHours: z.number().optional(),
+  windowDays: z.number().optional(),
+  action: z.enum(["raiseProposal", "alert", "log"]).default("raiseProposal"),
+  severity: z.enum(["low", "mid", "high", "critical"]).default("mid"),
+  description: z.string().default(""),
+})
+export const PackEvalRuleSetSchema = z.object({
+  name: z.string().min(1),
+  industryPack: z.string().min(1),
+  version: z.string().min(1),
+  description: z.string().default(""),
+  rules: z.array(EvalRuleSchema).min(1),
+})
+export type PackEvalRuleSet = z.infer<typeof PackEvalRuleSetSchema>
+
+/** Knowledge 资产（pack 自带知识库 markdown，简单文本即可）。 */
+export const PackKnowledgeFileSchema = z.object({
+  /** 文件键（不含扩展名） */
+  key: z.string().min(1),
+  /** Markdown 原文 */
+  content: z.string(),
+})
+export type PackKnowledgeFile = z.infer<typeof PackKnowledgeFileSchema>

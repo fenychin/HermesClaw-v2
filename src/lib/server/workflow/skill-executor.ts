@@ -71,7 +71,7 @@ function parseToolScopes(raw: string | null | undefined): string[] {
  * 执行流程：
  *   1. 从节点 config.skillId 加载数据库 Skill 记录（含 workspaceId 隔离）
  *   2. 校验 automationLevel：L3 须有已审批 HarnessProposal，L4 绝对拒绝
- *   3. 读取 .claude/skills/<skill.name>/SKILL.md 获取技能指令
+ *   3. 读取 SKILL.md 获取技能指令（路径优先级：industry-packs/<industryId>/skills/<name>/SKILL.md → .claude/skills/<name>/SKILL.md）
  *   4. 加载 AGENTS.md 治理规则，注入 system prompt
  *   5. 通过 selectModel() 策略路由选择 LLM Provider 与模型
  *   6. 调用 LLM 执行技能任务

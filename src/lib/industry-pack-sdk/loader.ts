@@ -20,7 +20,7 @@
  * - loadIndustryPrompt
  * - clearCache
  */
-import { readFileSync } from "fs"
+import { readFileSync, readdirSync, existsSync } from "fs"
 import { join } from "path"
 import { IndustryManifestSchema } from "@/contracts"
 import type { IndustryManifest } from "@/contracts"
@@ -29,10 +29,17 @@ import {
   WorkflowDagFileSchema,
   WorkflowStepsFileSchema,
   PackAgentAssetSchema,
+  PackConnectorAssetSchema,
+  PackDashboardAssetSchema,
+  PackEvalRuleSetSchema,
   type WorkflowMeta,
   type WorkflowDagFile,
   type WorkflowStepsFile,
   type PackAgentAsset,
+  type PackConnectorAsset,
+  type PackDashboardAsset,
+  type PackEvalRuleSet,
+  type PackKnowledgeFile,
 } from "./schemas"
 import { mapLegacyManifest } from "./legacy-mapper"
 
@@ -46,6 +53,11 @@ const workflowDagCache = new Map<string, WorkflowDagFile>()
 const workflowStepsCache = new Map<string, WorkflowStepsFile>()
 const agentsCache = new Map<string, PackAgentAsset[]>()
 const promptCache = new Map<string, string>()
+const skillCache = new Map<string, string>()
+const connectorCache = new Map<string, PackConnectorAsset>()
+const dashboardCache = new Map<string, PackDashboardAsset>()
+const knowledgeCache = new Map<string, PackKnowledgeFile[]>()
+const evalRulesCache = new Map<string, PackEvalRuleSet>()
 
 // ─── 工具：packId 合法性校验（防 path traversal） ────────────────
 
@@ -319,14 +331,201 @@ export function loadIndustryPrompt(packId: string, key: string): string | null {
   }
 }
 
-// ─── 缓存清理 ───────────────────────────────────────────────────
+// ─── §6.2 Skills / Connectors / Knowledge / Schemas / Dashboards / EvalRules ───
+
+/**
+ * 装载行业 pack 内某个 skill 的 SKILL.md 全文。
+ *
+ * 路径：industry-packs/<packId>/skills/<skillId>/SKILL.md
+ *
+ * 找不到时返回 null（兼容仍住在 .claude/skills/ 的通用技能）。
+ */
+export function loadIndustrySkill(packId: string, skillId: string): string | null {
+  assertSafePackId(packId)
+  assertSafeAssetId(skillId)
+
+  const cacheKey = `${packId}::${skillId}`
+  if (skillCache.has(cacheKey)) {
+    return skillCache.get(cacheKey)!
+  }
+
+  const skillPath = join(PACKS_DIR, packId, "skills", skillId, "SKILL.md")
+  try {
+    const text = readFileSync(skillPath, "utf-8")
+    skillCache.set(cacheKey, text)
+    return text
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return null
+    }
+    throw error
+  }
+}
+
+/** 列出指定 pack 的 skill ID 列表（来自 manifest.directory.skills）。 */
+export function listIndustrySkills(packId: string): string[] {
+  const manifest = getCachedManifest(packId)
+  return manifest.directory?.skills ?? []
+}
+
+/**
+ * 装载行业 pack 内某个 connector 的 connector.json。
+ *
+ * 路径：industry-packs/<packId>/connectors/<name>/connector.json
+ *
+ * 装载阶段 zod 强校验，缺失即抛错（fail-closed）。
+ */
+export function loadIndustryConnector(
+  packId: string,
+  name: string,
+): PackConnectorAsset {
+  assertSafePackId(packId)
+  assertSafeAssetId(name)
+
+  const cacheKey = `${packId}::${name}`
+  if (connectorCache.has(cacheKey)) {
+    return connectorCache.get(cacheKey)!
+  }
+
+  const filePath = join(PACKS_DIR, packId, "connectors", name, "connector.json")
+  try {
+    const rawText = readFileSync(filePath, "utf-8")
+    const parsed = JSON.parse(rawText)
+    const verified = PackConnectorAssetSchema.parse(parsed)
+    connectorCache.set(cacheKey, verified)
+    return verified
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to load connector: ${name} in pack: ${packId}. Error: ${message}`)
+  }
+}
+
+/** 列出指定 pack 已装载的 connector 资产。 */
+export function listIndustryConnectors(packId: string): PackConnectorAsset[] {
+  const manifest = getCachedManifest(packId)
+  const names = manifest.directory?.connectors ?? []
+  return names.map((n) => loadIndustryConnector(packId, n))
+}
+
+/**
+ * 装载行业 pack 内某个 dashboard 的 *.json 配置。
+ *
+ * 路径：industry-packs/<packId>/dashboards/<name>.json
+ */
+export function loadIndustryDashboard(
+  packId: string,
+  name: string,
+): PackDashboardAsset {
+  assertSafePackId(packId)
+  assertSafeAssetId(name)
+
+  const cacheKey = `${packId}::${name}`
+  if (dashboardCache.has(cacheKey)) {
+    return dashboardCache.get(cacheKey)!
+  }
+
+  const filePath = join(PACKS_DIR, packId, "dashboards", `${name}.json`)
+  try {
+    const rawText = readFileSync(filePath, "utf-8")
+    const parsed = JSON.parse(rawText)
+    const verified = PackDashboardAssetSchema.parse(parsed)
+    dashboardCache.set(cacheKey, verified)
+    return verified
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to load dashboard: ${name} in pack: ${packId}. Error: ${message}`)
+  }
+}
+
+/**
+ * 装载行业 pack 的评估规则集（Harness 评估引擎消费）。
+ *
+ * 路径：industry-packs/<packId>/eval-rules/<name>.json
+ */
+export function loadIndustryEvalRules(
+  packId: string,
+  name = "baseline",
+): PackEvalRuleSet {
+  assertSafePackId(packId)
+  assertSafeAssetId(name)
+
+  const cacheKey = `${packId}::${name}`
+  if (evalRulesCache.has(cacheKey)) {
+    return evalRulesCache.get(cacheKey)!
+  }
+
+  const filePath = join(PACKS_DIR, packId, "eval-rules", `${name}.json`)
+  try {
+    const rawText = readFileSync(filePath, "utf-8")
+    const parsed = JSON.parse(rawText)
+    const verified = PackEvalRuleSetSchema.parse(parsed)
+    evalRulesCache.set(cacheKey, verified)
+    return verified
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to load eval rules: ${name} in pack: ${packId}. Error: ${message}`)
+  }
+}
+
+/**
+ * 装载行业 pack 内 knowledge/ 目录下的所有 markdown 文件。
+ *
+ * 路径：industry-packs/<packId>/knowledge/*.md
+ */
+export function loadIndustryKnowledge(packId: string): PackKnowledgeFile[] {
+  assertSafePackId(packId)
+
+  if (knowledgeCache.has(packId)) {
+    return knowledgeCache.get(packId)!
+  }
+
+  const dirPath = join(PACKS_DIR, packId, "knowledge")
+  if (!existsSync(dirPath)) {
+    knowledgeCache.set(packId, [])
+    return []
+  }
+
+  let entries: string[]
+  try {
+    entries = readdirSync(dirPath).filter((f) => f.endsWith(".md"))
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to list knowledge dir for pack: ${packId}. Error: ${message}`)
+  }
+
+  const files: PackKnowledgeFile[] = entries.map((entry) => {
+    const key = entry.replace(/\.md$/, "")
+    const content = readFileSync(join(dirPath, entry), "utf-8")
+    return { key, content }
+  })
+
+  knowledgeCache.set(packId, files)
+  return files
+}
+
+/**
+ * 装载行业 pack 内 schemas/ 目录的元数据列表（仅返回文件列表，schema 内容由调用方读取）。
+ *
+ * MVP 阶段 pack-owned 表声明仍住在主 prisma/schema.prisma；本 API 用于
+ * 自描述行业包持有哪些表，未来 monorepo 化拆出 pack 私有 schema 时再扩展。
+ */
+export function loadIndustrySchemas(packId: string): string[] {
+  assertSafePackId(packId)
+
+  const dirPath = join(PACKS_DIR, packId, "schemas")
+  if (!existsSync(dirPath)) return []
+  return readdirSync(dirPath)
+}
+
+
 
 export function clearCache(packId?: string): void {
   if (packId) {
     manifestCache.delete(packId)
     workflowMetasCache.delete(packId)
     agentsCache.delete(packId)
-    // 工作流 DAG / steps / prompt 用 packId::xxx 复合 key，遍历清理
+    knowledgeCache.delete(packId)
+    // 工作流 DAG / steps / prompt / skill / connector / dashboard / evalRules 用 packId::xxx 复合 key，遍历清理
     for (const key of workflowDagCache.keys()) {
       if (key.startsWith(`${packId}::`)) workflowDagCache.delete(key)
     }
@@ -336,6 +535,18 @@ export function clearCache(packId?: string): void {
     for (const key of promptCache.keys()) {
       if (key.startsWith(`${packId}::`)) promptCache.delete(key)
     }
+    for (const key of skillCache.keys()) {
+      if (key.startsWith(`${packId}::`)) skillCache.delete(key)
+    }
+    for (const key of connectorCache.keys()) {
+      if (key.startsWith(`${packId}::`)) connectorCache.delete(key)
+    }
+    for (const key of dashboardCache.keys()) {
+      if (key.startsWith(`${packId}::`)) dashboardCache.delete(key)
+    }
+    for (const key of evalRulesCache.keys()) {
+      if (key.startsWith(`${packId}::`)) evalRulesCache.delete(key)
+    }
   } else {
     manifestCache.clear()
     workflowMetasCache.clear()
@@ -343,6 +554,11 @@ export function clearCache(packId?: string): void {
     workflowStepsCache.clear()
     agentsCache.clear()
     promptCache.clear()
+    skillCache.clear()
+    connectorCache.clear()
+    dashboardCache.clear()
+    knowledgeCache.clear()
+    evalRulesCache.clear()
   }
 }
 

@@ -40,18 +40,35 @@ export async function executeLocalTask(
   }
 
   // 2. 读取 SKILL.md
-  const skillMdPath = join(process.cwd(), '.claude', 'skills', skill.name, 'SKILL.md')
-  let skillMdContent: string
-  try {
-    skillMdContent = await readFile(skillMdPath, 'utf8')
-  } catch {
+  // 加载优先级（CLAUDE.md §6 行业包是插件不是业务分支）：
+  //   1) industry-packs/<industryId>/skills/<name>/SKILL.md  ← 行业包私有技能
+  //   2) .claude/skills/<name>/SKILL.md                        ← 通用技能兜底
+  const industryId = envelope.industryId
+  const packSkillPath = industryId
+    ? join(process.cwd(), 'industry-packs', industryId, 'skills', skill.name, 'SKILL.md')
+    : null
+  const fallbackSkillPath = join(process.cwd(), '.claude', 'skills', skill.name, 'SKILL.md')
+  const candidates = packSkillPath ? [packSkillPath, fallbackSkillPath] : [fallbackSkillPath]
+
+  let skillMdContent: string | null = null
+  let resolvedPath: string = fallbackSkillPath
+  for (const candidate of candidates) {
+    try {
+      skillMdContent = await readFile(candidate, 'utf8')
+      resolvedPath = candidate
+      break
+    } catch {
+      // 继续尝试下一个候选路径
+    }
+  }
+  if (skillMdContent === null) {
     // 知识缺口警告
     void writeAgentLog({
       source: 'knowledge-gap',
       taskName: `Skill「${skill.name}」缺少 SKILL.md`,
       status: 'warning',
       duration: '0s',
-      detail: `SKILL.md 文件缺失：${skillMdPath}，已使用描述+通用约束作为回退`,
+      detail: `SKILL.md 文件缺失，已尝试：${candidates.join(' / ')}，已使用描述+通用约束作为回退`,
       riskLevel: 'high',
     })
     skillMdContent = [
@@ -65,6 +82,11 @@ export async function executeLocalTask(
       `## 约束条件（cannot_do — 运行时回退通用约束）`,
       `- ${FALLBACK_SKILL_CONSTRAINTS}`,
     ].join('\n')
+  } else {
+    logger.debug('[OpenClaw Local Executor] SKILL.md loaded', {
+      skill: skill.name,
+      from: resolvedPath,
+    })
   }
 
   // 3. 加载治理规则

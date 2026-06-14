@@ -21,6 +21,15 @@ export {
   loadIndustryWorkflow,
   loadIndustryAgents,
   loadIndustryPrompt,
+  // §6.2 行业包资产装载 API
+  loadIndustrySkill,
+  listIndustrySkills,
+  loadIndustryConnector,
+  listIndustryConnectors,
+  loadIndustryDashboard,
+  loadIndustryEvalRules,
+  loadIndustryKnowledge,
+  loadIndustrySchemas,
   clearCache,
   clearManifestCache,
 } from "./loader"
@@ -31,6 +40,10 @@ export {
   WorkflowStepsFileSchema,
   PackAgentAssetSchema,
   PackWorkflowAssetSchema,
+  PackConnectorAssetSchema,
+  PackDashboardAssetSchema,
+  PackEvalRuleSetSchema,
+  PackKnowledgeFileSchema,
 } from "./schemas"
 
 export type {
@@ -39,6 +52,10 @@ export type {
   WorkflowStepsFile,
   PackAgentAsset,
   PackWorkflowAsset,
+  PackConnectorAsset,
+  PackDashboardAsset,
+  PackEvalRuleSet,
+  PackKnowledgeFile,
 } from "./schemas"
 
 export { mapLegacyManifest } from "./legacy-mapper"
