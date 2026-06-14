@@ -1,0 +1,6 @@
+{
+  "id": "followup-remind",
+  "title": "客户跟进提醒",
+  "description": "根据跟进周期自动发送提醒任务",
+  "icon": "Bell"
+}

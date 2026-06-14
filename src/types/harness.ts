@@ -1,25 +1,121 @@
 /**
  * 动态 Harness 进化提案类型
  * —— 对应 AGENTS.md 第三章 / PRD 第 11 节，自演化系统的核心机制
+ *
+ * ⚠️ 契约单源：AutomationLevel / RiskLevel 统一定义在 contracts/shared.ts，
+ *    本文件通过 import type + re-export 消费，不再手写重复类型。
  */
 
-export type RiskLevel = 'low' | 'mid' | 'high'
-export type ProposalStatus = 'pending' | 'approved' | 'rejected'
+import type {
+  AutomationLevel,
+  RiskLevel as ContractRiskLevel,
+  ProposalStatus,
+  TargetComponent,
+} from "@/contracts"
+import type { ModelProvider } from "./chat"
+
+export type { AutomationLevel }
+// ⚠️ RiskLevel 使用 compat 子集（不含 'critical'，Harness 不处理 catastrophic 级事件）
+export type RiskLevel = Exclude<ContractRiskLevel, 'critical'>
+// ProposalStatus / TargetComponent 单源来自 contracts/，此处仅 re-export 供外部便捷导入
+export type { ProposalStatus }
+export type { TargetComponent }
 
 /**
- * 自动化授权分级（AGENTS.md §4.7）
- * —— L1 全自动 / L2 建议执行留痕 / L3 需人工确认 / L4 绝对禁止自动
+ * 契约层 HarnessProposal（DB 对齐，扁平字段）。
+ * 从 contracts/ 导入，供需要与 DB/API 直接对齐的代码使用。
+ * 大部分 UI 层代码应使用下方的 HarnessProposal（UI 兼容视图，含嵌套 proposedChange）。
  */
-export type AutomationLevel = 'L1' | 'L2' | 'L3' | 'L4'
+export type { HarnessProposal as ContractHarnessProposal } from "@/contracts"
 
 /**
  * 由 riskLevel 派生 automationLevel（未显式标注时的回退规则，见 §4.7）
- * —— high→L3 / mid→L2 / low→L1
+ * —— high→L3 / medium→L2 / low→L1
  */
 export function automationLevelFromRisk(risk: RiskLevel): AutomationLevel {
   if (risk === 'high') return 'L3'
-  if (risk === 'mid') return 'L2'
+  if (risk === 'medium') return 'L2'
   return 'L1'
+}
+
+/**
+ * 解析自动化授权等级：显式标注优先，否则由 riskLevel 派生。
+ * —— 统一 automationLevel ?? automationLevelFromRisk(riskLevel) 的样板代码。
+ *    供 Route Handler / guardrail / harness-eval 等复用。
+ */
+export function resolveAutomationLevel(
+  automationLevel: string | null | undefined,
+  riskLevel: RiskLevel,
+): AutomationLevel {
+  if (automationLevel === 'L1' || automationLevel === 'L2' || automationLevel === 'L3' || automationLevel === 'L4') {
+    return automationLevel
+  }
+  return automationLevelFromRisk(riskLevel)
+}
+
+/** 审计日志风险等级（与 contracts RiskLevel 兼容，不含 'critical'） */
+export type AuditRiskLevel = Exclude<ContractRiskLevel, 'critical'>
+
+/**
+ * 将 AutomationLevel 映射为审计日志 riskLevel。
+ *
+ * 映射规则（AGENTS.md §4.7）：
+ *   L1 → low（全自动，低风险）
+ *   L2 → low（建议执行留痕，低风险）
+ *   L3 → medium（需人工确认，中风险）
+ *   L4 → high（绝对禁止自动，高风险）
+ *
+ * 供 dag-runner / guardrail / 所有 Skill 调用方复用，避免在各处重复 switch。
+ */
+export function mapAutomationToAuditRisk(level: AutomationLevel): AuditRiskLevel {
+  switch (level) {
+    case 'L1':
+    case 'L2':
+      return 'low'
+    case 'L3':
+      return 'medium'
+    case 'L4':
+      return 'high'
+    default:
+      return 'low'
+  }
+}
+
+/**
+ * 将 AutomationLevel 映射为 AgentLog riskLevel 字符串。
+ */
+export function mapAutomationToLogRisk(level: AutomationLevel): string {
+  switch (level) {
+    case 'L1':
+    case 'L2':
+      return 'low'
+    case 'L3':
+      return 'medium'
+    case 'L4':
+      return 'high'
+    default:
+      return 'low'
+  }
+}
+
+/**
+ * 将 AutomationLevel 映射为 selectModel() 使用的路由风险等级。
+ *
+ * L1/L2 → low（成本优化模型）
+ * L3    → medium（工作空间默认模型）
+ * L4    → high（高能力模型）
+ *
+ * 返回值为 model-router RouteRiskLevel 的等效字符串，调用方自行类型断言。
+ */
+export function mapAutomationToRouteRisk(level: AutomationLevel): 'low' | 'medium' | 'high' {
+  switch (level) {
+    case 'L4':
+      return 'high'
+    case 'L3':
+      return 'medium'
+    default:
+      return 'low'
+  }
 }
 
 /** Agent 业务动作 + 其自动化授权等级 */
@@ -59,21 +155,27 @@ export const TRADE_ACTIONS: AgentAction[] = [
 
 export interface HarnessProposal {
   id: string
-  proposalId: string
+  proposalId: string           // HEP-{timestamp}
   triggeredBy: 'auto' | 'manual'
+  triggerReason: string
   problemStatement: string
   evidence: string[]
-  targetComponent: string
-  proposedChange: string
-  riskLevel: RiskLevel
-  /** 自动化授权等级（§4.7）；审批拦截据此决定 L3 二次确认 / L4 硬拒绝 */
-  automationLevel: AutomationLevel
-  requiresApproval: true
-  status: ProposalStatus
+  proposedChange: {
+    targetComponent: TargetComponent
+    description: string
+    riskLevel: RiskLevel
+    automationLevel: AutomationLevel
+  }
+  requiresHumanApproval: true
   estimatedImpact: string
+  affectedAgents: string[]
+  rollbackPlan: string
+  status: ProposalStatus
   createdAt: string
   reviewedBy?: string
   reviewedAt?: string
+  /** 多租户隔离（§4.11），默认 "default" */
+  workspaceId?: string
 }
 
 /**
@@ -119,8 +221,9 @@ export interface HarnessEvaluateResult {
   triggered: boolean
   /** 本次评估的指标快照 */
   metrics: HarnessMetrics
-  /** 实际承担分析的 Provider（无 key 时回退 deepseek） */
-  provider: 'anthropic' | 'deepseek' | null
+  // ModelProvider 单源在 src/lib/server/llm-provider.ts (LlmProvider)
+  // 新增 Provider 时只需修改该文件，此处类型自动同步
+  provider: ModelProvider | null
   /** 实际使用的模型 ID */
   model: string | null
   /** 触发时生成的提案（未触发则缺省） */
@@ -129,6 +232,10 @@ export interface HarnessEvaluateResult {
   reason?: string
   /** AI 生成的 Markdown 评估报告（触发时） */
   reportMd?: string
+  /** 完整的 EvaluationReport 契约对象（P0 新增：对齐 contracts/evaluation-report.ts） */
+  evaluationReport?: import('@/contracts').EvaluationReport
+  /** AI 分析失败时的错误信息（P0 新增：区分"未触发"与"触发但分析失败"） */
+  error?: string
 }
 
 /**
@@ -142,7 +249,9 @@ export interface EvolutionLogEntry {
   errorRate: number
   successRate: number
   totalLogs: number
-  provider: 'anthropic' | 'deepseek' | null
+  // ModelProvider 单源在 src/lib/server/llm-provider.ts (LlmProvider)
+  // 新增 Provider 时只需修改该文件，此处类型自动同步
+  provider: ModelProvider | null
   model: string | null
   proposalId: string | null
   reason: string | null

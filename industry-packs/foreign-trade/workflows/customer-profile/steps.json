@@ -1,0 +1,23 @@
+{
+  "id": "customer-profile",
+  "title": "客户画像构建",
+  "description": "整合多渠道信息，生成完整客户档案",
+  "steps": [
+    {
+      "id": "step-n1-profile",
+      "title": "AI 客户画像构建",
+      "description": "输入客户公司名与基本信息，AI 自动构建完整画像",
+      "status": "pending",
+      "inputs": [
+        { "key": "company_name", "label": "客户公司名", "type": "text", "required": true, "placeholder": "如：BrightPath Trading LLC" },
+        { "key": "country", "label": "所在国家", "type": "text", "required": true, "placeholder": "美国、德国..." },
+        { "key": "business_type", "label": "业务类型", "type": "select", "required": true, "options": [
+          { "label": "进口商/贸易商", "value": "importer" },
+          { "label": "品牌商/制造商", "value": "brand" },
+          { "label": "零售商", "value": "retailer" },
+          { "label": "工程商", "value": "engineer" }
+        ]}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "followup-remind",
+  "title": "客户跟进提醒",
+  "description": "根据跟进周期自动发送提醒任务",
+  "steps": [
+    {
+      "id": "step-n1-analyze",
+      "title": "客户跟进分析",
+      "description": "输入客户信息，AI 分析跟进状态并生成建议",
+      "status": "pending",
+      "inputs": [
+        { "key": "customer_name", "label": "客户名称", "type": "text", "required": true },
+        { "key": "last_contact", "label": "上次联系时间", "type": "text", "required": true, "placeholder": "如：5天前 / 2026-06-01" },
+        { "key": "current_stage", "label": "当前阶段", "type": "select", "required": true, "options": [
+          { "label": "初次询盘", "value": "initial" },
+          { "label": "报价后跟进", "value": "quoted" },
+          { "label": "样品阶段", "value": "sample" },
+          { "label": "谈判中", "value": "negotiation" },
+          { "label": "待下单", "value": "order-pending" }
+        ]}
+      ]
+    }
+  ]
+}

@@ -1,22 +1,15 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import {
-  parseJsonField,
+  serializeMemory,
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
-import { checkConfirmQuery, checkConfirmValue } from "@/lib/server/guardrail"
-import { shouldVersion, snapshotRevision } from "@/lib/server/memory-version"
+import { actorFromSession } from "@/lib/server/audit"
+import { checkConfirmValue, checkAutomationGate } from "@/lib/server/guardrail"
+import { MemoryService } from "@/lib/server/memory-service"
 import { MemoryUpdateSchema, validateBody } from "@/lib/validators"
-
-/** 序列化 Memory，将 JSON 字符串字段反序列化 */
-function serializeMemory(memory: Record<string, unknown>) {
-  return {
-    ...memory,
-    tags: parseJsonField(memory.tags as string, []),
-  }
-}
+import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 /** GET /api/memory/[id] —— 获取单条记忆详情 */
 export async function GET(
@@ -74,12 +67,8 @@ export async function PATCH(
 
     const data: Record<string, unknown> = {}
 
-    // 冻结/解冻
-    if (body.frozen !== undefined) {
-      data.frozen = body.frozen
-    }
+    if (body.frozen !== undefined) data.frozen = body.frozen
 
-    // 升级记忆类型：mid → long
     if (body.type !== undefined) {
       const validTypes = ["short", "mid", "long"]
       if (!validTypes.includes(body.type)) {
@@ -88,31 +77,19 @@ export async function PATCH(
       data.type = body.type
     }
 
-    // 支持更新内容
     if (body.content !== undefined) data.content = body.content
     if (body.summary !== undefined) data.summary = body.summary
     if (body.confidence !== undefined) data.confidence = body.confidence
+    if (body.reason !== undefined) data.reason = body.reason
+    if (body.tags !== undefined) data.tags = body.tags
 
-    // 知识版本化（P2-⑧）：mid/long 内容性变更先快照旧版本再 bump version
-    if (shouldVersion(existing.type, body)) {
-      const newVersion = await snapshotRevision(
-        {
-          id: existing.id,
-          version: existing.version,
-          content: existing.content,
-          summary: existing.summary,
-          confidence: existing.confidence,
-        },
-        await actorFromSession(),
-        body.reason,
-      )
-      data.version = newVersion
-    }
-
-    const memory = await prisma.memory.update({
-      where: { id },
+    const actor = await actorFromSession()
+    const memory = await MemoryService.updateMemory(
+      existing.workspaceId,
+      id,
       data,
-    })
+      actor
+    )
 
     return successResponse({ memory: serializeMemory(memory as unknown as Record<string, unknown>) })
   } catch (error) {
@@ -128,25 +105,25 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+    const ctx = await buildWorkspaceContext(request)
+    requireWritable(ctx.role)
 
     const existing = await prisma.memory.findUnique({ where: { id } })
     if (!existing) {
       return errorResponse("记忆不存在", 404)
     }
 
-    const guard = await checkConfirmQuery(request, "删除记忆需二次确认")
-    if (!guard.ok) return guard.response
-
-    await prisma.memory.delete({ where: { id } })
-
-    await writeAuditLog({
-      actor: guard.actor,
-      action: "delete.memory",
-      targetType: "memory",
-      targetId: id,
-      detail: `${existing.type} · ${existing.summary}`,
-      riskLevel: "mid",
+    // 删除持久化数据 = 高危操作，永远需要人工审批（AGENTS.md §4.5）
+    // L3 门禁：需 ?confirm=true 二次确认；L4 硬拒绝
+    const gate = await checkAutomationGate({
+      automationLevel: "L3",
+      riskLevel: "high",
+      confirmed: new URL(request.url).searchParams.get("confirm") === "true",
+      actionName: `删除记忆：${existing.summary}`,
     })
+    if (!gate.ok) return gate.response
+
+    await MemoryService.deleteMemory(ctx.workspaceId, id, gate.actor)
 
     return successResponse({ message: "记忆已删除" })
   } catch (error) {
