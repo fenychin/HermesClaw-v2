@@ -1,6 +1,26 @@
 import { z } from "zod"
 
 /**
+ * Skill 执行 Payload Schema（对应 actionType = "skill.<name>"）。
+ * 动态的 skill 名称无法列入 discriminatedUnion 的字面量，但本 schema 在
+ * TypedTaskInputSchema 的 transform 中被 skill.* 前缀分支拦截校验，
+ * 不会裸落到 GenericPayloadSchema。
+ */
+export const SkillPayloadSchema = z.object({
+  _type: z.string().refine((val) => val.startsWith("skill."), {
+    message: "skill payload _type 必须以 skill. 开头",
+  }),
+  /** 工作流上下文的变量集 */
+  variables: z.record(z.string(), z.unknown()).default({}),
+  /** 上游节点输出累积 */
+  nodeOutputs: z.record(z.string(), z.unknown()).default({}),
+  /** 当前节点的 config */
+  config: z.record(z.string(), z.unknown()).default({}),
+})
+
+export type SkillPayload = z.infer<typeof SkillPayloadSchema>
+
+/**
  * 询盘处理 Payload Schema
  */
 export const HandleInquiryPayloadSchema = z.object({
@@ -98,6 +118,9 @@ export const TypedTaskInputSchema = z.any().transform((data, ctx) => {
     result = GenerateDevLetterPayloadSchema.safeParse(data)
   } else if (_type === "trade.generate-quotation") {
     result = GenerateQuotationPayloadSchema.safeParse(data)
+  } else if (typeof _type === "string" && _type.startsWith("skill.")) {
+    // P2-2.3：skill.* 动态 actionType 分支拦截，不走 GenericPayloadSchema 兜底
+    result = SkillPayloadSchema.safeParse(data)
   } else {
     result = GenericPayloadSchema.safeParse(data)
   }
@@ -116,6 +139,7 @@ export type TypedTaskInput =
   | HandleInquiryPayload
   | GenerateDevLetterPayload
   | GenerateQuotationPayload
+  | SkillPayload
   | GenericPayload
 
 /**

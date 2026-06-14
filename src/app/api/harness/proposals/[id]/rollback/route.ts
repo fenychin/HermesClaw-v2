@@ -178,8 +178,7 @@ export const POST = withRBAC(
           id: true,
           proposalId: true,
           status: true,
-          automationLevel: true,
-          riskLevel: true,
+          proposedChange: true,
           previousSnapshot: true,
           workspaceId: true,
         },
@@ -188,6 +187,14 @@ export const POST = withRBAC(
       if (!proposal) {
         return ApiResponse.error("提案不存在", 404)
       }
+
+      // automationLevel / riskLevel 嵌套在 proposedChange JSON 内（非顶层列）
+      const propChange = (proposal.proposedChange ?? {}) as {
+        automationLevel?: string
+        riskLevel?: string
+      }
+      const automationLevelRaw = propChange.automationLevel ?? null
+      const riskLevelRaw = propChange.riskLevel ?? "high"
 
       // 4. AGENTS.md §5 #3 禁止静默执行：回滚前写入预记录审计
       const actor = await actorFromSession()
@@ -199,13 +206,13 @@ export const POST = withRBAC(
         detail: `${proposal.proposalId} · 操作者 ${body.operatorId}`,
         riskLevel: "high",
         workspaceId: proposal.workspaceId,
-        automationLevel: (proposal.automationLevel as "L1" | "L2" | "L3" | "L4") ?? undefined,
+        automationLevel: (automationLevelRaw as "L1" | "L2" | "L3" | "L4") ?? undefined,
         triggeredBy: "user",
         contextSnapshot: {
           proposalId: proposal.proposalId,
           hepStatus: proposal.status,
-          riskLevel: proposal.riskLevel,
-          automationLevel: proposal.automationLevel,
+          riskLevel: riskLevelRaw,
+          automationLevel: automationLevelRaw,
           operatorId: body.operatorId,
           previousSnapshot: proposal.previousSnapshot
             ? JSON.parse(proposal.previousSnapshot)
@@ -216,8 +223,8 @@ export const POST = withRBAC(
 
       // 5. 自动化授权分级门禁（AGENTS.md §4.7）—— 使用共享护栏函数
       const gateResult = await checkAutomationGate({
-        automationLevel: proposal.automationLevel,
-        riskLevel: proposal.riskLevel,
+        automationLevel: automationLevelRaw,
+        riskLevel: riskLevelRaw,
         confirmed: body.confirmationToken === L3_CONFIRMATION_TOKEN,
         actionName: "回滚",
       })

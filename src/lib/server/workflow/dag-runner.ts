@@ -192,6 +192,8 @@ export async function runWorkflow(
     actor,
     depth,
     workspaceId: workflow.workspaceId ?? 'default',
+    // P1-5.1：从已加载的 workflow 一次性注入，消除 skill 节点逐个查库的 N+1
+    industryId: workflow.industryId ?? null,
   }
 
   // 4. 构建 handler 注册表（合并调用方自定义 handler + 内置 skill/subworkflow handler）
@@ -449,6 +451,19 @@ export async function runWorkflow(
           status: finalStatus,
           output: finalStatus === 'failed' ? null : stringifyJsonField(output),
           error: finalStatus === 'failed' ? '工作流执行失败' : null,
+          finishedAt: new Date(),
+        },
+      })
+
+      // 收尾对账：把仍 pending/running 的 NodeRun 标为 failed（防前端永久等待）
+      await tx.workflowNodeRun.updateMany({
+        where: {
+          runId,
+          status: { in: ['pending', 'running'] },
+        },
+        data: {
+          status: 'failed',
+          error: '运行终止状态（引擎结束时未收尾）',
           finishedAt: new Date(),
         },
       })

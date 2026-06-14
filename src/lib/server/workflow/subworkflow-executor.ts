@@ -1,5 +1,12 @@
 import { prisma } from '@/lib/prisma'
-import type { WorkflowNode, WorkflowRunContext, NodeExecutionResult, NodeHandler } from './dag-types'
+import type {
+  WorkflowNode,
+  WorkflowRunContext,
+  NodeExecutionResult,
+  NodeHandler,
+  RunTrigger,
+  RunStatus,
+} from './dag-types'
 
 type RunWorkflowFn = (
   workflowId: string,
@@ -8,10 +15,10 @@ type RunWorkflowFn = (
     parentRunId?: string
     depth?: number
     maxDepth?: number
-    trigger?: any
+    trigger?: RunTrigger
     handlers?: Record<string, NodeHandler>
   }
-) => Promise<{ runId: string; status: any; output: unknown }>
+) => Promise<{ runId: string; status: RunStatus; output: unknown }>
 
 /**
  * 创建子流程 NodeHandler。

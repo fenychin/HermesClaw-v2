@@ -30,7 +30,7 @@ import type {
 
 import { openclawClient } from '@/lib/server/adapters/openclaw/client'
 import type { TaskEnvelope } from '@/contracts/task-envelope'
-import type { ActionReceipt } from '@/contracts/action-receipt'
+import type { ActionReceipt, LlmResponse } from '@/contracts/action-receipt'
 import crypto from 'node:crypto'
 
 // ---- 常量 ----
@@ -45,6 +45,23 @@ export const FALLBACK_SKILL_CONSTRAINTS = [
   '不得发送外部邮件或执行资金操作',
   '输出必须标注置信度，低置信度（< 0.7）时须明确警示',
 ].join('；')
+
+/**
+ * 安全解析 ToolRegistry.scopes（持久化为 JSON 字符串）。
+ *
+ * 绝不抛异常：解析失败或结构非法时回退空数组。
+ * —— 授权校验属于安全热路径，scopes 解析一旦抛错绝不能反向导致放行（fail-open），
+ *    故此处吞掉解析异常并回退，真正的拦截判定由 grant 是否存在 / 双签是否齐全决定。
+ */
+function parseToolScopes(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === 'string') : []
+  } catch {
+    return []
+  }
+}
 
 // ---- 主执行器 ----
 
@@ -140,10 +157,7 @@ export async function executeSkillNode(
         where: {
           status: 'approved',
           workspaceId, // §4.11 数据隔离
-          OR: [
-            { targetComponent: skillId },
-            { targetComponent: `skill:${skillId}` },
-          ],
+          targetSkillId: skillId, // 提案须明确关联到当前 skill
         },
         orderBy: { updatedAt: 'desc' },
         select: { proposalId: true },
@@ -185,6 +199,9 @@ export async function executeSkillNode(
   // 4.6 运行时 ToolGrant 授权与双审批校验（AGENTS.md §4.3 / §6.1）
   // —— 如果该 Skill 被注册于 ToolRegistry 且为受控/高危工具（medium/high），
   //    则必须校验当前 Agent 在该 Workspace 下针对该 Tool 的有效 ToolGrant。
+  //
+  // 安全策略：fail-closed。授权校验链路中的任何非预期异常（DB 抖动、数据损坏等）
+  //          一律拒绝执行高危工具，绝不因校验系统自身故障而放行（与 L3 审批同策略）。
   try {
     const toolRegistry = await prisma.toolRegistry.findFirst({
       where: {
@@ -197,7 +214,7 @@ export async function executeSkillNode(
     if (toolRegistry && (toolRegistry.riskLevel === "medium" || toolRegistry.riskLevel === "high")) {
       const now = new Date()
       const currentAgentId = (ctx.variables.agentId as string) || "default-agent"
-      
+
       const grant = await prisma.toolGrant.findFirst({
         where: {
           workspaceId,
@@ -212,11 +229,10 @@ export async function executeSkillNode(
         logger.warn(
           `[skill-executor] 高危工具 ${toolRegistry.name} 授权缺失，拦截执行 (agentId=${currentAgentId})`
         )
-        const scopes = JSON.parse(toolRegistry.scopes || "[]")
         throw new ToolGrantMissingException(
           currentAgentId,
           toolRegistry.id,
-          scopes,
+          parseToolScopes(toolRegistry.scopes),
           `高危工具「${toolRegistry.name}」授权缺失，需申请临时授权。`,
           toolRegistry.riskLevel
         )
@@ -228,11 +244,10 @@ export async function executeSkillNode(
           logger.warn(
             `[skill-executor] 高危工具 ${toolRegistry.name} 双签不足，拦截执行 (grantId=${grant.id})`
           )
-          const scopes = JSON.parse(toolRegistry.scopes || "[]")
           throw new ToolGrantMissingException(
             currentAgentId,
             toolRegistry.id,
-            scopes,
+            parseToolScopes(toolRegistry.scopes),
             `特高危工具「${toolRegistry.name}」已获取临时 Token，但缺少双人审批签字（AGENTS.md §6.1），拦截执行。`,
             toolRegistry.riskLevel
           )
@@ -244,30 +259,38 @@ export async function executeSkillNode(
       )
     }
   } catch (error) {
+    // 预期内的授权拦截：直接上抛，由 dag-engine 转为 failed 节点并触发审计留痕
     if (error instanceof ToolGrantMissingException) {
       throw error
     }
-    logger.error("[skill-executor] ToolGrant 校验过程出现异常", { error })
+    // 非预期异常（DB 抖动 / 数据损坏等）：fail-closed —— 拒绝执行，绝不放行高危工具
+    const errMsg = error instanceof Error ? error.message : "未知异常"
+    logger.error(
+      `[skill-executor] 技能「${skill.name}」ToolGrant 校验过程异常，按 fail-closed 拒绝执行`,
+      { skillId, error: errMsg }
+    )
+    return {
+      status: 'failed',
+      error: `技能「${skill.name}」授权校验异常，已按安全策略（fail-closed）拒绝执行：${errMsg}`,
+      riskLevel: 'high',
+    }
   }
 
   // 5. 组装 TaskEnvelope 并分发到 OpenClaw 执行面
   const startTime = Date.now()
 
-  // P2-4：消除 'foreign-trade' 默认值。industryId 必须从 Workflow 实体强制读取，
-  //       缺失时抛 MissingIndustryIdError（而非用静默默认值绕过）。
-  const wf = await prisma.workflow.findUnique({
-    where: { id: ctx.workflowId },
-    select: { industryId: true }
-  })
-  if (!wf?.industryId) {
+  // industryId 从 ctx 读取（P1-5.1：由 dag-runner 一次性注入，消除 N+1），
+  // 缺失时抛 MissingIndustryIdError（而非用静默默认值绕过）。
+  if (!ctx.industryId) {
     throw new MissingIndustryIdError(ctx.workflowId)
   }
-  const industryId = wf.industryId
+  const industryId = ctx.industryId
 
   const envelopeInput = {
+    _type: `skill.${skill.name}`,
     variables: ctx.variables,
     nodeOutputs: ctx.nodeOutputs,
-    config
+    config,
   }
 
   const currentAgentId = (ctx.variables.agentId as string) || "default-agent"
@@ -307,25 +330,13 @@ export async function executeSkillNode(
   }
 
   const duration = `${((Date.now() - startTime) / 1000).toFixed(1)}s`
-  const outcomeResult = receipt.response || {}
+  const response = (receipt.response ?? {}) as LlmResponse
 
   // 6. 提取 confidence 并校验置信度
-  let confidence: number | undefined
+  // P2-2.1：收窄为 LlmResponse 类型，消除裸 as Record<string, unknown> / as any 摸索
+  let confidence = response.confidence ?? response.result?.confidence as number | undefined
   let effectiveRiskLevel = riskLevel
   const warnings: string[] = []
-
-  if (typeof outcomeResult === 'object' && outcomeResult !== null) {
-    const obj = outcomeResult as Record<string, unknown>
-    if (typeof obj.confidence === 'number') {
-      confidence = obj.confidence
-    }
-    if (confidence === undefined && typeof obj.result === 'object' && obj.result !== null) {
-      const inner = obj.result as Record<string, unknown>
-      if (typeof inner.confidence === 'number') {
-        confidence = inner.confidence
-      }
-    }
-  }
 
   if (confidence !== undefined && confidence < CONFIDENCE_THRESHOLD) {
     warnings.push(
@@ -341,17 +352,17 @@ export async function executeSkillNode(
     logger.warn(`[skill-executor] 技能 ${skill.name} 输出缺少 confidence 字段`, { skillId })
   }
 
-  const outcomeMeta = (outcomeResult as any)._meta || {}
+  const meta = response._meta
 
   const output = {
-    ...outcomeResult,
+    ...response,
     _meta: {
       skillId,
       skillName: skill.name,
       automationLevel,
       duration,
-      provider: outcomeMeta.provider || 'unknown',
-      model: outcomeMeta.model || 'unknown',
+      provider: meta?.provider || 'unknown',
+      model: meta?.model || 'unknown',
       confidence,
       riskLevel: effectiveRiskLevel,
       warnings,

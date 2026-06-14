@@ -28,6 +28,7 @@ describe('Subworkflow Executor 单元测试', () => {
     actor: 'admin',
     depth: 1,
     workspaceId,
+    industryId: 'foreign-trade',
   })
 
   beforeEach(() => {

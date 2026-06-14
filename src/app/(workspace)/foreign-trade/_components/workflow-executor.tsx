@@ -273,7 +273,7 @@ export function WorkflowExecutor({
       })
 
       // 安全解析 JSON：非 JSON 响应时取原始文本作为错误消息
-      let json: { success?: boolean; error?: string; data?: RunResult; details?: any }
+      let json: { success?: boolean; error?: string; code?: string; data?: RunResult; details?: any }
       try {
         json = await res.json()
       } catch {

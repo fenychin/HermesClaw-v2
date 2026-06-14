@@ -131,6 +131,12 @@ export interface WorkflowRunContext {
   depth: number
   /** 工作空间 ID（多租户隔离 + Skill 路由审计） */
   workspaceId: string
+  /**
+   * 行业包 ID（派生自 Workflow.industryId，run 启动时一次性注入）。
+   * Skill 节点据此路由行业包资产；为 null 表示工作流未绑定行业包，
+   * 由具体执行器在需要时抛 MissingIndustryIdError，避免按节点重复查库（N+1）。
+   */
+  industryId: string | null
 }
 
 // ---- 节点执行 ----
