@@ -143,7 +143,7 @@ function TradeFunnelDrillDown({
 }
 
 // ============================================================
-// 子组件：汇率卡片（接入 /api/exchange-rates 真实数据）
+// 子组件：汇率卡片（接入 /api/packs/foreign-trade/exchange-rates 真实数据）
 // ============================================================
 function ExchangeRateCard({
   rates,

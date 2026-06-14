@@ -98,7 +98,7 @@ async function fetchDashboardStats(): Promise<DashboardStats> {
 
 /** 获取报价列表 */
 async function fetchQuotations(): Promise<QuotationItem[]> {
-  const res = await fetch("/api/quotations")
+  const res = await fetch("/api/packs/foreign-trade/quotations")
   if (!res.ok) throw new Error("获取报价列表失败")
   const json = await res.json()
   if (!json.success) throw new Error(json.error ?? "未知错误")
@@ -116,7 +116,7 @@ async function fetchInquiries(filters?: InquiryFilters): Promise<InquiryItem[]> 
   const params: Record<string, string | undefined> = {}
   if (filters?.fromCountry) params.fromCountry = filters.fromCountry
   if (filters?.stage && filters.stage !== "all") params.stage = filters.stage
-  const url = buildUrl("/api/inquiries", Object.keys(params).length > 0 ? params : undefined)
+  const url = buildUrl("/api/packs/foreign-trade/inquiries", Object.keys(params).length > 0 ? params : undefined)
   const res = await fetch(url)
   if (!res.ok) throw new Error("获取询盘列表失败")
   const json = await res.json()

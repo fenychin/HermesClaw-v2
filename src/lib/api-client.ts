@@ -256,15 +256,15 @@ export const apiClient = {
       body: JSON.stringify(data),
     }),
 
-  // ---- 外贸：询盘 / 情报 / 报价 ----
+  // ---- 外贸：询盘 / 情报 / 报价（CLAUDE.md §6 行业包命名空间） ----
   getInquiries: () =>
-    apiFetch<{ inquiries: unknown[] }>("/api/inquiries"),
+    apiFetch<{ inquiries: unknown[] }>("/api/packs/foreign-trade/inquiries"),
 
   getIntelligence: () =>
-    apiFetch<{ intelligence: unknown[] }>("/api/intelligence"),
+    apiFetch<{ intelligence: unknown[] }>("/api/packs/foreign-trade/intelligence"),
 
   getQuotations: () =>
-    apiFetch<{ quotations: unknown[] }>("/api/quotations"),
+    apiFetch<{ quotations: unknown[] }>("/api/packs/foreign-trade/quotations"),
 
   // ---- 审计日志 ----
   getAuditLogs: (

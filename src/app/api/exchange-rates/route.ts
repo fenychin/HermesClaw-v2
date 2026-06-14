@@ -1,25 +1,23 @@
-import { prisma } from "@/lib/prisma"
-import { logger } from "@/lib/logger"
-import { successResponse, errorResponse, serializeDates } from "@/lib/api-utils"
-import { buildWorkspaceContext } from "@/lib/workspace"
+/**
+ * @deprecated 自 v0.12.12 起，外贸专属 API 收敛到 /api/packs/foreign-trade/* 命名空间。
+ * 本文件保留 308 永久重定向作为兼容层；计划在 v0.13 删除。
+ */
+import { NextResponse } from "next/server"
 
-/** GET /api/exchange-rates —— 获取汇率监测列表（按货币对升序） */
-export async function GET(request: Request) {
-  try {
-    const ctx = await buildWorkspaceContext(request)
-    const rates = await prisma.exchangeRate.findMany({
-      where: { workspaceId: ctx.workspaceId },
-      orderBy: { pair: "asc" },
-    })
-    return successResponse({
-      rates: rates.map((r) =>
-        serializeDates(r as unknown as Record<string, unknown>, ["updatedAt", "createdAt"]),
-      ),
-    })
-  } catch (error) {
-    logger.error("GET /api/exchange-rates: 失败", {
-      error: error instanceof Error ? error.message : "未知错误",
-    })
-    return errorResponse("服务器内部错误")
-  }
+const NEW_PREFIX = "/api/packs/foreign-trade/exchange-rates"
+const OLD_PREFIX = "/api/exchange-rates"
+
+function redirect(req: Request) {
+  const url = new URL(req.url)
+  url.pathname = url.pathname.replace(OLD_PREFIX, NEW_PREFIX)
+  return NextResponse.redirect(url, {
+    status: 308,
+    headers: {
+      Deprecation: "true",
+      Sunset: "v0.13",
+      Link: `<${url.pathname}>; rel="successor-version"`,
+    },
+  })
 }
+
+export const GET = redirect

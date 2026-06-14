@@ -31,6 +31,7 @@
 /.tmp/
 dev.db
 dev.db-journal
+dev.db.bak-*
 
 # debug
 npm-debug.log*

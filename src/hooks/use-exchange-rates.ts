@@ -25,7 +25,7 @@ export interface ExchangeRateItem {
  */
 export const useExchangeRates = createQueryListHook<ExchangeRateItem>({
   queryKey: ["exchange-rates"],
-  url: "/api/exchange-rates",
+  url: "/api/packs/foreign-trade/exchange-rates",
   dataField: "rates",
   errorLabel: "获取汇率监测",
   staleTime: 60_000,

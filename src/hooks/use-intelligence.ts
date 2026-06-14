@@ -13,7 +13,7 @@ import type { MarketIntelligence } from "@/types/trade"
  */
 export const useIntelligence = createQueryListHook<MarketIntelligence>({
   queryKey: ["intelligence"],
-  url: "/api/intelligence",
+  url: "/api/packs/foreign-trade/intelligence",
   dataField: "intelligence",
   errorLabel: "获取市场情报",
   staleTime: 60_000,

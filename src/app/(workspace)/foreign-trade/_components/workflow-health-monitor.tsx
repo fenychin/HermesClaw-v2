@@ -88,7 +88,7 @@ export function WorkflowHealthMonitor() {
   const { data, isLoading, isError, error, refetch } = useQuery<HealthData>({
     queryKey: ["foreign-trade-health"],
     queryFn: async () => {
-      const res = await fetch("/api/foreign-trade/health");
+      const res = await fetch("/api/packs/foreign-trade/health");
       if (!res.ok) throw new Error("获取外贸健康度失败");
       const json = await res.json();
       if (!json.success) throw new Error(json.error ?? "未知错误");

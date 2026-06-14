@@ -49,7 +49,7 @@ async function fetchReports(
   if (limit) params.limit = String(limit)
 
   const url = buildUrl(
-    "/api/reports",
+    "/api/packs/foreign-trade/reports",
     Object.keys(params).length > 0 ? params : undefined,
   )
   const res = await fetch(url)
@@ -64,7 +64,7 @@ async function fetchReports(
 
 /** 触发生成报告 */
 async function generateReport(type: ReportType = "MORNING"): Promise<GenerateReportResult> {
-  const res = await fetch("/api/reports/generate", {
+  const res = await fetch("/api/packs/foreign-trade/reports/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ type }),
