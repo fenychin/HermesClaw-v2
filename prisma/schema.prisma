@@ -410,6 +410,9 @@ model Inquiry {
   createdAt   DateTime @default(now())
 
   @@index([workspaceId])
+  // CLAUDE.md §6.1：本表归外贸 Industry Pack 所有，TS 模型名保持 Inquiry，
+  // 物理表 ft_inquiry，内核业务代码不得直接 import（ESLint 规则强制，详见 industry-packs/foreign-trade/schemas/README.md）。
+  @@map("ft_inquiry")
 }
 
 // ============================================================
@@ -430,6 +433,7 @@ model MarketIntelligence {
   createdAt       DateTime @default(now())
 
   @@index([workspaceId])
+  @@map("ft_market_intelligence")
 }
 
 // ============================================================
@@ -447,6 +451,7 @@ model ExchangeRate {
 
   @@unique([workspaceId, pair])
   @@index([workspaceId])
+  @@map("ft_exchange_rate")
 }
 
 // ============================================================
@@ -464,6 +469,7 @@ model Quotation {
   createdAt   DateTime @default(now())
 
   @@index([workspaceId])
+  @@map("ft_quotation")
 }
 
 // ============================================================
@@ -644,4 +650,5 @@ model Report {
   createdAt    DateTime  @default(now())
 
   @@index([workspaceId, generatedAt])
+  @@map("ft_report")
 }
