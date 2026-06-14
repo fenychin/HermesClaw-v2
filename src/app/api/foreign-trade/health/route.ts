@@ -1,21 +1,22 @@
 import { logger } from "@/lib/logger"
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { withRBAC } from "@/lib/server/api-handler"
-import { getForeignTradeHealthData } from "@/lib/server/foreign-trade"
+import { getIndustryHealthData } from "@/lib/server/industry-health"
 import type { WorkspaceContext } from "@/lib/workspace"
 
 export const runtime = "nodejs"
 
-
-
 /**
- * GET /api/foreign-trade/health —— 获取外贸工作流执行的实时健康度数据与自演化日志
+ * GET /api/foreign-trade/health —— 获取外贸 pack 工作流的实时健康度数据与自演化日志
+ *
+ * 路由形态保留为外贸专用入口（兼容现有 UI），但内部数据采集已下沉为通用
+ * `getIndustryHealthData(packId, workspaceId)`，packId 在路由层显式传入。
  */
 export const GET = withRBAC(
   async (request: Request, ctx: WorkspaceContext) => {
     try {
       const workspaceId = ctx.workspaceId || "default"
-      const data = await getForeignTradeHealthData(workspaceId)
+      const data = await getIndustryHealthData("foreign-trade", workspaceId)
 
       return successResponse({
         successRate: data.successRate,

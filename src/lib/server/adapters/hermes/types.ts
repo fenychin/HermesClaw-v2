@@ -291,3 +291,94 @@ export interface HermesHealthCheckResponse {
   version: string
   latencyMs: number
 }
+
+// ─── Zod 契约 Schema（P1-7 contract pact 测试）─────────────────
+//
+// 这些 schema 与上方 interface 一一对应，是 Hermes adapter 输出契约的
+// 运行时校验单源。任何 Hermes mock / 真实响应若与对应 schema 不匹配，
+// 均视为契约漂移，必须先升 schema 版本再改 mock。
+//
+// 使用方式：
+//   import { HermesRunWorkflowResponseSchema } from "./types"
+//   HermesRunWorkflowResponseSchema.parse(response)
+
+import { z } from "zod"
+
+/** Hermes 适配层契约版本（任何字段/枚举变更必须 +1） */
+export const HERMES_ADAPTER_CONTRACT_VERSION = 1
+
+const HermesRiskLevelSchema = z.enum(["low", "medium", "high"])
+const HermesAutomationLevelSchema = z.enum(["L0", "L1", "L2", "L3", "L4"])
+const HermesMemoryLevelSchema = z.enum(["short", "mid", "long"])
+const HermesWorkflowStatusSchema = z.enum(["queued", "running", "completed", "failed"])
+
+export const HermesRunWorkflowResponseSchema = z.object({
+  executionId: z.string().min(1),
+  status: HermesWorkflowStatusSchema,
+  outputs: z.record(z.string(), z.unknown()).optional(),
+  error: z.string().optional(),
+  durationMs: z.number().nonnegative().optional(),
+})
+
+export const HermesHarnessProposalSchema = z.object({
+  proposalId: z.string().min(1),
+  triggeredBy: z.string().min(1),
+  problemStatement: z.string().min(1),
+  proposedChange: z.string().min(1),
+  riskLevel: HermesRiskLevelSchema,
+  automationLevel: HermesAutomationLevelSchema,
+  requiresHumanApproval: z.literal(true),
+  estimatedImpact: z.string().min(1),
+  createdAt: z.string().min(1),
+})
+
+export const HermesMemoryReadResponseSchema = z.object({
+  key: z.string(),
+  value: z.unknown().nullable(),
+  level: HermesMemoryLevelSchema,
+  writtenAt: z.string().optional(),
+  remainingTtl: z.number().optional(),
+})
+
+export const HermesMemoryWriteResponseSchema = z.object({
+  success: z.boolean(),
+})
+
+export const HermesSessionIdentifierSchema = z.object({
+  sessionId: z.string().min(1),
+  agentId: z.string().min(1),
+  projectId: z.string().optional(),
+  workspaceId: z.string().min(1),
+  createdAt: z.string().min(1),
+})
+
+export const HermesCloseSessionResponseSchema = z.object({
+  archived: z.boolean(),
+})
+
+export const HermesReportToolCallsResponseSchema = z.object({
+  accepted: z.boolean(),
+})
+
+export const HermesSubmitReportResponseSchema = z.object({
+  reportId: z.string().min(1),
+})
+
+export const HermesHealthCheckResponseSchema = z.object({
+  ok: z.boolean(),
+  version: z.string().min(1),
+  latencyMs: z.number().nonnegative(),
+})
+
+/** 路径 → 响应 schema 索引（contract pact 测试用） */
+export const HERMES_RESPONSE_SCHEMAS = {
+  "/workflows/run": HermesRunWorkflowResponseSchema,
+  "/harness/evaluate": HermesHarnessProposalSchema,
+  "/memory/write": HermesMemoryWriteResponseSchema,
+  "/memory/read": HermesMemoryReadResponseSchema,
+  "/sessions/create": HermesSessionIdentifierSchema,
+  "/sessions/close": HermesCloseSessionResponseSchema,
+  "/sessions/tool-calls": HermesReportToolCallsResponseSchema,
+  "/harness/report": HermesSubmitReportResponseSchema,
+  "/health": HermesHealthCheckResponseSchema,
+} as const

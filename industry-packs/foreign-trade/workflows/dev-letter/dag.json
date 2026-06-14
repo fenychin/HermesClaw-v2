@@ -1,0 +1,43 @@
+{
+  "id": "dev-letter",
+  "name": "dev-letter",
+  "description": "开发信生成：基于客户画像生成个性化开发信草稿，人工审阅后发送",
+  "templateId": "ft-dev-letter",
+  "requiredSkills": ["ft-outreach-email"],
+  "automationLevel": "L3",
+  "riskLevel": "medium",
+  "nodes": [
+    {
+      "id": "n1-profile",
+      "kind": "task",
+      "name": "客户画像采集",
+      "handler": "log-customer-profile-input",
+      "config": { "automationLevel": "L1" }
+    },
+    {
+      "id": "n2-draft",
+      "kind": "skill",
+      "name": "AI 撰写开发信",
+      "config": { "skillId": "skill-ft-outreach-email", "automationLevel": "L2" }
+    },
+    {
+      "id": "n3-review",
+      "kind": "task",
+      "name": "人工审阅编辑",
+      "handler": "log-letter-review",
+      "config": { "automationLevel": "L3" }
+    },
+    {
+      "id": "n4-send",
+      "kind": "task",
+      "name": "发送确认",
+      "handler": "log-letter-send",
+      "config": { "automationLevel": "L3" }
+    }
+  ],
+  "edges": [
+    { "from": "n1-profile", "to": "n2-draft" },
+    { "from": "n2-draft", "to": "n3-review" },
+    { "from": "n3-review", "to": "n4-send" }
+  ]
+}

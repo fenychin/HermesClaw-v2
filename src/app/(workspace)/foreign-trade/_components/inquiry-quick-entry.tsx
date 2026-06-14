@@ -13,6 +13,17 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { COUNTRY_OPTIONS } from "../_helpers/country-options";
+import {
+  extractDevLetter,
+  extractGradeInfo,
+  type DevLetterDraft,
+  type GradeInfo,
+} from "../_helpers/workflow-output-extractors";
+
+// 抑制未使用类型警告（导出仅为对外契约）
+void (null as unknown as DevLetterDraft);
+void (null as unknown as GradeInfo);
 
 // ============================================================
 // 类型定义
@@ -38,89 +49,8 @@ interface SubmitState {
 }
 
 // ============================================================
-// 国家选项
+// 国家选项 + 工作流输出抽取器：已迁移至 ../_helpers/
 // ============================================================
-
-const COUNTRY_OPTIONS = [
-  { label: "美国", value: "US" },
-  { label: "德国", value: "DE" },
-  { label: "英国", value: "GB" },
-  { label: "法国", value: "FR" },
-  { label: "澳大利亚", value: "AU" },
-  { label: "加拿大", value: "CA" },
-  { label: "日本", value: "JP" },
-  { label: "韩国", value: "KR" },
-  { label: "印度", value: "IN" },
-  { label: "巴西", value: "BR" },
-  { label: "阿联酋", value: "AE" },
-  { label: "其他", value: "OTHER" },
-];
-
-// ============================================================
-// 辅助函数：从工作流输出中提取开发信草稿
-// ============================================================
-
-interface DevLetterDraft {
-  subject: string
-  body: string
-}
-
-/**
- * 从 workflowOutput 中提取 n4-email 节点生成的开发信草稿
- * —— workflowOutput 是 nodeId → nodeResult 的映射表
- */
-function extractDevLetter(workflowOutput: unknown): DevLetterDraft | null {
-  if (!workflowOutput || typeof workflowOutput !== "object") return null
-  const outputs = workflowOutput as Record<string, unknown>
-  // 安全守卫：对象键数异常（Array/Buffer 等）直接退出
-  if (Object.keys(outputs).length > 50) return null
-  // 遍历寻找产出包含 subject/body 的节点
-  for (const nodeResult of Object.values(outputs)) {
-    if (!nodeResult || typeof nodeResult !== "object") continue
-    const nr = nodeResult as Record<string, unknown>
-    // 尝试从 result 或根级获取 subject/body
-    const result = (typeof nr.result === "object" && nr.result) ? nr.result as Record<string, unknown> : nr
-    const subject = typeof result.subject === "string" ? result.subject : null
-    const body = typeof result.body === "string" ? result.body : null
-    if (subject && body) {
-      return { subject, body }
-    }
-  }
-  return null
-}
-
-// ============================================================
-// 辅助函数：从工作流输出中提取询盘分级信息
-// ============================================================
-
-interface GradeInfo {
-  grade: string
-  score: number
-  analysis: string
-  suggestedAction: string
-}
-
-function extractGradeInfo(workflowOutput: unknown): GradeInfo | null {
-  if (!workflowOutput || typeof workflowOutput !== "object") return null
-  const outputs = workflowOutput as Record<string, unknown>
-  // 安全守卫：对象键数异常（Array/Buffer 等）直接退出
-  if (Object.keys(outputs).length > 50) return null
-  for (const nodeResult of Object.values(outputs)) {
-    if (!nodeResult || typeof nodeResult !== "object") continue
-    const nr = nodeResult as Record<string, unknown>
-    const result = (typeof nr.result === "object" && nr.result) ? nr.result as Record<string, unknown> : nr
-    const grade = typeof result.grade === "string" ? result.grade : null
-    if (!grade) continue
-    const score = typeof result.score === "number" ? result.score :
-                  typeof result.score === "string" ? parseInt(result.score, 10) : 0
-    const analysis = typeof result.analysis === "string" ? result.analysis :
-                     typeof nr.summary === "string" ? nr.summary : ""
-    const suggestedAction = typeof result.suggestedAction === "string" ? result.suggestedAction :
-                            typeof result.suggested_action === "string" ? result.suggested_action : ""
-    return { grade, score, analysis, suggestedAction }
-  }
-  return null
-}
 
 // ============================================================
 // 组件

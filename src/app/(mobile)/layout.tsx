@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { notFound } from "next/navigation";
 import { MobileShell } from "@/components/layout/mobile-shell";
 
 /**
@@ -29,11 +30,19 @@ export const viewport: Viewport = {
  * 移动端专属布局
  * —— 不复用 (workspace) 的 AppShell，提供底部 Tab 导航
  * —— 使用 min-h-dvh 替代 min-h-screen 以适配移动端地址栏动态显隐
+ *
+ * ⚠️ MOBILE PREVIEW — PRD §9.3 暂缓项。
+ * 本路由组仅在 NEXT_PUBLIC_ENABLE_MOBILE_PREVIEW=true 时启用，
+ * 默认走 notFound()。生产构建避免暴露 fixture 数据驱动的 UI。
  */
 export default function MobileLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // 仅在显式开启时进入移动端预览。任何非 "true" 字符串均视为关闭。
+  if (process.env.NEXT_PUBLIC_ENABLE_MOBILE_PREVIEW !== "true") {
+    notFound();
+  }
   return <MobileShell>{children}</MobileShell>;
 }

@@ -14,27 +14,24 @@
  *   - AgentLog/AuditLog 由 dag-runner 的 onNodeFinish 钩子统一写入，此处不写
  */
 
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-
 import { prisma } from '@/lib/prisma'
-import { parseJsonField } from '@/lib/api-utils'
 import { logger } from '@/lib/logger'
-import { selectModel } from '@/lib/server/model-router'
-import { callDeepSeekJson, callAnthropicText } from '@/lib/server/llm-provider'
-import { loadAgentsMd } from '@/lib/server/agents-md'
 import { writeAgentLog } from '@/lib/server/agent-log'
 import {
   resolveAutomationLevel,
   mapAutomationToLogRisk,
-  mapAutomationToRouteRisk,
 } from '@/types'
-import { ToolGrantMissingException } from '@/lib/server/exceptions'
+import { ToolGrantMissingException, MissingIndustryIdError } from '@/lib/server/exceptions'
 import type {
   WorkflowNode,
   WorkflowRunContext,
   NodeExecutionResult,
 } from './dag-types'
+
+import { openclawClient } from '@/lib/server/adapters/openclaw/client'
+import type { TaskEnvelope } from '@/contracts/task-envelope'
+import type { ActionReceipt } from '@/contracts/action-receipt'
+import crypto from 'node:crypto'
 
 // ---- 常量 ----
 
@@ -253,166 +250,75 @@ export async function executeSkillNode(
     logger.error("[skill-executor] ToolGrant 校验过程出现异常", { error })
   }
 
-  // 5. 读取 SKILL.md 文件
-  const skillMdPath = join(process.cwd(), '.claude', 'skills', skill.name, 'SKILL.md')
-  let skillMdContent: string
-  try {
-    skillMdContent = await readFile(skillMdPath, 'utf8')
-    logger.info(`[skill-executor] 已加载 SKILL.md：${skillMdPath}`)
-  } catch {
-    // SKILL.md 不存在时，用数据库元数据 + 通用约束构造最小 skill prompt
-    logger.warn(
-      `[skill-executor] 无法读取 SKILL.md ${skillMdPath}，使用技能描述 + 通用约束作为回退`,
-    )
-    // P0-③ 知识缺口埋点：SKILL.md 缺失意味着知识库不完整，记录为 high risk
-    void writeAgentLog({
-      source: 'knowledge-gap',
-      taskName: `Skill「${skill.name}」缺少 SKILL.md`,
-      status: 'warning',
-      duration: '0s',
-      detail: `SKILL.md 文件缺失：${skillMdPath}，已使用描述+通用约束作为回退（skillId=${skillId}）`,
-      riskLevel: 'high',
-    })
-    skillMdContent = [
-      `# ${skill.name}`,
-      ``,
-      skill.description,
-      ``,
-      `版本：${skill.version}`,
-      `分类：${skill.category}`,
-      ``,
-      `## 约束条件（cannot_do — 运行时回退通用约束）`,
-      `- ${FALLBACK_SKILL_CONSTRAINTS}`,
-    ].join('\n')
-  }
-
-  // 6. 加载 AGENTS.md 治理规则并拼入 system prompt
-  const { governance } = await loadAgentsMd()
-  const governanceBlock = governance
-    ? `\n\n## 治理规则（来自 AGENTS.md，最高优先级，运行时加载）\n${governance}`
-    : ''
-
-  const systemPrompt = [
-    skillMdContent,
-    governanceBlock,
-    ``,
-    `## 执行上下文`,
-    `- 你正在工作流「${ctx.workflowId}」中作为技能节点「${node.name}」执行`,
-    `- 运行 ID：${ctx.runId} · 工作空间：${workspaceId}`,
-    `- 自动化授权等级：${automationLevel}`,
-    ``,
-    `## 输出格式要求`,
-    `请以 JSON 格式返回执行结果，结构如下：`,
-    `{`,
-    `  "result": { ... },       // 技能执行的核心产出`,
-    `  "summary": "string",     // 人类可读的执行摘要（中文）`,
-    `  "confidence": 0.0-1.0,   // 置信度（AGENTS.md §4.5：< 0.7 须标记待人工确认）`,
-    `  "warnings": ["..."]      // 执行过程中的警示信息`,
-    `}`,
-  ].join('\n')
-
-  // 7. 构造 user prompt：融入上游节点输出与工作流输入变量
-  const userPrompt = [
-    `请执行以下技能任务：`,
-    ``,
-    `## 工作流输入变量`,
-    `\`\`\`json`,
-    JSON.stringify(ctx.variables, null, 2),
-    `\`\`\``,
-    ``,
-    `## 上游节点输出`,
-    `\`\`\`json`,
-    JSON.stringify(ctx.nodeOutputs, null, 2),
-    `\`\`\``,
-    ``,
-    `## 节点配置`,
-    `\`\`\`json`,
-    JSON.stringify(config, null, 2),
-    `\`\`\``,
-    ``,
-    `请严格按照上述 SKILL.md 的能力清单（can_do）和约束条件（cannot_do）处理以上输入，并以 JSON 格式返回结果。`,
-  ].join('\n')
-
-  // 8. 策略路由 → 选择 LLM Provider 与模型（§4.12 禁止硬编码）
-  const routeRiskLevel = mapAutomationToRouteRisk(automationLevel)
-  let routing: { provider: string; model: string; reason: string }
-  try {
-    routing = await selectModel({
-      taskType: 'workflow',
-      riskLevel: routeRiskLevel,
-      estimatedTokens: 2000,
-      workspaceId,
-    })
-  } catch (error) {
-    logger.error(`[skill-executor] 技能 ${skill.name} 策略路由失败`, {
-      skillId,
-      automationLevel,
-      error: error instanceof Error ? error.message : '未知错误',
-    })
-    return {
-      status: 'failed',
-      error:
-        `技能「${skill.name}」策略路由失败：${error instanceof Error ? error.message : '未知错误'}` +
-        `（skillId=${skillId}，automationLevel=${automationLevel}）`,
-      riskLevel,
-    }
-  }
-
-  logger.info(
-    `[skill-executor] 技能 ${skill.name} 路由决策：${routing.provider}/${routing.model}（${routing.reason}）`,
-  )
-
-  // 9. 调用 LLM 执行技能
+  // 5. 组装 TaskEnvelope 并分发到 OpenClaw 执行面
   const startTime = Date.now()
-  let llmOutput: unknown
-  try {
-    if (routing.provider === 'anthropic') {
-      const text = await callAnthropicText({
-        systemPrompt,
-        userPrompt,
-        model: routing.model,
-        maxTokens: 4096,
-      })
-      // Anthropic 返回纯文本，尝试解析为 JSON；解析失败时保留原文
-      llmOutput = parseJsonField(text, text)
-    } else {
-      llmOutput = await callDeepSeekJson({
-        systemPrompt,
-        userPrompt,
-        model: routing.model,
-        maxTokens: 4096,
-        temperature: 0.4,
-      })
-    }
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'LLM 调用异常'
-    logger.error(`[skill-executor] 技能 ${skill.name} LLM 调用失败`, {
-      skillId,
-      provider: routing.provider,
-      model: routing.model,
-      error: errorMsg,
-    })
 
+  // P2-4：消除 'foreign-trade' 默认值。industryId 必须从 Workflow 实体强制读取，
+  //       缺失时抛 MissingIndustryIdError（而非用静默默认值绕过）。
+  const wf = await prisma.workflow.findUnique({
+    where: { id: ctx.workflowId },
+    select: { industryId: true }
+  })
+  if (!wf?.industryId) {
+    throw new MissingIndustryIdError(ctx.workflowId)
+  }
+  const industryId = wf.industryId
+
+  const envelopeInput = {
+    variables: ctx.variables,
+    nodeOutputs: ctx.nodeOutputs,
+    config
+  }
+
+  const currentAgentId = (ctx.variables.agentId as string) || "default-agent"
+
+  const envelope: TaskEnvelope = {
+    taskId: `t-${crypto.randomUUID()}`,
+    workflowRunId: ctx.runId,
+    workspaceId,
+    industryId,
+    agentId: currentAgentId,
+    actionType: `skill.${skill.name}`,
+    input: envelopeInput,
+    automationLevel,
+    riskLevel,
+    idempotencyKey: `idem-${crypto.randomUUID()}`,
+    callbackTarget: 'local-workflow-callback',
+    policySnapshotVersion: skill.version,
+    version: '1.0.0'
+  }
+
+  logger.info(`[skill-executor] 发送 TaskEnvelope 至 OpenClaw 执行面: taskId=${envelope.taskId}, actionType=${envelope.actionType}`)
+
+  let receipt: ActionReceipt
+  try {
+    receipt = await openclawClient.executeTask(envelope)
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'OpenClaw 执行异常'
+    logger.error(`[skill-executor] 技能 ${skill.name} 执行失败`, {
+      skillId,
+      error: errorMsg
+    })
     return {
       status: 'failed',
-      error: `技能「${skill.name}」LLM 调用失败：${errorMsg}`,
+      error: `技能「${skill.name}」分发执行失败：${errorMsg}`,
       riskLevel,
     }
   }
 
   const duration = `${((Date.now() - startTime) / 1000).toFixed(1)}s`
+  const outcomeResult = receipt.response || {}
 
-  // 10. 提取 confidence 并校验阈值（AGENTS.md §4.5：< 0.7 须标记待人工确认）
+  // 6. 提取 confidence 并校验置信度
   let confidence: number | undefined
   let effectiveRiskLevel = riskLevel
   const warnings: string[] = []
 
-  if (typeof llmOutput === 'object' && llmOutput !== null) {
-    const obj = llmOutput as Record<string, unknown>
+  if (typeof outcomeResult === 'object' && outcomeResult !== null) {
+    const obj = outcomeResult as Record<string, unknown>
     if (typeof obj.confidence === 'number') {
       confidence = obj.confidence
     }
-    // 也尝试从嵌套路径提取
     if (confidence === undefined && typeof obj.result === 'object' && obj.result !== null) {
       const inner = obj.result as Record<string, unknown>
       if (typeof inner.confidence === 'number') {
@@ -425,7 +331,6 @@ export async function executeSkillNode(
     warnings.push(
       `置信度 ${(confidence * 100).toFixed(0)}% 低于阈值 ${(CONFIDENCE_THRESHOLD * 100).toFixed(0)}%（AGENTS.md §4.5），建议人工审核`,
     )
-    // 升格风险等级：低置信度输出视为高风险
     effectiveRiskLevel = 'high'
     logger.warn(
       `[skill-executor] 技能 ${skill.name} 置信度 ${(confidence * 100).toFixed(0)}% < ${(CONFIDENCE_THRESHOLD * 100).toFixed(0)}%，已升格 riskLevel 为 high`,
@@ -436,31 +341,31 @@ export async function executeSkillNode(
     logger.warn(`[skill-executor] 技能 ${skill.name} 输出缺少 confidence 字段`, { skillId })
   }
 
-  // 11. 构造输出（注入警示信息）
+  const outcomeMeta = (outcomeResult as any)._meta || {}
+
   const output = {
-    ...(typeof llmOutput === 'object' && llmOutput !== null ? llmOutput : { raw: llmOutput }),
+    ...outcomeResult,
     _meta: {
       skillId,
       skillName: skill.name,
       automationLevel,
       duration,
-      provider: routing.provider,
-      model: routing.model,
+      provider: outcomeMeta.provider || 'unknown',
+      model: outcomeMeta.model || 'unknown',
       confidence,
       riskLevel: effectiveRiskLevel,
       warnings,
-    },
+    }
   }
 
   logger.info(
-    `[skill-executor] 技能 ${skill.name} 执行完成（${duration}，风险等级：${effectiveRiskLevel}）`,
-    { skillId, provider: routing.provider, model: routing.model, confidence },
+    `[skill-executor] 技能 ${skill.name} 执行完成（${duration}，结果状态：${receipt.outcome}，风险等级：${effectiveRiskLevel}）`,
   )
 
-  // AgentLog / AuditLog 由 dag-runner 的 onNodeFinish 钩子统一写入（避免双写）
   return {
-    status: 'completed',
+    status: receipt.outcome === 'success' ? 'completed' : 'failed',
     output,
+    error: receipt.outcome === 'failure' ? (receipt.errorCode || '执行失败') : undefined,
     riskLevel: effectiveRiskLevel,
   }
 }

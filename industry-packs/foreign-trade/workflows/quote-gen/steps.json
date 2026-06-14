@@ -1,0 +1,24 @@
+{
+  "id": "quote-gen",
+  "title": "报价生成",
+  "description": "根据产品与客户条件快速生成报价单",
+  "steps": [
+    {
+      "id": "step-n1-cost",
+      "title": "成本核算",
+      "description": "输入产品参数，自动核算多贸易术语成本",
+      "status": "pending",
+      "inputs": [
+        { "key": "product_name", "label": "产品名称", "type": "text", "required": true },
+        { "key": "quantity", "label": "数量", "type": "text", "required": true, "placeholder": "如：500pcs" },
+        { "key": "target_market", "label": "目标市场", "type": "text", "required": true, "placeholder": "欧盟、美国..." }
+      ]
+    },
+    {
+      "id": "step-n2-pdf",
+      "title": "生成报价单",
+      "description": "AI 自动生成专业报价单",
+      "status": "pending"
+    }
+  ]
+}

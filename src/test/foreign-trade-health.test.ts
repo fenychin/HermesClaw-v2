@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { calculateWorkflowHealth } from "@/lib/server/foreign-trade";
-import type { WorkflowRunSummary } from "@/lib/server/foreign-trade";
+import { calculateWorkflowHealth } from "@/lib/server/industry-health";
+import type { WorkflowRunSummary } from "@/lib/server/industry-health";
 
-describe("calculateWorkflowHealth — 外贸工作流健康度统计", () => {
+describe("calculateWorkflowHealth — 行业包工作流健康度统计纯函数", () => {
   it("应妥善处理空数组边界情况", () => {
     const runs: WorkflowRunSummary[] = [];
     const stats = calculateWorkflowHealth(runs);

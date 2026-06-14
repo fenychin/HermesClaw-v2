@@ -61,3 +61,21 @@ export class ToolGrantMissingException extends AppException {
     super("TOOL_GRANT_MISSING", message, 403, { agentId, toolId, scopes, riskLevel });
   }
 }
+
+/**
+ * Workflow 实体缺少 industryId 异常 (500 Internal Server Error)。
+ *
+ * P2-4：消除 `let industryId = 'foreign-trade'` 字面量。
+ * 当一个 Workflow 既不存在、又无 industryId 字段时抛出此异常 ——
+ * 它表示数据完整性破损，不能用任何静默默认值绕过，否则会把多包路由信号丢失。
+ */
+export class MissingIndustryIdError extends AppException {
+  constructor(workflowId: string) {
+    super(
+      "MISSING_INDUSTRY_ID",
+      `Workflow ${workflowId} 缺失 industryId（数据完整性破损，无法路由到行业包）`,
+      500,
+      { workflowId },
+    );
+  }
+}

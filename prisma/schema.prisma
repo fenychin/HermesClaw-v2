@@ -250,6 +250,7 @@ model MemoryRevision {
   confidence Float
   editedBy   String   // 操作者：用户邮箱/名，或 "system"
   reason     String?  // 变更原因（KCL）
+  proposalId String?  // 关联的演化提案 ID
   createdAt  DateTime @default(now())
 
   @@index([workspaceId])

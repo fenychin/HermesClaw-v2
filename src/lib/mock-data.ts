@@ -2,6 +2,10 @@
  * HermesClaw-v2 完整 Mock 数据集
  * —— 外贸行业 MVP 阶段全量演示数据，字段完整、跨引用一致
  *
+ * ⚠️ SEED ONLY — 仅供 prisma seed 与初始化脚本使用，**禁止**被任何 UI 组件、
+ *   Route Handler 或服务端业务代码直接 import。UI 必须经由 prisma / API
+ *   读取真实持久化数据。
+ *
  * 跨实体引用关系：
  *   Agent.bindSkills       → Skill.id
  *   Agent.bindConnectors   → Connector.id

@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@hermesclaw/industry-pack-sdk": ["./src/lib/industry-pack-sdk"]
     }
   },
   "include": [

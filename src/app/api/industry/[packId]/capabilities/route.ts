@@ -1,4 +1,4 @@
-import { getCachedManifest, loadIndustryWorkflows, loadIndustryAgents } from "@/lib/server/industry-pack-loader"
+import { getCachedManifest, listIndustryWorkflows, loadIndustryAgents } from "@/lib/industry-pack-sdk"
 import { withRBAC } from "@/lib/server/api-handler"
 import type { RouteContext } from "@/lib/server/api-handler"
 import { logger } from "@/lib/logger"
@@ -9,8 +9,8 @@ export const GET = withRBAC<RouteContext<{ packId: string }>>(
     try {
       const params = await routeContext.params
       packId = params.packId
-      
-      const workflows = loadIndustryWorkflows(packId)
+
+      const workflows = listIndustryWorkflows(packId)
       const agents = loadIndustryAgents(packId)
       const manifest = getCachedManifest(packId)
       

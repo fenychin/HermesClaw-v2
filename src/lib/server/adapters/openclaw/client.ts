@@ -21,6 +21,18 @@ import type { TaskEnvelope } from '@/contracts/task-envelope'
 import type { ActionReceipt } from '@/contracts/action-receipt'
 import { ACTION_RECEIPT_VERSION } from '@/contracts/action-receipt'
 
+import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
+
+
+const FALLBACK_SKILL_CONSTRAINTS = [
+  '不得删除任何持久化数据',
+  '不得修改系统配置或其他 Agent 的任务边界',
+  '不得发送外部邮件或执行资金操作',
+  '输出必须标注置信度，低置信度（< 0.7）时须明确警示',
+].join('；')
+
+
 /**
  * OpenClaw 统一 HTTP 客户端
  *
@@ -67,24 +79,46 @@ class OpenClawClient {
   }
 
   /**
+   * 本地执行大模型技能任务
+   */
+  private async executeTaskLocally(
+    envelope: TaskEnvelope
+  ): Promise<OpenClawTaskResult> {
+    const { executeLocalTask } = await import('./local-executor')
+    return executeLocalTask(envelope)
+  }
+
+  /**
    * 执行任务
    * @param envelope - 任务封装契约对象
    */
   async executeTask(
     envelope: TaskEnvelope
   ): Promise<ActionReceipt> {
-    const req: OpenClawExecuteTaskRequest = {
-      taskId: envelope.taskId,
-      inputs: {
-        ...envelope.input,
-        workflowRunId: envelope.workflowRunId,
-        workspaceId: envelope.workspaceId,
-        agentId: envelope.agentId,
-        actionType: envelope.actionType,
-      },
+    const isSkill = envelope.actionType.startsWith('skill.')
+
+    let rawResult: OpenClawTaskResult
+    try {
+      const req: OpenClawExecuteTaskRequest = {
+        taskId: envelope.taskId,
+        inputs: {
+          ...envelope.input,
+          workflowRunId: envelope.workflowRunId,
+          workspaceId: envelope.workspaceId,
+          agentId: envelope.agentId,
+          actionType: envelope.actionType,
+        },
+      }
+      rawResult = await this.request<OpenClawTaskResult>('/tasks/execute', req)
+    } catch (error) {
+      if (isSkill) {
+        logger.warn(`[OpenClawClient] 外部服务不可达或报错，技能任务退化至本地大模型执行引擎: ${error instanceof Error ? error.message : String(error)}`)
+        rawResult = await this.executeTaskLocally(envelope)
+      } else {
+        throw error
+      }
     }
 
-    const rawResult = await this.request<OpenClawTaskResult>('/tasks/execute', req)
     const outcome: 'success' | 'failure' = rawResult.status === 'succeeded' ? 'success' : 'failure'
 
     return {
