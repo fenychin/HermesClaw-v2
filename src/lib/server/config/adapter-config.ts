@@ -3,7 +3,11 @@
  *
  * 版本号锁定策略：Hermes / OpenClaw 版本升级须经 HEP 审批流程，
  * 禁止在未经审批的情况下修改 version 字段。
+ *
+ * Mock 判定：统一从 src/config/runtime-mode.ts 读取（全局架构审查 P1-#6）。
  */
+
+import { runtimeMode } from "@/config/runtime-mode"
 
 export const ADAPTER_CONFIG = {
   hermes: {
@@ -13,10 +17,8 @@ export const ADAPTER_CONFIG = {
     baseUrl: process.env.HERMES_API_URL ?? 'http://localhost:8000',
     /** 请求超时时间（毫秒） */
     timeout: 30000,
-    /** 是否启用 Mock 模式（开发环境默认启用） */
-    useMock:
-      process.env.HERMES_USE_MOCK === 'true' ||
-      process.env.NODE_ENV === 'development',
+    /** 是否启用 Mock 模式 */
+    useMock: runtimeMode.hermes.useMock,
   },
   openclaw: {
     /** 锁定版本，升级须经 HEP 审批 */
@@ -25,10 +27,8 @@ export const ADAPTER_CONFIG = {
     baseUrl: process.env.OPENCLAW_API_URL ?? 'http://localhost:8001',
     /** 请求超时时间（毫秒） */
     timeout: 15000,
-    /** 是否启用 Mock 模式（开发环境默认启用） */
-    useMock:
-      process.env.OPENCLAW_USE_MOCK === 'true' ||
-      process.env.NODE_ENV === 'development',
+    /** 是否启用 Mock 模式 */
+    useMock: runtimeMode.openclaw.useMock,
   },
 } as const
 

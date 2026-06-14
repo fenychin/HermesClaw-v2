@@ -9,6 +9,7 @@
  */
 
 import { ADAPTER_CONFIG } from '../../config/adapter-config'
+import { runtimeMode } from '@/config/runtime-mode'
 import type {
   HermesRunWorkflowRequest,
   HermesRunWorkflowResponse,
@@ -40,13 +41,10 @@ class HermesClient {
   private readonly config = ADAPTER_CONFIG.hermes
 
   /**
-   * 动态读取 Mock 模式开关（每次请求时读取，支持运行时切换）。
-   * 🔄 P2 整改（问题5.1）：getter 替代构造时固化，集成测试可临时关闭 Mock。
+   * 动态读取 Mock 模式开关（统一从 runtimeMode 获取，全局架构审查 P1-#6）。
    */
   private get useMock(): boolean {
-    if (process.env.HERMES_USE_MOCK === 'true') return true
-    if (process.env.HERMES_USE_MOCK === 'false') return false
-    return process.env.NODE_ENV === 'development'
+    return runtimeMode.hermes.useMock
   }
 
   /**

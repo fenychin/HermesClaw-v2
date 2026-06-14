@@ -14,6 +14,7 @@ import { writeAgentLog } from "@/lib/server/shared/agent-log"
 import { hermesClient } from "@/lib/server/adapters/hermes"
 import { runWorkflow as runLocalWorkflow } from "@/lib/server/workflow/dag-runner"
 import { TypedTaskInputSchema, isCriticalActionType } from "@/contracts"
+import { runtimeMode } from '@/config/runtime-mode'
 import { TaskInputValidationError, HermesApiError } from "@/lib/server/shared/exceptions"
 
 export interface ScheduleOptions {
@@ -66,14 +67,11 @@ export class WorkflowSchedulerService {
       throw new TaskInputValidationError(errorMsg, { errors: validationErrors })
     }
 
-    // 2. 路由决定逻辑
-    const envMode = process.env.WORKFLOW_ROUTING_MODE
-    let engine: "local" | "hermes" = "local"
-
-    if (envMode === "hermes" || envMode === "local") {
-      engine = envMode
-    } else {
-      // workspace 设定决定路由模式，若不存在则使用缺省 'local'
+    // 2. 路由决定逻辑（统一从 runtimeMode 获取，全局架构审查 P1-#6）
+    const envEngine = runtimeMode.workflow.engine
+    let engine: "local" | "hermes" = envEngine
+    // 当 env 未显式指定时，workspace 设定决定路由模式
+    if (envEngine !== "hermes" && envEngine !== "local") {
       const settings = await prisma.workspaceSettings.findUnique({
         where: { workspaceId },
       })
@@ -83,7 +81,6 @@ export class WorkflowSchedulerService {
     logger.info(`[WorkflowScheduler] 工作流 ${workflowId} 路由决定为: ${engine} 执行器`, {
       workspaceId,
       engine,
-      envMode,
     })
 
     // 3. 动态审计风险级别确定：若 actionType 为高危类型则为 high，否则默认为 medium
