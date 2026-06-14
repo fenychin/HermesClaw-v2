@@ -11,10 +11,10 @@
  * 请求体（可选）：{ input?: Record<string, unknown> }
  * 响应体：ApiResponse<{ runId: string; status: string; output: unknown }>
  */
-import { ApiResponse } from '@/lib/server/api-response'
+import { ApiResponse } from '@/lib/server/shared/api-response'
 import { logger } from '@/lib/logger'
 import { rateLimit } from '@/lib/rate-limit'
-import { withRBAC, type RouteContext } from '@/lib/server/api-handler'
+import { withRBAC, type RouteContext } from '@/lib/server/shared/api-handler'
 import { validateBody, WorkflowRunSchema } from '@/lib/validators'
 import type { WorkspaceContext } from '@/lib/workspace'
 import { WorkflowSchedulerService } from '@/lib/server/workflow/scheduler'

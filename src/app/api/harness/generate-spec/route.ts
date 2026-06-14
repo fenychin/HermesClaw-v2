@@ -12,8 +12,8 @@
  * 响应：{ spec: HarnessSpec（JSON）, markdown: string }
  */
 import anthropic from "@/lib/anthropic"
-import { parseJsonLoose } from "@/lib/server/harness-llm"
-import { resolveLlmProvider } from "@/lib/server/llm-provider"
+import { parseJsonLoose } from "@/lib/server/hermes/harness-llm"
+import { resolveLlmProvider } from "@/lib/server/shared/llm-provider"
 import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { rateLimit } from "@/lib/rate-limit"

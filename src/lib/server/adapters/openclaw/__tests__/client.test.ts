@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, vi } from "vitest"
 
 // Mock 运行日志写入服务，避免 Prisma 抛出外键越界约束警告污染测试输出
-vi.mock("@/lib/server/agent-log", () => ({
+vi.mock("@/lib/server/shared/agent-log", () => ({
   writeAgentLog: vi.fn().mockResolvedValue(undefined),
 }))
 

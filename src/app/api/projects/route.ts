@@ -8,8 +8,8 @@ import {
 } from "@/lib/api-utils"
 import { ProjectCreateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
-import { auditedWrite } from "@/lib/server/audited-write"
-import { actorFromSession } from "@/lib/server/audit"
+import { auditedWrite } from "@/lib/server/shared/audited-write"
+import { actorFromSession } from "@/lib/server/shared/audit"
 
 /** GET /api/projects —— 获取当前 workspace 的项目列表 */
 export async function GET(request: Request) {

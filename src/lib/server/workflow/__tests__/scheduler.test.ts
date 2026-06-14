@@ -42,12 +42,12 @@ vi.mock("@/lib/server/workflow/dag-runner", () => ({
   MaxDepthExceededError: class extends Error {},
 }))
 
-vi.mock("@/lib/server/audit", () => ({
+vi.mock("@/lib/server/shared/audit", () => ({
   writeAuditLog: vi.fn().mockResolvedValue({}),
   actorFromSession: vi.fn().mockResolvedValue("member@hermesclaw.ai"),
 }))
 
-vi.mock("@/lib/server/agent-log", () => ({
+vi.mock("@/lib/server/shared/agent-log", () => ({
   writeAgentLog: vi.fn().mockResolvedValue({}),
 }))
 

@@ -6,8 +6,8 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
-import { checkConfirmQuery } from "@/lib/server/guardrail"
+import { writeAuditLog, actorFromSession } from "@/lib/server/shared/audit"
+import { checkConfirmQuery } from "@/lib/server/hermes/guardrail"
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
 import { z } from "zod"
 import { validateBody } from "@/lib/validators"

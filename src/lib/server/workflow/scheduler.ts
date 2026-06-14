@@ -9,12 +9,12 @@
  */
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
-import { writeAuditLog, actorFromSession, type AuditRiskLevel } from "@/lib/server/audit"
-import { writeAgentLog } from "@/lib/server/agent-log"
+import { writeAuditLog, actorFromSession, type AuditRiskLevel } from "@/lib/server/shared/audit"
+import { writeAgentLog } from "@/lib/server/shared/agent-log"
 import { hermesClient } from "@/lib/server/adapters/hermes"
 import { runWorkflow as runLocalWorkflow } from "@/lib/server/workflow/dag-runner"
 import { TypedTaskInputSchema, isCriticalActionType } from "@/contracts"
-import { TaskInputValidationError, HermesApiError } from "@/lib/server/exceptions"
+import { TaskInputValidationError, HermesApiError } from "@/lib/server/shared/exceptions"
 
 export interface ScheduleOptions {
   /** 工作流 ID */

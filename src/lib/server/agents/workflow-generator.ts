@@ -18,15 +18,15 @@
  */
 import { prisma } from "@/lib/prisma"
 import { stringifyJsonField } from "@/lib/api-utils"
-import { parseJsonLoose } from "@/lib/server/harness-llm"
+import { parseJsonLoose } from "@/lib/server/hermes/harness-llm"
 import { logger } from "@/lib/logger"
-import { writeAuditLog } from "@/lib/server/audit"
-import { guardOutput } from "@/lib/server/output-guard"
+import { writeAuditLog } from "@/lib/server/shared/audit"
+import { guardOutput } from "@/lib/server/shared/output-guard"
 import {
   resolveLlmProvider,
   callAnthropicText,
   callDeepSeekJson,
-} from "@/lib/server/llm-provider"
+} from "@/lib/server/shared/llm-provider"
 import type { WorkflowNode, WorkflowEdge } from "@/lib/server/workflow/dag-types"
 import { loadIndustryPrompt } from "@/lib/industry-pack-sdk"
 

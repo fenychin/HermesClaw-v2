@@ -1,6 +1,6 @@
-import { ApiResponse } from '@/lib/server/api-response'
+import { ApiResponse } from '@/lib/server/shared/api-response'
 import { prisma } from '@/lib/prisma'
-import { withRBAC, type RouteContext } from '@/lib/server/api-handler'
+import { withRBAC, type RouteContext } from '@/lib/server/shared/api-handler'
 import type { WorkspaceContext } from '@/lib/workspace'
 import type { HarnessProposal } from '@/types'
 import { HarnessProposalSchema } from '@/contracts'

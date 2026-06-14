@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { assertWithinBoundary } from "@/lib/server/boundary"
-import * as llmProvider from "@/lib/server/llm-provider"
+import { assertWithinBoundary } from "@/lib/server/hermes/boundary"
+import * as llmProvider from "@/lib/server/shared/llm-provider"
 import { logger } from "@/lib/logger"
 
 describe("assertWithinBoundary 边界与红线运行时校验", () => {

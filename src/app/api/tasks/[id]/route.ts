@@ -2,9 +2,9 @@ import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import { errorResponse } from "@/lib/api-utils"
 import { type WorkspaceContext } from "@/lib/workspace"
-import { withRBAC, type RouteContext } from "@/lib/server/api-handler"
-import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
-import { ApiResponse } from "@/lib/server/api-response"
+import { withRBAC, type RouteContext } from "@/lib/server/shared/api-handler"
+import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/shared/audit"
+import { ApiResponse } from "@/lib/server/shared/api-response"
 import { z } from "zod"
 
 /** 任务状态允许值 */

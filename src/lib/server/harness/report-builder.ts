@@ -5,8 +5,8 @@
  */
 
 import { prisma } from "@/lib/prisma"
-import { writeAuditLog } from "@/lib/server/audit"
-import { guardOutput } from "@/lib/server/output-guard"
+import { writeAuditLog } from "@/lib/server/shared/audit"
+import { guardOutput } from "@/lib/server/shared/output-guard"
 import { EVAL_WINDOW_HOURS } from "./metrics"
 import type {
   HarnessMetrics,

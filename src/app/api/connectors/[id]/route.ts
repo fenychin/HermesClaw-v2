@@ -5,8 +5,8 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
-import { checkConfirmQuery } from "@/lib/server/guardrail"
+import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/shared/audit"
+import { checkConfirmQuery } from "@/lib/server/hermes/guardrail"
 import { ConnectorUpdateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 

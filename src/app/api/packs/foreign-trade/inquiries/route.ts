@@ -2,14 +2,14 @@ import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger'
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { buildWorkspaceContext, type WorkspaceContext } from "@/lib/workspace"
-import { withRBAC } from "@/lib/server/api-handler"
+import { withRBAC } from "@/lib/server/shared/api-handler"
 import { validateBody, InquiryCreateSchema } from "@/lib/validators"
-import { actorFromSession } from "@/lib/server/audit"
-import { auditedWrite } from "@/lib/server/audited-write"
-import { ApiResponse } from "@/lib/server/api-response"
+import { actorFromSession } from "@/lib/server/shared/audit"
+import { auditedWrite } from "@/lib/server/shared/audited-write"
+import { ApiResponse } from "@/lib/server/shared/api-response"
 import { countryCodeToFlag } from "@/lib/country-utils"
 import { runWorkflow } from '@/lib/server/workflow/dag-runner'
-import { WorkflowNotFoundError } from '@/lib/server/exceptions'
+import { WorkflowNotFoundError } from '@/lib/server/shared/exceptions'
 
 /** 序列化 Inquiry，将 DateTime 转为 ISO 字符串（匹配 types/trade.ts） */
 function serializeInquiry(inquiry: {

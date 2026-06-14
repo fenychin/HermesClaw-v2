@@ -1,7 +1,7 @@
 import { logger } from "@/lib/logger"
 import { successResponse, errorResponse } from "@/lib/api-utils"
-import { withRBAC } from "@/lib/server/api-handler"
-import { getIndustryHealthData } from "@/lib/server/industry-health"
+import { withRBAC } from "@/lib/server/shared/api-handler"
+import { getIndustryHealthData } from "@/lib/server/hermes/industry-health"
 import type { WorkspaceContext } from "@/lib/workspace"
 
 export const runtime = "nodejs"

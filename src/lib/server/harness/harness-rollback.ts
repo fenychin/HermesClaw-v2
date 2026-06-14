@@ -7,7 +7,7 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import { stringifyJsonField } from "@/lib/api-utils"
-import { writeAgentLog } from "@/lib/server/agent-log"
+import { writeAgentLog } from "@/lib/server/shared/agent-log"
 
 // ==============================
 // 快照结构
@@ -247,7 +247,7 @@ export async function rollbackHarnessProposal(
 
     // 5. 异步触发 Harness 降级评估（AGENTS.md §2.3：配置变更后纳入评估窗口）
     //    使用动态 import 避免循环依赖；失败不阻断主流程
-    import("@/lib/server/harness-eval")
+    import("@/lib/server/hermes/harness-eval")
       .then(({ runHarnessEvaluation }) =>
         runHarnessEvaluation(proposal.workspaceId, "auto").catch((err: unknown) =>
           logger.warn("回滚后自动评估触发失败（已忽略）", {

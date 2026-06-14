@@ -5,8 +5,8 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
-import { withRBAC } from "@/lib/server/api-handler"
+import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/shared/audit"
+import { withRBAC } from "@/lib/server/shared/api-handler"
 import type { WorkspaceContext } from "@/lib/workspace"
 import { z } from "zod"
 

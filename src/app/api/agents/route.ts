@@ -5,10 +5,10 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { actorFromSession } from "@/lib/server/audit"
+import { actorFromSession } from "@/lib/server/shared/audit"
 import { AgentCreateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
-import { serializeAgent } from "@/lib/server/agent-serializer"
+import { serializeAgent } from "@/lib/server/shared/agent-serializer"
 
 /** GET /api/agents —— 获取当前 workspace 的智能体列表 */
 export async function GET(request: Request) {

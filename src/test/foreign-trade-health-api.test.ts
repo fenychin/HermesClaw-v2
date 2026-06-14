@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { getIndustryHealthData } from "@/lib/server/industry-health";
-import type { IndustryHealthDeps } from "@/lib/server/industry-health";
+import { getIndustryHealthData } from "@/lib/server/hermes/industry-health";
+import type { IndustryHealthDeps } from "@/lib/server/hermes/industry-health";
 
 describe("getIndustryHealthData — 行业包健康度查询通用化", () => {
   it("应将 packId 入参映射为 Workflow.industryId 过滤条件，并精准查询关联运行记录", async () => {

@@ -2,7 +2,7 @@
  * GET /api/brain/stats —— 获取智慧大脑（Brain）的统计指标与知识缺口
  */
 import { buildWorkspaceContext } from "@/lib/workspace";
-import { getBrainStats } from "@/lib/server/brain";
+import { getBrainStats } from "@/lib/server/hermes/brain";
 import { successResponse, errorResponse } from "@/lib/api-utils";
 import { logger } from "@/lib/logger";
 

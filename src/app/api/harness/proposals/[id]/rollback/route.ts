@@ -13,15 +13,15 @@
  */
 
 import { prisma } from "@/lib/prisma"
-import { ApiResponse } from "@/lib/server/api-response"
+import { ApiResponse } from "@/lib/server/shared/api-response"
 import { logger } from "@/lib/logger"
 import {
   rollbackHarnessProposal,
   RollbackException,
 } from "@/lib/server/harness/harness-rollback"
-import { checkAutomationGate } from "@/lib/server/guardrail"
-import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
-import { withRBAC, type RouteContext } from "@/lib/server/api-handler"
+import { checkAutomationGate } from "@/lib/server/hermes/guardrail"
+import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/shared/audit"
+import { withRBAC, type RouteContext } from "@/lib/server/shared/api-handler"
 import type { WorkspaceContext } from "@/lib/workspace"
 import { z } from "zod"
 import { validateBody } from "@/lib/validators"

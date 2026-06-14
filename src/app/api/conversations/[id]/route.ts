@@ -5,9 +5,9 @@ import {
   errorResponse,
 } from "@/lib/api-utils"
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
-import { actorFromSession } from "@/lib/server/audit"
-import { auditedWrite } from "@/lib/server/audited-write"
-import { writeAgentLog } from "@/lib/server/agent-log"
+import { actorFromSession } from "@/lib/server/shared/audit"
+import { auditedWrite } from "@/lib/server/shared/audited-write"
+import { writeAgentLog } from "@/lib/server/shared/agent-log"
 import { z } from "zod"
 import { validateBody } from "@/lib/validators"
 

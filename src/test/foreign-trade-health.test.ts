@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { calculateWorkflowHealth } from "@/lib/server/industry-health";
-import type { WorkflowRunSummary } from "@/lib/server/industry-health";
+import { calculateWorkflowHealth } from "@/lib/server/hermes/industry-health";
+import type { WorkflowRunSummary } from "@/lib/server/hermes/industry-health";
 
 describe("calculateWorkflowHealth — 行业包工作流健康度统计纯函数", () => {
   it("应妥善处理空数组边界情况", () => {

@@ -1,15 +1,15 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import type { WorkspaceContext } from "@/lib/workspace"
-import { withRBAC } from "@/lib/server/api-handler"
+import { withRBAC } from "@/lib/server/shared/api-handler"
 import {
   createAuditEntry,
   updateAuditEntry,
   actorFromSession,
-} from "@/lib/server/audit"
-import { ApiResponse } from "@/lib/server/api-response"
-import { selectModel } from "@/lib/server/model-router"
-import { callAnthropicText } from "@/lib/server/llm-provider"
+} from "@/lib/server/shared/audit"
+import { ApiResponse } from "@/lib/server/shared/api-response"
+import { selectModel } from "@/lib/server/shared/model-router"
+import { callAnthropicText } from "@/lib/server/shared/llm-provider"
 import { z } from "zod"
 
 /** POST /api/reports/generate 请求体 schema（type 可选，默认 MORNING） */

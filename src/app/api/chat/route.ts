@@ -1,13 +1,13 @@
 import { NextRequest } from "next/server";
 import { logger } from '@/lib/logger';
 import { HERMES_SYSTEM_PROMPT } from "@/lib/system-prompts";
-import { writeAgentLog } from "@/lib/server/agent-log";
-import { getGovernanceClause } from "@/lib/server/agents-md";
+import { writeAgentLog } from "@/lib/server/shared/agent-log";
+import { getGovernanceClause } from "@/lib/server/shared/agents-md";
 import { rateLimit } from "@/lib/rate-limit";
 import { ChatMessageSchema, validateBody } from "@/lib/validators";
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace";
-import { selectModel } from "@/lib/server/model-router";
-import { openChatStream } from "@/lib/server/llm-provider";
+import { selectModel } from "@/lib/server/shared/model-router";
+import { openChatStream } from "@/lib/server/shared/llm-provider";
 
 export const runtime = "nodejs";
 

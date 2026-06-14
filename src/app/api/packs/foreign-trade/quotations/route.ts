@@ -2,11 +2,11 @@ import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger'
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { buildWorkspaceContext, type WorkspaceContext } from "@/lib/workspace"
-import { withRBAC } from "@/lib/server/api-handler"
+import { withRBAC } from "@/lib/server/shared/api-handler"
 import { validateBody, QuotationCreateSchema } from "@/lib/validators"
-import { actorFromSession } from "@/lib/server/audit"
-import { auditedWrite } from "@/lib/server/audited-write"
-import { ApiResponse } from "@/lib/server/api-response"
+import { actorFromSession } from "@/lib/server/shared/audit"
+import { auditedWrite } from "@/lib/server/shared/audited-write"
+import { ApiResponse } from "@/lib/server/shared/api-response"
 
 /** 序列化 Quotation，将 DateTime 转为 ISO 字符串 */
 function serializeQuotation(quotation: {

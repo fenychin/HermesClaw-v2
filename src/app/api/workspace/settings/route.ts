@@ -6,7 +6,7 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import { successResponse, errorResponse, parseJsonField } from "@/lib/api-utils"
-import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
+import { writeAuditLog, actorFromSession } from "@/lib/server/shared/audit"
 import { buildWorkspaceContext, guardRole } from "@/lib/workspace"
 import { z } from "zod"
 

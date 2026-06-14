@@ -11,7 +11,7 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
-import { EVAL_WINDOW_HOURS } from "@/lib/server/harness-eval"
+import { EVAL_WINDOW_HOURS } from "@/lib/server/hermes/harness-eval"
 import type { HarnessStatus } from "@/types"
 import { buildWorkspaceContext } from "@/lib/workspace"
 

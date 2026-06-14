@@ -2,8 +2,8 @@ import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import type { WorkspaceContext } from "@/lib/workspace"
-import { withRBAC } from "@/lib/server/api-handler"
-import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
+import { withRBAC } from "@/lib/server/shared/api-handler"
+import { writeAuditLog, actorFromSession } from "@/lib/server/shared/audit"
 import { countryCodeToFlag } from "@/lib/country-utils"
 
 /** 沉默预警条目 */

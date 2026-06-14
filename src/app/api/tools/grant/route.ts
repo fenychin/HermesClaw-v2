@@ -7,10 +7,10 @@
  *
  * —— AGENTS.md §5 #3 禁止静默执行：授权前写入预记录审计，执行后更新状态。
  */
-import { issueToolGrant } from "@/lib/server/tool-registry"
+import { issueToolGrant } from "@/lib/server/shared/tool-registry"
 import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
-import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
+import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/shared/audit"
 import { ToolGrantSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 

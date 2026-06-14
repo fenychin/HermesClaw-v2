@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import type { WorkspaceContext } from "@/lib/workspace"
-import { withRBAC } from "@/lib/server/api-handler"
+import { withRBAC } from "@/lib/server/shared/api-handler"
 
 /** 序列化 MarketIntelligence，将 DateTime 转为 ISO 字符串 */
 function serializeIntelligence(intel: {

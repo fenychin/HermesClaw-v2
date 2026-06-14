@@ -5,9 +5,9 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
-import { withRBAC } from "@/lib/server/api-handler"
-import { checkAutomationGate } from "@/lib/server/guardrail"
+import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/shared/audit"
+import { withRBAC } from "@/lib/server/shared/api-handler"
+import { checkAutomationGate } from "@/lib/server/hermes/guardrail"
 import type { WorkspaceContext } from "@/lib/workspace"
 import type { AutomationLevel } from "@/types/harness"
 

@@ -5,9 +5,9 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { actorFromSession } from "@/lib/server/audit"
-import { checkConfirmValue, checkAutomationGate } from "@/lib/server/guardrail"
-import { MemoryService } from "@/lib/server/memory-service"
+import { actorFromSession } from "@/lib/server/shared/audit"
+import { checkConfirmValue, checkAutomationGate } from "@/lib/server/hermes/guardrail"
+import { MemoryService } from "@/lib/server/hermes/memory-service"
 import { MemoryUpdateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 

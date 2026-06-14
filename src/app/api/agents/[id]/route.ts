@@ -5,12 +5,12 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
-import { writeAgentLog } from "@/lib/server/agent-log"
-import { checkConfirmQuery, checkConfirmValue, checkAutomationGate } from "@/lib/server/guardrail"
+import { writeAuditLog, actorFromSession } from "@/lib/server/shared/audit"
+import { writeAgentLog } from "@/lib/server/shared/agent-log"
+import { checkConfirmQuery, checkConfirmValue, checkAutomationGate } from "@/lib/server/hermes/guardrail"
 import { AgentUpdateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
-import { serializeAgent } from "@/lib/server/agent-serializer"
+import { serializeAgent } from "@/lib/server/shared/agent-serializer"
 
 /** GET /api/agents/[id] —— 获取智能体详情（含运行日志，workspaceId 隔离） */
 export async function GET(

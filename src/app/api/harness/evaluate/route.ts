@@ -1,7 +1,7 @@
 import { hermesClient } from '@/lib/server/adapters/hermes'
-import { withRBAC } from '@/lib/server/api-handler'
+import { withRBAC } from '@/lib/server/shared/api-handler'
 import type { WorkspaceContext } from "@/lib/workspace"
-import { ApiResponse } from '@/lib/server/api-response'
+import { ApiResponse } from '@/lib/server/shared/api-response'
 import { z } from "zod"
 import { validateBody } from "@/lib/validators"
 

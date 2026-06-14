@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { openclawClient } from '@/lib/server/adapters/openclaw/client'
 import { executeSkillNode } from '../skill-executor'
-import { ToolGrantMissingException } from '@/lib/server/exceptions'
+import { ToolGrantMissingException } from '@/lib/server/shared/exceptions'
 import type { WorkflowNode, WorkflowRunContext } from '../dag-types'
 
 vi.mock('@/lib/prisma', () => ({
@@ -30,7 +30,7 @@ vi.mock('@/lib/server/adapters/openclaw/client', () => ({
 }))
 
 // agent-log 写入与本测试无关，stub 掉避免触达真实 DB
-vi.mock('@/lib/server/agent-log', () => ({
+vi.mock('@/lib/server/shared/agent-log', () => ({
   writeAgentLog: vi.fn().mockResolvedValue(undefined),
 }))
 

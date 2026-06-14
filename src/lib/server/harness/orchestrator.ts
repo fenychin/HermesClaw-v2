@@ -10,9 +10,9 @@
  */
 
 import { prisma } from "@/lib/prisma"
-import { analyzeHarnessLogs } from "@/lib/server/harness-llm"
-import type { HarnessAnalysis } from "@/lib/server/harness-llm"
-import { selectModel } from "@/lib/server/model-router"
+import { analyzeHarnessLogs } from "@/lib/server/hermes/harness-llm"
+import type { HarnessAnalysis } from "@/lib/server/hermes/harness-llm"
+import { selectModel } from "@/lib/server/shared/model-router"
 import { automationLevelFromRisk } from "@/types"
 import type {
   HarnessEvaluateResult,

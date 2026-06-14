@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import { successResponse, errorResponse } from "@/lib/api-utils"
-import { withRBAC, type RouteContext } from "@/lib/server/api-handler"
-import { findProjectOrThrow } from "@/lib/server/project-helpers"
+import { withRBAC, type RouteContext } from "@/lib/server/shared/api-handler"
+import { findProjectOrThrow } from "@/lib/server/hermes/project-helpers"
 import type { WorkspaceContext } from "@/lib/workspace"
 
 /**

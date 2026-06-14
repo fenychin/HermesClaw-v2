@@ -10,10 +10,10 @@
 import { z } from "zod"
 import { logger } from "@/lib/logger"
 import { successResponse, errorResponse } from "@/lib/api-utils"
-import { createAuditEntry, updateAuditEntry, writeAuditLog, actorFromSession } from "@/lib/server/audit"
+import { createAuditEntry, updateAuditEntry, writeAuditLog, actorFromSession } from "@/lib/server/shared/audit"
 import { createEmailConnector } from "@/lib/server/connectors/email/email-connector"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
-import { writeAgentLog } from "@/lib/server/agent-log"
+import { writeAgentLog } from "@/lib/server/shared/agent-log"
 
 export const runtime = "nodejs"
 

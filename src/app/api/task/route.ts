@@ -1,17 +1,17 @@
 import { TRADE_AGENT_PROMPTS } from "@/lib/system-prompts";
-import { writeAgentLog } from "@/lib/server/agent-log";
+import { writeAgentLog } from "@/lib/server/shared/agent-log";
 import { rateLimit } from "@/lib/rate-limit";
 import { TaskExecuteSchema, validateBody } from "@/lib/validators";
 import { TypedTaskInputSchema, isCriticalActionType } from "@/contracts";
 import { logger } from "@/lib/logger";
 import type { WorkspaceContext } from "@/lib/workspace";
-import { withRBAC } from "@/lib/server/api-handler";
-import { selectModel } from "@/lib/server/model-router";
+import { withRBAC } from "@/lib/server/shared/api-handler";
+import { selectModel } from "@/lib/server/shared/model-router";
 import {
   callAnthropicText,
   classifyUpstreamError,
   type LlmProvider,
-} from "@/lib/server/llm-provider";
+} from "@/lib/server/shared/llm-provider";
 
 export const runtime = "nodejs";
 

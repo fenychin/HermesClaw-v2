@@ -10,7 +10,7 @@
 import { NextRequest } from "next/server"
 import { logger } from '@/lib/logger';
 import { prisma } from "@/lib/prisma"
-import { runHarnessEvaluation, EVAL_WINDOW_HOURS } from "@/lib/server/harness-eval"
+import { runHarnessEvaluation, EVAL_WINDOW_HOURS } from "@/lib/server/hermes/harness-eval"
 import { successResponse, errorResponse } from "@/lib/api-utils"
 
 export const runtime = "nodejs"

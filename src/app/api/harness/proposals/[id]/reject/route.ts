@@ -1,8 +1,8 @@
-import { ApiResponse } from '@/lib/server/api-response'
+import { ApiResponse } from '@/lib/server/shared/api-response'
 import { prisma } from '@/lib/prisma'
-import { withRBAC, type RouteContext } from '@/lib/server/api-handler'
-import { checkAutomationGate } from '@/lib/server/guardrail'
-import { createAuditEntry, updateAuditEntry, actorFromSession } from '@/lib/server/audit'
+import { withRBAC, type RouteContext } from '@/lib/server/shared/api-handler'
+import { checkAutomationGate } from '@/lib/server/hermes/guardrail'
+import { createAuditEntry, updateAuditEntry, actorFromSession } from '@/lib/server/shared/audit'
 import { resolveAutomationLevel } from '@/types'
 import type { WorkspaceContext } from '@/lib/workspace'
 

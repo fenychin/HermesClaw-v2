@@ -2,17 +2,17 @@
 import { describe, it, expect, vi } from "vitest";
 
 // Mock harness-eval 避免导入大模型 SDK 以及 next-auth
-vi.mock("@/lib/server/harness-eval", () => ({
+vi.mock("@/lib/server/hermes/harness-eval", () => ({
   isErrorStatus: (status: string) =>
     ["error", "failed", "failure", "timeout", "失败", "超时", "异常"].includes(
       (status || "").toLowerCase()
     ),
 }));
 
-import { getBrainStats } from "@/lib/server/brain";
-import { guardOutput } from "@/lib/server/output-guard";
-import { getSkillsWithStats } from "@/lib/server/skills";
-import { getEnrichedConnectors } from "@/lib/server/connectors";
+import { getBrainStats } from "@/lib/server/hermes/brain";
+import { guardOutput } from "@/lib/server/shared/output-guard";
+import { getSkillsWithStats } from "@/lib/server/hermes/skills";
+import { getEnrichedConnectors } from "@/lib/server/shared/connectors";
 import type { prisma } from "@/lib/prisma";
 
 describe("智慧大脑 (Brain) 模块健康度测试", () => {

@@ -5,9 +5,9 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { createAuditEntry, updateAuditEntry } from "@/lib/server/audit"
-import { writeAgentLog } from "@/lib/server/agent-log"
-import { checkConfirmQuery, checkAutomationGate } from "@/lib/server/guardrail"
+import { createAuditEntry, updateAuditEntry } from "@/lib/server/shared/audit"
+import { writeAgentLog } from "@/lib/server/shared/agent-log"
+import { checkConfirmQuery, checkAutomationGate } from "@/lib/server/hermes/guardrail"
 import { resolveAutomationLevel } from "@/types"
 import { HarnessProposalUpdateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireHarnessAdmin } from "@/lib/workspace"

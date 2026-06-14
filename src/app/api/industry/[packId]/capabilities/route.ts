@@ -1,6 +1,6 @@
 import { getCachedManifest, listIndustryWorkflows, loadIndustryAgents } from "@/lib/industry-pack-sdk"
-import { withRBAC } from "@/lib/server/api-handler"
-import type { RouteContext } from "@/lib/server/api-handler"
+import { withRBAC } from "@/lib/server/shared/api-handler"
+import type { RouteContext } from "@/lib/server/shared/api-handler"
 import { logger } from "@/lib/logger"
 
 export const GET = withRBAC<RouteContext<{ packId: string }>>(

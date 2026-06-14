@@ -6,12 +6,12 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
+import { writeAuditLog, actorFromSession } from "@/lib/server/shared/audit"
 import { ConnectorCreateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 import type { Connector } from "@/types"
 
-import { getEnrichedConnectors } from "@/lib/server/connectors"
+import { getEnrichedConnectors } from "@/lib/server/shared/connectors"
 
 /** GET /api/connectors —— 获取所有连接器列表（CDN 缓存 60s，过期后可 revalidate 30s） */
 export async function GET(request: Request) {

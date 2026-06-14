@@ -18,17 +18,17 @@
 import { prisma } from '@/lib/prisma'
 import { parseJsonField, stringifyJsonField } from '@/lib/api-utils'
 import { logger } from '@/lib/logger'
-import { writeAuditLog, actorFromSession, type AuditRiskLevel } from '@/lib/server/audit'
-import { writeAgentLog } from '@/lib/server/agent-log'
+import { writeAuditLog, actorFromSession, type AuditRiskLevel } from '@/lib/server/shared/audit'
+import { writeAgentLog } from '@/lib/server/shared/agent-log'
 import { runDag } from '@/lib/server/workflow/dag-engine'
-import { runHarnessEvaluation } from '@/lib/server/harness-eval'
-import { guardOutput } from '@/lib/server/output-guard'
+import { runHarnessEvaluation } from '@/lib/server/hermes/harness-eval'
+import { guardOutput } from '@/lib/server/shared/output-guard'
 import { executeSkillNode } from '@/lib/server/workflow/skill-executor'
 import { executeDataWriteNode } from '@/lib/server/workflow/data-write-executor'
 import { emitOpenClawEvent, emitExecutionEvent } from '@/lib/server/adapters/openclaw/event-emitter'
 import { EXECUTION_EVENT_VERSION } from '@/contracts/execution-event'
 import { createSubworkflowHandler } from './subworkflow-executor'
-import { WorkflowNotFoundError, MaxDepthExceededError } from '@/lib/server/exceptions'
+import { WorkflowNotFoundError, MaxDepthExceededError } from '@/lib/server/shared/exceptions'
 import type {
   WorkflowNode,
   WorkflowEdge,

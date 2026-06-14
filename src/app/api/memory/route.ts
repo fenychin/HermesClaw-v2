@@ -5,11 +5,11 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { actorFromSession } from "@/lib/server/audit"
+import { actorFromSession } from "@/lib/server/shared/audit"
 import { MemoryCreateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
-import { guardOutput } from "@/lib/server/output-guard"
-import { MemoryService } from "@/lib/server/memory-service"
+import { guardOutput } from "@/lib/server/shared/output-guard"
+import { MemoryService } from "@/lib/server/hermes/memory-service"
 
 /** GET /api/memory?type=short|mid|long —— 获取记忆列表，支持类型过滤 */
 export async function GET(request: Request) {

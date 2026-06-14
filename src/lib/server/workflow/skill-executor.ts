@@ -16,12 +16,12 @@
 
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-import { writeAgentLog } from '@/lib/server/agent-log'
+import { writeAgentLog } from '@/lib/server/shared/agent-log'
 import {
   resolveAutomationLevel,
   mapAutomationToLogRisk,
 } from '@/types'
-import { ToolGrantMissingException, MissingIndustryIdError } from '@/lib/server/exceptions'
+import { ToolGrantMissingException, MissingIndustryIdError } from '@/lib/server/shared/exceptions'
 import type {
   WorkflowNode,
   WorkflowRunContext,

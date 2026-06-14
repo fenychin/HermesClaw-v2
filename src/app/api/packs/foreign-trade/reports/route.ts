@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import { buildWorkspaceContext } from "@/lib/workspace"
-import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
-import { ApiResponse } from "@/lib/server/api-response"
+import { writeAuditLog, actorFromSession } from "@/lib/server/shared/audit"
+import { ApiResponse } from "@/lib/server/shared/api-response"
 
 /**
  * GET /api/reports —— 获取报告列表（按生成时间倒序）

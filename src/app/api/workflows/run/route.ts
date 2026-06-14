@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { ApiResponse } from '@/lib/server/api-response'
-import { withRBAC } from '@/lib/server/api-handler'
+import { ApiResponse } from '@/lib/server/shared/api-response'
+import { withRBAC } from '@/lib/server/shared/api-handler'
 import { validateBody } from '@/lib/validators'
 import type { WorkspaceContext } from '@/lib/workspace'
 import { WorkflowSchedulerService } from '@/lib/server/workflow/scheduler'

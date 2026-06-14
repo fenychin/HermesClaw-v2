@@ -2,13 +2,13 @@ import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import { parseJsonField, successResponse, errorResponse, serializeSkill } from "@/lib/api-utils"
 import { buildWorkspaceContext } from "@/lib/workspace"
-import { withRBAC } from "@/lib/server/api-handler"
+import { withRBAC } from "@/lib/server/shared/api-handler"
 import { validateBody, SkillCreateSchema } from "@/lib/validators"
 import type { WorkspaceContext } from "@/lib/workspace"
 import { rateLimit } from "@/lib/rate-limit"
-import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
+import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/shared/audit"
 
-import { getSkillsWithStats } from "@/lib/server/skills"
+import { getSkillsWithStats } from "@/lib/server/hermes/skills"
 
 /** GET /api/skills —— 获取所有技能列表 */
 export async function GET(request: Request) {

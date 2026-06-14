@@ -15,7 +15,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-import { createAuditEntry, updateAuditEntry } from '@/lib/server/audit'
+import { createAuditEntry, updateAuditEntry } from '@/lib/server/shared/audit'
 import type {
   WorkflowNode,
   WorkflowRunContext,

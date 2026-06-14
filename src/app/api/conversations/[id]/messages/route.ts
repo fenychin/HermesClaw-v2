@@ -6,8 +6,8 @@ import {
 } from "@/lib/api-utils"
 import { ConversationMessageSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
-import { actorFromSession } from "@/lib/server/audit"
-import { auditedWrite } from "@/lib/server/audited-write"
+import { actorFromSession } from "@/lib/server/shared/audit"
+import { auditedWrite } from "@/lib/server/shared/audited-write"
 
 /** POST /api/conversations/[id]/messages —— 向对话追加消息 */
 export async function POST(

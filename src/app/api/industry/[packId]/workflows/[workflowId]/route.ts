@@ -10,8 +10,8 @@
  *   prisma seed 与 UI 静态 fallback 均派生自这里。
  */
 import { loadIndustryWorkflow } from "@/lib/industry-pack-sdk"
-import { withRBAC } from "@/lib/server/api-handler"
-import type { RouteContext } from "@/lib/server/api-handler"
+import { withRBAC } from "@/lib/server/shared/api-handler"
+import type { RouteContext } from "@/lib/server/shared/api-handler"
 import { logger } from "@/lib/logger"
 
 export const GET = withRBAC<RouteContext<{ packId: string; workflowId: string }>>(

@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger'
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { buildWorkspaceContext } from "@/lib/workspace"
-import { writeAgentLog } from "@/lib/server/agent-log"
+import { writeAgentLog } from "@/lib/server/shared/agent-log"
 import type { RecentRecordItem } from "@/lib/api-client"
 
 const LIMIT = 10

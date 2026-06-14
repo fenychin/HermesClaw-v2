@@ -39,14 +39,14 @@ vi.mock("@/lib/logger", () => ({
 // ---- Mock isProviderAvailable ----
 const mockIsAvailable = vi.fn<(provider: string) => boolean>(() => true);
 
-vi.mock("@/lib/server/llm-provider", () => ({
+vi.mock("@/lib/server/shared/llm-provider", () => ({
   isProviderAvailable: (provider: string) => mockIsAvailable(provider),
   DEFAULT_ANTHROPIC_MODEL: "claude-sonnet-4-6",
   DEFAULT_DEEPSEEK_MODEL: "deepseek-chat",
 }));
 
-import { selectModel } from "@/lib/server/model-router";
-import type { ModelRouteContext } from "@/lib/server/model-router";
+import { selectModel } from "@/lib/server/shared/model-router";
+import type { ModelRouteContext } from "@/lib/server/shared/model-router";
 
 // ---- 测试辅助 ----
 

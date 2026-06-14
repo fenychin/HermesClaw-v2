@@ -8,14 +8,14 @@ vi.mock("@/lib/auth", () => ({
 
 // Mock writeAuditLog 审计接口以做断言校验
 export const mockWriteAuditLog = vi.fn()
-vi.mock("@/lib/server/audit", () => ({
+vi.mock("@/lib/server/shared/audit", () => ({
   writeAuditLog: (...args: any[]) => mockWriteAuditLog(...args),
   actorFromSession: vi.fn().mockResolvedValue("SYSTEM"),
   createAuditEntry: vi.fn().mockResolvedValue({ auditId: "test-audit-id" }),
   updateAuditEntry: vi.fn().mockResolvedValue({}),
 }))
 
-import { runHarnessEvaluation } from "../harness-eval"
+import { runHarnessEvaluation } from "@/lib/server/hermes/harness-eval"
 import type { prisma } from "@/lib/prisma"
 
 describe("Harness 评估系统单元测试", () => {

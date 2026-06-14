@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { MemoryService } from "@/lib/server/memory-service"
+import { MemoryService } from "@/lib/server/hermes/memory-service"
 
 // ---- Mock 审计日志写入接口 ----
-vi.mock("@/lib/server/audit", () => ({
+vi.mock("@/lib/server/shared/audit", () => ({
   writeAuditLog: vi.fn().mockResolvedValue(undefined),
 }))
 

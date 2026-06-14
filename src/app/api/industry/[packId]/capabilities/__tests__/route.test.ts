@@ -35,7 +35,7 @@ vi.mock("@/lib/prisma", () => ({
 }))
 
 // mock audit helper
-vi.mock("@/lib/server/audit", () => ({
+vi.mock("@/lib/server/shared/audit", () => ({
   writeAuditLog: vi.fn().mockResolvedValue({}),
   actorFromSession: vi.fn().mockResolvedValue("member@hermesclaw.ai"),
 }))

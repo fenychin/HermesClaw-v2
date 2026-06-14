@@ -14,16 +14,16 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
-import { assertWithinBoundary } from "@/lib/server/boundary"
-import { guardOutput } from "@/lib/server/output-guard"
-import { writeAgentLog } from "@/lib/server/agent-log"
-import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
-import { getGovernanceClause } from "@/lib/server/agents-md"
+import { assertWithinBoundary } from "@/lib/server/hermes/boundary"
+import { guardOutput } from "@/lib/server/shared/output-guard"
+import { writeAgentLog } from "@/lib/server/shared/agent-log"
+import { writeAuditLog, actorFromSession } from "@/lib/server/shared/audit"
+import { getGovernanceClause } from "@/lib/server/shared/agents-md"
 import { rateLimit } from "@/lib/rate-limit"
 import { AgentExecuteSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
-import { selectModel } from "@/lib/server/model-router"
-import { callAnthropicText, type LlmProvider } from "@/lib/server/llm-provider"
+import { selectModel } from "@/lib/server/shared/model-router"
+import { callAnthropicText, type LlmProvider } from "@/lib/server/shared/llm-provider"
 
 export const runtime = "nodejs"
 export const maxDuration = 60

@@ -3,11 +3,11 @@ import { join } from "path"
 import { logger } from '@/lib/logger'
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { type WorkspaceContext } from "@/lib/workspace"
-import { actorFromSession, createAuditEntry, updateAuditEntry } from "@/lib/server/audit"
-import { writeAgentLog } from "@/lib/server/agent-log"
-import { withRBAC } from "@/lib/server/api-handler"
+import { actorFromSession, createAuditEntry, updateAuditEntry } from "@/lib/server/shared/audit"
+import { writeAgentLog } from "@/lib/server/shared/agent-log"
+import { withRBAC } from "@/lib/server/shared/api-handler"
 import { rateLimit } from "@/lib/rate-limit"
-import { extractFileText } from "@/lib/server/extract-file-text"
+import { extractFileText } from "@/lib/server/shared/extract-file-text"
 
 export const runtime = "nodejs"
 

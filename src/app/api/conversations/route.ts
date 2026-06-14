@@ -6,9 +6,9 @@ import {
 } from "@/lib/api-utils"
 import { ConversationCreateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
-import { actorFromSession } from "@/lib/server/audit"
-import { auditedWrite } from "@/lib/server/audited-write"
-import { writeAgentLog } from "@/lib/server/agent-log"
+import { actorFromSession } from "@/lib/server/shared/audit"
+import { auditedWrite } from "@/lib/server/shared/audited-write"
+import { writeAgentLog } from "@/lib/server/shared/agent-log"
 
 /** GET /api/conversations —— 获取对话列表 */
 export async function GET(request: Request) {
