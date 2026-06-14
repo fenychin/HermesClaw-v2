@@ -59,7 +59,9 @@ describe("GET /api/industry/[packId]/capabilities API 路由测试", () => {
 
     expect(res.status).toBe(200)
     expect(body.workflows).toBeDefined()
-    expect(body.workflows).toContain("inquiry-grade")
+    expect(body.workflows.some((w: any) => w.id === "inquiry-grade")).toBe(true)
+    expect(body.agents).toBeDefined()
+    expect(body.agents.some((a: any) => a.id === "agent-001")).toBe(true)
   })
 
   it("当角色是 VIEWER 时拦截并返回 403 错误", async () => {

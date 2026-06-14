@@ -1,4 +1,84 @@
-import { loadIndustryManifest, getCachedManifest, mapLegacyManifest } from "../lib/server/industry-pack-loader"
+import { vi, describe, it, expect } from "vitest"
+import { loadIndustryManifest, getCachedManifest, mapLegacyManifest, loadIndustryWorkflows, loadIndustryAgents } from "../lib/server/industry-pack-loader"
+
+// ---- Mock 物理文件读取，使单测与真实环境磁盘文件解耦 ----
+vi.mock("fs", async (importOriginal) => {
+  const actual = await importOriginal()
+  const mockFiles: Record<string, string> = {
+    "/mock-root/industry-packs/foreign-trade/manifest.json": JSON.stringify({
+      packId: "foreign-trade",
+      id: "foreign-trade",
+      name: "外贸行业包",
+      version: "1.0.0",
+      compatibleHermesApi: { min: "1.0.0", max: "2.0.0" },
+      directory: {
+        workflows: ["inquiry-grade", "dev-letter", "customer-profile", "quote-gen", "followup", "close-deal"],
+        agents: ["agent-001", "agent-002"],
+      },
+    }),
+    "/mock-root/industry-packs/foreign-trade/workflows/inquiry-grade.json": JSON.stringify({
+      id: "inquiry-grade",
+      title: "询盘分级",
+      description: "自动评分",
+      icon: "Filter",
+    }),
+    "/mock-root/industry-packs/foreign-trade/workflows/dev-letter.json": JSON.stringify({
+      id: "dev-letter",
+      title: "开发信",
+      description: "开发信写作",
+      icon: "Mail",
+    }),
+    "/mock-root/industry-packs/foreign-trade/workflows/customer-profile.json": JSON.stringify({
+      id: "customer-profile",
+      title: "客户画像",
+      description: "客户画像",
+      icon: "User",
+    }),
+    "/mock-root/industry-packs/foreign-trade/workflows/quote-gen.json": JSON.stringify({
+      id: "quote-gen",
+      title: "报价生成",
+      description: "报价生成",
+      icon: "Calculator",
+    }),
+    "/mock-root/industry-packs/foreign-trade/workflows/followup.json": JSON.stringify({
+      id: "followup",
+      title: "跟进",
+      description: "跟进",
+      icon: "Activity",
+    }),
+    "/mock-root/industry-packs/foreign-trade/workflows/close-deal.json": JSON.stringify({
+      id: "close-deal",
+      title: "成交",
+      description: "成交",
+      icon: "Award",
+    }),
+    "/mock-root/industry-packs/foreign-trade/agents/agent-001.json": JSON.stringify({
+      id: "agent-001",
+      name: "Leon",
+      role: "开发信写手",
+      description: "Leon",
+    }),
+    "/mock-root/industry-packs/foreign-trade/agents/agent-002.json": JSON.stringify({
+      id: "agent-002",
+      name: "Clara",
+      role: "询盘分析师",
+      description: "Clara",
+    }),
+  }
+
+  return {
+    ...actual,
+    readFileSync: vi.fn((path: string) => {
+      const cleanPath = path.replace(/.*\/industry-packs\//, "/mock-root/industry-packs/")
+      if (mockFiles[cleanPath]) {
+        return mockFiles[cleanPath]
+      }
+      const err = new Error("ENOENT")
+      ;(err as Error & { code?: string }).code = "ENOENT"
+      throw err
+    }),
+  }
+})
 
 describe("mapLegacyManifest 遗留配置转换", () => {
   it("应该能够将包含 id 和 directory 数组的旧格式映射为含 packId 和 directories 布尔标志的标准结构", () => {
@@ -14,7 +94,15 @@ describe("mapLegacyManifest 遗留配置转换", () => {
       }
     }
 
-    const mapped = mapLegacyManifest(legacy)
+    const mapped = mapLegacyManifest(legacy) as {
+      packId: string
+      id: string
+      industry: string
+      directories: Record<string, boolean>
+      createdAt: string
+      updatedAt: string
+      version_field: string
+    }
 
     expect(mapped.packId).toBe("legacy-pack")
     expect(mapped.id).toBe("legacy-pack")
@@ -69,5 +157,21 @@ describe("Industry Pack Loader", () => {
     const m1 = getCachedManifest("foreign-trade")
     const m2 = getCachedManifest("foreign-trade")
     expect(m1).toBe(m2) // 同一个内存引用
+  })
+
+  it("loadIndustryWorkflows 应该成功动态加载 workflows 文件夹下的 JSON 资产元数据", () => {
+    const workflows = loadIndustryWorkflows("foreign-trade")
+    expect(workflows).toBeDefined()
+    expect(workflows.length).toBeGreaterThan(0)
+    expect(workflows.some((w) => w.id === "inquiry-grade")).toBe(true)
+    expect(workflows.some((w) => w.id === "dev-letter")).toBe(true)
+  })
+
+  it("loadIndustryAgents 应该成功动态加载 agents 文件夹下的 JSON 岗位元数据", () => {
+    const agents = loadIndustryAgents("foreign-trade")
+    expect(agents).toBeDefined()
+    expect(agents.length).toBeGreaterThan(0)
+    expect(agents.some((a) => a.id === "agent-001")).toBe(true)
+    expect(agents.some((a) => a.id === "agent-002")).toBe(true)
   })
 })

@@ -151,6 +151,8 @@ async function main() {
         statsJson: JSON.stringify(a.stats),
         lastActive: a.lastActive,
         createdAt: new Date(a.createdAt),
+        industryId: a.industryId ?? null,
+        templateId: a.templateId ?? null,
       },
     })
   }

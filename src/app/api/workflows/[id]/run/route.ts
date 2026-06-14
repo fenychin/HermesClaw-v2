@@ -18,7 +18,6 @@ import { withRBAC, type RouteContext } from '@/lib/server/api-handler'
 import { validateBody, WorkflowRunSchema } from '@/lib/validators'
 import type { WorkspaceContext } from '@/lib/workspace'
 import { WorkflowSchedulerService } from '@/lib/server/workflow/scheduler'
-import { WorkflowNotFoundError, MaxDepthExceededError } from '@/lib/server/workflow/dag-runner'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -33,56 +32,37 @@ export const POST = withRBAC(
       return ApiResponse.error('请求过于频繁，请稍后重试', 429)
     }
 
+    // zod schema 校验请求体（空 body 容错仍保留）
+    let rawBody: unknown = {}
     try {
-      // zod schema 校验请求体（空 body 容错仍保留）
-      let rawBody: unknown = {}
-      try {
-        const text = await req.text()
-        if (text && text.trim().length > 0) {
-          rawBody = JSON.parse(text)
-        }
-      } catch {
-        return ApiResponse.error('请求体 JSON 解析失败', 400)
+      const text = await req.text()
+      if (text && text.trim().length > 0) {
+        rawBody = JSON.parse(text)
       }
-
-      const parsed = validateBody(rawBody, WorkflowRunSchema)
-      if (parsed instanceof Response) return parsed
-
-      const input = parsed.input
-
-      logger.info('POST /api/workflows/[id]/run', { workflowId: id, userId: ctx.userId })
-
-      const result = await WorkflowSchedulerService.runWorkflow({
-        workflowId: id,
-        inputs: input,
-        workspaceId: ctx.workspaceId,
-      })
-
-      return ApiResponse.ok({
-        runId: result.runId,
-        status: result.status,
-        output: result.output,
-      })
     } catch (error) {
-      const message = error instanceof Error ? error.message : '未知错误'
-      
-      if (error instanceof WorkflowNotFoundError) {
-        return ApiResponse.error(message, 404)
-      }
-      if (error instanceof MaxDepthExceededError || message.includes('任务输入不符合')) {
-        return ApiResponse.error(message, 400)
-      }
-      if (message.includes('[Hermes API 错误]') || (error instanceof DOMException && error.name === 'TimeoutError')) {
-        return ApiResponse.error(message, 502)
-      }
-
-      logger.error('POST /api/workflows/[id]/run 执行失败', {
-        workflowId: id,
-        error: message,
-      })
-      return ApiResponse.error(`工作流执行失败：${message}`, 500)
+      return ApiResponse.error('请求体 JSON 解析失败', 400)
     }
+
+    const parsed = validateBody(rawBody, WorkflowRunSchema)
+    if (parsed instanceof Response) return parsed
+
+    const input = parsed.input
+
+    logger.info('POST /api/workflows/[id]/run', { workflowId: id, userId: ctx.userId })
+
+    const result = await WorkflowSchedulerService.runWorkflow({
+      workflowId: id,
+      inputs: input,
+      workspaceId: ctx.workspaceId,
+    })
+
+    return ApiResponse.ok({
+      runId: result.runId,
+      status: result.status,
+      output: result.output,
+    })
   },
   'MEMBER',
 )
+
 

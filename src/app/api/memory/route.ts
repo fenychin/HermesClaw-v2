@@ -1,15 +1,15 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import {
-  stringifyJsonField,
   serializeMemory,
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
+import { actorFromSession } from "@/lib/server/audit"
 import { MemoryCreateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 import { guardOutput } from "@/lib/server/output-guard"
+import { MemoryService } from "@/lib/server/memory-service"
 
 /** GET /api/memory?type=short|mid|long —— 获取记忆列表，支持类型过滤 */
 export async function GET(request: Request) {
@@ -51,10 +51,10 @@ export async function POST(request: Request) {
       return errorResponse(`知识库文本不合规：${guard.reason}`, 400)
     }
 
-    const memory = await prisma.memory.create({
-      data: {
-        id: crypto.randomUUID(),
-        workspaceId: ctx.workspaceId,
+    const actor = await actorFromSession()
+    const memory = await MemoryService.createMemory(
+      ctx.workspaceId,
+      {
         type: body.type,
         content: body.content,
         summary: body.summary,
@@ -63,20 +63,12 @@ export async function POST(request: Request) {
         relatedAgent: body.relatedAgent,
         confidence: body.confidence,
         frozen: body.frozen,
-        tags: stringifyJsonField(body.tags),
+        tags: body.tags,
         projectId: body.projectId,
       },
-    })
+      actor
+    )
 
-    await writeAuditLog({
-      actor: await actorFromSession(),
-      action: "create.memory",
-      targetType: "memory",
-      targetId: memory.id,
-      detail: `${memory.type} · ${memory.summary}`,
-      riskLevel: "low",
-      workspaceId: ctx.workspaceId,
-    })
 
     return successResponse(
       { memory: serializeMemory(memory as unknown as Record<string, unknown>) },

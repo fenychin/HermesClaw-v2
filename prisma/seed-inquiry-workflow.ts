@@ -126,6 +126,8 @@ async function main() {
     status: 'active',
     nodes: stringifyJsonField(nodes),
     edges: stringifyJsonField(edges),
+    industryId: 'foreign-trade',
+    templateId: 'ft-inquiry-grading',
   }
 
   console.log('\n📝 写入工作流...')

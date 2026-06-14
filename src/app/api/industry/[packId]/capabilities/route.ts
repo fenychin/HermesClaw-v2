@@ -1,4 +1,4 @@
-import { getCachedManifest } from "@/lib/server/industry-pack-loader"
+import { getCachedManifest, loadIndustryWorkflows, loadIndustryAgents } from "@/lib/server/industry-pack-loader"
 import { withRBAC } from "@/lib/server/api-handler"
 import type { RouteContext } from "@/lib/server/api-handler"
 import { logger } from "@/lib/logger"
@@ -9,19 +9,19 @@ export const GET = withRBAC<RouteContext<{ packId: string }>>(
     try {
       const params = await routeContext.params
       packId = params.packId
+      
+      const workflows = loadIndustryWorkflows(packId)
+      const agents = loadIndustryAgents(packId)
       const manifest = getCachedManifest(packId)
       
       const directory = manifest.directory || {
-        workflows: [],
         skills: [],
-        agents: [],
-        connectors: [],
       }
       
       return Response.json({
-        workflows: directory.workflows || [],
+        workflows,
+        agents,
         skills: directory.skills || [],
-        agents: directory.agents || [],
       })
     } catch (error: any) {
       logger.error("[API] 获取行业包能力失败", {

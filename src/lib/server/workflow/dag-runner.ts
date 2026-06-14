@@ -28,6 +28,7 @@ import { executeDataWriteNode } from '@/lib/server/workflow/data-write-executor'
 import { emitOpenClawEvent, emitExecutionEvent } from '@/lib/server/adapters/openclaw/event-emitter'
 import { EXECUTION_EVENT_VERSION } from '@/contracts/execution-event'
 import { createSubworkflowHandler } from './subworkflow-executor'
+import { WorkflowNotFoundError, MaxDepthExceededError } from '@/lib/server/exceptions'
 import type {
   WorkflowNode,
   WorkflowEdge,
@@ -38,24 +39,6 @@ import type {
   RunStatus,
   RunTrigger,
 } from './dag-types'
-
-// ---- 错误类型 ----
-
-/** 工作流不存在 */
-export class WorkflowNotFoundError extends Error {
-  constructor(workflowId: string) {
-    super(`工作流不存在：${workflowId}`)
-    this.name = 'WorkflowNotFoundError'
-  }
-}
-
-/** 子流程嵌套深度超上限 */
-export class MaxDepthExceededError extends Error {
-  constructor(depth: number, maxDepth: number) {
-    super(`子流程嵌套深度 ${depth} 超过上限 ${maxDepth}`)
-    this.name = 'MaxDepthExceededError'
-  }
-}
 
 // ---- 运行选项 ----
 

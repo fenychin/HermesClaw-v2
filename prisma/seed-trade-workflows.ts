@@ -29,6 +29,7 @@ interface WorkflowDef {
   id: string
   name: string
   description: string
+  templateId: string
   nodes: Array<{
     id: string
     kind: string
@@ -48,6 +49,7 @@ const WORKFLOWS: WorkflowDef[] = [
     id: 'wf-customer-profile',
     name: 'customer-profile',
     description: '客户画像构建：整合多渠道信息生成完整客户档案，辅助开发信与报价策略',
+    templateId: 'ft-customer-profile',
     requiredSkills: ['ft-customer-profiling'],
     nodes: [
       {
@@ -67,6 +69,7 @@ const WORKFLOWS: WorkflowDef[] = [
     id: 'wf-quote-gen',
     name: 'quote-gen',
     description: '报价生成：核算产品成本 + 生成专业报价单，输出多贸易术语明细',
+    templateId: 'ft-quote-gen',
     requiredSkills: ['ft-cost-accounting', 'ft-quotation-pdf'],
     nodes: [
       {
@@ -94,6 +97,7 @@ const WORKFLOWS: WorkflowDef[] = [
     id: 'wf-sample-mgmt',
     name: 'sample-mgmt',
     description: '样品管理：跟踪样品寄送状态，记录客户反馈，推进样品到订单转化',
+    templateId: 'ft-sample-mgmt',
     requiredSkills: [],
     nodes: [
       {
@@ -128,6 +132,7 @@ const WORKFLOWS: WorkflowDef[] = [
     id: 'wf-order-push',
     name: 'order-push',
     description: '订单推进：监控订单进度，自动提醒关键节点（备料/排产/验货/出运）',
+    templateId: 'ft-order-push',
     requiredSkills: [],
     nodes: [
       {
@@ -162,6 +167,7 @@ const WORKFLOWS: WorkflowDef[] = [
     id: 'wf-exhibition-leads',
     name: 'exhibition-leads',
     description: '展会线索整理：整理展会名片与线索，自动分类分级并生成跟进计划',
+    templateId: 'ft-exhibition-leads',
     requiredSkills: ['ft-inquiry-sorter'],
     nodes: [
       {
@@ -189,6 +195,7 @@ const WORKFLOWS: WorkflowDef[] = [
     id: 'wf-followup-remind',
     name: 'followup-remind',
     description: '客户跟进提醒：根据客户阶段与上次沟通时间，自动生成跟进提醒与建议话术',
+    templateId: 'ft-followup-remind',
     requiredSkills: ['ft-follow-up-crm'],
     nodes: [
       {
@@ -246,6 +253,8 @@ async function main() {
       status: 'active',
       nodes: stringifyJsonField(wf.nodes),
       edges: stringifyJsonField(wf.edges),
+      industryId: 'foreign-trade',
+      templateId: wf.templateId,
     }
 
     const existing = await prisma.workflow.findUnique({ where: { id: wf.id } })

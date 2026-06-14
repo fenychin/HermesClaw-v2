@@ -19,6 +19,7 @@ import {
 } from "@/lib/workspace"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { logger } from "@/lib/logger"
+import { AppException } from "@/lib/server/exceptions"
 
 /**
  * Next.js 动态路由参数上下文（App Router 第二参形态）。
@@ -122,6 +123,18 @@ export function withRBAC<C = unknown>(
     try {
       return await handler(request, ctx, routeContext)
     } catch (error) {
+      if (error instanceof AppException) {
+        return Response.json(
+          {
+            success: false,
+            error: error.message,
+            code: error.errorCode,
+            details: error.details,
+          },
+          { status: error.httpStatus }
+        )
+      }
+
       logger.error("[withRBAC] 业务 handler 执行失败", {
         path: new URL(request.url).pathname,
         method: request.method,
