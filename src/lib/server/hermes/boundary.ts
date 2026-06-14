@@ -4,10 +4,15 @@
  * —— 智能体执行任务前，比对请求动作与其 cannotDo 清单；命中即拒绝执行，
  *    不绕过 Harness。与 P0-③「边界变更需二次确认」形成「变更受控 + 运行时强制」闭环。
  *
- * 判定策略（务实，先关键词/规则匹配，LLM 语义判定留作后续增强）：
- *   - 将 cannotDo 每条拆为关键词，若动作文本命中任一关键词 → 越界。
- *   - 同时内置一批高危动作词（删除生产数据、绕过审批等）作为兜底红线。
+ * 判定策略（CLAUDE.md §8 + 全局架构审查 P2-#8）：
+ *   1. HARD_REDLINES 兜底红线 → fail-closed（source: hard-redline）
+ *   2. 关键词命中 → fail-closed（source: keyword，短路加速器）
+ *   3. LLM 二级语义判定 → 主路径（source: llm）
+ *   4. LLM 调用失败/超时 → fail-closed（source: llm-fail-closed，安全优先）
+ *
+ * 所有决策返回 BoundaryDecision 契约对象，写入 AuditLog（boundary.check）。
  */
+
 import { prisma } from "@/lib/prisma"
 import { parseJsonField } from "@/lib/api-utils"
 import { logger } from "@/lib/logger"
@@ -16,6 +21,13 @@ import {
   callAnthropicStructured,
   callDeepSeekJson,
 } from "@/lib/server/shared/llm-provider"
+import { writeAuditLog, actorFromSession } from "@/lib/server/shared/audit"
+import {
+  BoundaryDecisionSchema,
+  type BoundaryDecision,
+  type BoundaryDecisionSource,
+} from "@/contracts"
+import { CONTRACT_VERSION } from "@/contracts"
 
 /** 兜底红线关键词：无论 cannotDo 是否声明，命中即视为越界 */
 const HARD_REDLINES = [
@@ -28,10 +40,9 @@ const HARD_REDLINES = [
   "未经审批",
 ]
 
+// 向后兼容旧接口
 export interface BoundaryCheckResult {
-  /** 是否允许执行 */
   allowed: boolean
-  /** 越界时命中的边界条目或红线 */
   violation?: string
 }
 
@@ -43,75 +54,128 @@ function toKeywords(rule: string): string[] {
     .filter((w) => w.length >= 2)
 }
 
+/** LLM 语义判定 schema（与 boundary-decision 契约对齐） */
+const boundaryLlmSchema = {
+  type: "object",
+  properties: {
+    allowed: {
+      type: "boolean",
+      description: "是否允许执行该动作。如果动作在语义上违反了禁止行为清单（cannotDo）中的任何一条，或者属于全局高危红线，则为 false；否则为 true。",
+    },
+    reason: {
+      type: "string",
+      description: "简短说明决策理由（≤200字）。如果 allowed 为 false，必须引用被违反的 cannotDo 条目原文本或高危红线。",
+    },
+  },
+  required: ["allowed", "reason"],
+}
+
 /**
  * 校验某动作是否在智能体边界内。
+ *
+ * 决策顺序（四级）：
+ *   1. hard-redline  → fail-closed
+ *   2. keyword       → fail-closed（短路）
+ *   3. LLM 语义判定   → 主路径
+ *   4. LLM fail      → fail-closed（安全优先，取代旧版的 fail-open 降级）
+ *
  * @param agentId     智能体 ID
  * @param action      本次请求的动作描述（自然语言）
- * @param workspaceId 工作空间 ID（AGENTS.md §4.11 多租户隔离），默认 "default"
+ * @param workspaceId 工作空间 ID（AGENTS.md §4.11 多租户隔离）
  */
 export async function assertWithinBoundary(
   agentId: string,
   action: string,
   workspaceId: string,
   opts?: { prisma?: typeof prisma },
-): Promise<BoundaryCheckResult> {
+): Promise<BoundaryDecision> {
   const text = action.toLowerCase()
   const client = opts?.prisma || prisma
+  const startTime = Date.now()
 
-  // 1. 兜底红线（第一级：硬匹配）
+  // ── 1. 兜底红线（第一级：硬匹配，source: hard-redline） ──
   for (const red of HARD_REDLINES) {
     if (text.includes(red.toLowerCase())) {
-      return { allowed: false, violation: `触发高危红线：${red}` }
+      const decision: BoundaryDecision = {
+        allowed: false,
+        source: "hard-redline",
+        reason: `触发高危红线：${red}`,
+        matchedRule: red,
+        version: CONTRACT_VERSION,
+      }
+      await auditBoundaryCheck(agentId, action, workspaceId, decision).catch(() => {})
+      return decision
     }
   }
 
-  // 2. 读取该 agent 的 cannotDo（workspaceId 隔离）
+  // ── 2. 关键词匹配（第二级：短路加速器，source: keyword） ──
   const agent = await client.agent.findUnique({
     where: { id: agentId, workspaceId },
     select: { cannotDo: true },
   })
   if (!agent) {
-    // 找不到 agent 时保守拒绝（避免无主执行）
-    return { allowed: false, violation: "智能体不存在，拒绝执行" }
+    const decision: BoundaryDecision = {
+      allowed: false,
+      source: "hard-redline",
+      reason: "智能体不存在，拒绝执行",
+      matchedRule: "agent-not-found",
+      version: CONTRACT_VERSION,
+    }
+    await auditBoundaryCheck(agentId, action, workspaceId, decision).catch(() => {})
+    return decision
   }
 
   const cannotDo = parseJsonField<string[]>(agent.cannotDo, [])
+  const matchedKeywords: string[] = []
+
   for (const rule of cannotDo) {
     const keywords = toKeywords(rule)
-    // 整条命中（动作文本包含完整规则）直接判越界
     if (text.includes(rule.toLowerCase())) {
-      return { allowed: false, violation: rule }
+      const decision: BoundaryDecision = {
+        allowed: false,
+        source: "keyword",
+        reason: `命中禁止规则：${rule}`,
+        matchedRule: rule,
+        version: CONTRACT_VERSION,
+      }
+      await auditBoundaryCheck(agentId, action, workspaceId, decision).catch(() => {})
+      return decision
     }
-    // 关键词命中 ≥2 个视为越界（降低单字误伤）
     const hit = keywords.filter((k) => text.includes(k.toLowerCase()))
     if (hit.length >= 2) {
-      return { allowed: false, violation: rule }
+      matchedKeywords.push(...hit)
     }
   }
 
-  // 3. 第二级拦截：LLM 语义判定（解决同义词语义绕过及模糊表达的精准控制）
-  // NOTE: 如果 cannotDo 列表为空，且未触发高危红线硬过滤，则可以直接放行（无需调用 LLM）。
-  if (cannotDo.length === 0) {
-    return { allowed: true }
+  if (matchedKeywords.length >= 2) {
+    const decision: BoundaryDecision = {
+      allowed: false,
+      source: "keyword",
+      reason: `命中关键词（≥2）：${matchedKeywords.join(", ")}`,
+      matchedRule: cannotDo.find((r) => {
+        const kw = toKeywords(r)
+        return kw.filter((k) => matchedKeywords.includes(k)).length >= 2
+      }) ?? matchedKeywords.join(", "),
+      version: CONTRACT_VERSION,
+    }
+    await auditBoundaryCheck(agentId, action, workspaceId, decision).catch(() => {})
+    return decision
   }
 
+  // cannotDo 为空且无红线触发 → 直接放行，无需 LLM 判定
+  if (cannotDo.length === 0) {
+    const decision: BoundaryDecision = {
+      allowed: true,
+      source: "keyword",
+      reason: "cannotDo 清单为空，仅红线硬过滤通过",
+      version: CONTRACT_VERSION,
+    }
+    return decision
+  }
+
+  // ── 3. LLM 语义判定（第三级：主路径，source: llm） ──
   try {
     const { provider, model } = resolveLlmProvider()
-
-    const boundaryResponseSchema = {
-      type: "object",
-      properties: {
-        allowed: {
-          type: "boolean",
-          description: "是否允许执行该动作。如果动作在语义上违反了禁止行为清单（cannotDo）中的任何一条，或者属于全局高危红线，则为 false；否则为 true。"
-        },
-        violation: {
-          type: "string",
-          description: "如果 allowed 为 false，这里必须填写被违反的禁止行为清单（cannotDo）中的原文本条目（不允许自行改写）或者触犯的高危红线原因。如果 allowed 为 true，则为 null。"
-        }
-      },
-      required: ["allowed", "violation"]
-    }
 
     const systemPrompt = `你是一个智能安全护栏（Security Guardrail），负责评估智能体（Agent）计划执行的动作是否在允许的业务边界内。
 
@@ -126,7 +190,7 @@ export async function assertWithinBoundary(
 你必须返回符合 JSON Schema 的 JSON 对象：
 {
   "allowed": boolean, // 是否允许执行
-  "violation": string | null // 如果 allowed 为 false，给出被违反的 cannotDo 条款原文本（必须是 cannotDo 列表中某项一模一样的原句）或高危红线说明。如果 allowed 为 true，则为 null。
+  "reason": string    // 简短说明（≤200字）。如果 allowed 为 false，必须引用被违反的 cannotDo 条目原文本或高危红线
 }`
 
     const userPrompt = `【待评估动作】：
@@ -142,7 +206,7 @@ ${HARD_REDLINES.map((red, idx) => `${idx + 1}. ${red}`).join("\n")}
 
     interface LlmBoundaryResponse {
       allowed: boolean
-      violation: string | null
+      reason: string
     }
 
     let llmResult: LlmBoundaryResponse
@@ -150,32 +214,83 @@ ${HARD_REDLINES.map((red, idx) => `${idx + 1}. ${red}`).join("\n")}
       llmResult = (await callAnthropicStructured({
         systemPrompt,
         userPrompt,
-        schema: boundaryResponseSchema,
+        schema: boundaryLlmSchema,
         model,
       })) as LlmBoundaryResponse
     } else {
       llmResult = (await callDeepSeekJson({
         systemPrompt,
-        userPrompt: `${userPrompt}\n\n请返回 JSON 格式，严格包含 allowed 和 violation 字段。`,
+        userPrompt: `${userPrompt}\n\n请返回 JSON 格式，严格包含 allowed 和 reason 字段。`,
         model,
       })) as LlmBoundaryResponse
     }
 
     if (llmResult && typeof llmResult.allowed === "boolean") {
-      const allowed = llmResult.allowed
-      const violation = allowed ? undefined : (llmResult.violation || "违反任务边界（语义拦截）")
-      return { allowed, violation }
+      const latencyMs = Date.now() - startTime
+      const decision: BoundaryDecision = {
+        allowed: llmResult.allowed,
+        source: "llm",
+        reason: llmResult.reason || (llmResult.allowed ? "LLM 语义判定通过" : "LLM 语义判定拒绝"),
+        llmProvider: provider,
+        latencyMs,
+        version: CONTRACT_VERSION,
+      }
+      await auditBoundaryCheck(agentId, action, workspaceId, decision).catch(() => {})
+      return decision
     }
-  } catch (error: any) {
-    // NOTE: 防爆降级。
-    // 当没有配置大模型 API Key，或者 LLM 接口调用超时/失败时，记录警告日志，
-    // 并采用第一级硬过滤的放行判定结果，避免因安全层失效导致主流程阻断。
-    logger.warn(`[Boundary LLM Check Failed] 二级 LLM 语义判定失败，安全降级至一级硬过滤放行结果。`, {
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : "未知错误"
+    logger.warn(`[Boundary LLM Check Failed] 二级 LLM 语义判定失败 → fail-closed`, {
       agentId,
       action,
-      error: error.message || error,
+      error: errMsg,
     })
+
+    // ── 4. LLM 失败/超时 → fail-closed（安全优先，不再 fail-open） ──
+    const decision: BoundaryDecision = {
+      allowed: false,
+      source: "llm-fail-closed",
+      reason: `LLM 二级语义判定失败（${errMsg.slice(0, 100)}），安全关闭拒绝执行`,
+      latencyMs: Date.now() - startTime,
+      version: CONTRACT_VERSION,
+    }
+    await auditBoundaryCheck(agentId, action, workspaceId, decision).catch(() => {})
+    return decision
   }
 
-  return { allowed: true }
+  // 理论上不可达（LLM 调用无异常但返回数据格式异常），保守拒绝
+  const decision: BoundaryDecision = {
+    allowed: false,
+    source: "llm-fail-closed",
+    reason: "LLM 返回数据格式异常，安全关闭拒绝执行",
+    latencyMs: Date.now() - startTime,
+    version: CONTRACT_VERSION,
+  }
+  await auditBoundaryCheck(agentId, action, workspaceId, decision).catch(() => {})
+  return decision
+}
+
+/**
+ * 记录 Boundary 决策到 AuditLog（action: boundary.check）。
+ */
+async function auditBoundaryCheck(
+  agentId: string,
+  action: string,
+  decision: BoundaryDecision,
+  workspaceId?: string,
+) {
+  try {
+    const actor = await actorFromSession()
+    await writeAuditLog({
+      actor,
+      action: "boundary.check",
+      targetType: "agent",
+      targetId: agentId,
+      detail: `边界检查：${decision.allowed ? "放行" : "拒绝"}（source: ${decision.source}）\n理由: ${decision.reason}\n原始动作: ${action.slice(0, 200)}`,
+      riskLevel: decision.allowed ? "low" : "high",
+      workspaceId: workspaceId ?? "default",
+    })
+  } catch {
+    // 审计失败不阻断主流程
+  }
 }

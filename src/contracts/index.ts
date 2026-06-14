@@ -7,7 +7,8 @@
  *
  * 对应 AGENTS.md §3.1 核心契约对象：
  *   TaskEnvelope / ExecutionEvent / ActionReceipt / ExecutionSummary /
- *   CapabilityRegistration / ConnectorLease / HumanApprovalCheckpoint
+ *   CapabilityRegistration / ConnectorLease / HumanApprovalCheckpoint /
+ *   BoundaryDecision
  */
 
 // 公共枚举 / 常量 / 基础 schema
@@ -185,3 +186,16 @@ export type {
   GenericPayload,
   TypedTaskInput,
 } from "./task-payloads"
+
+// BoundaryDecision
+export {
+  BoundaryDecisionSchema,
+  BoundaryDecisionSourceSchema,
+  BoundaryCheckRequestSchema,
+  BOUNDARY_DECISION_VERSION,
+} from "./boundary-decision"
+export type {
+  BoundaryDecision,
+  BoundaryDecisionSource,
+  BoundaryCheckRequest,
+} from "./boundary-decision"

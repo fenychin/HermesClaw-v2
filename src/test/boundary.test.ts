@@ -4,7 +4,13 @@ import { assertWithinBoundary } from "@/lib/server/hermes/boundary"
 import * as llmProvider from "@/lib/server/shared/llm-provider"
 import { logger } from "@/lib/logger"
 
-describe("assertWithinBoundary 边界与红线运行时校验", () => {
+// Mock audit to avoid next-auth/next/server import chain in node test env
+vi.mock("@/lib/server/shared/audit", () => ({
+  writeAuditLog: vi.fn().mockResolvedValue({}),
+  actorFromSession: vi.fn().mockResolvedValue("test-user@hermesclaw.ai"),
+}))
+
+describe("assertWithinBoundary 边界与红线运行时校验（四级决策 + BoundaryDecision 契约）", () => {
   let mockPrisma: any
 
   beforeEach(() => {
@@ -17,28 +23,30 @@ describe("assertWithinBoundary 边界与红线运行时校验", () => {
   })
 
   // -------------------------------------------------------------
-  // 1. 一级拦截：全局高危红线与关键词匹配
+  // 1. 一级拦截：全局高危红线（source: hard-redline）
   // -------------------------------------------------------------
-  it("应该直接拦截包含全局硬红线的动作，无需调用 LLM", async () => {
-    // 监听 LLM 相关调用，以确保没有被触发
+  it("应该直接拦截包含全局硬红线的动作（source: hard-redline），无需调用 LLM", async () => {
     const resolveSpy = vi.spyOn(llmProvider, "resolveLlmProvider")
-    
+
     const result = await assertWithinBoundary(
       "agent-123",
       "请帮我 rm -rf /data 整个生产文件夹",
       "default",
       { prisma: mockPrisma }
     )
-    
+
     expect(result.allowed).toBe(false)
-    expect(result.violation).toContain("触发高危红线：rm -rf")
+    expect(result.source).toBe("hard-redline")
+    expect(result.reason).toContain("rm -rf")
     expect(resolveSpy).not.toHaveBeenCalled()
   })
 
-  it("应该直接拦截命中 cannotDo 完整句子或 >= 2个关键词的动作，无需调用 LLM", async () => {
+  // -------------------------------------------------------------
+  // 2. 关键词匹配（source: keyword，短路加速器）
+  // -------------------------------------------------------------
+  it("应该直接拦截命中 cannotDo 完整句子或 ≥2 个关键词的动作（source: keyword），无需调用 LLM", async () => {
     const resolveSpy = vi.spyOn(llmProvider, "resolveLlmProvider")
-    
-    // 模拟 Agent 存在且设置了 cannotDo，含有逗号以供 toKeywords 切分出多个关键词
+
     mockPrisma.agent.findUnique.mockResolvedValue({
       cannotDo: JSON.stringify(["禁止报价", "签署、合规、合同"]),
     })
@@ -51,9 +59,10 @@ describe("assertWithinBoundary 边界与红线运行时校验", () => {
       { prisma: mockPrisma }
     )
     expect(result1.allowed).toBe(false)
-    expect(result1.violation).toBe("禁止报价")
-    
-    // B. 命中 >= 2 个关键词（"签署", "合同" 等）
+    expect(result1.source).toBe("keyword")
+    expect(result1.reason).toContain("禁止报价")
+
+    // B. 命中 ≥ 2 个关键词
     const result2 = await assertWithinBoundary(
       "agent-123",
       "帮我签署一份对外合同",
@@ -61,14 +70,14 @@ describe("assertWithinBoundary 边界与红线运行时校验", () => {
       { prisma: mockPrisma }
     )
     expect(result2.allowed).toBe(false)
-    expect(result2.violation).toBe("签署、合规、合同")
+    expect(result2.source).toBe("keyword")
 
     expect(resolveSpy).not.toHaveBeenCalled()
   })
 
-  it("当 cannotDo 为空时，第一级过滤通过后应该直接放行，无需调用 LLM", async () => {
+  it("当 cannotDo 为空时，keyword 级通过后应该直接放行，无需调用 LLM", async () => {
     const resolveSpy = vi.spyOn(llmProvider, "resolveLlmProvider")
-    
+
     mockPrisma.agent.findUnique.mockResolvedValue({
       cannotDo: JSON.stringify([]),
     })
@@ -80,12 +89,13 @@ describe("assertWithinBoundary 边界与红线运行时校验", () => {
       { prisma: mockPrisma }
     )
     expect(result.allowed).toBe(true)
+    expect(result.source).toBe("keyword")
     expect(resolveSpy).not.toHaveBeenCalled()
   })
 
-  it("当智能体不存在时，应该保守拒绝，直接拦截", async () => {
+  it("当智能体不存在时，应该保守拒绝（source: hard-redline）", async () => {
     mockPrisma.agent.findUnique.mockResolvedValue(null)
-    
+
     const result = await assertWithinBoundary(
       "non-existent",
       "做点普通事情",
@@ -93,29 +103,28 @@ describe("assertWithinBoundary 边界与红线运行时校验", () => {
       { prisma: mockPrisma }
     )
     expect(result.allowed).toBe(false)
-    expect(result.violation).toBe("智能体不存在，拒绝执行")
+    expect(result.source).toBe("hard-redline")
+    expect(result.reason).toContain("智能体不存在")
   })
 
   // -------------------------------------------------------------
-  // 2. 二级拦截：LLM 语义拦截与同义分析
+  // 3. LLM 语义判定（source: llm，主路径）
   // -------------------------------------------------------------
-  it("对于可能绕过关键词匹配但语义上违反 cannotDo 的动作，应该被二级 Anthropic LLM 拦截", async () => {
+  it("对于语义上违反 cannotDo 的动作，LLM 应拦截（source: llm）", async () => {
     mockPrisma.agent.findUnique.mockResolvedValue({
       cannotDo: JSON.stringify(["禁止向任何客户报价"]),
     })
 
-    // 动作中不含 "禁止"、"向"、"任何"、"客户"、"报价"，避开了关键词硬过滤
     const action = "给小王算一下这个产品的总费用是 500 美元并通知他"
 
-    // 模拟 Anthropic 决策与返回
     vi.spyOn(llmProvider, "resolveLlmProvider").mockReturnValue({
       provider: "anthropic",
       model: "claude-sonnet-4-6",
     })
-    
+
     const anthropicSpy = vi.spyOn(llmProvider, "callAnthropicStructured").mockResolvedValue({
       allowed: false,
-      violation: "禁止向任何客户报价",
+      reason: "语义上等同于向客户报价，违反「禁止向任何客户报价」",
     })
 
     const result = await assertWithinBoundary(
@@ -124,13 +133,14 @@ describe("assertWithinBoundary 边界与红线运行时校验", () => {
       "default",
       { prisma: mockPrisma }
     )
-    
+
     expect(result.allowed).toBe(false)
-    expect(result.violation).toBe("禁止向任何客户报价")
+    expect(result.source).toBe("llm")
+    expect(result.reason).toContain("禁止向任何客户报价")
     expect(anthropicSpy).toHaveBeenCalled()
   })
 
-  it("对于语义上合法的动作，二级 DeepSeek LLM 应该允许放行", async () => {
+  it("对于语义上合法的动作，LLM 应该放行（source: llm）", async () => {
     mockPrisma.agent.findUnique.mockResolvedValue({
       cannotDo: JSON.stringify(["禁止向任何客户报价"]),
     })
@@ -144,7 +154,7 @@ describe("assertWithinBoundary 边界与红线运行时校验", () => {
 
     const deepseekSpy = vi.spyOn(llmProvider, "callDeepSeekJson").mockResolvedValue({
       allowed: true,
-      violation: null,
+      reason: "此动作为客服回复，不涉及报价行为",
     })
 
     const result = await assertWithinBoundary(
@@ -153,24 +163,23 @@ describe("assertWithinBoundary 边界与红线运行时校验", () => {
       "default",
       { prisma: mockPrisma }
     )
-    
+
     expect(result.allowed).toBe(true)
-    expect(result.violation).toBeUndefined()
+    expect(result.source).toBe("llm")
+    expect(result.llmProvider).toBe("deepseek")
     expect(deepseekSpy).toHaveBeenCalled()
   })
 
   // -------------------------------------------------------------
-  // 3. 安全防爆降级
+  // 4. LLM 失败 → fail-closed（安全优先，不再 fail-open）
   // -------------------------------------------------------------
-  it("若大模型服务抛出异常，应该记录警告日志并安全降级（放行一级匹配通过的动作）", async () => {
+  it("若 LLM 调用抛出异常，应该 fail-closed 拒绝执行（source: llm-fail-closed）", async () => {
     mockPrisma.agent.findUnique.mockResolvedValue({
       cannotDo: JSON.stringify(["禁止报价"]),
     })
 
-    // 动作本身 safe（未触发一级硬匹配）
     const action = "发送一封问候邮件给潜在客户"
 
-    // 模拟 LLM 抛错
     vi.spyOn(llmProvider, "resolveLlmProvider").mockImplementation(() => {
       throw new Error("API Key Missing")
     })
@@ -183,13 +192,35 @@ describe("assertWithinBoundary 边界与红线运行时校验", () => {
       "default",
       { prisma: mockPrisma }
     )
-    
-    // 降级后应允许执行
-    expect(result.allowed).toBe(true)
-    expect(result.violation).toBeUndefined()
+
+    // fail-closed：LLM 失败 → 拒绝执行（安全优先）
+    expect(result.allowed).toBe(false)
+    expect(result.source).toBe("llm-fail-closed")
+    expect(result.reason).toContain("API Key Missing")
     expect(loggerWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("二级 LLM 语义判定失败"),
+      expect.stringContaining("fail-closed"),
       expect.any(Object)
     )
+  })
+
+  // -------------------------------------------------------------
+  // 5. 契约版本验证
+  // -------------------------------------------------------------
+  it("所有 BoundaryDecision 应包含有效的 version 字段", async () => {
+    mockPrisma.agent.findUnique.mockResolvedValue({
+      cannotDo: JSON.stringify([]),
+    })
+
+    const result = await assertWithinBoundary(
+      "agent-123",
+      "正常的客户查询",
+      "default",
+      { prisma: mockPrisma }
+    )
+
+    expect(result.allowed).toBe(true)
+    expect(result.version).toBeDefined()
+    expect(typeof result.version).toBe("string")
+    expect(result.version).toMatch(/^\d+\.\d+\.\d+$/)
   })
 })
