@@ -16,6 +16,7 @@
     "seed:tools": "tsx prisma/seed-tools.ts",
     "test": "vitest",
     "contracts:check": "tsx scripts/check-contract-usage.ts",
+    "routes:check": "tsx scripts/check-route-prisma.ts",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage"
   },
