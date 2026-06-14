@@ -29,6 +29,7 @@ import {
   mapAutomationToLogRisk,
   mapAutomationToRouteRisk,
 } from '@/types'
+import { ToolGrantMissingException } from '@/lib/server/exceptions'
 import type {
   WorkflowNode,
   WorkflowRunContext,
@@ -182,6 +183,74 @@ export async function executeSkillNode(
         `须在源业务系统由人工发起。`,
       riskLevel,
     }
+  }
+
+  // 4.6 运行时 ToolGrant 授权与双审批校验（AGENTS.md §4.3 / §6.1）
+  // —— 如果该 Skill 被注册于 ToolRegistry 且为受控/高危工具（medium/high），
+  //    则必须校验当前 Agent 在该 Workspace 下针对该 Tool 的有效 ToolGrant。
+  try {
+    const toolRegistry = await prisma.toolRegistry.findFirst({
+      where: {
+        workspaceId,
+        name: skill.name,
+        enabled: true,
+      }
+    })
+
+    if (toolRegistry && (toolRegistry.riskLevel === "medium" || toolRegistry.riskLevel === "high")) {
+      const now = new Date()
+      const currentAgentId = (ctx.variables.agentId as string) || "default-agent"
+      
+      const grant = await prisma.toolGrant.findFirst({
+        where: {
+          workspaceId,
+          agentId: currentAgentId,
+          toolId: toolRegistry.id,
+          expiresAt: { gte: now },
+          revoked: false,
+        }
+      })
+
+      if (!grant) {
+        logger.warn(
+          `[skill-executor] 高危工具 ${toolRegistry.name} 授权缺失，拦截执行 (agentId=${currentAgentId})`
+        )
+        const scopes = JSON.parse(toolRegistry.scopes || "[]")
+        throw new ToolGrantMissingException(
+          currentAgentId,
+          toolRegistry.id,
+          scopes,
+          `高危工具「${toolRegistry.name}」授权缺失，需申请临时授权。`,
+          toolRegistry.riskLevel
+        )
+      }
+
+      // 高危（high）工具必须双审批人签字（approvedBy1 & approvedBy2 均非空，AGENTS.md §6.1）
+      if (toolRegistry.riskLevel === "high") {
+        if (!grant.approvedBy1 || !grant.approvedBy2) {
+          logger.warn(
+            `[skill-executor] 高危工具 ${toolRegistry.name} 双签不足，拦截执行 (grantId=${grant.id})`
+          )
+          const scopes = JSON.parse(toolRegistry.scopes || "[]")
+          throw new ToolGrantMissingException(
+            currentAgentId,
+            toolRegistry.id,
+            scopes,
+            `特高危工具「${toolRegistry.name}」已获取临时 Token，但缺少双人审批签字（AGENTS.md §6.1），拦截执行。`,
+            toolRegistry.riskLevel
+          )
+        }
+      }
+
+      logger.info(
+        `[skill-executor] 高危工具 ${toolRegistry.name} 运行时授权校验通过 (grantId=${grant.id})`
+      )
+    }
+  } catch (error) {
+    if (error instanceof ToolGrantMissingException) {
+      throw error
+    }
+    logger.error("[skill-executor] ToolGrant 校验过程出现异常", { error })
   }
 
   // 5. 读取 SKILL.md 文件

@@ -209,6 +209,18 @@ export function WorkflowExecutor({
   const [isExecuting, setIsExecuting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // 临时授权的缺失状态
+  const [missingGrant, setMissingGrant] = useState<{
+    agentId: string
+    toolId: string
+    scopes: string[]
+    riskLevel: string
+  } | null>(null)
+  const [approver1, setApprover1] = useState("")
+  const [approver2, setApprover2] = useState("")
+  const [grantSubmitting, setGrantSubmitting] = useState(false)
+  const [grantError, setGrantError] = useState<string | null>(null)
+
   // 收集所有步骤的 inputs（展平）
   const allInputs = workflow.steps.flatMap((step) =>
     (step.inputs ?? []).map((inp) => ({ ...inp, stepId: step.id, stepTitle: step.title })),
@@ -261,7 +273,7 @@ export function WorkflowExecutor({
       })
 
       // 安全解析 JSON：非 JSON 响应时取原始文本作为错误消息
-      let json: { success?: boolean; error?: string; data?: RunResult }
+      let json: { success?: boolean; error?: string; data?: RunResult; details?: any }
       try {
         json = await res.json()
       } catch {
@@ -270,6 +282,11 @@ export function WorkflowExecutor({
       }
 
       if (!res.ok || !json.success) {
+        if (json.code === "TOOL_GRANT_MISSING" && json.details) {
+          const details = json.details as { agentId: string; toolId: string; scopes: string[]; riskLevel: string }
+          setMissingGrant(details)
+          throw new Error("工作流执行被拦截：当前智能体缺少所需的高危工具授权。")
+        }
         throw new Error(json.error ?? "工作流执行失败")
       }
 
@@ -481,6 +498,178 @@ export function WorkflowExecutor({
           </div>
         )}
       </div>
+
+      {/* 临时授权 Dialog 弹窗 */}
+      {missingGrant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md transition-opacity duration-300">
+          <div className="bg-card/95 border border-border w-full max-w-md rounded-3xl p-6 shadow-2xl relative overflow-hidden backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200">
+            {/* 渐变流光背景 */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-brand-blue/5 to-transparent pointer-events-none" />
+            
+            {/* 警告图标 */}
+            <div className="flex items-center gap-3.5 mb-4 relative z-10">
+              <div className="bg-warning/20 border border-warning/30 rounded-2xl p-2.5 shadow-inner">
+                <AlertCircle className="text-warning size-6 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-foreground text-base font-bold">申请临时工具授权</h3>
+                <p className="text-hint text-[11px] mt-0.5 font-medium">智能体执行高危操作，需经安全门禁人工确认</p>
+              </div>
+            </div>
+
+            {/* 参数卡片 */}
+            <div className="bg-background/80 border border-border/60 rounded-2xl p-4 space-y-2.5 text-xs mb-4 shadow-sm relative z-10">
+              <div className="flex justify-between items-center">
+                <span className="text-hint font-medium">智能体 (Agent):</span>
+                <span className="text-foreground font-semibold font-mono bg-accent/40 rounded px-1.5 py-0.5 text-[11px]">{missingGrant.agentId}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-hint font-medium">受控工具 (Tool):</span>
+                <span className="text-foreground font-semibold font-mono bg-accent/40 rounded px-1.5 py-0.5 text-[11px]">{missingGrant.toolId}</span>
+              </div>
+              <div>
+                <span className="text-hint font-medium block mb-1">要求权限范围 (Scopes):</span>
+                <div className="flex flex-wrap gap-1">
+                  {missingGrant.scopes.map((s, idx) => (
+                    <span key={idx} className="text-[10px] bg-primary/10 text-primary font-medium px-1.5 py-0.5 rounded-md font-mono">{s}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="flex justify-between items-center pt-1.5 border-t border-border/50">
+                <span className="text-hint font-medium">工具风险级别:</span>
+                <span className={cn(
+                  "text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shadow-sm",
+                  missingGrant.riskLevel === "high" ? "bg-danger/15 text-danger border border-danger/30" : "bg-warning/15 text-warning border border-warning/30"
+                )}>
+                  {missingGrant.riskLevel === "high" ? "特高危 (需双签)" : "高危 (需单签)"}
+                </span>
+              </div>
+            </div>
+
+            {/* 错误提示 */}
+            {grantError && (
+              <div className="bg-danger/10 border border-danger/25 text-danger rounded-xl p-3 text-xs mb-4 relative z-10">
+                {grantError}
+              </div>
+            )}
+
+            {/* 输入框 */}
+            <div className="space-y-3 mb-5 relative z-10">
+              <div>
+                <label className="text-foreground text-xs font-semibold block mb-1.5">
+                  一级审批人签字 (姓名/邮箱) <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="例如: admin@company.com"
+                  value={approver1}
+                  onChange={(e) => setApprover1(e.target.value)}
+                  disabled={grantSubmitting}
+                  className="w-full bg-background border border-border/80 focus:border-primary focus:ring-1 focus:ring-primary rounded-xl px-3.5 py-2 text-xs text-foreground placeholder:text-hint outline-none transition-all"
+                />
+              </div>
+
+              {missingGrant.riskLevel === "high" && (
+                <div>
+                  <label className="text-foreground text-xs font-semibold block mb-1.5">
+                    二级联合审批人签字 (姓名/邮箱) <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="例如: manager@company.com"
+                    value={approver2}
+                    onChange={(e) => setApprover2(e.target.value)}
+                    disabled={grantSubmitting}
+                    className="w-full bg-background border border-border/80 focus:border-primary focus:ring-1 focus:ring-primary rounded-xl px-3.5 py-2 text-xs text-foreground placeholder:text-hint outline-none transition-all"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* 按钮 */}
+            <div className="flex gap-2.5 justify-end relative z-10">
+              <button
+                type="button"
+                onClick={() => {
+                  setMissingGrant(null)
+                  setGrantError(null)
+                  setApprover1("")
+                  setApprover2("")
+                }}
+                disabled={grantSubmitting}
+                className="bg-accent hover:bg-accent/80 text-foreground font-medium px-4 py-2 rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!approver1.trim()) {
+                    setGrantError("请填写一级审批人签字")
+                    return
+                  }
+                  if (missingGrant.riskLevel === "high" && !approver2.trim()) {
+                    setGrantError("高危工具必须提供二级审批人签字")
+                    return
+                  }
+                  if (missingGrant.riskLevel === "high" && approver1.trim() === approver2.trim()) {
+                    setGrantError("一级和二级审批人签字不能为同一人")
+                    return
+                  }
+
+                  setGrantSubmitting(true)
+                  setGrantError(null)
+                  try {
+                    const res = await fetch("/api/tools/grant", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        toolId: missingGrant.toolId,
+                        agentId: missingGrant.agentId,
+                        scopes: missingGrant.scopes,
+                        approvedBy1: approver1,
+                        approvedBy2: approver2 || undefined,
+                      })
+                    })
+
+                    const json = await res.json()
+                    if (!res.ok || !json.success) {
+                      throw new Error(json.message || json.error || "签发临时授权失败")
+                    }
+
+                    // 授权成功：清除状态，自动重新运行！
+                    setMissingGrant(null)
+                    setApprover1("")
+                    setApprover2("")
+                    // 延迟重新触发执行，确保 DB 写入刷入
+                    setTimeout(() => {
+                      handleExecute()
+                    }, 400)
+                  } catch (err: any) {
+                    setGrantError(err.message || "服务器发生异常")
+                  } finally {
+                    setGrantSubmitting(false)
+                  }
+                }}
+                disabled={grantSubmitting || !approver1.trim() || (missingGrant.riskLevel === "high" && !approver2.trim())}
+                className={cn(
+                  "bg-primary text-white font-medium px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer",
+                  "disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/95"
+                )}
+              >
+                {grantSubmitting ? (
+                  <>
+                    <Loader2 className="size-3 animate-spin" />
+                    正在授权...
+                  </>
+                ) : (
+                  "签发授权并重新运行"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

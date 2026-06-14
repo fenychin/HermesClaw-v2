@@ -5,9 +5,9 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
+import { actorFromSession } from "@/lib/server/audit"
 import { checkConfirmValue, checkAutomationGate } from "@/lib/server/guardrail"
-import { shouldVersion, snapshotRevision } from "@/lib/server/memory-version"
+import { MemoryService } from "@/lib/server/memory-service"
 import { MemoryUpdateSchema, validateBody } from "@/lib/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
@@ -67,12 +67,8 @@ export async function PATCH(
 
     const data: Record<string, unknown> = {}
 
-    // 冻结/解冻
-    if (body.frozen !== undefined) {
-      data.frozen = body.frozen
-    }
+    if (body.frozen !== undefined) data.frozen = body.frozen
 
-    // 升级记忆类型：mid → long
     if (body.type !== undefined) {
       const validTypes = ["short", "mid", "long"]
       if (!validTypes.includes(body.type)) {
@@ -81,31 +77,19 @@ export async function PATCH(
       data.type = body.type
     }
 
-    // 支持更新内容
     if (body.content !== undefined) data.content = body.content
     if (body.summary !== undefined) data.summary = body.summary
     if (body.confidence !== undefined) data.confidence = body.confidence
+    if (body.reason !== undefined) data.reason = body.reason
+    if (body.tags !== undefined) data.tags = body.tags
 
-    // 知识版本化（P2-⑧）：mid/long 内容性变更先快照旧版本再 bump version
-    if (shouldVersion(existing.type, body)) {
-      const newVersion = await snapshotRevision(
-        {
-          id: existing.id,
-          version: existing.version,
-          content: existing.content,
-          summary: existing.summary,
-          confidence: existing.confidence,
-        },
-        await actorFromSession(),
-        body.reason,
-      )
-      data.version = newVersion
-    }
-
-    const memory = await prisma.memory.update({
-      where: { id },
+    const actor = await actorFromSession()
+    const memory = await MemoryService.updateMemory(
+      existing.workspaceId,
+      id,
       data,
-    })
+      actor
+    )
 
     return successResponse({ memory: serializeMemory(memory as unknown as Record<string, unknown>) })
   } catch (error) {
@@ -139,17 +123,7 @@ export async function DELETE(
     })
     if (!gate.ok) return gate.response
 
-    await prisma.memory.delete({ where: { id } })
-
-    await writeAuditLog({
-      actor: gate.actor,
-      action: "delete.memory",
-      targetType: "memory",
-      targetId: id,
-      detail: `${existing.type} · ${existing.summary}`,
-      riskLevel: "medium",
-      workspaceId: ctx.workspaceId,
-    })
+    await MemoryService.deleteMemory(ctx.workspaceId, id, gate.actor)
 
     return successResponse({ message: "记忆已删除" })
   } catch (error) {

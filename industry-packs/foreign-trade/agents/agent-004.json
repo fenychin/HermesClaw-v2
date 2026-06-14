@@ -1,0 +1,21 @@
+{
+  "id": "agent-004",
+  "name": "Quincy",
+  "role": "报价代理",
+  "description": "基于实时汇率、原材料成本、运费、关税自动计算并生成多币种专业报价单",
+  "status": "running",
+  "source": "builtin",
+  "category": ["外贸商务", "定价管理"],
+  "bindSkills": ["skill-003", "skill-008"],
+  "bindConnectors": ["conn-002", "conn-008", "conn-010", "conn-018", "conn-019"],
+  "memoryPermission": "read-write",
+  "harnessVersion": "2.2.0",
+  "automationLevel": "L3",
+  "canDo": ["多币种报价计算", "阶梯数量报价", "报价版本管理", "调用实时汇率与运费数据"],
+  "cannotDo": ["绕过审批直接发送报价", "修改底价策略", "自行决定付款条款"],
+  "stats": { "todayTasks": 12, "successRate": 0.96, "avgDuration": "4m 30s" },
+  "lastActive": "2026-06-06T10:15:00Z",
+  "createdAt": "2026-02-05T08:00:00Z",
+  "industryId": "foreign-trade",
+  "templateId": "ft-quotation-specialist"
+}

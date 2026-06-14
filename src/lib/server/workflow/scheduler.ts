@@ -14,6 +14,7 @@ import { writeAgentLog } from "@/lib/server/agent-log"
 import { hermesClient } from "@/lib/server/adapters/hermes"
 import { runWorkflow as runLocalWorkflow } from "@/lib/server/workflow/dag-runner"
 import { TypedTaskInputSchema, isCriticalActionType } from "@/contracts"
+import { TaskInputValidationError, HermesApiError } from "@/lib/server/exceptions"
 
 export interface ScheduleOptions {
   /** 工作流 ID */
@@ -56,12 +57,13 @@ export class WorkflowSchedulerService {
     const typedInput = TypedTaskInputSchema.safeParse(inputs)
     if (!typedInput.success && isCriticalActionType(actionType)) {
       const errorMsg = "任务输入不符合 actionType 要求"
+      const validationErrors = typedInput.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`)
       logger.warn(`[WorkflowScheduler] 执行被拦截：${errorMsg}`, {
         workflowId,
         actionType,
-        errors: typedInput.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
+        errors: validationErrors,
       })
-      throw new Error(errorMsg)
+      throw new TaskInputValidationError(errorMsg, { errors: validationErrors })
     }
 
     // 2. 路由决定逻辑
@@ -161,13 +163,18 @@ export class WorkflowSchedulerService {
             error: auditError instanceof Error ? auditError.message : "未知",
           })
         }
-        throw error
+        throw new HermesApiError(`Hermes 执行工作流失败：${message}`)
       }
     } else {
       // 本地 DAG 引擎执行
       // 本地执行器 dag-runner 会在其生命周期钩子中自动处理节点级 AuditLog 和 AgentLog
       try {
-        const result = await runLocalWorkflow(workflowId, inputs)
+        const localInputs = {
+          ...inputs,
+          ...(agentId ? { agentId } : {}),
+          ...(projectId ? { projectId } : {}),
+        }
+        const result = await runLocalWorkflow(workflowId, localInputs)
         return {
           runId: result.runId,
           status: result.status,

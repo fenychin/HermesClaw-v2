@@ -26,6 +26,8 @@ export interface Agent {
   cannotDo: string[]
   /** AI 生成的 Harness Spec Markdown 文档（AGENTS.md P6 Spec-First） */
   harnessSpec?: string
+  industryId?: string
+  templateId?: string
   stats: {
     todayTasks: number
     successRate: number

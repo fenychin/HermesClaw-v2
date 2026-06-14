@@ -141,11 +141,14 @@ model Agent {
   cannotDo        String   // JSON 数组
   statsJson       String   // JSON 对象
   lastActive      String?
+  industryId      String?
+  templateId      String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   runLogs         AgentLog[]
 
   @@index([workspaceId])
+  @@index([industryId])
 }
 
 // 智能体运行日志
@@ -543,12 +546,15 @@ model Workflow {
   status      String        @default("active")   // active | archived
   nodes       String                              // JSON: WorkflowNode[]
   edges       String                              // JSON: WorkflowEdge[]
+  industryId  String?
+  templateId  String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   runs        WorkflowRun[]
 
   @@index([workspaceId])
   @@index([status])
+  @@index([industryId])
 }
 
 // 一次工作流运行（整体状态机：pending → running → completed | failed）

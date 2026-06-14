@@ -460,6 +460,8 @@ export const mockAgents: Agent[] = [
     stats: { todayTasks: 23, successRate: 0.94, avgDuration: '2m 18s' },
     lastActive: '2026-06-06T10:32:00Z',
     createdAt: '2025-11-15T08:00:00Z',
+    industryId: 'foreign-trade',
+    templateId: 'ft-email-writer',
   },
   {
     id: 'agent-002',
@@ -479,6 +481,8 @@ export const mockAgents: Agent[] = [
     stats: { todayTasks: 47, successRate: 0.91, avgDuration: '45s' },
     lastActive: '2026-06-06T10:45:00Z',
     createdAt: '2025-12-01T08:00:00Z',
+    industryId: 'foreign-trade',
+    templateId: 'ft-inquiry-sorter',
   },
   {
     id: 'agent-003',
@@ -498,6 +502,8 @@ export const mockAgents: Agent[] = [
     stats: { todayTasks: 18, successRate: 0.88, avgDuration: '3m 05s' },
     lastActive: '2026-06-06T09:58:00Z',
     createdAt: '2026-01-10T08:00:00Z',
+    industryId: 'foreign-trade',
+    templateId: 'ft-followup-manager',
   },
   {
     id: 'agent-004',
@@ -517,6 +523,8 @@ export const mockAgents: Agent[] = [
     stats: { todayTasks: 12, successRate: 0.96, avgDuration: '4m 30s' },
     lastActive: '2026-06-06T10:15:00Z',
     createdAt: '2026-02-05T08:00:00Z',
+    industryId: 'foreign-trade',
+    templateId: 'ft-quotation-specialist',
   },
   {
     id: 'agent-005',
@@ -536,6 +544,8 @@ export const mockAgents: Agent[] = [
     stats: { todayTasks: 8, successRate: 0.92, avgDuration: '5m 12s' },
     lastActive: '2026-06-05T18:30:00Z',
     createdAt: '2026-01-22T08:00:00Z',
+    industryId: 'foreign-trade',
+    templateId: 'ft-product-manager',
   },
   {
     id: 'agent-006',
@@ -555,6 +565,8 @@ export const mockAgents: Agent[] = [
     stats: { todayTasks: 5, successRate: 0.95, avgDuration: '12m 40s' },
     lastActive: '2026-06-06T09:00:00Z',
     createdAt: '2026-03-01T08:00:00Z',
+    industryId: 'foreign-trade',
+    templateId: 'ft-market-researcher',
   },
   {
     id: 'agent-007',
@@ -574,6 +586,8 @@ export const mockAgents: Agent[] = [
     stats: { todayTasks: 31, successRate: 0.89, avgDuration: '5m 50s' },
     lastActive: '2026-06-06T10:50:00Z',
     createdAt: '2025-12-20T08:00:00Z',
+    industryId: 'foreign-trade',
+    templateId: 'ft-sales-assistant',
   },
   {
     id: 'agent-008',
@@ -593,6 +607,8 @@ export const mockAgents: Agent[] = [
     stats: { todayTasks: 3, successRate: 0.97, avgDuration: '18m 20s' },
     lastActive: '2026-06-05T16:00:00Z',
     createdAt: '2026-02-15T08:00:00Z',
+    industryId: 'foreign-trade',
+    templateId: 'ft-risk-auditor',
   },
   {
     id: 'agent-009',
@@ -612,6 +628,8 @@ export const mockAgents: Agent[] = [
     stats: { todayTasks: 0, successRate: 0.86, avgDuration: '8m 00s' },
     lastActive: '2026-05-20T14:00:00Z',
     createdAt: '2026-04-01T08:00:00Z',
+    industryId: 'foreign-trade',
+    templateId: 'ft-exhibition-sorter',
   },
   {
     id: 'agent-010',
@@ -631,6 +649,8 @@ export const mockAgents: Agent[] = [
     stats: { todayTasks: 156, successRate: 0.98, avgDuration: '8s' },
     lastActive: '2026-06-06T10:52:00Z',
     createdAt: '2025-12-10T08:00:00Z',
+    industryId: 'foreign-trade',
+    templateId: 'ft-email-classifier',
   },
 ]
 
