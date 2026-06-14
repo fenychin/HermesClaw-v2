@@ -22,11 +22,7 @@ import {
   callDeepSeekJson,
 } from "@/lib/server/shared/llm-provider"
 import { writeAuditLog, actorFromSession } from "@/lib/server/shared/audit"
-import {
-  BoundaryDecisionSchema,
-  type BoundaryDecision,
-  type BoundaryDecisionSource,
-} from "@/contracts"
+import { type BoundaryDecision } from "@/contracts"
 import { CONTRACT_VERSION } from "@/contracts"
 
 /** 兜底红线关键词：无论 cannotDo 是否声明，命中即视为越界 */
