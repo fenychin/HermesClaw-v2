@@ -13,7 +13,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { TradeWorkflow } from "../_data/workflows";
+import type { TradeWorkflow } from "./workflow-types";
 
 // ============================================================
 // 图标动态映射表（Lucide 按字符串名称解析）

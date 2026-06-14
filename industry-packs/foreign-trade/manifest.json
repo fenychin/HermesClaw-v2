@@ -6,9 +6,10 @@
   "compatibleRuntimeApi": { "min": "1.0.0", "max": "2.0.0" },
   "directory": {
     "agents": ["agent-001","agent-002","agent-003","agent-004","agent-005","agent-006","agent-007","agent-008"],
-    "workflows": ["inquiry-grade","dev-letter","customer-profile","quote-gen","followup","close-deal"],
+    "workflows": ["inquiry-grade","dev-letter","customer-profile","quote-gen","sample-mgmt","order-push","exhibition-leads","followup-remind"],
     "skills": ["ft-inquiry-grading","ft-outreach-email","ft-quote-generator","ft-follow-up-crm"],
-    "connectors": ["email","crm"]
+    "connectors": ["email","crm"],
+    "prompts": ["workflow-templates"]
   },
   "migrationRules": []
 }

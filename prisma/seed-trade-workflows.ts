@@ -1,212 +1,44 @@
 /**
- * 外贸剩余 6 个工作流 DAG 种子脚本
- * —— 为每个工作流创建 DAG 定义，关联已有 Skill
+ * 外贸剩余工作流 DAG 种子脚本（pack-driven）
+ * —— 把 industry-packs/foreign-trade/workflows/<wfId>/dag.json 写入 DB Workflow 表。
  *
  * 用法：pnpm exec tsx prisma/seed-trade-workflows.ts
  * 幂等：upsert，可重复运行
  *
- * 覆盖工作流：
- *   客户画像构建 (customer-profile) → ft-customer-profiling
- *   报价生成 (quote-gen)           → ft-cost-accounting + ft-quotation-pdf
- *   样品管理 (sample-mgmt)          → 纯 task 节点（追踪寄样与反馈状态）
- *   订单推进 (order-push)           → 纯 task 节点（关键节点监控）
- *   展会线索整理 (exhibition-leads)  → ft-inquiry-sorter
- *   客户跟进提醒 (followup-remind)    → ft-follow-up-crm
+ * P0-4 重构：
+ *   单一数据源是 pack 内的 dag.json，本脚本不再持有 nodes/edges 字面量。
+ *   inquiry-grade 由 prisma/seed-inquiry-workflow.ts 单独负责，本脚本仅处理"剩余 6 个"。
+ *
+ * 处理 workflow ID（与 pack 一致）：
+ *   customer-profile, quote-gen, sample-mgmt, order-push, exhibition-leads, followup-remind
  */
 import 'dotenv/config'
 import * as path from 'node:path'
 import { createSeedPrisma } from './seed-utils'
 import { loadForeignTradeSkills, toSkillDbRecord } from './seed-skills'
 import { stringifyJsonField } from '../src/lib/api-utils'
+import { loadIndustryWorkflowDag } from '../src/lib/industry-pack-sdk'
 
 const prisma = createSeedPrisma()
 
 // ============================================================
-// 工作流定义
+// 配置：与 pack 中的 wfId 一一对应
 // ============================================================
 
-interface WorkflowDef {
-  id: string
-  name: string
-  description: string
-  templateId: string
-  nodes: Array<{
-    id: string
-    kind: string
-    name: string
-    config: Record<string, unknown>
-  }>
-  edges: Array<{ from: string; to: string; when?: string }>
-  /** 依赖的 skill commandName 列表 */
-  requiredSkills: string[]
+interface SeedSpec {
+  /** DB Workflow.id（与历史保持兼容，加 wf- 前缀） */
+  dbWorkflowId: string
+  /** pack 中的 workflow id（即 industry-packs/foreign-trade/workflows/<id>/） */
+  packWorkflowId: string
 }
 
-const WORKFLOWS: WorkflowDef[] = [
-  // ==========================================================
-  // 客户画像构建 (customer-profile)
-  // ==========================================================
-  {
-    id: 'wf-customer-profile',
-    name: 'customer-profile',
-    description: '客户画像构建：整合多渠道信息生成完整客户档案，辅助开发信与报价策略',
-    templateId: 'ft-customer-profile',
-    requiredSkills: ['ft-customer-profiling'],
-    nodes: [
-      {
-        id: 'n1-profile',
-        kind: 'skill',
-        name: '客户画像构建',
-        config: { skillId: 'skill-ft-customer-profiling' },
-      },
-    ],
-    edges: [],
-  },
-
-  // ==========================================================
-  // 报价生成 (quote-gen)
-  // ==========================================================
-  {
-    id: 'wf-quote-gen',
-    name: 'quote-gen',
-    description: '报价生成：核算产品成本 + 生成专业报价单，输出多贸易术语明细',
-    templateId: 'ft-quote-gen',
-    requiredSkills: ['ft-cost-accounting', 'ft-quotation-pdf'],
-    nodes: [
-      {
-        id: 'n1-cost',
-        kind: 'skill',
-        name: '成本核算',
-        config: { skillId: 'skill-ft-cost-accounting' },
-      },
-      {
-        id: 'n2-pdf',
-        kind: 'skill',
-        name: '生成报价单',
-        config: { skillId: 'skill-ft-quotation-pdf' },
-      },
-    ],
-    edges: [
-      { from: 'n1-cost', to: 'n2-pdf' },
-    ],
-  },
-
-  // ==========================================================
-  // 样品管理 (sample-mgmt)
-  // ==========================================================
-  {
-    id: 'wf-sample-mgmt',
-    name: 'sample-mgmt',
-    description: '样品管理：跟踪样品寄送状态，记录客户反馈，推进样品到订单转化',
-    templateId: 'ft-sample-mgmt',
-    requiredSkills: [],
-    nodes: [
-      {
-        id: 'n1-dispatch',
-        kind: 'task',
-        name: '登记样品寄送',
-        config: { handler: 'log-sample-dispatch' },
-      },
-      {
-        id: 'n2-track',
-        kind: 'task',
-        name: '追踪物流状态',
-        config: { handler: 'log-tracking-status' },
-      },
-      {
-        id: 'n3-feedback',
-        kind: 'task',
-        name: '记录客户反馈',
-        config: { handler: 'log-customer-feedback' },
-      },
-    ],
-    edges: [
-      { from: 'n1-dispatch', to: 'n2-track' },
-      { from: 'n2-track', to: 'n3-feedback' },
-    ],
-  },
-
-  // ==========================================================
-  // 订单推进 (order-push)
-  // ==========================================================
-  {
-    id: 'wf-order-push',
-    name: 'order-push',
-    description: '订单推进：监控订单进度，自动提醒关键节点（备料/排产/验货/出运）',
-    templateId: 'ft-order-push',
-    requiredSkills: [],
-    nodes: [
-      {
-        id: 'n1-status',
-        kind: 'task',
-        name: '订单状态快照',
-        config: { handler: 'log-order-status' },
-      },
-      {
-        id: 'n2-check',
-        kind: 'task',
-        name: '关键节点检查',
-        config: { handler: 'log-node-check' },
-      },
-      {
-        id: 'n3-remind',
-        kind: 'task',
-        name: '生成提醒任务',
-        config: { handler: 'log-reminder-task' },
-      },
-    ],
-    edges: [
-      { from: 'n1-status', to: 'n2-check' },
-      { from: 'n2-check', to: 'n3-remind' },
-    ],
-  },
-
-  // ==========================================================
-  // 展会线索整理 (exhibition-leads)
-  // ==========================================================
-  {
-    id: 'wf-exhibition-leads',
-    name: 'exhibition-leads',
-    description: '展会线索整理：整理展会名片与线索，自动分类分级并生成跟进计划',
-    templateId: 'ft-exhibition-leads',
-    requiredSkills: ['ft-inquiry-sorter'],
-    nodes: [
-      {
-        id: 'n1-sort',
-        kind: 'skill',
-        name: '线索分类分级',
-        config: { skillId: 'skill-ft-inquiry-sorter' },
-      },
-      {
-        id: 'n2-plan',
-        kind: 'task',
-        name: '生成跟进计划',
-        config: { handler: 'log-followup-plan' },
-      },
-    ],
-    edges: [
-      { from: 'n1-sort', to: 'n2-plan' },
-    ],
-  },
-
-  // ==========================================================
-  // 客户跟进提醒 (followup-remind)
-  // ==========================================================
-  {
-    id: 'wf-followup-remind',
-    name: 'followup-remind',
-    description: '客户跟进提醒：根据客户阶段与上次沟通时间，自动生成跟进提醒与建议话术',
-    templateId: 'ft-followup-remind',
-    requiredSkills: ['ft-follow-up-crm'],
-    nodes: [
-      {
-        id: 'n1-analyze',
-        kind: 'skill',
-        name: '客户跟进分析',
-        config: { skillId: 'skill-ft-follow-up-crm' },
-      },
-    ],
-    edges: [],
-  },
+const REMAINING_WORKFLOWS: SeedSpec[] = [
+  { dbWorkflowId: 'wf-customer-profile', packWorkflowId: 'customer-profile' },
+  { dbWorkflowId: 'wf-quote-gen',         packWorkflowId: 'quote-gen' },
+  { dbWorkflowId: 'wf-sample-mgmt',       packWorkflowId: 'sample-mgmt' },
+  { dbWorkflowId: 'wf-order-push',        packWorkflowId: 'order-push' },
+  { dbWorkflowId: 'wf-exhibition-leads',  packWorkflowId: 'exhibition-leads' },
+  { dbWorkflowId: 'wf-followup-remind',   packWorkflowId: 'followup-remind' },
 ]
 
 // ============================================================
@@ -214,16 +46,24 @@ const WORKFLOWS: WorkflowDef[] = [
 // ============================================================
 
 async function main() {
-  console.log('🌱 外贸工作流种子脚本（剩余 6 个）\n')
+  console.log('🌱 外贸工作流种子脚本（pack-driven，剩余 6 个）\n')
 
-  // 1. 加载已有技能（用于校验依赖）
+  // 1. 一次性加载所有 DAG（pack 是 SoT）
+  const dags = REMAINING_WORKFLOWS.map((s) => {
+    const dag = loadIndustryWorkflowDag('foreign-trade', s.packWorkflowId)
+    if (!dag) {
+      console.error(`❌ pack 未提供 ${s.packWorkflowId}/dag.json`)
+      process.exit(1)
+    }
+    return { ...s, dag }
+  })
+
+  // 2. 收集所需技能并校验
   const skillsDir = path.resolve(__dirname, '../.claude/skills')
   const allTemplates = loadForeignTradeSkills(skillsDir)
-
-  // 2. 确保所需技能已存在于 DB（不存在则自动 upsert）
   const neededSkills = new Set<string>()
-  for (const wf of WORKFLOWS) {
-    for (const s of wf.requiredSkills) neededSkills.add(s)
+  for (const w of dags) {
+    for (const s of w.dag.requiredSkills) neededSkills.add(s)
   }
 
   for (const cmdName of neededSkills) {
@@ -246,40 +86,40 @@ async function main() {
   // 3. Upsert 工作流
   console.log('\n📝 写入工作流 DAG 定义...')
 
-  for (const wf of WORKFLOWS) {
+  for (const w of dags) {
     const data = {
-      name: wf.name,
-      description: wf.description,
+      name: w.dag.name,
+      description: w.dag.description,
       status: 'active',
-      nodes: stringifyJsonField(wf.nodes),
-      edges: stringifyJsonField(wf.edges),
+      nodes: stringifyJsonField(w.dag.nodes),
+      edges: stringifyJsonField(w.dag.edges),
       industryId: 'foreign-trade',
-      templateId: wf.templateId,
+      templateId: w.dag.templateId ?? `ft-${w.packWorkflowId}`,
     }
 
-    const existing = await prisma.workflow.findUnique({ where: { id: wf.id } })
+    const existing = await prisma.workflow.findUnique({ where: { id: w.dbWorkflowId } })
     if (existing) {
-      await prisma.workflow.update({ where: { id: wf.id }, data })
-      console.log(`  🔄 ${wf.name} → ${wf.id}（已更新）`)
+      await prisma.workflow.update({ where: { id: w.dbWorkflowId }, data })
+      console.log(`  🔄 ${w.dag.name} → ${w.dbWorkflowId}（已更新）`)
     } else {
       await prisma.workflow.create({
         data: {
-          id: wf.id,
+          id: w.dbWorkflowId,
           workspaceId: 'default',
           ...data,
         },
       })
-      console.log(`  ✅ ${wf.name} → ${wf.id}（新建）`)
+      console.log(`  ✅ ${w.dag.name} → ${w.dbWorkflowId}（新建）`)
     }
   }
 
   // 4. 验证
   console.log('\n🔍 验证...')
   let ok = true
-  for (const wf of WORKFLOWS) {
-    const verify = await prisma.workflow.findUnique({ where: { id: wf.id } })
+  for (const w of dags) {
+    const verify = await prisma.workflow.findUnique({ where: { id: w.dbWorkflowId } })
     if (!verify) {
-      console.error(`  ❌ ${wf.name} (${wf.id}) 写入失败`)
+      console.error(`  ❌ ${w.dag.name} (${w.dbWorkflowId}) 写入失败`)
       ok = false
     } else {
       const nodes = JSON.parse(verify.nodes as string)
@@ -289,7 +129,7 @@ async function main() {
   }
 
   if (ok) {
-    console.log(`\n✅ ${WORKFLOWS.length} 个工作流已就绪！`)
+    console.log(`\n✅ ${dags.length} 个工作流已就绪！`)
   } else {
     console.error('\n❌ 部分工作流写入失败')
     process.exit(1)

@@ -18,6 +18,7 @@ export interface CreateMemoryInput {
   frozen?: boolean
   tags?: string[]
   projectId?: string | null
+  proposalId?: string | null // 关联升级提案 ID
 }
 
 export interface UpdateMemoryInput {
@@ -32,6 +33,7 @@ export interface UpdateMemoryInput {
   tags?: string[]
   projectId?: string | null
   reason?: string // 变更原因 (KCL)
+  proposalId?: string | null // 关联升级提案 ID
 }
 
 /** 是否需要版本化快照（仅限制 mid 或 long 类型的记忆发生了内容性更改） */
@@ -94,6 +96,7 @@ export class MemoryService {
           confidence: newMemory.confidence,
           editedBy: actor,
           reason: "初始创建",
+          proposalId: input.proposalId ?? null,
         },
       })
 
@@ -165,6 +168,7 @@ export class MemoryService {
             confidence: existing.confidence,
             editedBy: actor,
             reason: input.reason ?? "更新记忆内容",
+            proposalId: input.proposalId ?? null,
           },
         })
         // version 属性自增 +1

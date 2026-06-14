@@ -90,6 +90,7 @@ describe("MemoryService 记忆版本化与 KCL 事务服务测试", () => {
           confidence: 0.9,
           editedBy: "admin@hermesclaw.ai",
           reason: "初始创建",
+          proposalId: null,
         },
       })
 
@@ -135,6 +136,7 @@ describe("MemoryService 记忆版本化与 KCL 事务服务测试", () => {
           confidence: 0.8,
           editedBy: "admin@hermesclaw.ai",
           reason: "修改了客户核心需求",
+          proposalId: null,
         },
       })
 

@@ -90,11 +90,11 @@ function formatSSEFrame(event: unknown): Uint8Array {
   return encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
 }
 
-/**
- * 发射一个标准契约执行事件。
- * @param event 标准 ExecutionEvent 对象
- */
-export function emitExecutionEvent(event: ExecutionEvent): void {
+/** 事件分发代理类型定义 */
+export type ExecutionEventPublisher = (event: ExecutionEvent) => void | Promise<void>
+
+/** 默认的本地进程内 SSE 广播发射代理 */
+export const localSsePublisher: ExecutionEventPublisher = (event: ExecutionEvent): void => {
   const frame = formatSSEFrame(event)
 
   for (const [id, entry] of subscribers) {
@@ -105,6 +105,37 @@ export function emitExecutionEvent(event: ExecutionEvent): void {
     } catch {
       subscribers.delete(id)
     }
+  }
+}
+
+/** 当前激活的事件发布代理（默认使用本地 SSE 内存广播） */
+let activePublisher: ExecutionEventPublisher = localSsePublisher
+
+/**
+ * 注册一个自定义事件发布代理。
+ * 未来如果有分布式部署或微服务队列需求，可通过此接口注入 Redis PubSub 或 MQ 适配器，实现无缝切换。
+ *
+ * @param publisher 符合 ExecutionEventPublisher 契约的发布函数
+ */
+export function registerEventPublisher(publisher: ExecutionEventPublisher): void {
+  activePublisher = publisher
+}
+
+/**
+ * 发射一个标准契约执行事件。
+ * @param event 标准 ExecutionEvent 对象
+ */
+export function emitExecutionEvent(event: ExecutionEvent): void {
+  // 经由注册的活动发布代理分发执行
+  try {
+    const res = activePublisher(event)
+    if (res instanceof Promise) {
+      res.catch((err) => {
+        console.error("[openclaw-event-emitter] 异步事件发射代理抛出未捕获异常:", err)
+      })
+    }
+  } catch (err) {
+    console.error("[openclaw-event-emitter] 同步事件发射代理发生异常:", err)
   }
 }
 

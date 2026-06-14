@@ -1,9 +1,9 @@
 import { vi, describe, it, expect } from "vitest"
-import { loadIndustryManifest, getCachedManifest, mapLegacyManifest, loadIndustryWorkflows, loadIndustryAgents } from "../lib/server/industry-pack-loader"
+import { loadIndustryManifest, getCachedManifest, mapLegacyManifest, loadIndustryWorkflows, loadIndustryAgents } from "@/lib/industry-pack-sdk"
 
 // ---- Mock 物理文件读取，使单测与真实环境磁盘文件解耦 ----
 vi.mock("fs", async (importOriginal) => {
-  const actual = await importOriginal()
+  const actual = (await importOriginal()) as Record<string, unknown>
   const mockFiles: Record<string, string> = {
     "/mock-root/industry-packs/foreign-trade/manifest.json": JSON.stringify({
       packId: "foreign-trade",
@@ -12,7 +12,7 @@ vi.mock("fs", async (importOriginal) => {
       version: "1.0.0",
       compatibleHermesApi: { min: "1.0.0", max: "2.0.0" },
       directory: {
-        workflows: ["inquiry-grade", "dev-letter", "customer-profile", "quote-gen", "followup", "close-deal"],
+        workflows: ["inquiry-grade", "dev-letter", "customer-profile", "quote-gen", "sample-mgmt", "order-push", "exhibition-leads", "followup-remind"],
         agents: ["agent-001", "agent-002"],
       },
     }),
@@ -40,17 +40,29 @@ vi.mock("fs", async (importOriginal) => {
       description: "报价生成",
       icon: "Calculator",
     }),
-    "/mock-root/industry-packs/foreign-trade/workflows/followup.json": JSON.stringify({
-      id: "followup",
-      title: "跟进",
-      description: "跟进",
-      icon: "Activity",
+    "/mock-root/industry-packs/foreign-trade/workflows/sample-mgmt.json": JSON.stringify({
+      id: "sample-mgmt",
+      title: "样品管理",
+      description: "样品管理",
+      icon: "Package",
     }),
-    "/mock-root/industry-packs/foreign-trade/workflows/close-deal.json": JSON.stringify({
-      id: "close-deal",
-      title: "成交",
-      description: "成交",
-      icon: "Award",
+    "/mock-root/industry-packs/foreign-trade/workflows/order-push.json": JSON.stringify({
+      id: "order-push",
+      title: "订单推进",
+      description: "订单推进",
+      icon: "TrendingUp",
+    }),
+    "/mock-root/industry-packs/foreign-trade/workflows/exhibition-leads.json": JSON.stringify({
+      id: "exhibition-leads",
+      title: "展会线索",
+      description: "展会线索",
+      icon: "Users",
+    }),
+    "/mock-root/industry-packs/foreign-trade/workflows/followup-remind.json": JSON.stringify({
+      id: "followup-remind",
+      title: "跟进提醒",
+      description: "跟进提醒",
+      icon: "Bell",
     }),
     "/mock-root/industry-packs/foreign-trade/agents/agent-001.json": JSON.stringify({
       id: "agent-001",
@@ -115,7 +127,8 @@ describe("mapLegacyManifest 遗留配置转换", () => {
       knowledge: false,
       schemas: false,
       dashboards: false,
-      evalRules: false
+      evalRules: false,
+      prompts: false
     })
     expect(mapped.createdAt).toBeDefined()
     expect(mapped.updatedAt).toBeDefined()
@@ -149,8 +162,10 @@ describe("Industry Pack Loader", () => {
     expect(manifest.directory?.workflows).toContain("dev-letter")
     expect(manifest.directory?.workflows).toContain("customer-profile")
     expect(manifest.directory?.workflows).toContain("quote-gen")
-    expect(manifest.directory?.workflows).toContain("followup")
-    expect(manifest.directory?.workflows).toContain("close-deal")
+    expect(manifest.directory?.workflows).toContain("sample-mgmt")
+    expect(manifest.directory?.workflows).toContain("order-push")
+    expect(manifest.directory?.workflows).toContain("exhibition-leads")
+    expect(manifest.directory?.workflows).toContain("followup-remind")
   })
 
   it("getCachedManifest 应该返回缓存中的同一个 manifest 实例", () => {

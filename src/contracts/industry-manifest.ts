@@ -30,6 +30,8 @@ export const IndustryDirectorySchema = z.object({
   dashboards: z.boolean().default(false),
   /** 评估规则目录（必选）。 */
   evalRules: z.boolean().default(false),
+  /** Prompt 模板目录（CLAUDE.md §3.2 行业 prompt 必须随包发布，不得硬编码进核心）。 */
+  prompts: z.boolean().default(false),
 })
 export type IndustryDirectory = z.infer<typeof IndustryDirectorySchema>
 
@@ -97,6 +99,7 @@ export const IndustryManifestSchema = z.object({
     schemas: false,
     dashboards: false,
     evalRules: false,
+    prompts: false,
   }),
   /** 具体的资源目录（包含具体的资源 ID 列表）。 */
   directory: z.object({
@@ -104,6 +107,8 @@ export const IndustryManifestSchema = z.object({
     workflows: z.array(z.string()).default([]),
     skills: z.array(z.string()).default([]),
     connectors: z.array(z.string()).default([]),
+    /** Prompt 模板键列表（如 ['workflow-templates']） */
+    prompts: z.array(z.string()).default([]).optional(),
   }).optional(),
   /** 支持的语言列表。 */
   languages: z.array(z.string()).default(["zh-CN"]),

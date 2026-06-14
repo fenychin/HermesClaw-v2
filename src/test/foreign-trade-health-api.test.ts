@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { getForeignTradeHealthData } from "@/lib/server/foreign-trade";
-import type { ForeignTradeHealthDeps } from "@/lib/server/foreign-trade";
+import { getIndustryHealthData } from "@/lib/server/industry-health";
+import type { IndustryHealthDeps } from "@/lib/server/industry-health";
 
-describe("Foreign Trade Health API 重构精准过滤测试", () => {
-  it("应仅过滤出具有 industryId='foreign-trade' 的工作流及其运行记录，完全剔除中文模糊搜索与静态 ID 硬编码", async () => {
-    // 1. 模拟 Prisma 依赖，包括 workflow, workflowRun, workflowNodeRun, evolutionLog, auditLog
+describe("getIndustryHealthData — 行业包健康度查询通用化", () => {
+  it("应将 packId 入参映射为 Workflow.industryId 过滤条件，并精准查询关联运行记录", async () => {
+    // 1. 模拟 Prisma 依赖
     const mockWorkflowFindMany = vi.fn().mockResolvedValue([
       { id: "wf-customer-profile" },
       { id: "wf-inquiry-grading" },
@@ -26,31 +26,19 @@ describe("Foreign Trade Health API 重构精准过滤测试", () => {
     const mockAuditLogFindMany = vi.fn().mockResolvedValue([]);
 
     const mockPrisma = {
-      workflow: {
-        findMany: mockWorkflowFindMany,
-      },
-      workflowRun: {
-        findMany: mockWorkflowRunFindMany,
-      },
-      workflowNodeRun: {
-        findMany: mockWorkflowNodeRunFindMany,
-      },
-      evolutionLog: {
-        findMany: mockEvolutionLogFindMany,
-      },
-      auditLog: {
-        findMany: mockAuditLogFindMany,
-      },
+      workflow: { findMany: mockWorkflowFindMany },
+      workflowRun: { findMany: mockWorkflowRunFindMany },
+      workflowNodeRun: { findMany: mockWorkflowNodeRunFindMany },
+      evolutionLog: { findMany: mockEvolutionLogFindMany },
+      auditLog: { findMany: mockAuditLogFindMany },
     } as any;
 
-    const deps: ForeignTradeHealthDeps = {
-      prisma: mockPrisma,
-    };
+    const deps: IndustryHealthDeps = { prisma: mockPrisma };
 
-    // 2. 调用核心逻辑处理函数
-    const result = await getForeignTradeHealthData("test-workspace", deps);
+    // 2. 调用通用核心：packId="foreign-trade"
+    const result = await getIndustryHealthData("foreign-trade", "test-workspace", deps);
 
-    // 3. 校验工作流过滤参数：必须基于 industryId: "foreign-trade"
+    // 3. 校验工作流过滤参数：industryId 由 packId 入参派生，不是字面量硬编码
     expect(mockWorkflowFindMany).toHaveBeenCalledWith({
       where: {
         workspaceId: "test-workspace",
@@ -59,7 +47,7 @@ describe("Foreign Trade Health API 重构精准过滤测试", () => {
       select: { id: true },
     });
 
-    // 4. 校验最近运行查询：必须精准使用查出的工作流 ID，没有任何静态 ID 混入
+    // 4. 校验最近运行查询使用查出的工作流 ID
     expect(mockWorkflowRunFindMany).toHaveBeenCalledWith({
       where: {
         workspaceId: "test-workspace",
@@ -75,5 +63,23 @@ describe("Foreign Trade Health API 重构精准过滤测试", () => {
     expect(result.totalRuns).toBe(1);
     expect(result.recentRuns).toHaveLength(1);
     expect(result.recentRuns[0].id).toBe("run-1");
+  });
+
+  it("当传入不同 packId 时应反映在 industryId 过滤上（行业无关性证据）", async () => {
+    const mockWorkflowFindMany = vi.fn().mockResolvedValue([]);
+    const mockPrisma = {
+      workflow: { findMany: mockWorkflowFindMany },
+      workflowRun: { findMany: vi.fn().mockResolvedValue([]) },
+      workflowNodeRun: { findMany: vi.fn().mockResolvedValue([]) },
+      evolutionLog: { findMany: vi.fn().mockResolvedValue([]) },
+      auditLog: { findMany: vi.fn().mockResolvedValue([]) },
+    } as any;
+
+    await getIndustryHealthData("retail-pack", "test-workspace", { prisma: mockPrisma });
+
+    expect(mockWorkflowFindMany).toHaveBeenCalledWith({
+      where: { workspaceId: "test-workspace", industryId: "retail-pack" },
+      select: { id: true },
+    });
   });
 });

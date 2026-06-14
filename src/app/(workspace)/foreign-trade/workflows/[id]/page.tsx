@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/common/empty-state";
 import { WorkflowStepNav } from "../../_components/workflow-step-nav";
 import { WorkflowExecutor } from "../../_components/workflow-executor";
 import { WorkflowContextPanel } from "../../_components/workflow-context-panel";
-import { getWorkflowById } from "../../_data/workflow-details";
+import { buildStepInputs } from "../../_helpers/step-input-builder";
 import type { Workflow, WorkflowRunStatus } from "@/types/workflow";
 
 // ============================================================
@@ -38,34 +38,7 @@ function mapNodesToSteps(nodes: DbWorkflow["nodes"]) {
     }))
 }
 
-/** 按节点类型构建步骤输入字段 */
-function buildStepInputs(
-  node: DbWorkflow["nodes"][number],
-  index: number,
-): Array<{
-  key: string
-  label: string
-  type: "text" | "textarea" | "select"
-  required: boolean
-  placeholder?: string
-  options?: Array<{ label: string; value: string }>
-}> {
-  if (node.kind === "skill") {
-    return [
-      {
-        key: `input_${node.id}_text`,
-        label: "输入内容",
-        type: "textarea" as const,
-        required: true,
-        placeholder: index === 0
-          ? "粘贴询盘邮件原文 / 客户需求描述..."
-          : "补充信息或调整指令...",
-      },
-    ]
-  }
-  // data-write / task 节点不需要用户输入
-  return []
-}
+// buildStepInputs 已抽出至 ../../_helpers/step-input-builder.ts
 
 // ============================================================
 // 客户端页面主体
@@ -78,10 +51,11 @@ interface PageProps {
 export default function WorkflowDetailPage({ params }: PageProps) {
   const { id } = use(params)
   const [dbWorkflow, setDbWorkflow] = useState<DbWorkflow | null>(null)
+  const [packWorkflow, setPackWorkflow] = useState<Workflow | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  // 从 API 加载 DB 中的工作流定义
+  // 1) 先尝试 DB；2) DB 无记录时回退到 pack 资产（CLAUDE.md §3.2 SoT）
   useEffect(() => {
     let cancelled = false
     async function load() {
@@ -89,16 +63,35 @@ export default function WorkflowDetailPage({ params }: PageProps) {
       setLoadError(null)
       try {
         const res = await fetch(`/api/workflows/${id}`)
-        if (!res.ok) {
-          if (res.status === 404) {
-            setDbWorkflow(null)
+        if (res.ok) {
+          const json = await res.json()
+          if (json.success) {
+            if (!cancelled) setDbWorkflow(json.data as DbWorkflow)
             return
           }
+        } else if (res.status !== 404) {
           throw new Error("加载工作流失败")
         }
-        const json = await res.json()
-        if (!json.success) throw new Error(json.error ?? "未知错误")
-        if (!cancelled) setDbWorkflow(json.data as DbWorkflow)
+
+        // 回退到 pack（v2 dir 形态：meta + dag + steps）
+        const packRes = await fetch(`/api/industry/foreign-trade/workflows/${id}`)
+        if (packRes.ok) {
+          const pack = await packRes.json() as {
+            meta: { id: string; title: string; description: string }
+            steps: { id: string; title: string; description: string; steps: Workflow["steps"] } | null
+          }
+          if (!cancelled) {
+            setPackWorkflow({
+              id: pack.meta.id,
+              title: pack.meta.title,
+              description: pack.meta.description,
+              runStatus: "idle",
+              steps: pack.steps?.steps ?? [],
+            })
+          }
+        } else if (packRes.status !== 404) {
+          throw new Error("加载行业包工作流失败")
+        }
       } catch (err) {
         if (!cancelled) setLoadError(err instanceof Error ? err.message : "加载失败")
       } finally {
@@ -134,28 +127,25 @@ export default function WorkflowDetailPage({ params }: PageProps) {
     )
   }
 
-  // DB 中无此工作流定义 → 回退到静态 mock 数据（兼容旧数据）
-  if (!dbWorkflow) {
-    const staticWorkflow = getWorkflowById(id)
-    if (!staticWorkflow) {
-      return (
-        <div className="flex h-full items-center justify-center">
-          <EmptyState
-            icon={GitBranch}
-            title="工作流不存在"
-            description={`未找到 ID 为「${id}」的工作流，请返回外贸工作台重新选择。`}
-          />
-        </div>
-      )
-    }
-    // 使用静态 mock 数据（兼容：无 DB 记录的旧工作流）
-    return (
-      <StaticWorkflowPage workflow={staticWorkflow} />
-    )
+  // 优先 DB
+  if (dbWorkflow) {
+    return <DbWorkflowPage dbWorkflow={dbWorkflow} workflowId={id} />
   }
 
-  // 使用 DB 工作流定义
-  return <DbWorkflowPage dbWorkflow={dbWorkflow} workflowId={id} />
+  // 回退：pack 资产驱动（既不在 DB 也不在 pack 才报"工作流不存在"）
+  if (packWorkflow) {
+    return <StaticWorkflowPage workflow={packWorkflow} />
+  }
+
+  return (
+    <div className="flex h-full items-center justify-center">
+      <EmptyState
+        icon={GitBranch}
+        title="工作流不存在"
+        description={`未找到 ID 为「${id}」的工作流，请返回外贸工作台重新选择。`}
+      />
+    </div>
+  )
 }
 
 // ============================================================

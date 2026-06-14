@@ -1,9 +1,13 @@
 /**
- * WorkflowGenerator Agent — 外贸行业 DAG 工作流生成引擎
+ * WorkflowGenerator Agent — DAG 工作流生成引擎
  *
- * 职责：接收用户自然语言意图 + 行业上下文，调用 LLM 将意图解析为
+ * 职责：接收用户自然语言意图 + 行业上下文（packId），调用 LLM 将意图解析为
  *       DAG JSON Schema（{ nodes, edges, metadata }），写入 DB Workflow 表
  *       状态为 'draft'（符合 AGENTS.md §4.7 L3 约束：不可直接执行，需人工 Review）。
+ *
+ * CLAUDE.md §3.2：行业相关的 prompt 模板必须从 industry-pack 注入，不得硬编码到核心。
+ * 因此本文件不再持有 `TRADE_WORKFLOW_EXAMPLES` 字面量，而是 runtime 通过
+ * `loadIndustryPrompt(packId, 'workflow-templates')` 拉取；缺失则降级到通用模板。
  *
  * Provider 策略（与 harness-llm.ts 一致，复用 llm-provider.ts）：
  *   1. HARNESS_LLM_PROVIDER 显式覆盖
@@ -24,6 +28,7 @@ import {
   callDeepSeekJson,
 } from "@/lib/server/llm-provider"
 import type { WorkflowNode, WorkflowEdge } from "@/lib/server/workflow/dag-types"
+import { loadIndustryPrompt } from "@/lib/industry-pack-sdk"
 
 // ---- 类型定义 ----
 
@@ -67,18 +72,14 @@ export interface WorkflowGenerateResult {
   metadata: WorkflowDagMetadata
 }
 
-// ---- 外贸行业经典工作流模板（供 LLM 参考） ----
+// ---- 行业模板注入（CLAUDE.md §3.2：禁止在核心持有特定行业字面量） ----
 
-const TRADE_WORKFLOW_EXAMPLES = `
-外贸行业经典 DAG 工作流模板：
-
-1. 询盘分级（inquiry-grade）：邮件分类(L1) → AI分析评分(L2) → 分配跟进(L3) → 创建任务(L2)
-2. 开发信生成（dev-letter）：客户画像(L1) → AI撰写(L2) → 人工审核编辑(L3) → 发送确认(L3)
-3. 客户画像（customer-profile）：数据采集(L1) → 信息整合(L2) → 画像输出(L2)
-4. 报价生成（quote-gen）：产品匹配(L1) → 成本计算(L2) → 报价单生成(L2) → 主管审批(L3)
-5. 样品管理（sample-mgmt）：申请审核(L3) → 寄送安排(L2) → 物流跟踪(L1) → 反馈收集(L2)
-6. 订单推进（order-push）：订单录入(L2) → 进度跟踪(L1) → 节点提醒(L1) → 异常预警(L2)
-7. 展会线索（exhibition-leads）：名片录入(L1) → 线索分级(L2) → 分配销售(L3) → 跟进提醒(L2)
+/**
+ * 通用降级模板：当 pack 未提供 `prompts/workflow-templates.md` 时使用。
+ * 仅含与具体行业无关的节点 kind 与等级语义说明。
+ */
+const GENERIC_FALLBACK_TEMPLATE = `
+通用 DAG 工作流构造规范：
 
 节点 kind 说明：
 - task：自定义任务（需 handler 执行）
@@ -87,12 +88,36 @@ const TRADE_WORKFLOW_EXAMPLES = `
 - noop：占位节点
 
 自动化授权等级（L1-L4）应标注在节点 config.automationLevel 中。
-所有涉及发送、删除、审批等操作的节点须为 L3。`
+所有涉及发送、删除、审批等操作的节点须为 L3。
+工作流生成不涉及 L4（绝对禁止自动）动作。`
 
-const SYSTEM_PROMPT = `你是 HermesClaw-v2 的 WorkflowGenerator 引擎。
+/**
+ * 构造系统提示词。
+ *
+ * @param packId 行业包 ID（runtime 注入）。
+ *   - 提供时：通过 SDK 加载 `prompts/workflow-templates.md` 拼接进 SYSTEM_PROMPT
+ *   - 缺失或加载失败：降级到 GENERIC_FALLBACK_TEMPLATE
+ */
+function buildSystemPrompt(packId?: string): string {
+  let industryTemplate = GENERIC_FALLBACK_TEMPLATE
+  if (packId) {
+    try {
+      const loaded = loadIndustryPrompt(packId, "workflow-templates")
+      if (loaded && loaded.trim().length > 0) {
+        industryTemplate = loaded
+      }
+    } catch (err) {
+      logger.warn("WorkflowGenerator: 行业 prompt 模板加载失败，使用通用降级模板", {
+        packId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  return `你是 HermesClaw-v2 的 WorkflowGenerator 引擎。
 你的职责是将用户的自然语言业务意图，转化为结构化的 DAG（有向无环图）工作流定义。
 
-${TRADE_WORKFLOW_EXAMPLES}
+${industryTemplate}
 
 AGENTS.md §4.7 自动化授权分级：
 - L1：全自动执行，无需审批
@@ -108,6 +133,7 @@ AGENTS.md §4.7 自动化授权分级：
 - 至少包含 2 个节点，最多 10 个节点
 - config 中的 automationLevel 必须标注为 "L1" | "L2" | "L3"
 - 仅输出 JSON 对象，不要任何额外文字或 Markdown 包裹`
+}
 
 /**
  * 构造用户提示词
@@ -311,7 +337,7 @@ function validateDagSchema(raw: unknown): WorkflowDagSchema {
     nodes,
     edges,
     metadata: {
-      industry: String(metadata.industry ?? "foreign-trade"),
+      industry: metadata.industry ? String(metadata.industry) : "",
       generatedBy: String(metadata.generatedBy ?? "WorkflowGenerator"),
       version: String(metadata.version ?? "1.0"),
     },
@@ -330,11 +356,12 @@ function generateWorkflowName(intent: string): string {
 
 /** Anthropic 路径 */
 async function generateWithAnthropic(
+  systemPrompt: string,
   userPrompt: string,
   model: string,
 ): Promise<WorkflowDagSchema> {
   const text = await callAnthropicText({
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt,
     userPrompt,
     model,
     maxTokens: 4096,
@@ -344,11 +371,12 @@ async function generateWithAnthropic(
 
 /** DeepSeek 路径：兜底生成 */
 async function generateWithDeepSeek(
+  systemPrompt: string,
   userPrompt: string,
   model: string,
 ): Promise<WorkflowDagSchema> {
   const raw = await callDeepSeekJson({
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt,
     userPrompt,
     model,
     maxTokens: 4096,
@@ -370,12 +398,15 @@ export async function generateWorkflow(
   // Provider 选择（复用共享工具 llm-provider.ts）
   const { provider, model } = resolveLlmProvider()
 
+  // 行业模板由 packId（即 industryContext）通过 SDK 注入；缺失则降级到通用模板
+  const systemPrompt = buildSystemPrompt(input.industryContext)
+
   // 调用 LLM 生成 DAG
   const userPrompt = buildUserPrompt(input)
   const schema =
     provider === "anthropic"
-      ? await generateWithAnthropic(userPrompt, model)
-      : await generateWithDeepSeek(userPrompt, model)
+      ? await generateWithAnthropic(systemPrompt, userPrompt, model)
+      : await generateWithDeepSeek(systemPrompt, userPrompt, model)
 
   const workflowName = generateWorkflowName(input.intent)
 

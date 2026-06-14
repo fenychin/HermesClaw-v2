@@ -141,12 +141,31 @@
       "Bash(pnpm contracts:check)",
       "Bash(echo \"门禁 exit: $?\")",
       "Bash(git commit *)",
-      "Bash(echo \"commit: $?\")"
+      "Bash(echo \"commit: $?\")",
+      "Bash(pnpm tsc *)",
+      "Bash(export CLAUDE_CODE_TMPDIR=/Users/Feng/Desktop/Hermesclaw-v2/.tmp)",
+      "Bash(pnpm vitest *)",
+      "Bash(find /Users/Feng/Desktop/Hermesclaw-v2/src/test -name \"*workflow-generator*\" -o -name \"*workflow-gen*\")",
+      "Bash(grep -rln \"workflow-generator\\\\|generateWorkflow\" /Users/Feng/Desktop/Hermesclaw-v2/src/test)",
+      "Bash(rm -rf /private/tmp/claude-503/-Users-Feng-Desktop-Hermesclaw-v2/38516823-45ae-42aa-bb16-c9403b3b6fac/tasks/* 2>/dev/null; mkdir -p /Users/Feng/Desktop/Hermesclaw-v2/.tmp; df -h /private/tmp 2>&1 | tail -2)",
+      "Bash(grep -rln \"generateWorkflow\\\\b\" /Users/Feng/Desktop/Hermesclaw-v2/src)",
+      "Bash(grep -rln \"workflow-generator\\\\|@/lib/server/agents/workflow-generator\" /Users/Feng/Desktop/Hermesclaw-v2/src/test /Users/Feng/Desktop/Hermesclaw-v2/test)",
+      "Bash(find /Users/Feng/Desktop/Hermesclaw-v2/src/test -type f -name \"*.test.ts\")",
+      "Bash(rm -rf /private/tmp/claude-503 2>/dev/null; mkdir -p /Users/Feng/Desktop/Hermesclaw-v2/.tmp/tasks; df -h /private/tmp 2>&1 | tail -2; df -h /Users/Feng 2>&1 | tail -2)",
+      "Bash(ls /Users/Feng/Desktop/Hermesclaw-v2/src/test/)",
+      "Bash(ls /Users/Feng/Desktop/Hermesclaw-v2/industry-packs/foreign-trade/workflows/)",
+      "Bash(echo \"---\")",
+      "Bash(ls /Users/Feng/Desktop/Hermesclaw-v2/industry-packs/foreign-trade/agents/)",
+      "Bash(wc -l /Users/Feng/Desktop/Hermesclaw-v2/prisma/seed-trade-workflows.ts /Users/Feng/Desktop/Hermesclaw-v2/prisma/seed-inquiry-workflow.ts /Users/Feng/Desktop/Hermesclaw-v2/src/app/\\\\\\(workspace\\\\\\)/foreign-trade/_data/workflow-details.ts /Users/Feng/Desktop/Hermesclaw-v2/src/app/\\\\\\(workspace\\\\\\)/foreign-trade/_data/workflows.ts)",
+      "Bash(mkdir -p \"/Users/Feng/Desktop/Hermesclaw-v2/src/app/api/industry/[packId]/workflows/[workflowId]\")"
     ],
     "additionalDirectories": [
       "/Users/Feng/Desktop/Hermesclaw-v2/src/components/pages",
       "/Users/Feng/Desktop/Hermesclaw-v2/src/app/api/projects/[id]",
-      "/Users/Feng/Desktop/Hermesclaw-v2/src/app/api/projects/[id]/memory"
+      "/Users/Feng/Desktop/Hermesclaw-v2/src/app/api/projects/[id]/memory",
+      "/private/tmp/claude-503/-Users-Feng-Desktop-Hermesclaw-v2/38516823-45ae-42aa-bb16-c9403b3b6fac/tasks",
+      "/private/tmp/claude-503",
+      "/Users/Feng/Desktop/Hermesclaw-v2/src/app/api/industry/[packId]/workflows"
     ]
   }
 }

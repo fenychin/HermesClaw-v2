@@ -107,3 +107,68 @@ export interface OpenClawSyncResult {
   /** 完成时间（ISO 8601） */
   completedAt?: string
 }
+
+// ─── Zod 契约 Schema（P1-7 contract pact 测试）─────────────────
+//
+// 与上方 interface 一一对应，是 OpenClaw adapter 输出契约的运行时校验单源。
+// mock 或真实响应若与 schema 不匹配视为契约漂移，必须先升 schema 版本再改 mock。
+
+import { z } from "zod"
+
+/** OpenClaw 适配层契约版本（任何字段/枚举变更必须 +1） */
+export const OPENCLAW_ADAPTER_CONTRACT_VERSION = 1
+
+const OpenClawTaskStatusSchema = z.enum([
+  "pending",
+  "executing",
+  "succeeded",
+  "failed",
+  "cancelled",
+])
+
+const OpenClawConnectorHealthSchema = z.enum(["healthy", "degraded", "down", "unknown"])
+
+const OpenClawSyncStatusSchema = z.enum([
+  "initializing",
+  "syncing",
+  "completed",
+  "failed",
+  "partial",
+])
+
+export const OpenClawTaskResultSchema = z.object({
+  taskId: z.string().min(1),
+  status: OpenClawTaskStatusSchema,
+  outputs: z.record(z.string(), z.unknown()).optional(),
+  error: z.string().optional(),
+  durationMs: z.number().nonnegative().optional(),
+  completedAt: z.string().optional(),
+})
+
+export const OpenClawConnectorStatusSchema = z.object({
+  connectorId: z.string().min(1),
+  name: z.string().min(1),
+  health: OpenClawConnectorHealthSchema,
+  lastHeartbeat: z.string().optional(),
+  connectedSources: z.number().int().nonnegative(),
+  version: z.string().min(1),
+  latencyMs: z.number().nonnegative().optional(),
+})
+
+export const OpenClawSyncResultSchema = z.object({
+  syncId: z.string().min(1),
+  status: OpenClawSyncStatusSchema,
+  totalRecords: z.number().int().nonnegative(),
+  syncedRecords: z.number().int().nonnegative(),
+  failedRecords: z.number().int().nonnegative(),
+  errors: z.array(z.string()).optional(),
+  startedAt: z.string().min(1),
+  completedAt: z.string().optional(),
+})
+
+/** 路径 → 响应 schema 索引（contract pact 测试用） */
+export const OPENCLAW_RESPONSE_SCHEMAS = {
+  "/tasks/execute": OpenClawTaskResultSchema,
+  "/connectors/status": OpenClawConnectorStatusSchema,
+  "/data/sync": OpenClawSyncResultSchema,
+} as const
