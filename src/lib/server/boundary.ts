@@ -39,12 +39,14 @@ function toKeywords(rule: string): string[] {
 
 /**
  * 校验某动作是否在智能体边界内。
- * @param agentId 智能体 ID
- * @param action  本次请求的动作描述（自然语言）
+ * @param agentId     智能体 ID
+ * @param action      本次请求的动作描述（自然语言）
+ * @param workspaceId 工作空间 ID（AGENTS.md §4.11 多租户隔离），默认 "default"
  */
 export async function assertWithinBoundary(
   agentId: string,
   action: string,
+  workspaceId: string,
 ): Promise<BoundaryCheckResult> {
   const text = action.toLowerCase()
 
@@ -55,9 +57,9 @@ export async function assertWithinBoundary(
     }
   }
 
-  // 2. 读取该 agent 的 cannotDo
+  // 2. 读取该 agent 的 cannotDo（workspaceId 隔离）
   const agent = await prisma.agent.findUnique({
-    where: { id: agentId },
+    where: { id: agentId, workspaceId },
     select: { cannotDo: true },
   })
   if (!agent) {
