@@ -155,3 +155,14 @@ export async function getIndustryHealthData(
     auditLogs,
   }
 }
+
+export interface IndustryKpiBaseline {
+  successRate: number
+  avgDurationMs: number
+}
+
+export const FOREIGN_TRADE_BASELINE: IndustryKpiBaseline = {
+  successRate: 0.90,     // 默认成功率基准为 90%
+  avgDurationMs: 5000,   // 默认平均耗时基准为 5秒
+}
+

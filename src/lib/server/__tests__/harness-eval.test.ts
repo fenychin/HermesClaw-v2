@@ -1,202 +1,181 @@
-// @vitest-environment node
-import { describe, it, expect, vi } from "vitest"
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock auth (next-auth 依赖链入口)
-vi.mock("@/lib/auth", () => ({
-  auth: vi.fn(() => Promise.resolve({ user: { id: "test-user", name: "测试用户" } })),
+// 必须在任何业务代码导入前 Mock，切断 Anthropic / Next.js/Auth 的级联加载链
+vi.mock("@/lib/server/harness/orchestrator", () => ({
+  runHarnessEvaluation: vi.fn(),
+}));
+vi.mock("@/lib/server/harness/metrics", () => ({
+  EVAL_WINDOW_HOURS: 24,
+  isTrendingUp: vi.fn(),
+  isErrorStatus: vi.fn(),
+  buildLogSummary: vi.fn(),
+  computeMetrics: vi.fn(),
+}));
+vi.mock("@/lib/server/harness/report-builder", () => ({
+  buildEvaluationReport: vi.fn(),
 }));
 
-// Mock writeAuditLog 审计接口以做断言校验
-export const mockWriteAuditLog = vi.fn()
-vi.mock("@/lib/server/audit", () => ({
-  writeAuditLog: (...args: any[]) => mockWriteAuditLog(...args),
-  actorFromSession: vi.fn().mockResolvedValue("SYSTEM"),
-  createAuditEntry: vi.fn().mockResolvedValue({ auditId: "test-audit-id" }),
-  updateAuditEntry: vi.fn().mockResolvedValue({}),
-}))
+import { evaluateHarnessRun, type EvalInput } from '../harness-eval';
 
-import { runHarnessEvaluation } from "../harness-eval"
-import type { prisma } from "@/lib/prisma"
+describe('Harness Evaluation Engine Unit Tests', () => {
+  // Mock 依赖项
+  const mockWriteAuditLog = vi.fn().mockResolvedValue(undefined);
+  const mockGenerateProposal = vi.fn().mockResolvedValue({});
 
-describe("Harness 评估系统单元测试", () => {
-  it("应当在提供了有效的 workspaceId 时正常触发评估并进行隔离查询", async () => {
-    // 模拟 prisma DB
-    const mockPrisma = {
-      agentLog: {
-        findMany: vi.fn().mockResolvedValue([]),
-        count: vi.fn().mockResolvedValue(0),
-        findFirst: vi.fn().mockResolvedValue(null),
-      },
-      evolutionLog: {
-        findMany: vi.fn().mockResolvedValue([]),
-        create: vi.fn().mockResolvedValue({}),
-      },
-      harnessProposal: {
-        create: vi.fn().mockResolvedValue({
-          id: "proposal-1",
-          proposalId: "HEP-1234",
-          workspaceId: "test-workspace-999",
-          triggeredBy: "auto",
-          triggerReason: "检测到零日志",
-          problemStatement: "检测到零日志",
-          evidence: ["证据 1"],
-          proposedChange: {
-            targetComponent: "反馈闭环",
-            description: "无变化",
-            riskLevel: "low",
-            automationLevel: "L2",
-          },
-          requiresHumanApproval: true,
-          estimatedImpact: "无影响",
-          affectedAgents: [],
-          rollbackPlan: "回退配置",
-          status: "pending",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }),
-      },
-    } as unknown as typeof prisma
+  const mockDeps = {
+    writeAuditLog: mockWriteAuditLog,
+    generateProposal: mockGenerateProposal,
+  };
 
-    const mockSelectModel = vi.fn().mockResolvedValue({
-      provider: "deepseek",
-      model: "deepseek-chat",
-    })
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-    const mockAnalyzeHarnessLogs = vi.fn().mockResolvedValue({
-      draft: {
-        problemStatement: "检测到零日志",
-        evidence: ["证据 1"],
-        targetComponent: "workflow",
-        proposedChange: "升级超时阈值",
-        riskLevel: "low",
-        estimatedImpact: "提高健壮性",
-        reportMd: "# 评估报告",
-      },
-      durationSeconds: 1.5,
-    })
-
-    const result = await runHarnessEvaluation(
-      "test-workspace-999",
-      "auto",
-      {
-        prisma: mockPrisma,
-        selectModel: mockSelectModel,
-        analyzeHarnessLogs: mockAnalyzeHarnessLogs,
+  it('正常执行：指标全部优良，不触发自演化提案', async () => {
+    const input: EvalInput = {
+      workflowRunId: 'run-good-001',
+      agentLogs: [
+        { id: 'log-1', status: 'completed' },
+        { id: 'log-2', status: 'completed' },
+      ],
+      auditEvents: [],
+      connectorResults: [
+        { connectorId: 'c-1', success: true },
+        { connectorId: 'c-2', success: true },
+      ],
+      humanCorrections: [
+        { runId: 'run-good-001', correctionMade: false }
+      ],
+      memoryMissEvents: [
+        { key: 'm-1', missed: false }
+      ],
+      industryKpiSnapshot: {
+        actualSuccessRate: 0.95,
+        actualAvgDurationMs: 4800,
       }
-    )
+    };
 
-    // 验证返回值与触发状态
-    expect(result.triggered).toBe(true)
-    expect(result.metrics.total).toBe(0)
+    const report = await evaluateHarnessRun(input, 'test-workspace', mockDeps);
 
-    // 验证底层数据库查询是否带上了 workspaceId 过滤
-    expect(mockPrisma.agentLog.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          workspaceId: "test-workspace-999",
-        }),
-      })
-    )
-
-    // 验证写入进化日志和提案时都带上了 workspaceId
-    expect(mockPrisma.evolutionLog.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          workspaceId: "test-workspace-999",
-        }),
-      })
-    )
-
-    expect(mockPrisma.harnessProposal.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          workspaceId: "test-workspace-999",
-        }),
-      })
-    )
-  })
-
-  it("应当在写入进化日志失败时，记录控制台错误并触发 writeAuditLog 审计", async () => {
-    mockWriteAuditLog.mockClear()
-    const mockPrisma = {
-      agentLog: {
-        findMany: vi.fn().mockResolvedValue([]),
-        count: vi.fn().mockResolvedValue(0),
-        findFirst: vi.fn().mockResolvedValue(null),
-      },
-      evolutionLog: {
-        findMany: vi.fn().mockResolvedValue([]),
-        create: vi.fn().mockRejectedValue(new Error("Database connection fail")),
-      },
-      harnessProposal: {
-        create: vi.fn().mockResolvedValue({
-          id: "proposal-1",
-          proposalId: "HEP-1234",
-          workspaceId: "test-workspace-err-1",
-          triggeredBy: "auto",
-          triggerReason: "测试",
-          problemStatement: "测试",
-          evidence: ["证据 1"],
-          proposedChange: {
-            targetComponent: "反馈闭环",
-            description: "测试",
-            riskLevel: "low",
-            automationLevel: "L2",
-          },
-          requiresHumanApproval: true,
-          estimatedImpact: "测试",
-          affectedAgents: [],
-          rollbackPlan: "回退配置",
-          status: "pending",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }),
-      },
-    } as unknown as typeof prisma
-
-    const mockSelectModel = vi.fn().mockResolvedValue({
-      provider: "deepseek",
-      model: "deepseek-chat",
-    })
-
-    const mockAnalyzeHarnessLogs = vi.fn().mockResolvedValue({
-      draft: {
-        problemStatement: "测试",
-        evidence: ["证据 1"],
-        targetComponent: "workflow",
-        proposedChange: "测试",
-        riskLevel: "low",
-        estimatedImpact: "测试",
-        reportMd: "# 评估报告",
-      },
-      durationSeconds: 1.5,
-    })
-
-    await runHarnessEvaluation(
-      "test-workspace-err-1",
-      "auto",
-      {
-        prisma: mockPrisma,
-        selectModel: mockSelectModel,
-        analyzeHarnessLogs: mockAnalyzeHarnessLogs,
-      }
-    )
-
-    // 验证 AuditLog 是否以中等风险记录了这一失败事件
-    expect(mockWriteAuditLog).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: "evolution.log.fail",
-        riskLevel: "medium",
-        workspaceId: "test-workspace-err-1",
-        detail: expect.stringContaining("Database connection fail"),
-      })
-    )
-  })
-
-  it("类型保护测试：不传 workspaceId 时 TypeScript 编译应当报错", async () => {
-    // 提示：若以下两行报错未被 @ts-expect-error 捕获（即没有编译报错），则说明我们没有移除 workspaceId 默认值
+    expect(report.runId).toBe('run-good-001');
+    expect(report.overallScore).toBeGreaterThanOrEqual(90);
+    expect(report.proposalEligible).toBe(false);
+    expect(report.anomalies.length).toBe(0);
     
-    // @ts-expect-error 缺少参数：应该有 1 到 3 个参数，但传入了 0 个
-    await runHarnessEvaluation()
-  })
-})
+    // 应该只写入 EvalStarted 和 EvalCompleted 日志，没有 Anomaly 和 ProposalTriggered
+    expect(mockWriteAuditLog).toHaveBeenCalledTimes(2);
+    expect(mockWriteAuditLog.mock.calls[0][0].action).toBe('EvalStarted');
+    expect(mockWriteAuditLog.mock.calls[1][0].action).toBe('EvalCompleted');
+    expect(mockGenerateProposal).not.toHaveBeenCalled();
+  });
+
+  it('异常执行：Connector 成功率低 (< 0.85)，触发自演化提案', async () => {
+    const input: EvalInput = {
+      workflowRunId: 'run-conn-fail',
+      agentLogs: [{ id: 'log-1', status: 'completed' }],
+      auditEvents: [],
+      connectorResults: [
+        { connectorId: 'c-1', success: true },
+        { connectorId: 'c-2', success: false }, // 50% 成功率，低于 85%
+      ],
+      humanCorrections: [],
+      memoryMissEvents: [],
+      industryKpiSnapshot: {
+        actualSuccessRate: 0.90,
+        actualAvgDurationMs: 5000,
+      }
+    };
+
+    const report = await evaluateHarnessRun(input, 'test-workspace', mockDeps);
+
+    expect(report.proposalEligible).toBe(true);
+    expect(report.dimensions.connectorSuccessRate).toBe(0.5);
+    
+    // 包含一个连接器异常
+    const connectorAnomaly = report.anomalies.find(a => a.dimension === 'connectorSuccessRate');
+    expect(connectorAnomaly).toBeDefined();
+    
+    // 校验审计留痕
+    const auditActions = mockWriteAuditLog.mock.calls.map(call => call[0].action);
+    expect(auditActions).toContain('EvalAnomalyDetected');
+    expect(auditActions).toContain('EvalProposalTriggered');
+    
+    // 验证调用了 proposal-engine
+    expect(mockGenerateProposal).toHaveBeenCalled();
+  });
+
+  it('异常执行：人工纠正率超标 (> 0.15)，触发自演化提案', async () => {
+    const input: EvalInput = {
+      workflowRunId: 'run-human-correct',
+      agentLogs: [{ id: 'log-1', status: 'completed' }],
+      auditEvents: [],
+      connectorResults: [],
+      humanCorrections: [
+        { runId: 'run-human-correct', correctionMade: true }, // 100% 纠正率
+      ],
+      memoryMissEvents: [],
+      industryKpiSnapshot: {
+        actualSuccessRate: 0.90,
+        actualAvgDurationMs: 5000,
+      }
+    };
+
+    const report = await evaluateHarnessRun(input, 'test-workspace', mockDeps);
+
+    expect(report.proposalEligible).toBe(true);
+    expect(report.dimensions.humanCorrectionRate).toBe(1.0);
+    
+    const anomaly = report.anomalies.find(a => a.dimension === 'humanCorrectionRate');
+    expect(anomaly).toBeDefined();
+    expect(mockGenerateProposal).toHaveBeenCalled();
+  });
+
+  it('异常执行：KPI 偏差及综合分过低 (< 60)，触发自演化提案', async () => {
+    const input: EvalInput = {
+      workflowRunId: 'run-low-score',
+      agentLogs: [
+        { id: 'log-1', status: 'failed' },
+        { id: 'log-2', status: 'failed' }, // 完成率低
+      ],
+      auditEvents: [],
+      connectorResults: [
+        { connectorId: 'c-1', success: false } // 成功率低
+      ],
+      humanCorrections: [],
+      memoryMissEvents: [],
+      industryKpiSnapshot: {
+        actualSuccessRate: 0.50, // KPI 大幅偏移 (成功率只有 50%)
+        actualAvgDurationMs: 12000, // 耗时严重超标
+      }
+    };
+
+    const report = await evaluateHarnessRun(input, 'test-workspace', mockDeps);
+
+    expect(report.overallScore).toBeLessThan(60);
+    expect(report.proposalEligible).toBe(true);
+    expect(mockGenerateProposal).toHaveBeenCalled();
+  });
+
+  it('空集/冷启动输入：不崩溃且能优雅降级，返还满分达标状态', async () => {
+    const input: EvalInput = {
+      workflowRunId: '',
+      agentLogs: [],
+      auditEvents: [],
+      connectorResults: [],
+      humanCorrections: [],
+      memoryMissEvents: [],
+      industryKpiSnapshot: {
+        actualSuccessRate: 0.90,
+        actualAvgDurationMs: 5000,
+      }
+    };
+
+    const report = await evaluateHarnessRun(input, 'test-workspace', mockDeps);
+
+    expect(report.runId).toBeDefined();
+    expect(report.overallScore).toBe(100); // 冷启动默认为满分状态
+    expect(report.proposalEligible).toBe(false);
+    expect(report.anomalies.length).toBe(0);
+    expect(mockGenerateProposal).not.toHaveBeenCalled();
+  });
+});
