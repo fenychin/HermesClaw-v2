@@ -15,16 +15,102 @@ import { actorFromSession } from "@/lib/server/audit"
 export async function GET(request: Request) {
   try {
     const ctx = await buildWorkspaceContext(request)
-    const projects = await prisma.project.findMany({
-      where: { workspaceId: ctx.workspaceId },
-      orderBy: { createdAt: "desc" },
-      include: {
-        _count: { select: { memories: true } },
-      },
-    })
+    const { searchParams } = new URL(request.url)
+    const status = searchParams.get("status") || "active"
+    const page = parseInt(searchParams.get("page") || "1", 10)
+    const limit = parseInt(searchParams.get("limit") || "20", 10)
+    const skip = (page - 1) * limit
+
+    const where: Record<string, unknown> = {
+      workspaceId: ctx.workspaceId,
+    }
+    
+    // 如果 status 是 active 或者是 archived，则过滤该状态。物理数据库 status 有 active, archived, completed。
+    if (status) {
+      where.status = status
+    }
+
+    const [projects, total] = await Promise.all([
+      prisma.project.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.project.count({ where })
+    ])
+
+    // 为列表项动态计算关联项
+    const processedProjects = await Promise.all(
+      projects.map(async (project) => {
+        // 1. 获取工作流执行次数 (使用 JSON 模糊匹配 inputContext 中的 projectId 或者是 input 中的项目 ID)
+        const workflowRunCount = await prisma.workflowRun.count({
+          where: {
+            workspaceId: ctx.workspaceId,
+            OR: [
+              { inputContext: { path: "$.projectId", equals: project.id } },
+              { input: { contains: project.id } }
+            ]
+          }
+        })
+
+        // 2. 获取最晚活跃时间（最近一次工作流执行的 createdAt，如没有则使用 project.updatedAt）
+        const lastRun = await prisma.workflowRun.findFirst({
+          where: {
+            workspaceId: ctx.workspaceId,
+            OR: [
+              { inputContext: { path: "$.projectId", equals: project.id } },
+              { input: { contains: project.id } }
+            ]
+          },
+          orderBy: { createdAt: "desc" },
+          select: { createdAt: true }
+        })
+        const lastActivityAt = lastRun?.createdAt ? lastRun.createdAt.toISOString() : project.updatedAt.toISOString()
+
+        // 3. 计算成员数 (activeAgents 解析后的长度 + 1)
+        const agentsCount = (() => {
+          try {
+            const parsed = JSON.parse(project.activeAgents || "[]")
+            return Array.isArray(parsed) ? parsed.length : 0
+          } catch {
+            return 0
+          }
+        })()
+        const memberCount = agentsCount + 1
+
+        const parsedTags = (() => {
+          try {
+            return JSON.parse(project.tags || "[]")
+          } catch {
+            return []
+          }
+        })()
+
+        return {
+          id: project.id,
+          name: project.name,
+          description: project.productLine || "",
+          productLine: project.productLine || "",
+          status: project.status,
+          createdAt: project.createdAt.toISOString(),
+          updatedAt: project.updatedAt.toISOString(),
+          memberCount,
+          workflowRunCount,
+          lastActivityAt,
+          tags: parsedTags,
+          owner: project.owner,
+          country: project.country,
+          relatedClient: project.relatedClient,
+        }
+      })
+    )
 
     return successResponse({
-      projects: projects.map((p) => serializeProject(p as unknown as Record<string, unknown>)),
+      projects: processedProjects,
+      total,
+      page,
+      limit,
     })
   } catch (error) {
     logger.error('GET /api/projects: 失败', { error: error instanceof Error ? error.message : '未知错误' })
@@ -38,18 +124,33 @@ export async function POST(request: Request) {
     const ctx = await buildWorkspaceContext(request)
     requireWritable(ctx.role)
     const rawBody = await request.json()
+    const actor = await actorFromSession()
+
+    // 自适应补充 Zod 强校验要求的 type & owner
+    if (!rawBody.type) {
+      rawBody.type = "product-line" // 物理可选：customer | order | exhibition | product-line
+    }
+    if (!rawBody.owner) {
+      rawBody.owner = actor || "admin@hermesclaw.ai"
+    }
+    if (rawBody.description !== undefined && !rawBody.productLine) {
+      rawBody.productLine = rawBody.description
+    }
+    if (rawBody.industryId && (!rawBody.tags || rawBody.tags.length === 0)) {
+      rawBody.tags = [rawBody.industryId]
+    }
+
     const parsed = validateBody(rawBody, ProjectCreateSchema)
     if (parsed instanceof Response) return parsed
     const body = parsed
 
-    const actor = await actorFromSession()
     const projectId = crypto.randomUUID()
 
     // 使用 auditedWrite 收敛预记录+执行+回填样板（AGENTS.md §4.3 / §5 #3）
     const project = await auditedWrite(
       {
         actor,
-        action: "project.create",
+        action: "project.created", // 修改为 project.created 审计
         targetType: "project",
         targetId: projectId,
         detail: `创建项目空间: ${body.name}`,
@@ -112,7 +213,18 @@ export async function POST(request: Request) {
     }
 
     return successResponse(
-      { project: serializeProject(project as unknown as Record<string, unknown>) },
+      {
+        project: {
+          id: project.id,
+          name: project.name,
+          description: project.productLine || "",
+          status: project.status,
+          createdAt: project.createdAt.toISOString(),
+          updatedAt: project.updatedAt.toISOString(),
+          owner: project.owner,
+          tags: body.tags,
+        }
+      },
       201,
     )
   } catch (error) {

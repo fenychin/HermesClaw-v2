@@ -20,6 +20,7 @@ export interface WorkspaceInfo {
   name: string;
   plan: string;
   createdAt: string;
+  automationLevel?: string;
 }
 
 export interface WorkspaceData {

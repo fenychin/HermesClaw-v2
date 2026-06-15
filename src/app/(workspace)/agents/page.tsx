@@ -1,24 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { AgentCard } from "./_components/agent-card";
-import { mockAgents, type AgentData } from "./_data/mock-agents";
 import { NewAgentDialog } from "./_components/new-agent-dialog";
 import { useOpenClawStream } from "@/hooks/use-openclaw-stream";
+import { cn } from "@/lib/utils";
 
-/** API 返回的智能体原始数据 */
-interface AgentApiItem {
-  id: string
-  name: string
-  role: string
-  status: string
-  source: string
-  category: string[]
-  automationLevel?: string
-  statsJson?: Record<string, unknown>
+export interface AgentData {
+  id: string;
+  name: string;
+  role: string;
+  status: "active" | "idle" | "error";
+  tags: string[];
+  taskCount: number;
+  isBuiltIn: boolean;
+  automationLevel?: string;
 }
 
 /** 骨架屏 —— 8 张卡片占位 */
@@ -59,34 +60,38 @@ function AgentGridSkeleton() {
 }
 
 /** 将 API 数据映射为 AgentCard 所需格式 */
-function toAgentData(api: AgentApiItem): AgentData {
+function toAgentData(api: any): AgentData {
   return {
     id: api.id,
     name: api.name,
-    role: api.role,
-    // API status: running/idle/error/paused → AgentCard: active/idle/error
+    role: api.role || "智能助手",
+    // 映射状态为 UI 标准值
     status:
-      api.status === "running" || api.status === "paused"
+      api.status === "running" || api.status === "active"
         ? "active"
         : api.status === "error"
           ? "error"
           : "idle",
-    tags: api.category ?? [],
-    taskCount: (api.statsJson?.todayTasks as number) ?? 0,
+    tags: api.tags || [],
+    taskCount: api.taskCount || 0,
     isBuiltIn: api.source === "builtin",
     automationLevel: api.automationLevel ?? "L2",
   };
 }
 
 export default function AgentsPage() {
-  // 订阅全局 SSE 实时事件流（AGENTS.md §4.8）
-  // 自动更新 Zustand agentExecutionStates → AgentCard 实时状态圆点
+  // 订阅全局 SSE 实时事件流
   useOpenClawStream();
+
+  // 当前展开的智能体 ID
+  const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
 
   const {
     data: agents,
     isLoading,
     isError,
+    refetch,
+    isRefetching,
   } = useQuery({
     queryKey: ["agents"],
     queryFn: async (): Promise<AgentData[]> => {
@@ -94,16 +99,14 @@ export default function AgentsPage() {
       if (!res.ok) throw new Error("获取智能体列表失败");
       const json = await res.json();
       if (!json.success) throw new Error(json.error ?? "未知错误");
-      const list = json.data.agents as AgentApiItem[];
+      const list = json.data as any[];
       return list.map(toAgentData);
     },
     staleTime: 30_000,
     retry: 1,
   });
 
-  // API 失败或返回空数组时，自动回退到页面级 mock 数据
-  const displayAgents: AgentData[] =
-    isError || (!isLoading && !agents?.length) ? mockAgents : (agents ?? []);
+  const displayAgents: AgentData[] = agents ?? [];
 
   const builtInAgents = displayAgents.filter((a) => a.isBuiltIn);
   const customAgents = displayAgents.filter((a) => !a.isBuiltIn);
@@ -113,14 +116,28 @@ export default function AgentsPage() {
       <PageHeader
         title="智能体"
         description="管理外贸 AI 数字员工——内置 8 个外贸岗位智能体，支持自定义创建与 Harness 等级配置"
-        actions={<NewAgentDialog />}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isLoading || isRefetching}
+              className="bg-card border-border h-9 text-xs flex items-center gap-1.5"
+            >
+              <RefreshCw className={cn("size-3.5", isRefetching && "animate-spin")} />
+              刷新列表
+            </Button>
+            <NewAgentDialog />
+          </div>
+        }
       />
 
       {/* API 异常提示条 */}
       {isError && (
-        <div className="flex items-center gap-2 mt-2 mb-1 px-3 py-2 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs">
+        <div className="flex items-center gap-2 mt-2 mb-1 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 text-xs">
           <AlertTriangle className="size-3.5 shrink-0" />
-          <span>API 暂不可用，当前展示本地回退数据</span>
+          <span>无法连接后端智能体服务，请检查网络或刷新重试。</span>
         </div>
       )}
 
@@ -135,7 +152,7 @@ export default function AgentsPage() {
         <TabsContent value="all" className="mt-0">
           {isLoading ? (
             <AgentGridSkeleton />
-          ) : (
+          ) : displayAgents.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {displayAgents.map((agent) => (
                 <AgentCard
@@ -148,8 +165,16 @@ export default function AgentsPage() {
                   taskCount={agent.taskCount}
                   isBuiltIn={agent.isBuiltIn}
                   automationLevel={agent.automationLevel ?? "L2"}
+                  isExpanded={expandedAgentId === agent.id}
+                  onToggleExpand={() =>
+                    setExpandedAgentId(expandedAgentId === agent.id ? null : agent.id)
+                  }
                 />
               ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 border border-dashed border-border rounded-2xl text-muted-foreground text-xs">
+              暂无任何智能体记录
             </div>
           )}
         </TabsContent>
@@ -158,7 +183,7 @@ export default function AgentsPage() {
         <TabsContent value="foreign-trade" className="mt-0">
           {isLoading ? (
             <AgentGridSkeleton />
-          ) : (
+          ) : builtInAgents.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {builtInAgents.map((agent) => (
                 <AgentCard
@@ -171,8 +196,16 @@ export default function AgentsPage() {
                   taskCount={agent.taskCount}
                   isBuiltIn={agent.isBuiltIn}
                   automationLevel={agent.automationLevel ?? "L2"}
+                  isExpanded={expandedAgentId === agent.id}
+                  onToggleExpand={() =>
+                    setExpandedAgentId(expandedAgentId === agent.id ? null : agent.id)
+                  }
                 />
               ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 border border-dashed border-border rounded-2xl text-muted-foreground text-xs">
+              暂无官方智能体记录
             </div>
           )}
         </TabsContent>
@@ -194,15 +227,16 @@ export default function AgentsPage() {
                   taskCount={agent.taskCount}
                   isBuiltIn={agent.isBuiltIn}
                   automationLevel={agent.automationLevel ?? "L2"}
+                  isExpanded={expandedAgentId === agent.id}
+                  onToggleExpand={() =>
+                    setExpandedAgentId(expandedAgentId === agent.id ? null : agent.id)
+                  }
                 />
               ))}
             </div>
           ) : (
-            <div className="py-20 text-center flex flex-col items-center justify-center border border-dashed border-border rounded-xl">
-              <p className="text-muted-foreground text-sm mb-4">
-                暂无自定义智能体
-              </p>
-              <NewAgentDialog />
+            <div className="text-center py-12 border border-dashed border-border rounded-2xl text-muted-foreground text-xs">
+              暂无自定义智能体，点击右上角新建。
             </div>
           )}
         </TabsContent>

@@ -49,7 +49,7 @@ export async function GET(request: Request) {
 
     const workspace = await prisma.workspace.findUnique({
       where: { id: ctx.workspaceId },
-      select: { id: true, name: true, plan: true, createdAt: true },
+      select: { id: true, name: true, plan: true, createdAt: true, automationLevel: true },
     })
 
     return successResponse({

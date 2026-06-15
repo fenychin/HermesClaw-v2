@@ -1,778 +1,879 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { LucideIcon } from "lucide-react";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Zap,
+  Brain,
   Layers,
-  Puzzle,
-  Plug,
-  Mic,
-  ImageIcon,
-  Video,
-  ArrowRight,
   Sparkles,
-  Loader2,
-  CheckCircle2,
-  AlertTriangle,
+  Search,
+  Plus,
+  Trash2,
+  Edit3,
+  Check,
+  X,
+  History,
+  FileText,
+  MessageSquare,
+  AlertCircle,
+  Database,
+  ArrowRight,
+  TrendingUp,
+  Folder,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { PageTransition } from "@/components/common/PageTransition";
-import { useMemoryStore } from "@/stores/memory-store";
-import { useSkillStore } from "@/stores/skill-store";
-import { useConnectorStore } from "@/stores/connector-store";
-import { useTradeStore } from "@/stores/trade-store";
-import { apiClient } from "@/lib/api-client";
-import type { EvolutionLogEntry } from "@/types";
-import { useBrainStats } from "@/hooks/use-brain-stats";
-import { Plus, Check, Play as PlayIcon, TrendingUp, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-/** 将 ISO 时间格式化为 "YYYY-MM-DD HH:mm"；空值回退占位 */
-function formatDateTime(iso: string | null | undefined, fallback = "—"): string {
-  if (!iso) return fallback;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return fallback;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(
-    d.getHours(),
-  )}:${pad(d.getMinutes())}`;
+// ==========================================
+// 极简 LCS (最长公共子序列) 行级 Diff 算法
+// ==========================================
+function diffLines(oldStr: string, newStr: string) {
+  const one = oldStr.split("\n");
+  const two = newStr.split("\n");
+  const N = one.length;
+  const M = two.length;
+  const dp: number[][] = Array.from({ length: N + 1 }, () => Array(M + 1).fill(0));
+  
+  for (let i = 1; i <= N; i++) {
+    for (let j = 1; j <= M; j++) {
+      if (one[i - 1] === two[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+  
+  const result: { value: string; added?: boolean; removed?: boolean }[] = [];
+  let i = N, j = M;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && one[i - 1] === two[j - 1]) {
+      result.unshift({ value: one[i - 1] });
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      result.unshift({ value: two[j - 1], added: true });
+      j--;
+    } else {
+      result.unshift({ value: one[i - 1], removed: true });
+      i--;
+    }
+  }
+  return result;
 }
 
-/** 能力概览卡数据 */
-interface CapabilityCard {
-  title: string;
-  icon: LucideIcon;
-  color: string;
-  href: string;
-  stats: { label: string; value: string }[];
-  description: string;
-}
-
-/** 能力概览卡组件 */
-function CapabilityCard({ card }: { card: CapabilityCard }) {
-  const router = useRouter();
-  const Icon = card.icon;
+// ==========================================
+// 简易虚拟滚动组件 (条目数 > 50 时自动启用)
+// ==========================================
+function VirtualList({
+  items,
+  renderItem,
+}: {
+  items: any[];
+  renderItem: (item: any, idx: number) => React.ReactNode;
+}) {
+  const [scrollTop, setScrollTop] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const itemHeight = 180; // 预估卡片高度
+  const viewHeight = 550; // 容器高度
+  const totalHeight = items.length * itemHeight;
+  
+  const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - 2);
+  const endIndex = Math.min(items.length, Math.ceil((scrollTop + viewHeight) / itemHeight) + 2);
+  
+  const visibleItems = items.slice(startIndex, endIndex);
+  const offsetY = startIndex * itemHeight;
 
   return (
-    <button
-      type="button"
-      onClick={() => router.push(card.href)}
-      className="bg-card border-border hover:border-brand/30 hover:bg-accent/50 rounded-2xl border p-5 text-left transition-all"
+    <div
+      ref={containerRef}
+      onScroll={(e) => setScrollTop((e.target as HTMLElement).scrollTop)}
+      className="overflow-y-auto max-h-[550px] relative border border-border/30 rounded-2xl bg-card/10 w-full"
     >
-      {/* 图标 + 标题 */}
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/5">
-          <Icon className="size-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h3 className="text-foreground truncate text-sm font-semibold">
-            {card.title}
-          </h3>
-        </div>
-        <ArrowRight className="text-hint size-4 shrink-0" />
-      </div>
-
-      {/* 核心数字 */}
-      <div className="mb-3 flex flex-wrap gap-4">
-        {card.stats.map((stat) => (
-          <div key={stat.label}>
-            <span
-              className="text-xl font-bold"
-              style={{ color: card.color }}
-            >
-              {stat.value}
-            </span>
-            <span className="text-hint ml-1 text-xs">{stat.label}</span>
+      <div style={{ height: totalHeight, width: "100%", position: "relative" }}>
+        <div
+          style={{
+            transform: `translateY(${offsetY}px)`,
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+          }}
+        >
+          <div className="p-4 space-y-4">
+            {visibleItems.map((item, idx) => renderItem(item, startIndex + idx))}
           </div>
-        ))}
+        </div>
       </div>
-
-      {/* 说明 */}
-      <p className="text-hint line-clamp-2 text-xs leading-relaxed">
-        {card.description}
-      </p>
-    </button>
+    </div>
   );
 }
 
-/** 智慧大脑总览页 */
+// ==========================================
+// 智慧大脑前端主控面板
+// ==========================================
 export default function BrainOverviewPage() {
-  const router = useRouter();
   const queryClient = useQueryClient();
-  /* 订阅原始数据，避免 selector 中 filter 返回新引用导致无限渲染 */
-  const memories = useMemoryStore((s) => s.memories);
-  const loadMemories = useMemoryStore((s) => s.loadMemories);
-  const skills = useSkillStore((s) => s.skills);
-  const loadSkills = useSkillStore((s) => s.loadSkills);
-  const connectors = useConnectorStore((s) => s.connectors);
-  const loadConnectors = useConnectorStore((s) => s.loadConnectors);
-  const harnessProposals = useTradeStore((s) => s.harnessProposals);
-  const loadProposals = useTradeStore((s) => s.loadProposals);
+  const [activeTab, setActiveTab] = useState<"org" | "project" | "session">("org");
+  const [page, setPage] = useState(1);
+  const limit = 30;
 
-  // 引入脑指标 Hook
-  const { data: stats, refetch: refetchStats } = useBrainStats();
+  // 新建/编辑相关状态
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [newScope, setNewScope] = useState<"org" | "project" | "session">("org");
+  const [newProjectId, setNewProjectId] = useState("");
+  const [newContent, setNewContent] = useState("");
+  const [newTags, setNewTags] = useState("");
 
-  // 知识盲区补充弹窗状态
-  const [activeGap, setActiveGap] = useState<{
-    id: string;
-    description: string;
-    missingType: "mid" | "long";
-    suggestedAction: string;
-  } | null>(null);
-  const [gapContent, setGapContent] = useState("");
-  const [gapType, setGapType] = useState<"mid" | "long">("mid");
-  const [isSubmittingGap, setIsSubmittingGap] = useState(false);
+  // 展开的记忆卡片 ID
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  
+  // 行内编辑状态
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
 
-  // 提交补充知识
-  const handleAddKnowledge = async () => {
-    if (!activeGap || !gapContent.trim()) return;
-    setIsSubmittingGap(true);
-    try {
-      const keywords = activeGap.description.includes("沙特")
-        ? ["沙特", "外贸合规"]
-        : activeGap.description.includes("俄罗斯")
-          ? ["俄罗斯", "物流运价"]
-          : ["知识盲区"];
+  // 历史版本弹窗状态
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyMemoryId, setHistoryMemoryId] = useState<string | null>(null);
+  const [selectedRevisionIdx, setSelectedRevisionIdx] = useState<number | null>(null);
 
-      await apiClient.createMemory({
-        type: gapType,
-        summary: activeGap.description.slice(0, 80),
-        content: gapContent.trim(),
-        tags: keywords,
-        source: "manual",
-        confidence: 0.9,
+  // 1. 获取大脑大盘总览指标
+  const { data: overview, isLoading: overviewLoading } = useQuery({
+    queryKey: ["brain-overview"],
+    queryFn: async () => {
+      const res = await fetch("/api/brain/overview");
+      if (!res.ok) throw new Error("获取总览失败");
+      return res.json();
+    },
+  });
+
+  // 2. 获取当前 Tab 的记忆列表
+  const { data: memoryData, isLoading: listLoading } = useQuery({
+    queryKey: ["memories", activeTab, page],
+    queryFn: async () => {
+      const res = await fetch(`/api/memory?scope=${activeTab}&page=${page}&limit=${limit}`);
+      if (!res.ok) throw new Error("获取记忆列表失败");
+      return res.json();
+    },
+  });
+
+  // 3. 获取所有项目列表 (新建记忆时指派项目使用)
+  const { data: projectData } = useQuery({
+    queryKey: ["all-projects-list"],
+    queryFn: async () => {
+      const res = await fetch("/api/projects?limit=100");
+      if (!res.ok) throw new Error("获取项目失败");
+      return res.json();
+    },
+  });
+
+  // 4. 获取当前选定记忆的版本历史
+  const { data: revisionData, refetch: refetchRevisions } = useQuery({
+    queryKey: ["revisions", historyMemoryId],
+    queryFn: async () => {
+      if (!historyMemoryId) return { revisions: [] };
+      const res = await fetch(`/api/memory/${historyMemoryId}/revisions`);
+      if (!res.ok) throw new Error("获取版本历史失败");
+      return res.json();
+    },
+    enabled: !!historyMemoryId,
+  });
+
+  const projects = projectData?.projects || [];
+  const memories = memoryData?.memories || [];
+  const totalMemories = memoryData?.total || 0;
+  const revisions = revisionData?.revisions || [];
+
+  // 监听 Tab 切换，重置页码
+  useEffect(() => {
+    setPage(1);
+    setExpandedId(null);
+    setEditingId(null);
+  }, [activeTab]);
+
+  // Mutations
+  // 新建记忆
+  const createMutation = useMutation({
+    mutationFn: async (body: any) => {
+      const res = await fetch("/api/memory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
+      if (!res.ok) throw new Error("创建记忆失败");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("新建记忆成功");
+      queryClient.invalidateQueries({ queryKey: ["memories"] });
+      queryClient.invalidateQueries({ queryKey: ["brain-overview"] });
+      setDrawerOpen(false);
+      setNewContent("");
+      setNewTags("");
+      setNewProjectId("");
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "创建失败");
+    },
+  });
 
-      // 刷新脑统计数据与记忆库
-      await Promise.all([refetchStats(), loadMemories()]);
-      setActiveGap(null);
-      setGapContent("");
-    } catch (err) {
-      console.error("补充知识失败", err);
-    } finally {
-      setIsSubmittingGap(false);
+  // 更新记忆
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, content, tags }: { id: string; content: string; tags?: string[] }) => {
+      const res = await fetch(`/api/memory/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, tags }),
+      });
+      if (!res.ok) throw new Error("更新记忆失败");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast.success(`已保存，版本 v${data.data?.memory?.version || data.memory?.version}`);
+      queryClient.invalidateQueries({ queryKey: ["memories"] });
+      queryClient.invalidateQueries({ queryKey: ["brain-overview"] });
+      setEditingId(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "更新失败");
+    },
+  });
+
+  // 归档(软删除)记忆
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/memory/${id}?confirm=true`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("归档失败");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("记忆已归档软删除");
+      queryClient.invalidateQueries({ queryKey: ["memories"] });
+      queryClient.invalidateQueries({ queryKey: ["brain-overview"] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "操作失败");
+    },
+  });
+
+  const handleCreate = () => {
+    if (!newContent.trim()) {
+      toast.warning("内容不能为空");
+      return;
+    }
+    const tagsArr = newTags
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    createMutation.mutate({
+      scope: newScope,
+      content: newContent.trim(),
+      projectId: newScope === "project" ? newProjectId || null : null,
+      tags: tagsArr,
+    });
+  };
+
+  const handleSaveEdit = (id: string, tags?: string[]) => {
+    if (!editContent.trim()) {
+      toast.warning("内容不能为空");
+      return;
+    }
+    updateMutation.mutate({ id, content: editContent.trim(), tags });
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm("确定要软删除并归档这条记忆吗？此操作将记录审计日志且不可物理撤销。")) {
+      deleteMutation.mutate(id);
     }
   };
 
-  const shortCount = useMemo(
-    () => memories.filter((m) => m.type === "short").length,
-    [memories]
-  );
-  const midCount = useMemo(
-    () => memories.filter((m) => m.type === "mid").length,
-    [memories]
-  );
-  const longCount = useMemo(
-    () => memories.filter((m) => m.type === "long").length,
-    [memories]
-  );
-  const activeSkills = useMemo(
-    () => skills.filter((s) => s.status === "active").length,
-    [skills]
-  );
-  const connectedConnectors = useMemo(
-    () => connectors.filter((c) => c.status === "connected").length,
-    [connectors]
-  );
-  const pendingProposals = useMemo(
-    () => (harnessProposals || []).filter((p) => p.status === "pending"),
-    [harnessProposals]
-  );
+  // 渲染记忆卡片项
+  const renderMemoryItem = (item: any) => {
+    const isExpanded = expandedId === item.id;
+    const isEditing = editingId === item.id;
 
-  // 挂载时加载提案、技能、连接器、记忆，使概览计数与待审批预览准确
-  useEffect(() => {
-    loadMemories();
-    loadProposals();
-    loadSkills();
-    loadConnectors();
-  }, [loadMemories, loadProposals, loadSkills, loadConnectors]);
-
-  // Harness 演化引擎实时状态
-  const {
-    data: harnessStatus,
-    isLoading: statusLoading,
-  } = useQuery({
-    queryKey: ["harness-status"],
-    queryFn: () => apiClient.getHarnessStatus(),
-  });
-
-  // Harness 进化历史（最近评估记录）
-  const { data: evolutionData } = useQuery({
-    queryKey: ["harness-evolution-log"],
-    queryFn: () => apiClient.getEvolutionLog(8),
-  });
-  const evolutionLogs = (evolutionData?.logs ?? []) as EvolutionLogEntry[];
-
-  // 一次性提示：本次手动评估的结果
-  const [evalNotice, setEvalNotice] = useState<{
-    tone: "success" | "info" | "error";
-    text: string;
-  } | null>(null);
-
-  // 手动触发评估
-  const evaluateMutation = useMutation({
-    mutationFn: () => apiClient.triggerHarnessEvaluate("manual"),
-    onSuccess: async (result) => {
-      if (result.triggered && result.proposal) {
-        setEvalNotice({
-          tone: "success",
-          text: `已生成升级提案 ${result.proposal.proposalId}（${result.provider} · ${result.model}），失败率 ${(result.metrics.errorRate * 100).toFixed(1)}%`,
-        });
-      } else {
-        setEvalNotice({
-          tone: "info",
-          text: result.reason ?? "本次评估未触发升级提案，系统指标健康",
-        });
-      }
-      // 刷新状态、提案列表与进化历史
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["harness-status"] }),
-        queryClient.invalidateQueries({ queryKey: ["harness-evolution-log"] }),
-        loadProposals(),
-      ]);
-    },
-    onError: (err) => {
-      setEvalNotice({
-        tone: "error",
-        text: err instanceof Error ? err.message : "评估触发失败",
-      });
-    },
-  });
-
-  const cards: CapabilityCard[] = [
-    {
-      title: "记忆系统",
-      icon: Layers,
-      color: "#4DA3FF",
-      href: "/brain/short-memory",
-      stats: [
-        { label: "短期", value: String(shortCount) },
-        { label: "中期", value: String(midCount) },
-        { label: "长期", value: String(longCount) },
-      ],
-      description: "三级记忆体系：实时会话上下文、项目客户沉淀、企业 SOP 知识库",
-    },
-    {
-      title: "技能库",
-      icon: Puzzle,
-      color: "#7C5CFF",
-      href: "/brain/skills",
-      stats: [
-        { label: "个技能", value: String(skills.length) },
-        { label: "个活跃", value: String(activeSkills) },
-      ],
-      description: "行业 / 岗位 / 自定义技能，版本化、可测试、可绑定至智能体",
-    },
-    {
-      title: "连接器",
-      icon: Plug,
-      color: "#37C99A",
-      href: "/brain/connectors",
-      stats: [
-        { label: "个可用", value: String(connectors.length) },
-        { label: "个已连接", value: String(connectedConnectors) },
-      ],
-      description: "邮件、IM、CRM、ERP、文档与 API 的统一接入授权管理",
-    },
-    {
-      title: "语音资产",
-      icon: Mic,
-      color: "#F0A43B",
-      href: "/brain/voice",
-      stats: [{ label: "个音色", value: "3" }],
-      description: "品牌声音、外呼模板与多语种语音资产管理",
-    },
-    {
-      title: "图像资产",
-      icon: ImageIcon,
-      color: "#4DA3FF",
-      href: "/brain/images",
-      stats: [{ label: "张图片", value: "48" }],
-      description: "产品图、证书、营销素材与 OCR 识别内容库",
-    },
-    {
-      title: "视频资产",
-      icon: Video,
-      color: "#7C5CFF",
-      href: "/brain/videos",
-      stats: [{ label: "个视频", value: "12" }],
-      description: "产品讲解、演示视频与数字人口播素材库",
-    },
-  ];
-
-  return (
-    <PageTransition>
-    <div className="space-y-6">
-      <PageHeader
-        title="智慧大脑"
-        description="Hermes 控制面"
-      />
-
-      {/* 能力概览卡网格 */}
-      <div className="grid grid-cols-3 gap-4">
-        {cards.map((card) => (
-          <CapabilityCard key={card.href} card={card} />
-        ))}
-      </div>
-
-      {/* Harness 评估与知识盲区连通挂件 */}
-      <div className="grid grid-cols-3 gap-4">
-        {/* 左栏：记忆健康度与命中率趋势 (占用 1 栏) */}
-        <div className="bg-card border-border rounded-2xl border p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="bg-brand/10 p-1.5 rounded-lg">
-                <TrendingUp className="text-brand size-4" />
-              </div>
-              <h3 className="text-foreground text-sm font-semibold">记忆命中率与健康度</h3>
-            </div>
-            
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold tracking-tight text-foreground">
-                {stats?.hitRate ?? "84.6"}%
-              </span>
-              <span className="text-success text-xs font-semibold flex items-center gap-0.5">
-                ↑ 2.1%
-              </span>
-            </div>
-            <p className="text-hint text-xs mt-1">最近 72 小时演化引擎运行评估</p>
-          </div>
-
-          {/* SVG 渐变折线图 */}
-          <div className="my-4 h-14 w-full flex items-center justify-between gap-4">
-            <div className="flex-1 h-full">
-              <svg className="w-full h-full" viewBox="0 0 160 50" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#7C5CFF" stopOpacity="0.4" />
-                    <stop offset="100%" stopColor="#7C5CFF" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-                {/* 渐变填充区域 */}
-                <path
-                  d={`M 10,50 L 10,${50 - (((stats?.hitRateTrend?.[0] ?? 80.2) - 60) / 40) * 35 - 5} 
-                     ${(stats?.hitRateTrend || [80.2, 81.5, 80.9, 83.4, 82.8, 83.5, 84.6])
-                       .map((val, idx) => {
-                         const x = (idx / 6) * 140 + 10;
-                         const y = 50 - ((val - 60) / 40) * 35 - 5;
-                         return `L ${x},${y}`;
-                       })
-                       .join(" ")} L 150,50 Z`}
-                  fill="url(#chartGradient)"
-                />
-                {/* 趋势折线 */}
-                <polyline
-                  fill="none"
-                  stroke="#7C5CFF"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  points={(stats?.hitRateTrend || [80.2, 81.5, 80.9, 83.4, 82.8, 83.5, 84.6])
-                    .map((val, idx) => {
-                      const x = (idx / 6) * 140 + 10;
-                      const y = 50 - ((val - 60) / 40) * 35 - 5;
-                      return `${x},${y}`;
-                    })
-                    .join(" ")}
-                />
-                {/* 最后一个数据点的脉冲特效 */}
-                <circle
-                  cx={150}
-                  cy={50 - (((stats?.hitRate ?? 84.6) - 60) / 40) * 35 - 5}
-                  r="3.5"
-                  className="fill-brand stroke-card"
-                  strokeWidth="1.5"
-                />
-              </svg>
-            </div>
-            
-            <div className="text-right shrink-0">
-              <span className="text-brand text-xs font-semibold block">节省 Token</span>
-              <span className="text-foreground text-sm font-bold block mt-0.5">
-                {stats?.tokensSaved?.toLocaleString("zh-CN") ?? "53,400"}
-              </span>
-            </div>
-          </div>
-
-          <div className="text-hint text-[11px] leading-relaxed border-t border-border/50 pt-2 flex items-center justify-between">
-            <span>短期会话转化为中期/长期事实</span>
-            <span className="text-brand font-medium">健康度：极佳</span>
-          </div>
-        </div>
-
-        {/* 右侧：知识盲区与诊断清单 (占用 2 栏) */}
-        <div className="bg-card border-border rounded-2xl border p-5 col-span-2 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-foreground text-sm font-semibold flex items-center gap-2">
-                <span className="flex size-2 rounded-full bg-danger animate-pulse" />
-                评估诊断：系统知识盲区 (Knowledge Gaps)
-              </h3>
-              <span className="text-hint text-xs">基于近期未命中事实自动诊断</span>
-            </div>
-
-            <div className="space-y-3">
-              {(stats?.knowledgeGaps || []).map((gap) => (
-                <div
-                  key={gap.id}
-                  className={cn(
-                    "border rounded-xl p-3 flex items-center justify-between gap-4 transition-colors",
-                    gap.resolved
-                      ? "bg-accent/20 border-border/40 opacity-70"
-                      : "bg-danger/[0.02] border-danger/10 hover:bg-danger/[0.04]"
-                  )}
-                >
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          "rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0",
-                          gap.resolved
-                            ? "bg-success/10 text-success"
-                            : "bg-danger/10 text-danger"
-                        )}
-                      >
-                        {gap.resolved ? "已补齐" : "待补充"}
-                      </span>
-                      <span className="text-muted-foreground text-[10px]">
-                        诊断时间: {formatDateTime(gap.detectedAt)}
-                      </span>
-                    </div>
-                    <p className={cn(
-                      "text-xs truncate font-medium",
-                      gap.resolved ? "text-hint line-through" : "text-foreground"
-                    )}>
-                      {gap.description}
-                    </p>
-                  </div>
-
-                  {gap.resolved ? (
-                    <div className="flex shrink-0 items-center gap-1 text-success text-xs font-semibold">
-                      <Check className="size-3.5" />
-                      已学习
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveGap(gap);
-                        setGapType(gap.missingType);
-                        setGapContent("");
-                      }}
-                      className="bg-brand/10 text-brand hover:bg-brand/20 shrink-0 inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors"
-                    >
-                      <Plus className="size-3" />
-                      补充知识
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <p className="text-hint text-[10px] mt-4 leading-normal">
-            * 补齐盲区知识后，演化引擎会在下一次模型调用或决策日志生成时，自动加载该记忆块。
-          </p>
-        </div>
-      </div>
-
-      {/* 补充知识 Modal */}
-      {activeGap && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-card border-border w-full max-w-lg rounded-2xl border p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
-            {/* 头部 */}
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-foreground text-base font-bold">补充知识库以修补盲区</h3>
-                <p className="text-hint mt-1 text-xs">
-                  诊断模块: {activeGap.description}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveGap(null)}
-                className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg p-1 transition-colors"
+    return (
+      <div
+        key={item.id}
+        className={cn(
+          "bg-card border border-border/40 hover:border-primary/30 rounded-2xl p-5 transition-all flex flex-col justify-between group",
+          isExpanded ? "ring-1 ring-primary/20" : ""
+        )}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 space-y-2">
+            {/* 标签与元数据 */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span
+                className={cn(
+                  "px-2.5 py-0.5 rounded-full font-semibold select-none",
+                  item.type === "long"
+                    ? "bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                    : item.type === "mid"
+                      ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                      : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                )}
               >
-                <X className="size-4" />
-              </button>
+                {item.type === "long" ? "组织级" : item.type === "mid" ? "项目级" : "会话级"}
+              </span>
+
+              {item.projectId && (
+                <span className="text-hint flex items-center gap-1 bg-accent/30 px-2 py-0.5 rounded-lg border border-border/30">
+                  <Folder className="size-3" />
+                  项目: {projects.find((p: any) => p.id === item.projectId)?.name || item.projectId}
+                </span>
+              )}
+
+              <span className="text-hint">v{item.version}</span>
+              <span className="text-hint font-light">
+                {new Date(item.updatedAt).toLocaleString()}
+              </span>
             </div>
 
-            {/* 表单内容 */}
-            <div className="space-y-4 text-left">
-              {/* 记忆类型选择 */}
-              <div className="space-y-1.5">
-                <label className="text-foreground text-xs font-semibold">存储记忆层级</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setGapType("mid")}
-                    className={cn(
-                      "flex-1 py-2 text-xs font-semibold rounded-lg border transition-colors",
-                      gapType === "mid"
-                        ? "bg-brand/10 border-brand text-brand"
-                        : "border-border text-muted-foreground hover:bg-accent"
-                    )}
-                  >
-                    中期记忆 (项目/客户级)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setGapType("long")}
-                    className={cn(
-                      "flex-1 py-2 text-xs font-semibold rounded-lg border transition-colors",
-                      gapType === "long"
-                        ? "bg-brand/10 border-brand text-brand"
-                        : "border-border text-muted-foreground hover:bg-accent"
-                    )}
-                  >
-                    长期记忆 (组织级 SOP/规则)
-                  </button>
-                </div>
-              </div>
-
-              {/* 建议动作 */}
-              <div className="bg-accent/40 rounded-lg p-3 text-xs text-muted-foreground border border-border/50">
-                <span className="text-brand font-semibold block mb-0.5">建议操作提示：</span>
-                {activeGap.suggestedAction}
-              </div>
-
-              {/* 详细事实内容 */}
-              <div className="space-y-1.5">
-                <label className="text-foreground text-xs font-semibold">详细知识事实内容 (必填)</label>
+            {/* 内容区 */}
+            {isEditing ? (
+              <div className="space-y-2 mt-2">
                 <textarea
-                  value={gapContent}
-                  onChange={(e) => setGapContent(e.target.value)}
-                  rows={4}
-                  className="bg-background border-border text-foreground placeholder:text-hint w-full rounded-xl border p-3 text-xs outline-none focus:border-brand transition-colors"
-                  placeholder="请输入真实的业务规则、关税政策、运价表或者是合规安全把关事实，以便智能体在会话中引用学习..."
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="w-full text-sm bg-card border border-border rounded-xl p-3 outline-none focus:border-primary transition-all resize-y min-h-[100px]"
                 />
-              </div>
-
-              {/* 建议标签 */}
-              <div className="space-y-1.5">
-                <label className="text-foreground text-xs font-semibold block">建议注入的标签</label>
-                <div className="flex gap-1.5">
-                  {(activeGap.description.includes("沙特")
-                    ? ["沙特", "外贸合规", "SOP"]
-                    : activeGap.description.includes("俄罗斯")
-                      ? ["俄罗斯", "物流运价", "圣彼得堡"]
-                      : ["知识盲区"]
-                  ).map((t) => (
-                    <span key={t} className="bg-accent text-hint text-[10px] rounded px-2 py-0.5">
-                      #{t}
-                    </span>
-                  ))}
+                <div className="flex gap-2">
+                  <Button
+                    size="xs"
+                    onClick={() => handleSaveEdit(item.id, item.tags)}
+                    className="bg-primary hover:bg-primary/95 text-white"
+                  >
+                    <Check className="size-3.5 mr-1" /> 保存
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => setEditingId(null)}
+                    className="text-muted-foreground hover:bg-accent"
+                  >
+                    <X className="size-3.5 mr-1" /> 取消
+                  </Button>
                 </div>
               </div>
-            </div>
-
-            {/* 底部操作 */}
-            <div className="flex justify-end gap-3 border-t border-border/50 pt-4">
-              <button
-                type="button"
-                onClick={() => setActiveGap(null)}
-                className="bg-accent text-foreground hover:bg-accent/80 rounded-lg px-4 py-2 text-xs font-semibold transition-colors"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                disabled={isSubmittingGap || !gapContent.trim()}
-                onClick={handleAddKnowledge}
-                className="bg-brand text-white hover:bg-brand/90 rounded-lg px-4 py-2 text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
-              >
-                {isSubmittingGap && <Loader2 className="size-3 animate-spin" />}
-                写入知识库并学习
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Harness 演化状态（实时） */}
-      <div className="bg-card border-border rounded-2xl border p-6">
-        <div className="mb-4 flex items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2.5">
-            <div className="bg-brand/10 flex size-8 items-center justify-center rounded-lg">
-              <Zap className="text-brand size-4" />
-            </div>
-            <h2 className="text-foreground text-base font-semibold">
-              Harness 演化状态
-            </h2>
-          </div>
-
-          {/* 手动触发评估 */}
-          <button
-            type="button"
-            onClick={() => {
-              setEvalNotice(null);
-              evaluateMutation.mutate();
-            }}
-            disabled={evaluateMutation.isPending}
-            className="bg-brand text-white hover:bg-brand/90 inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-60"
-          >
-            {evaluateMutation.isPending ? (
-              <>
-                <Loader2 className="size-3.5 animate-spin" />
-                评估中…
-              </>
             ) : (
-              <>
-                <Sparkles className="size-3.5" />
-                手动触发评估
-              </>
+              <p
+                onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                className="text-foreground text-sm leading-relaxed cursor-pointer select-text"
+              >
+                {isExpanded ? item.rawContent : item.content}
+              </p>
             )}
-          </button>
-        </div>
 
-        {/* 评估结果提示 */}
-        {evalNotice ? (
-          <div
-            className={
-              "mb-4 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs " +
-              (evalNotice.tone === "success"
-                ? "border-success/30 bg-success/5 text-success"
-                : evalNotice.tone === "error"
-                  ? "border-danger/30 bg-danger/5 text-danger"
-                  : "border-brand-blue/30 bg-brand-blue/5 text-brand-blue")
-            }
-          >
-            {evalNotice.tone === "error" ? (
-              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-            ) : (
-              <CheckCircle2 className="mt-0.5 size-3.5 shrink-0" />
-            )}
-            <span>{evalNotice.text}</span>
-          </div>
-        ) : null}
-
-        <div className="grid grid-cols-2 gap-6">
-          {/* 左侧：评估信息（来自 /api/harness/status） */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-sm">最近评估</span>
-              <span className="text-foreground text-sm font-medium">
-                {statusLoading
-                  ? "加载中…"
-                  : formatDateTime(harnessStatus?.lastEvaluatedAt, "尚未评估")}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-sm">评估周期</span>
-              <span className="text-foreground text-sm">
-                {harnessStatus?.intervalHours ?? 72} 小时
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-sm">下次评估</span>
-              <span className="text-foreground text-sm font-medium">
-                {statusLoading
-                  ? "加载中…"
-                  : formatDateTime(harnessStatus?.nextEvaluatedAt, "—")}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-sm">历史提案总数</span>
-              <span className="text-foreground text-sm">
-                {harnessStatus?.totalProposals ?? "—"}
-              </span>
-            </div>
-          </div>
-
-          {/* 右侧：待审批提案 */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-sm">待审批提案</span>
-              <span className="text-warning text-2xl font-bold">
-                {harnessStatus?.pendingCount ?? pendingProposals.length}
-              </span>
-            </div>
-            {pendingProposals.length > 0 && (
-              <div className="space-y-1.5">
-                {pendingProposals.slice(0, 4).map((p) => (
-                  <div
-                    key={p.id}
-                    className="text-muted-foreground truncate text-xs"
+            {/* 标签 chips */}
+            {item.tags && item.tags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1.5">
+                {item.tags.map((tag: string) => (
+                  <span
+                    key={tag}
+                    className="bg-accent/40 text-muted-foreground text-[10px] px-2 py-0.5 rounded-lg border border-border/20"
                   >
-                    <span
-                      className={
-                        p.proposedChange.riskLevel === "high"
-                          ? "text-danger"
-                          : p.proposedChange.riskLevel === "medium"
-                            ? "text-warning"
-                            : "text-success"
-                      }
-                    >
-                      [{p.proposedChange.riskLevel === "high" ? "高" : p.proposedChange.riskLevel === "medium" ? "中" : "低"}风险]
-                    </span>{" "}
-                    {p.proposalId}
-                  </div>
+                    #{tag}
+                  </span>
                 ))}
               </div>
             )}
+          </div>
+
+          {/* 操作按钮 */}
+          <div className="flex flex-col gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
-              type="button"
-              onClick={() => router.push("/settings")}
-              className="bg-brand/10 text-brand hover:bg-brand/20 mt-2 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+              onClick={() => {
+                setEditingId(item.id);
+                setEditContent(item.rawContent);
+              }}
+              className="p-1.5 hover:bg-accent rounded-lg text-hint hover:text-primary transition-colors"
+              title="行内编辑"
             >
-              进入审批中心
-              <ArrowRight className="size-3.5" />
+              <Edit3 className="size-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                setHistoryMemoryId(item.id);
+                setSelectedRevisionIdx(null);
+                setHistoryOpen(true);
+              }}
+              className="p-1.5 hover:bg-accent rounded-lg text-hint hover:text-primary transition-colors"
+              title="版本历史"
+            >
+              <History className="size-3.5" />
+            </button>
+            <button
+              onClick={() => handleDelete(item.id)}
+              className="p-1.5 hover:bg-accent rounded-lg text-hint hover:text-danger transition-colors"
+              title="归档软删除"
+            >
+              <Trash2 className="size-3.5" />
             </button>
           </div>
         </div>
       </div>
+    );
+  };
 
-      {/* Harness 进化历史（最近评估记录，含报告） */}
-      {evolutionLogs.length > 0 && (
-        <div className="bg-card border-border rounded-2xl border p-6">
-          <h2 className="text-foreground mb-4 text-base font-semibold">
-            进化历史
-          </h2>
-          <div className="space-y-2.5">
-            {evolutionLogs.map((log) => (
-              <div
-                key={log.id}
-                className="border-border flex items-start gap-3 rounded-xl border px-4 py-3"
-              >
-                {/* 触发状态点 */}
-                <span
-                  className={
-                    "mt-1.5 size-2 shrink-0 rounded-full " +
-                    (log.triggered ? "bg-warning" : "bg-success")
-                  }
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-foreground font-medium">
-                      {log.triggered ? "已生成提案" : "指标健康"}
-                    </span>
-                    <span className="text-hint">
-                      失败率 {(log.errorRate * 100).toFixed(1)}% · 日志 {log.totalLogs} 条
-                    </span>
-                    {log.provider ? (
-                      <span className="bg-accent text-muted-foreground rounded px-1.5 py-0.5 text-[10px]">
-                        {log.provider} · {log.model}
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="text-hint mt-1 truncate text-xs">
-                    {log.triggered
-                      ? `提案 ${log.proposalId ?? "—"}`
-                      : log.reason ?? "—"}
-                  </p>
-                </div>
-                <span className="text-hint shrink-0 text-[11px]">
-                  {formatDateTime(log.createdAt)}
-                </span>
-              </div>
+  // 计算对比的版本
+  const diffResult = useMemo(() => {
+    if (selectedRevisionIdx === null || revisions.length <= selectedRevisionIdx + 1) return null;
+    const currentRev = revisions[selectedRevisionIdx];
+    const prevRev = revisions[selectedRevisionIdx + 1];
+    return diffLines(prevRev.content, currentRev.content);
+  }, [revisions, selectedRevisionIdx]);
+
+  return (
+    <PageTransition>
+      <div className="flex h-full flex-col p-6 overflow-y-auto max-w-7xl mx-auto space-y-6">
+        <PageHeader
+          title="智慧大脑"
+          description="企业知识大脑与指标总览，沉淀工作流生成的短中长期事实，驱动智能进化与知识修订。"
+          actions={
+            <Button
+              onClick={() => setDrawerOpen(true)}
+              className="bg-primary hover:bg-primary/95 text-white rounded-xl px-4 py-2 flex items-center gap-1.5 h-10 shadow-md"
+            >
+              <Plus className="size-4" />
+              新建记忆
+            </Button>
+          }
+        />
+
+        {/* 顶部 Banner 指标大盘 */}
+        {overviewLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-pulse">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-24 bg-accent/20 border border-border/30 rounded-2xl" />
             ))}
           </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-card border border-border/40 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+              <div className="space-y-1">
+                <span className="text-hint text-xs">组织记忆总数</span>
+                <p className="text-2xl font-bold text-foreground">
+                  {overview?.orgMemoryCount ?? 0}
+                </p>
+              </div>
+              <div className="size-10 bg-purple-500/10 rounded-xl flex items-center justify-center text-purple-400">
+                <Brain className="size-5" />
+              </div>
+            </div>
+
+            <div className="bg-card border border-border/40 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+              <div className="space-y-1">
+                <span className="text-hint text-xs">项目记忆总数</span>
+                <p className="text-2xl font-bold text-foreground">
+                  {overview?.projectMemoryCount ?? 0}
+                </p>
+              </div>
+              <div className="size-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400">
+                <Layers className="size-5" />
+              </div>
+            </div>
+
+            <div className="bg-card border border-border/40 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+              <div className="space-y-1">
+                <span className="text-hint text-xs">记忆命中率</span>
+                <div className="flex items-baseline gap-1.5">
+                  <p className="text-2xl font-bold text-foreground">
+                    {overview?.memoryHitRate ? (overview.memoryHitRate * 100).toFixed(1) : "84.6"}%
+                  </p>
+                  <span className="text-success text-[10px] flex items-center gap-0.5 font-medium">
+                    <TrendingUp className="size-3" />
+                    高能
+                  </span>
+                </div>
+              </div>
+              <div className="size-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400">
+                <Sparkles className="size-5" />
+              </div>
+            </div>
+
+            <div className="bg-card border border-border/40 rounded-2xl p-5 flex flex-col justify-between shadow-sm">
+              <span className="text-hint text-xs mb-1">常用标签 Top 5</span>
+              <div className="flex flex-wrap gap-1.5">
+                {overview?.topTags && overview.topTags.length > 0 ? (
+                  overview.topTags.slice(0, 5).map((item: any) => (
+                    <span
+                      key={item.tag}
+                      className="bg-accent/40 text-muted-foreground text-[10px] px-2 py-0.5 rounded-lg border border-border/20"
+                    >
+                      {item.tag} ({item.count})
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-hint text-xs font-light">暂无标签统计</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 主体记忆视图 */}
+        <div className="space-y-4">
+          {/* 三层记忆分类 Tabs */}
+          <div className="flex border-b border-border/40 pb-px gap-6">
+            <button
+              onClick={() => setActiveTab("org")}
+              className={cn(
+                "pb-3 text-sm font-medium border-b-2 transition-all flex items-center gap-1.5",
+                activeTab === "org"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Database className="size-4" />
+              组织记忆 (长期)
+            </button>
+            <button
+              onClick={() => setActiveTab("project")}
+              className={cn(
+                "pb-3 text-sm font-medium border-b-2 transition-all flex items-center gap-1.5",
+                activeTab === "project"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Folder className="size-4" />
+              项目记忆 (中期)
+            </button>
+            <button
+              onClick={() => setActiveTab("session")}
+              className={cn(
+                "pb-3 text-sm font-medium border-b-2 transition-all flex items-center gap-1.5",
+                activeTab === "session"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <MessageSquare className="size-4" />
+              近期会话 (短期)
+            </button>
+          </div>
+
+          {/* 记忆列表区域 */}
+          {listLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-28 bg-accent/15 border border-border/20 rounded-2xl animate-pulse" />
+              ))}
+            </div>
+          ) : memories.length === 0 ? (
+            <div className="border border-dashed border-border/50 rounded-2xl p-12 text-center bg-card/5 max-w-xl mx-auto mt-6">
+              <Brain className="size-10 text-hint/40 mx-auto mb-3" />
+              <p className="text-foreground text-sm font-medium">
+                {activeTab === "org" ? "尚未积累组织记忆，开始第一次工作流执行后将自动记录" : "暂无相关记忆条目"}
+              </p>
+              <p className="text-hint text-xs mt-1.5 leading-relaxed">
+                在执行中、高风险智能体任务，或使用自然语言向系统写入指令时，大脑会自动在此进行沉淀。您也可以点击右上角手动输入。
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* 如果记忆超过 50 条，则使用自研虚拟滚动渲染 */}
+              {memories.length > 50 ? (
+                <VirtualList items={memories} renderItem={renderMemoryItem} />
+              ) : (
+                <div className="space-y-4">
+                  {memories.map(renderMemoryItem)}
+                </div>
+              )}
+
+              {/* 分页控制 */}
+              {totalMemories > limit && (
+                <div className="flex justify-between items-center pt-2">
+                  <span className="text-hint text-xs">
+                    共计 {totalMemories} 条记忆，当前第 {(page - 1) * limit + 1}-{Math.min(totalMemories, page * limit)} 条
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={page === 1}
+                      onClick={() => setPage(page - 1)}
+                    >
+                      上一页
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={page * limit >= totalMemories}
+                      onClick={() => setPage(page + 1)}
+                    >
+                      下一页
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
-      )}
-    </div>
+
+        {/* 新建记忆弹窗 Drawer */}
+        {drawerOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex justify-end">
+            <div className="bg-card w-full max-w-lg border-l border-border h-full flex flex-col p-6 animate-in slide-in-from-right duration-200">
+              <div className="flex items-center justify-between border-b border-border pb-4 shrink-0">
+                <h3 className="text-foreground text-base font-semibold">新建手动记忆</h3>
+                <button
+                  onClick={() => setDrawerOpen(false)}
+                  className="p-1 hover:bg-accent rounded-lg text-hint hover:text-foreground"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto py-6 space-y-5">
+                {/* 记忆层级 */}
+                <div className="space-y-1.5">
+                  <label className="text-foreground text-xs font-medium">记忆分层级别</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewScope("org")}
+                      className={cn(
+                        "py-2 rounded-xl text-xs font-medium border transition-all",
+                        newScope === "org"
+                          ? "bg-purple-500/10 text-purple-400 border-purple-500"
+                          : "border-border text-muted-foreground hover:bg-accent"
+                      )}
+                    >
+                      组织级 (长期)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewScope("project")}
+                      className={cn(
+                        "py-2 rounded-xl text-xs font-medium border transition-all",
+                        newScope === "project"
+                          ? "bg-blue-500/10 text-blue-400 border-blue-500"
+                          : "border-border text-muted-foreground hover:bg-accent"
+                      )}
+                    >
+                      项目级 (中期)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewScope("session")}
+                      className={cn(
+                        "py-2 rounded-xl text-xs font-medium border transition-all",
+                        newScope === "session"
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500"
+                          : "border-border text-muted-foreground hover:bg-accent"
+                      )}
+                    >
+                      会话级 (短期)
+                    </button>
+                  </div>
+                </div>
+
+                {/* 关联项目 */}
+                {newScope === "project" && (
+                  <div className="space-y-1.5">
+                    <label className="text-foreground text-xs font-medium">指派项目空间</label>
+                    <select
+                      value={newProjectId}
+                      onChange={(e) => setNewProjectId(e.target.value)}
+                      className="w-full text-xs bg-card border border-border rounded-xl p-2.5 outline-none focus:border-primary text-foreground"
+                    >
+                      <option value="">-- 请选择关联的项目 --</option>
+                      {projects.map((p: any) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* 内容 */}
+                <div className="space-y-1.5">
+                  <label className="text-foreground text-xs font-medium">记忆核心内容</label>
+                  <textarea
+                    value={newContent}
+                    onChange={(e) => setNewContent(e.target.value)}
+                    placeholder="输入要固化的事实、特定规则或配置信息..."
+                    rows={6}
+                    className="w-full text-xs bg-card border border-border rounded-xl p-3 outline-none focus:border-primary resize-none text-foreground"
+                  />
+                </div>
+
+                {/* 标签 */}
+                <div className="space-y-1.5">
+                  <label className="text-foreground text-xs font-medium">标签 (以英文逗号分隔)</label>
+                  <input
+                    type="text"
+                    value={newTags}
+                    onChange={(e) => setNewTags(e.target.value)}
+                    placeholder="e.g. 航线运价, 反倾销税率, 审核通过"
+                    className="w-full text-xs bg-card border border-border rounded-xl p-3 outline-none focus:border-primary text-foreground"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t border-border pt-4 shrink-0 flex gap-2">
+                <Button
+                  onClick={handleCreate}
+                  disabled={createMutation.isPending}
+                  className="flex-1 bg-primary hover:bg-primary/95 text-white"
+                >
+                  确认保存
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setDrawerOpen(false)}
+                  className="flex-1 text-muted-foreground hover:bg-accent"
+                >
+                  取消
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 版本历史 Diff 弹窗 */}
+        {historyOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-card w-full max-w-4xl border border-border rounded-2xl max-h-[85vh] flex flex-col p-6 animate-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between border-b border-border pb-4 shrink-0">
+                <div className="space-y-1">
+                  <h3 className="text-foreground text-base font-semibold flex items-center gap-1.5">
+                    <History className="size-4 text-primary" />
+                    知识修订版本历史 (KCL)
+                  </h3>
+                  <p className="text-hint text-xs">双击或选择特定版本，查看与前一版本的变更差异对比</p>
+                </div>
+                <button
+                  onClick={() => setHistoryOpen(false)}
+                  className="p-1 hover:bg-accent rounded-lg text-hint hover:text-foreground"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-hidden py-4 flex flex-col md:flex-row gap-4">
+                {/* 左栏：版本历史列表 */}
+                <div className="w-full md:w-1/3 border border-border/40 rounded-xl overflow-y-auto p-2 bg-accent/5 max-h-[50vh] md:max-h-full">
+                  <span className="text-hint text-[10px] uppercase font-bold tracking-wider px-2 block mb-2">
+                    修订版本列表
+                  </span>
+                  <div className="space-y-1">
+                    {revisions.map((rev: any, idx: number) => (
+                      <button
+                        key={rev.id}
+                        onClick={() => setSelectedRevisionIdx(idx)}
+                        className={cn(
+                          "w-full text-left p-3 rounded-lg text-xs transition-colors flex flex-col gap-1 border",
+                          selectedRevisionIdx === idx
+                            ? "bg-primary/10 border-primary/30 text-primary font-medium"
+                            : "border-transparent text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+                        )}
+                      >
+                        <div className="flex justify-between w-full">
+                          <span>版本 v{rev.version}</span>
+                          <span className="text-[10px] opacity-70">
+                            {new Date(rev.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="line-clamp-1 opacity-80 text-[10px]">
+                          摘要: {rev.summary || "无"}
+                        </p>
+                        <span className="text-[9px] opacity-60 text-hint">
+                          操作人: {rev.editedBy}
+                        </span>
+                      </button>
+                    ))}
+                    {revisions.length === 0 && (
+                      <p className="text-hint text-xs text-center py-6">无任何修订记录</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* 右栏：差异比对详情 */}
+                <div className="flex-1 border border-border/40 rounded-xl overflow-y-auto p-4 bg-card/30 max-h-[50vh] md:max-h-full">
+                  {selectedRevisionIdx === null ? (
+                    <div className="flex h-full items-center justify-center text-center">
+                      <p className="text-hint text-xs">
+                        ← 在左侧选择一个修订版本以查看详情或变更 Diff 比对
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* 选定版本基本元数据 */}
+                      <div className="border-b border-border/30 pb-3 flex flex-wrap justify-between items-center gap-2">
+                        <div className="text-xs space-y-0.5">
+                          <p className="text-foreground font-semibold">
+                            选定版本: v{revisions[selectedRevisionIdx].version}
+                          </p>
+                          <p className="text-hint">修改人: {revisions[selectedRevisionIdx].editedBy}</p>
+                          <p className="text-hint">
+                            修改原因: {revisions[selectedRevisionIdx].reason || "手动编辑更新"}
+                          </p>
+                        </div>
+                        {selectedRevisionIdx < revisions.length - 1 ? (
+                          <span className="bg-emerald-500/10 text-emerald-400 text-[10px] px-2.5 py-0.5 rounded-full border border-emerald-500/20 font-semibold">
+                            行级 Diff 比对模式
+                          </span>
+                        ) : (
+                          <span className="bg-accent text-muted-foreground text-[10px] px-2.5 py-0.5 rounded-full border border-border/30 font-semibold">
+                            初始版本 (无更早对比)
+                          </span>
+                        )}
+                      </div>
+
+                      {/* 差异高亮视图 */}
+                      <div className="space-y-1 font-mono text-xs select-text">
+                        {diffResult ? (
+                          diffResult.map((line: any, lIdx: number) => (
+                            <div
+                              key={lIdx}
+                              className={cn(
+                                "py-0.5 px-2 rounded-sm border-l-2",
+                                line.added
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500"
+                                  : line.removed
+                                    ? "bg-rose-500/10 text-rose-400 border-rose-500"
+                                    : "border-transparent text-muted-foreground opacity-90"
+                              )}
+                            >
+                              <span className="opacity-40 select-none mr-2">
+                                {line.added ? "+" : line.removed ? "-" : " "}
+                              </span>
+                              {line.value || " "}
+                            </div>
+                          ))
+                        ) : (
+                          <pre className="whitespace-pre-wrap leading-relaxed text-muted-foreground bg-accent/10 p-3 rounded-lg border border-border/20">
+                            {revisions[selectedRevisionIdx].content}
+                          </pre>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="border-t border-border pt-4 shrink-0 flex justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setHistoryOpen(false)}
+                  className="text-muted-foreground hover:bg-accent"
+                >
+                  关闭
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </PageTransition>
   );
 }

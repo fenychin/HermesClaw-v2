@@ -1,7 +1,7 @@
 import { ApiResponse } from '@/lib/server/api-response'
 import { withRBAC } from '@/lib/server/api-handler'
 import { cancelWorkflowRun } from '@/lib/server/workflow/runtime-engine'
-import { checkConfirmValue } from '@/lib/server/guardrail'
+import { writeAuditLog } from '@/lib/server/audit'
 
 export const POST = withRBAC(
   async (req: Request, ctx: any, routeCtx: any) => {
@@ -17,14 +17,22 @@ export const POST = withRBAC(
       // ignore
     }
 
-    // Guardrail 二次确认
-    const guard = await checkConfirmValue(body.confirm, "取消工作流运行需要二次确认")
-    if (!guard.ok) {
-      return guard.response
-    }
+    const reason = body.reason || '用户手动取消'
 
     try {
       const run = await cancelWorkflowRun(id, ctx.workspaceId, ctx.userId || 'system')
+
+      // 写入 AuditLog 记录 task.cancel
+      await writeAuditLog({
+        actor: ctx.userId || 'system',
+        action: 'task.cancel',
+        targetType: 'workflowRun',
+        targetId: run.id, // 物理主键 ID
+        detail: `取消工作流运行: ${reason}`,
+        riskLevel: 'low',
+        workspaceId: ctx.workspaceId
+      })
+
       return ApiResponse.ok(run)
     } catch (err: any) {
       return ApiResponse.error(err.message, 400)

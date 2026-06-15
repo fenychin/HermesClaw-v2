@@ -12,6 +12,7 @@ export const POST = withRBAC(async (request, ctx, routeContext: RouteContext<{ i
 
   const decision = body.decision;
   const decidedBy = body.decidedBy || ctx.userId || "system";
+  const comment = body.comment || "";
 
   if (decision !== "approved" && decision !== "rejected") {
     return Response.json(
@@ -20,7 +21,7 @@ export const POST = withRBAC(async (request, ctx, routeContext: RouteContext<{ i
     );
   }
 
-  const checkpoint = await decideApprovalCheckpoint(id, decision, decidedBy, {
+  const checkpoint = await decideApprovalCheckpoint(id, decision, decidedBy, comment, {
     writeAuditLog: async (input) => {
       const { writeAuditLog } = await import("@/lib/server/audit");
       await writeAuditLog(input);
@@ -101,4 +102,4 @@ export const POST = withRBAC(async (request, ctx, routeContext: RouteContext<{ i
     success: true,
     data: checkpoint,
   });
-}, "MEMBER");
+}, "ADMIN");

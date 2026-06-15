@@ -39,7 +39,6 @@ import {
 } from "@/components/common/agent-status-badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useUiStore } from "@/stores/ui-store";
-import { mockAgents } from "../_data/mock-agents";
 
 /** 运行时校验 Agent 关键字段 */
 function isValidAgent(data: unknown): data is Agent {
@@ -56,31 +55,6 @@ function isValidAgent(data: unknown): data is Agent {
     typeof a.stats === "object" &&
     a.stats !== null
   );
-}
-
-/** 从页面级 mock 数据构建 Agent 对象（API 失败时回退） */
-function buildMockAgent(id: string): Agent | null {
-  const m = mockAgents.find((a) => a.id === id);
-  if (!m) return null;
-  return {
-    id: m.id,
-    name: m.name,
-    role: m.role,
-    description: `内置外贸智能体 — ${m.role}`,
-    status: (m.status === "active" ? "running" : m.status) as Agent["status"],
-    source: "builtin",
-    category: ["外贸"],
-    bindSkills: [],
-    bindConnectors: [],
-    memoryPermission: "read-write",
-    harnessVersion: "2.0.0",
-    automationLevel: (m.automationLevel as Agent["automationLevel"]) ?? "L2",
-    canDo: ["处理外贸业务", "生成专业输出"],
-    cannotDo: ["直接操作资金", "修改系统配置"],
-    stats: { todayTasks: m.taskCount, successRate: 0.95, avgDuration: "1.2s" },
-    lastActive: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-  };
 }
 
 /** 运行时校验日志条目 */
@@ -150,7 +124,7 @@ function SseStatusLabel({ agentId }: { agentId: string }) {
 export default function AgentDetailPage() {
   const { id } = useParams<{ id: string }>();
 
-  // 获取智能体数据（带 mock 回退）
+  // 获取智能体数据
   const {
     data: agentData,
     isLoading: agentLoading,
@@ -158,16 +132,10 @@ export default function AgentDetailPage() {
   } = useQuery({
     queryKey: ["agent", id],
     queryFn: async () => {
-      try {
-        const data = await apiClient.getAgent(id);
-        const raw = data?.agent;
-        if (isValidAgent(raw)) return raw;
-          // API 返回但校验失败 → 回退到 mock
-          return buildMockAgent(id);
-      } catch {
-        // API 失败 → 回退到 mock 数据
-        return buildMockAgent(id);
-      }
+      const data = await apiClient.getAgent(id);
+      const raw = data?.agent;
+      if (isValidAgent(raw)) return raw;
+      throw new Error("智能体数据校验失败");
     },
     enabled: !!id,
     retry: 1,

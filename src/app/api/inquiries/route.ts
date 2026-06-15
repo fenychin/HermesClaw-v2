@@ -35,46 +35,152 @@ function extractCompanyHint(email: string): string {
   }
 }
 
-/** GET /api/inquiries —— 获取询盘列表（按接收时间倒序）
- * —— 查询参数：fromCountry（国家代码）, stage（new/replied/closed）
- * —— ALWAYS 包含 workspaceId（AGENTS.md §4.11）
- */
+/** GET /api/inquiries —— 获取询盘列表，支持分页、优先级与状态筛选，按优先级 DESC + 跟进时间 ASC 内存排序 */
 export async function GET(request: Request) {
   try {
     const ctx = await buildWorkspaceContext(request)
     const url = new URL(request.url)
+    
+    // 筛选参数
+    const priorityParam = url.searchParams.get("priority") || undefined // high | medium | low
+    const statusParam = url.searchParams.get("status") || undefined // 跟进中 | 已报价 | 已成交 | 已流失
     const fromCountry = url.searchParams.get("fromCountry") || undefined
-    const stage = url.searchParams.get("stage") || undefined
 
     // 分页参数
     const page = Math.max(Number(url.searchParams.get("page")) || 1, 1)
     const limitParam = Number(url.searchParams.get("limit") || url.searchParams.get("pageSize"))
-    const limit =
-      Number.isFinite(limitParam) && limitParam > 0
-        ? Math.min(limitParam, 500)
-        : 20
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 500) : 20
     const skip = (page - 1) * limit
 
-    // 构建 Prisma where 条件：workspaceId 强制隔离 + 可选筛选
-    const where: Record<string, unknown> = { workspaceId: ctx.workspaceId }
-    if (fromCountry) where.fromCountry = fromCountry.toUpperCase()
-    if (stage === "new") where.replied = false
-    if (stage === "replied") where.replied = true
-    // TODO: stage=closed 需 Inquiry.status 字段（当前模型仅有 replied 布尔）
-    //       Prisma schema 迁移：为 Inquiry 模型新增 status String @default("open")，枚举 open/closed
-    //       迁移后此处改为: if (stage === "closed") where.status = "closed"
+    // 1. 先把当前 workspace 的所有询盘查出来，以便进行内存关联与复杂状态计算
+    const where: any = { workspaceId: ctx.workspaceId }
+    if (fromCountry) {
+      where.fromCountry = fromCountry.toUpperCase()
+    }
+    
+    const inquiries = await prisma.inquiry.findMany({
+      where,
+      orderBy: { receivedAt: "desc" },
+    })
 
-    const [inquiries, total] = await prisma.$transaction([
-      prisma.inquiry.findMany({
-        where,
-        orderBy: { receivedAt: "desc" },
-        skip,
-        take: limit,
-      }),
-      prisma.inquiry.count({ where }),
-    ])
+    // 2. 查出这些询盘相关的所有报价单
+    const quotations = await prisma.quotation.findMany({
+      where: {
+        workspaceId: ctx.workspaceId,
+        projectId: { in: inquiries.map(i => i.id) }
+      }
+    })
+
+    // 3. 在内存中将询盘和报价关联，计算出丰富的外贸业务字段
+    const formattedList = inquiries.map(inquiry => {
+      const relatedQuotes = quotations.filter(q => q.projectId === inquiry.id)
+
+      // a. 计算最后跟进时间
+      let lastFollowUpAt = inquiry.receivedAt
+      if (relatedQuotes.length > 0) {
+        const quoteTimes = relatedQuotes.map(q => q.createdAt.getTime())
+        lastFollowUpAt = new Date(Math.max(...quoteTimes))
+      }
+
+      // b. 计算最后跟进天数
+      const diffTime = Math.max(0, Date.now() - lastFollowUpAt.getTime())
+      const daysSinceLastContact = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+
+      // c. 估算金额：取最贵的一个报价单，没有则为 0
+      let value = 0
+      let currency = "USD"
+      if (relatedQuotes.length > 0) {
+        const amounts = relatedQuotes.map(q => {
+          const num = parseFloat(q.totalAmount.replace(/[^0-9.]/g, ""))
+          return isNaN(num) ? 0 : num
+        })
+        const maxIdx = amounts.indexOf(Math.max(...amounts))
+        if (maxIdx !== -1) {
+          value = amounts[maxIdx]
+          currency = relatedQuotes[maxIdx].currency || "USD"
+        }
+      }
+
+      // d. 动态计算状态
+      let status = "跟进中"
+      const hasAccepted = relatedQuotes.some(q => q.status === "accepted")
+      const hasRejected = relatedQuotes.some(q => q.status === "rejected")
+      const hasSent = relatedQuotes.some(q => q.status === "sent")
+      
+      if (hasAccepted) {
+        status = "已成交"
+      } else if (hasRejected && !hasSent) {
+        status = "已流失"
+      } else if (relatedQuotes.length > 0 || inquiry.replied) {
+        status = "已报价"
+      }
+
+      // e. 动态打技能标签
+      const summaryLower = (inquiry.summary || '').toLowerCase()
+      const tags: string[] = []
+      if (summaryLower.includes('email') || summaryLower.includes('mail') || summaryLower.includes('letter') || summaryLower.includes('写信')) {
+        tags.push('开发信')
+      }
+      if (summaryLower.includes('price') || summaryLower.includes('quote') || summaryLower.includes('pricing') || summaryLower.includes('cost') || summaryLower.includes('询价') || summaryLower.includes('报价')) {
+        tags.push('询价')
+      }
+      if (summaryLower.includes('sample') || summaryLower.includes('test') || summaryLower.includes('trial') || summaryLower.includes('样品')) {
+        tags.push('样品需求')
+      }
+      if (summaryLower.includes('urgent') || summaryLower.includes('quick') || summaryLower.includes('fast') || summaryLower.includes('紧急') || summaryLower.includes('立刻')) {
+        tags.push('快速响应')
+      }
+      if (tags.length === 0) {
+        tags.push('新询盘')
+      }
+
+      return {
+        id: inquiry.id,
+        customerName: inquiry.companyName,
+        country: inquiry.fromCountry,
+        countryFlag: inquiry.countryFlag,
+        product: inquiry.summary,
+        value,
+        currency,
+        priority: inquiry.priority === "mid" ? "medium" : inquiry.priority, // 统一转化为 medium
+        status,
+        tags,
+        lastFollowUpAt: lastFollowUpAt.toISOString(),
+        daysSinceLastContact
+      }
+    })
+
+    // 4. 内存过滤
+    let filteredList = formattedList
+    if (priorityParam) {
+      filteredList = filteredList.filter(item => item.priority === priorityParam)
+    }
+    if (statusParam) {
+      filteredList = filteredList.filter(item => item.status === statusParam)
+    }
+
+    // 5. 内存复杂排序：按 priority DESC (high=3, medium=2, low=1) + lastFollowUpAt ASC
+    const priorityWeight: Record<string, number> = {
+      high: 3,
+      medium: 2,
+      low: 1
+    }
+
+    filteredList.sort((a, b) => {
+      const wa = priorityWeight[a.priority] || 2
+      const wb = priorityWeight[b.priority] || 2
+      if (wa !== wb) {
+        return wb - wa // 优先级高在前
+      }
+      return new Date(a.lastFollowUpAt).getTime() - new Date(b.lastFollowUpAt).getTime() // 日期久远（跟进天数长）的优先跟进在前
+    })
+
+    // 6. 内存分页
+    const total = filteredList.length
+    const paginatedList = filteredList.slice(skip, skip + limit)
+
     return successResponse({
-      inquiries: inquiries.map(serializeInquiry),
+      inquiries: paginatedList,
       total,
       page,
       limit,

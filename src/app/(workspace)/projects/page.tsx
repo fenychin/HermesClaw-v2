@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, FolderKanban } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageTransition } from "@/components/common/PageTransition";
 import { EmptyState } from "@/components/common/empty-state";
 import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
-import { MOCK_PROJECTS, MockProject, MockAgent } from "./_data/mock-projects";
 import { ProjectCard } from "./_components/project-card";
 import { NewProjectDialog } from "./_components/new-project-dialog";
 
@@ -17,91 +18,126 @@ const FILTER_CATEGORIES = [
   { key: "all", label: "全部" },
   { key: "customer", label: "客户" },
   { key: "order", label: "订单" },
-  { key: "region", label: "地区" },
-  { key: "product_line", label: "产品线" },
+  { key: "exhibition", label: "展会" },
+  { key: "product-line", label: "产品线" },
 ] as const;
 
 /**
- * 项目空间一级大盘页面
- * 布局：顶部栏（左侧标题，右侧"+ 新建空间"按钮） + 分类筛选栏 + 主内容区（3列卡片网格）
- * 支持按客户/订单/地区/产品线分类筛选，支持卡片的本地状态修改与项目空间删除/新建
+ * 项目空间一级大盘页面（对接真实 API）
  */
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<MockProject[]>(MOCK_PROJECTS);
+  const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string>("all");
 
-  // 按分类筛选项目
+  // 1. 获取真实项目列表 (包括 active 和 archived)
+  const { data: projectData, isLoading, refetch } = useQuery({
+    queryKey: ["projects-list"],
+    queryFn: async () => {
+      // 默认拉取活跃的项目
+      const res = await fetch("/api/projects?status=active&limit=100");
+      if (!res.ok) throw new Error("获取项目列表失败");
+      return res.json();
+    },
+  });
+
+  const projects = projectData?.projects || [];
+
+  // 按类型过滤项目 (前端内存中进行过滤，响应速度极快)
   const filteredProjects = useMemo(() => {
     if (activeFilter === "all") return projects;
-    return projects.filter((p) => p.type === activeFilter);
+    // 物理的 type 可能是 product-line 或 exhibition 或 customer 或 order
+    return projects.filter((p: any) => p.type === activeFilter);
   }, [projects, activeFilter]);
 
-  // 备选的 mock 智能体，用于新创建项目时随机指派
-  const candidateAgents: MockAgent[] = [
-    { id: "agent-opt-1", name: "Quincy", avatarColor: "bg-primary text-white" },
-    { id: "agent-opt-2", name: "Leon", avatarColor: "bg-brand-blue text-white" },
-    { id: "agent-opt-3", name: "Sophia", avatarColor: "bg-success text-white" },
-    { id: "agent-opt-4", name: "Marcus", avatarColor: "bg-warning text-white" },
-    { id: "agent-opt-5", name: "Victor", avatarColor: "bg-danger text-white" },
-    { id: "agent-opt-6", name: "Clara", avatarColor: "bg-brand text-white" },
-  ];
+  // 2. 新建项目空间 Mutation
+  const createMutation = useMutation({
+    mutationFn: async (body: any) => {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("创建项目空间失败");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("项目空间创建成功，已初始化专属中期记忆");
+      queryClient.invalidateQueries({ queryKey: ["projects-list"] });
+      setDialogOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "创建失败");
+    },
+  });
 
-  /**
-   * 更新项目空间属性（被 ProjectSettingsDialog 回调触发）
-   */
-  const handleUpdateProject = (id: string, updatedFields: Partial<MockProject>) => {
-    setProjects((prev) =>
-      prev.map((p) => {
-        if (p.id === id) {
-          return { ...p, ...updatedFields };
-        }
-        return p;
-      })
-    );
-  };
+  // 3. 更新项目 Mutation
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, fields }: { id: string; fields: any }) => {
+      const res = await fetch(`/api/projects/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fields),
+      });
+      if (!res.ok) throw new Error("更新项目失败");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("项目更新成功");
+      queryClient.invalidateQueries({ queryKey: ["projects-list"] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "更新失败");
+    },
+  });
 
-  /**
-   * 删除项目空间（被 ProjectSettingsDialog 回调触发）
-   */
-  const handleDeleteProject = (id: string) => {
-    setProjects((prev) => prev.filter((p) => p.id !== id));
-  };
+  // 4. 删除项目 Mutation (物理删除或软归档)
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // DELETE 会触发二次确认
+      const res = await fetch(`/api/projects/${id}?confirm=true`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("删除项目失败");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("项目已成功删除，关联记忆已自动解绑");
+      queryClient.invalidateQueries({ queryKey: ["projects-list"] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "删除失败");
+    },
+  });
 
-  /**
-   * 新建项目空间
-   */
   const handleCreateProject = (newProj: {
     name: string;
     description: string;
     industry: "foreign-trade" | "other";
   }) => {
-    // 随机选择 1 至 3 个候选智能体分配给新空间
-    const numAgents = Math.floor(Math.random() * 3) + 1; // 1-3
-    const shuffled = [...candidateAgents].sort(() => 0.5 - Math.random());
-    const assignedAgents = shuffled.slice(0, numAgents);
-
-    const newProject: MockProject = {
-      id: `proj-${Date.now()}`,
+    createMutation.mutate({
       name: newProj.name,
       description: newProj.description,
-      status: "processing",
-      agents: assignedAgents,
-      updatedAt: new Date().toISOString(),
-      industry: newProj.industry,
-      type: "customer",
-      country: undefined,
-      productLine: undefined,
-      tags: [],
-    };
+      industryId: newProj.industry,
+      type: "product-line", // 设定一个默认分类
+      activeAgents: newProj.industry === "foreign-trade" ? ["Quincy", "Leon"] : [],
+    });
+  };
 
-    setProjects((prev) => [newProject, ...prev]);
+  const handleUpdateProject = (id: string, updatedFields: any) => {
+    updateMutation.mutate({ id, fields: updatedFields });
+  };
+
+  const handleDeleteProject = (id: string) => {
+    if (confirm("确定要删除此项目空间吗？删除操作会导致与该项目下的工作流及记忆外键解绑，且将被审计。")) {
+      deleteMutation.mutate(id);
+    }
   };
 
   return (
     <PageTransition>
       <div className="flex h-full flex-col p-6 overflow-y-auto">
-        {/* 顶部栏：使用通用 PageHeader 并通过 actions 插槽传递新建按钮 */}
+        {/* 顶部栏：使用通用 PageHeader */}
         <PageHeader
           title="项目空间"
           description="企业业务的独立运作空间，绑定专属智能体与背景记忆，驱动外贸流程闭环。"
@@ -134,9 +170,15 @@ export default function ProjectsPage() {
           ))}
         </div>
 
-        {/* 主内容区：卡片网格或空状态 */}
+        {/* 主内容区 */}
         <div className="flex-1">
-          {filteredProjects.length === 0 ? (
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-40 bg-accent/20 border border-border/30 rounded-2xl animate-pulse" />
+              ))}
+            </div>
+          ) : filteredProjects.length === 0 ? (
             <div className="flex h-[350px] items-center justify-center">
               <EmptyState
                 icon={FolderKanban}
@@ -154,14 +196,42 @@ export default function ProjectsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filteredProjects.map((project) => (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  onUpdate={handleUpdateProject}
-                  onDelete={handleDeleteProject}
-                />
-              ))}
+              {filteredProjects.map((project: any) => {
+                // 做一下属性的适配，防止 ProjectCard 内部解析出错
+                const adaptedProject = {
+                  id: project.id,
+                  name: project.name,
+                  description: project.description || project.productLine || "",
+                  status: project.status === "active" ? "processing" : project.status === "completed" ? "completed" : "on-hold",
+                  agents: (() => {
+                    const activeAgents = project.activeAgents 
+                      ? (typeof project.activeAgents === "string" ? JSON.parse(project.activeAgents) : project.activeAgents)
+                      : ["Quincy", "Leon"];
+                    const colors = ["bg-primary text-white", "bg-brand-blue text-white", "bg-success text-white"];
+                    return activeAgents.map((name: string, index: number) => ({
+                      id: `agent-${index}`,
+                      name,
+                      avatarColor: colors[index % colors.length],
+                    }));
+                  })(),
+                  updatedAt: project.updatedAt || new Date().toISOString(),
+                  industry: project.tags?.includes("foreign-trade") ? "foreign-trade" : "other",
+                  type: project.type || "customer",
+                  relatedClient: project.relatedClient,
+                  country: project.country,
+                  productLine: project.productLine,
+                  tags: project.tags || [],
+                };
+
+                return (
+                  <ProjectCard
+                    key={project.id}
+                    project={adaptedProject as any}
+                    onUpdate={handleUpdateProject}
+                    onDelete={handleDeleteProject}
+                  />
+                );
+              })}
             </div>
           )}
         </div>

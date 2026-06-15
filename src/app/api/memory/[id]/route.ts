@@ -5,7 +5,7 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { actorFromSession } from "@/lib/server/audit"
+import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { checkConfirmValue, checkAutomationGate } from "@/lib/server/guardrail"
 import { MemoryService } from "@/lib/server/memory-service"
 import { MemoryUpdateSchema, validateBody } from "@/lib/server/validators"
@@ -98,7 +98,92 @@ export async function PATCH(
   }
 }
 
-/** DELETE /api/memory/[id] —— 删除记忆（需 ?confirm=true） */
+
+/** PUT /api/memory/[id] —— 更新记忆内容，自动生成 MemoryRevision */
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params
+    const ctx = await buildWorkspaceContext(request)
+    requireWritable(ctx.role)
+    const rawBody = await request.json()
+
+    const existing = await prisma.memory.findUnique({ where: { id } })
+    if (!existing) {
+      return errorResponse("记忆不存在", 404)
+    }
+
+    if (existing.workspaceId !== ctx.workspaceId) {
+      return errorResponse("无权访问此记忆", 403)
+    }
+
+    const actor = await actorFromSession()
+    
+    // 如果没有传入 summary，我们可以自动根据新 content 生成一个新的简短 summary
+    const summary = rawBody.content 
+      ? (rawBody.content.length > 50 ? rawBody.content.substring(0, 50) + "..." : rawBody.content)
+      : existing.summary
+
+    const updated = await MemoryService.updateMemory(
+      existing.workspaceId,
+      id,
+      {
+        content: rawBody.content,
+        summary: summary,
+        tags: rawBody.tags,
+        reason: rawBody.reason || "手动编辑更新",
+      },
+      actor
+    )
+
+    // 写入 memory.updated 审计日志
+    await writeAuditLog({
+      actor,
+      action: "memory.updated",
+      targetType: "memory",
+      targetId: id,
+      detail: `更新记忆内容并生成新版本 (v${updated.version}): ${updated.summary}`,
+      riskLevel: "low",
+      workspaceId: ctx.workspaceId,
+    }).catch(() => {})
+
+    const revisionCount = await prisma.memoryRevision.count({
+      where: { memoryId: id }
+    })
+
+    const parsedTags = (() => {
+      try {
+        return JSON.parse(updated.tags || "[]")
+      } catch {
+        return []
+      }
+    })()
+
+    return successResponse({
+      memory: {
+        id: updated.id,
+        workspaceId: updated.workspaceId,
+        projectId: updated.projectId,
+        type: updated.type,
+        content: updated.content,
+        summary: updated.summary,
+        source: updated.source,
+        tags: parsedTags,
+        version: updated.version,
+        revisionCount,
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      }
+    })
+  } catch (error) {
+    logger.error('PUT /api/memory/[id]: 失败', { error: error instanceof Error ? error.message : '未知错误' })
+    return errorResponse("服务器内部错误")
+  }
+}
+
+/** DELETE /api/memory/[id] —— 软删除记忆（不物理删除） */
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -113,19 +198,38 @@ export async function DELETE(
       return errorResponse("记忆不存在", 404)
     }
 
+    if (existing.workspaceId !== ctx.workspaceId) {
+      return errorResponse("无权访问此记忆", 403)
+    }
+
     // 删除持久化数据 = 高危操作，永远需要人工审批（AGENTS.md §4.5）
     // L3 门禁：需 ?confirm=true 二次确认；L4 硬拒绝
     const gate = await checkAutomationGate({
       automationLevel: "L3",
       riskLevel: "high",
       confirmed: new URL(request.url).searchParams.get("confirm") === "true",
-      actionName: `删除记忆：${existing.summary}`,
+      actionName: `归档记忆：${existing.summary}`,
     })
     if (!gate.ok) return gate.response
 
-    await MemoryService.deleteMemory(ctx.workspaceId, id, gate.actor)
+    // 软删除：修改 status 为 archived，禁止物理删除
+    await prisma.memory.update({
+      where: { id },
+      data: { status: "archived" }
+    })
 
-    return successResponse({ message: "记忆已删除" })
+    // 写入 memory.archived 审计日志
+    await writeAuditLog({
+      actor: gate.actor,
+      action: "memory.archived",
+      targetType: "memory",
+      targetId: id,
+      detail: `软删除归档记忆条目: ${existing.summary}`,
+      riskLevel: "medium",
+      workspaceId: ctx.workspaceId,
+    }).catch(() => {})
+
+    return successResponse({ message: "记忆已归档（软删除）" })
   } catch (error) {
     logger.error('DELETE /api/memory/[id]: 失败', { error: error instanceof Error ? error.message : '未知错误' })
     return errorResponse("服务器内部错误")
