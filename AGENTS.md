@@ -221,7 +221,7 @@ Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私
 - 契约层已实现：[contracts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/contracts/)
 - 合规版本：`CONTRACT_VERSION = '1.0'`
 - 已接入：`harness-eval.ts` / `connectors.ts` / `audit.ts`
-- 待接入：`workflow/` 目录中的 `WorkflowRun` 调度器
+- **已接入（v3.07）**：`workflow/runtime-engine.ts` + `orchestrator.ts` 已实现 Workflow Runtime Engine 与 Multi-Agent Orchestration，完整替代原「待接入」状态
 - **审批引擎补充约定**：
   - **时效管理**：提案审批默认 72 小时时效，高危动作默认 24 小时时效。审批超时必须提取为顶层常量（如 `PROPOSAL_APPROVAL_EXPIRY_MS`），严禁在函数内硬编码。
   - **状态与审计强关联**：审批检查点（`ApprovalCheckpoint`）生命周期的状态跃迁，必须与 AuditLog 的 `approval.*` 审计链（`requested` / `granted` / `rejected` / `expired`）强关联绑定，做到一客一审，审计与拦截可追溯。
@@ -311,6 +311,21 @@ Harness Runtime 至少由以下对象组成：
   - **幂等保护**：已处于 `completed` 状态的回滚请求，若再次重试应直接短路返回，防范并发与重复回滚风险。
   - **高危操作二次确认**：手动触发 API（`POST /api/rollbacks` 及 `POST /api/rollbacks/[id]/retry`）属于 `critical` 级高危操作，强制通过 `checkConfirmValue(confirm)` 进行二次确认（要求 `confirm === true`）。
 - **审计动作**：`harness.rollback.completed` / `harness.rollback.failed`。
+
+### 4.6.1 Multi-Agent Orchestration + Workflow Runtime 实现（2026-06-15 v3.07.00-dev）
+- **Workflow Runtime Engine**：[runtime-engine.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/workflow/runtime-engine.ts)
+- **Multi-Agent Orchestrator**：[orchestrator.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/orchestrator.ts)
+- **Contracts**：[agent-message.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/contracts/agent-message.ts) / [orchestration-session.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/contracts/orchestration-session.ts)
+- **Schema 新增模型**：`WorkflowRun`（扩展）/ `StepRun` / `OrchestrationSession` / `SubAgentTask` / `AgentMessage`
+- **执行模式**：支持串行（`sequential`）/ 并行（`parallel`）/ 条件分支（`conditional`）/ 人工介入（`human-in-loop`）四种工作流模式
+- **Orchestrator 权限门禁**：Orchestrator Agent 必须满足 `automationLevel >= L3`，否则拒绝创建编排会话
+- **Sub-Agent 限制**：单 Session 最多支持 `MAX_SUB_AGENTS = 8` 个 Sub-Agent 并发
+- **结果合并策略**：内置 `union` / `append` / `first-wins` / `majority` 四种合并模式
+- **超时管理**：WorkflowRun 整体 30 分钟、单 Step 60 秒、Session 默认 15 分钟，均提取为顶层可配置常量
+- **超时巡检**：[/api/cron/workflow-timeout](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/app/api/cron/workflow-timeout/route.ts)（每 5 分钟由 Cron 调度）
+- **API 路由**：`POST /api/workflow-runs`（启动）/ `POST /api/workflow-runs/[id]/execute`（执行）/ `POST /api/workflow-runs/[id]/cancel`（取消）/ `GET /api/workflow-runs/[id]/status`（状态查询）
+- **审计动作**：`workflow.run.started` / `workflow.run.completed` / `workflow.run.failed` / `workflow.run.cancelled` / `workflow.run.resumed` / `orchestration.session.started` / `orchestration.session.completed` / `orchestration.session.failed` / `orchestration.subagent.completed` / `orchestration.session.resumed`
+- **单元测试**：[runtime-engine.test.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/workflow/__tests__/runtime-engine.test.ts)（28 个测试用例） / [orchestrator.test.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/__tests__/orchestrator.test.ts)（14 个测试用例）
 
 ---
 

@@ -28,7 +28,7 @@ export const GET = withRBAC(
           workflowId: r.workflowId,
           status: r.status,
           trigger: r.trigger,
-          startedAt: r.startedAt.toISOString(),
+          startedAt: r.startedAt ? r.startedAt.toISOString() : null,
           finishedAt: r.finishedAt ? r.finishedAt.toISOString() : null,
           error: r.error,
         })),

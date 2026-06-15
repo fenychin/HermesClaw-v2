@@ -129,6 +129,8 @@ export async function runWorkflow(
     await tx.workflowRun.create({
       data: {
         id: runId,
+        runId,
+        workspaceId: workflow.workspaceId,
         workflowId: workflow.id,
         status: 'running',
         trigger,

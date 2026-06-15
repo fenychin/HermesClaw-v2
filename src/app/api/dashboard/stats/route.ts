@@ -251,6 +251,7 @@ export const GET = withRBAC(async (request: Request, ctx: WorkspaceContext) => {
       const dayStart = new Date(weekStart.getTime() + index * 86400000)
       const dayEnd = new Date(dayStart.getTime() + 86400000)
       const dayRuns = weekWorkflowRuns.filter((r) => {
+        if (!r.startedAt) return false
         const t = r.startedAt.getTime()
         return t >= dayStart.getTime() && t < dayEnd.getTime()
       })

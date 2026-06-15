@@ -10,7 +10,7 @@ import { prisma } from "@/lib/prisma"
 
 export interface WorkflowRunSummary {
   status: string
-  startedAt: Date
+  startedAt: Date | null
   finishedAt: Date | null
 }
 

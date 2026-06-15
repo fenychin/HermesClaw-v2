@@ -44,6 +44,7 @@ model Workspace {
   workflows           Workflow[]
   workflowRuns        WorkflowRun[]
   workflowNodeRuns    WorkflowNodeRun[]
+  stepRuns            StepRun[]
   tasks               Task[]
   reports             Report[]
   settings            WorkspaceSettings?
@@ -567,24 +568,52 @@ model Workflow {
 
 // 一次工作流运行（整体状态机：pending → running → completed | failed）
 model WorkflowRun {
-  id          String            @id
-  workspaceId String            @default("default")
-  workspace   Workspace         @relation(fields: [workspaceId], references: [id])
-  workflowId  String
-  workflow    Workflow          @relation(fields: [workflowId], references: [id])
-  status      String            @default("pending")   // pending | running | completed | failed
-  trigger     String            @default("manual")    // manual | auto | subworkflow
-  input       String            @default("{}")         // JSON: 运行入参
-  output      String?                                 // JSON: 终态输出汇总
-  error       String?                                 // 失败原因
-  parentRunId String?                                 // 子工作流回溯父运行
-  startedAt   DateTime          @default(now())
-  finishedAt  DateTime?
-  nodeRuns    WorkflowNodeRun[]
+  id              String   @id @default(cuid())
+  runId           String   @unique
+  workspaceId     String
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
+  workflowId      String   // 关联 Workflow.id
+  workflow        Workflow  @relation(fields: [workflowId], references: [id])
+  workflowVersion Int      @default(1)
 
-  @@index([workspaceId])
-  @@index([workflowId])
-  @@index([status])
+  status          String   @default("pending")
+  // 'pending' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled'
+
+  mode            String   @default("sequential")
+  // 'sequential' | 'parallel' | 'conditional' | 'human-in-loop'
+
+  triggeredBy     String   @default("system")
+  triggerType     String   @default("manual")
+  // 'manual' | 'scheduled' | 'event' | 'agent-dispatch'
+
+  inputContext    Json     @default("{}")
+  outputContext   Json?
+  errorMessage    String?
+
+  startedAt       DateTime?
+  completedAt     DateTime?
+  durationMs      Int?
+
+  agentId         String?    // 关联触发的 Agent（可选）
+  sessionId       String?    // 关联 OrchestrationSession（可选）
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  steps           StepRun[]
+
+  // --- 旧字段兼容开始 ---
+  trigger         String    @default("manual")    // manual | auto | subworkflow
+  input           String    @default("{}")         // JSON: 运行入参
+  output          String?                                 // JSON: 终态输出汇总
+  error           String?                                 // 失败原因
+  parentRunId     String?                                 // 子工作流回溯父运行
+  finishedAt      DateTime?
+  nodeRuns        WorkflowNodeRun[]
+  // --- 旧字段兼容结束 ---
+
+  @@index([workspaceId, status, createdAt])
+  @@index([workflowId, status])
 }
 
 // 单节点运行记录（与 AuditLog/AgentLog 互补，承载结构化 IO）
@@ -605,6 +634,121 @@ model WorkflowNodeRun {
   @@index([workspaceId])
   @@index([runId])
   @@index([status])
+}
+
+model StepRun {
+  id              String   @id @default(cuid())
+  stepId          String   @unique
+  runId           String
+  workspaceId     String
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
+
+  nodeId          String   // 对应 Workflow 节点的 id
+  nodeType        String
+  // 'agent-call' | 'skill-call' | 'connector-call' | 'condition'
+  // | 'human-approval' | 'merge' | 'branch' | 'delay'
+
+  status          String   @default("pending")
+  // 'pending' | 'running' | 'waiting' | 'skipped' | 'completed' | 'failed'
+
+  inputData       Json     @default("{}")
+  outputData      Json?
+  errorCode       String?
+  errorMessage    String?
+
+  agentId         String?    // 若 nodeType='agent-call'
+  capabilityId    String?    // 若 nodeType='skill-call' | 'connector-call'
+
+  startedAt       DateTime?
+  completedAt     DateTime?
+  durationMs      Int?
+  retryCount      Int      @default(0)
+
+  // 父节点与子节点关系（DAG 追踪）
+  parentStepId    String?
+  childStepIds    String   @default("[]")  // JSON 数组
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  workflowRun     WorkflowRun @relation(fields: [runId], references: [runId])
+
+  @@index([runId, status])
+  @@index([workspaceId, nodeType])
+}
+
+model OrchestrationSession {
+  id                       String   @id @default(cuid())
+  sessionId                String   @unique
+  workspaceId              String
+  workflowRunId            String
+  orchestratorAgentId      String
+  subAgentIds              String   @default("[]")  // JSON 数组
+  mode                     String   @default("sequential")
+  status                   String   @default("initializing")
+  goal                     String
+  inputContext             Json     @default("{}")
+  mergedOutput             Json?
+  startedAt                DateTime @default(now())
+  completedAt              DateTime?
+  failedAt                 DateTime?
+  failureReason            String?
+  humanInterventionReason  String?
+  createdBy                String   @default("system")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  subAgentTasks            SubAgentTask[]
+
+  @@index([workspaceId, status])
+  @@index([workflowRunId])
+}
+
+model SubAgentTask {
+  id            String   @id @default(cuid())
+  taskId        String   @unique
+  sessionId     String
+  workspaceId   String
+  agentId       String
+  instruction   String
+  inputData     Json     @default("{}")
+  status        String   @default("pending")
+  output        Json?
+  errorCode     String?
+  errorMessage  String?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  retryCount    Int      @default(0)
+  maxRetries    Int      @default(2)
+  timeoutMs     Int      @default(60000)
+  priority      String   @default("normal")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  session       OrchestrationSession @relation(fields: [sessionId], references: [sessionId])
+
+  @@index([sessionId, status])
+  @@index([agentId, status])
+}
+
+model AgentMessage {
+  id              String   @id @default(cuid())
+  messageId       String   @unique
+  sessionId       String
+  workspaceId     String
+  fromAgentId     String
+  toAgentId       String
+  fromRole        String
+  messageType     String
+  payload         Json
+  correlationId   String?
+  taskId          String?
+  stepId          String?
+  protocolVersion String   @default("1.0")
+  createdAt       DateTime @default(now())
+
+  @@index([sessionId, createdAt])
+  @@index([taskId])
 }
 
 // ============================================================

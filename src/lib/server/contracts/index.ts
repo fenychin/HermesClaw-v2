@@ -8,3 +8,5 @@ export * from './capability-registration';
 export * from './connector-lease';
 export * from './human-approval-checkpoint';
 export * from './industry-pack-manifest';
+export * from './agent-message';
+export * from './orchestration-session';
