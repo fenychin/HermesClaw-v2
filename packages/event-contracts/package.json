@@ -1,6 +1,6 @@
 {
   "name": "@hermesclaw/event-contracts",
-  "version": "0.12.18",
+  "version": "0.13.0",
   "private": true,
   "description": "HermesClaw runtime event contracts (TaskEnvelope / ExecutionEvent / ActionReceipt / ExecutionSummary / CapabilityRegistration / ConnectorLease / HumanApprovalCheckpoint / BoundaryDecision / TaskPayloads).",
   "type": "module",

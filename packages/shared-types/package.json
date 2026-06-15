@@ -1,6 +1,6 @@
 {
   "name": "@hermesclaw/shared-types",
-  "version": "0.12.18",
+  "version": "0.13.0",
   "private": true,
   "description": "Shared TypeScript types across HermesClaw domains (placeholder for v0.13+ split).",
   "type": "module",
