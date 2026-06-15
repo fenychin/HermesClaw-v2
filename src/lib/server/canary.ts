@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import crypto from "crypto"
 import { writeAuditLog } from "@/lib/server/audit"
 import type { Prisma } from "@/generated/prisma-v2/client"
+import { logger } from "@/lib/logger"
 
 // ==============================
 // 顶层常量定义
@@ -84,6 +85,7 @@ export interface AuditInput {
   detail?: string
   riskLevel?: 'low' | 'medium' | 'high'
   workspaceId: string
+  contextSnapshot?: Record<string, unknown>
 }
 
 export interface CanaryMetrics {
@@ -200,7 +202,8 @@ export async function startCanary(
     targetId: canaryId,
     detail: `Canary started for proposal ${proposalId} (agent: ${agentId}, traffic: ${trafficPercent}%, endsAt: ${endsAt.toISOString()})`,
     riskLevel: 'low',
-    workspaceId
+    workspaceId,
+    contextSnapshot: { canaryId, snapshotId: createdRecord.snapshotId, trafficPercent }
   })
 
   return {
@@ -253,7 +256,12 @@ export async function evaluateCanaryHealth(
 
   for (const canary of runningCanaries) {
     if (!activeDeps.getLatestMetrics) {
-      console.warn(`[evaluateCanaryHealth] getLatestMetrics is not configured, skipping canary evaluation: ${canary.canaryId}`)
+      logger.warn(`[evaluateCanaryHealth] getLatestMetrics is not configured, skipping canary evaluation: ${canary.canaryId}`, {
+        service: 'canary',
+        action: 'canary.health.skip',
+        traceId: canary.canaryId,
+        workspaceId: canary.workspaceId
+      })
       continue
     }
 
@@ -261,7 +269,15 @@ export async function evaluateCanaryHealth(
     try {
       metrics = await activeDeps.getLatestMetrics(canary.workspaceId, canary.agentId)
     } catch (err) {
-      console.error(`[evaluateCanaryHealth] Failed to load metrics for canary: ${canary.canaryId}`, err)
+      logger.error(`[evaluateCanaryHealth] Failed to load metrics for canary: ${canary.canaryId}`, {
+        service: 'canary',
+        action: 'canary.health.failed',
+        traceId: canary.canaryId,
+        workspaceId: canary.workspaceId,
+        errorCode: 'METRICS_LOAD_FAILED',
+        errorMessage: err instanceof Error ? err.message : String(err),
+        errorStack: err instanceof Error ? err.stack : undefined
+      })
       continue
     }
 
@@ -273,6 +289,7 @@ export async function evaluateCanaryHealth(
         canary.canaryId,
         `Early abort triggered. Current errorRate ${metrics.errorRate.toFixed(3)} exceeded threshold ${CANARY_ROLLBACK_ERROR_RATE_THRESHOLD}`,
         'auto',
+        metrics,
         activeDeps
       )
       earlyAborted++
@@ -291,6 +308,7 @@ export async function evaluateCanaryHealth(
           canary.canaryId,
           `Canary observation window ended but errorRate ${metrics.errorRate.toFixed(3)} exceeded threshold ${CANARY_ROLLBACK_ERROR_RATE_THRESHOLD}`,
           'auto',
+          metrics,
           activeDeps
         )
         rolledBack++
@@ -392,9 +410,19 @@ export async function abortCanary(
   canaryId: string,
   reason: string,
   abortedBy: string,
+  metricsOrDeps?: CanaryMetrics | CanaryDeps,
   deps?: CanaryDeps
 ): Promise<HarnessCanary> {
-  const activeDeps = { ...defaultDeps, ...deps }
+  let metrics: CanaryMetrics | undefined = undefined
+  let activeDeps = defaultDeps
+  if (metricsOrDeps) {
+    if ('getLatestMetrics' in metricsOrDeps || 'writeAuditLog' in metricsOrDeps) {
+      activeDeps = { ...defaultDeps, ...metricsOrDeps as CanaryDeps }
+    } else {
+      metrics = metricsOrDeps as CanaryMetrics
+      if (deps) activeDeps = { ...defaultDeps, ...deps }
+    }
+  }
 
   const canary = await prisma.harnessCanary.findUnique({
     where: { canaryId }
@@ -434,7 +462,8 @@ export async function abortCanary(
     targetId: canaryId,
     detail: `Canary ${canaryId} aborted by ${abortedBy}. Reason: ${reason}`,
     riskLevel: 'low',
-    workspaceId: updatedRecord.workspaceId
+    workspaceId: updatedRecord.workspaceId,
+    contextSnapshot: { canaryId, reason, metrics }
   })
 
   // 触发回滚钩子 (P1-C)

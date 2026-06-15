@@ -15,6 +15,7 @@ const TaskCreateSchema = z.object({
   source: z.string().optional(),
   relatedType: z.string().optional(),
   relatedId: z.string().optional(),
+  projectId: z.string().optional(),
   dueAt: z.string().optional(),
 })
 
@@ -31,19 +32,41 @@ export async function GET(request: Request) {
     const status = url.searchParams.get("status") || undefined
     const priority = url.searchParams.get("priority") || undefined
     const source = url.searchParams.get("source") || undefined
+    const projectId = url.searchParams.get("projectId") || undefined
+
+    // 分页参数
+    const page = Math.max(Number(url.searchParams.get("page")) || 1, 1)
+    const limitParam = Number(url.searchParams.get("limit") || url.searchParams.get("pageSize"))
+    const limit =
+      Number.isFinite(limitParam) && limitParam > 0
+        ? Math.min(limitParam, 500)
+        : 20
+    const skip = (page - 1) * limit
 
     // 构建 Prisma where 条件：workspaceId 强制隔离 + 可选筛选
     const where: Record<string, unknown> = { workspaceId: ctx.workspaceId }
     if (status) where.status = status
     if (priority) where.priority = priority
     if (source) where.source = source
+    if (projectId) where.projectId = projectId
 
-    const tasks = await prisma.task.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
+    // 事务并行查询列表与总数
+    const [tasks, total] = await prisma.$transaction([
+      prisma.task.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.task.count({ where }),
+    ])
+
+    return successResponse({
+      tasks,
+      total,
+      page,
+      limit,
     })
-
-    return successResponse({ tasks })
   } catch (error) {
     logger.error("GET /api/tasks: 失败", {
       error: error instanceof Error ? error.message : "未知错误",
@@ -62,7 +85,7 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
     const msg = parsed.error.issues[0]?.message || "请求体格式错误"
     return errorResponse(msg, 400)
   }
-  const { title, description, priority, source, relatedType, relatedId, dueAt } = parsed.data
+  const { title, description, priority, source, relatedType, relatedId, projectId, dueAt } = parsed.data
 
   const taskId = crypto.randomUUID()
   const actor = await actorFromSession()
@@ -101,6 +124,7 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
         source: source ?? null,
         relatedType: relatedType ?? null,
         relatedId: relatedId ?? null,
+        projectId: projectId ?? null,
         dueAt: dueAt ? new Date(dueAt) : null,
       },
     })

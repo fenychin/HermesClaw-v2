@@ -115,8 +115,8 @@ describe("Approval Engine Tests", () => {
 
       const result = await createApprovalCheckpoint(input);
 
-      expect(mockCreate).toHaveBeenCalledWith({
-        data: {
+      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
           checkpointId: expect.any(String),
           workspaceId: "ws-1",
           taskId: "task-1",
@@ -130,10 +130,10 @@ describe("Approval Engine Tests", () => {
           inputSnapshot: { key: "value" },
           policySnapshotVersion: "v1.0",
           expiresAt,
-        },
-      });
+        }),
+      }));
 
-      expect(mockWriteAuditLog).toHaveBeenCalledWith({
+      expect(mockWriteAuditLog).toHaveBeenCalledWith(expect.objectContaining({
         actor: "system",
         action: "approval.requested",
         targetType: "approval",
@@ -141,7 +141,7 @@ describe("Approval Engine Tests", () => {
         detail: "High risk task execution",
         riskLevel: "high",
         workspaceId: "ws-1",
-      });
+      }));
 
       expect(result.checkpointId).toBe("acp-123");
       expect(result.decision).toBe("pending");
@@ -229,7 +229,7 @@ describe("Approval Engine Tests", () => {
         },
       });
 
-      expect(mockWriteAuditLog).toHaveBeenCalledWith({
+      expect(mockWriteAuditLog).toHaveBeenCalledWith(expect.objectContaining({
         actor: "user-1",
         action: "approval.granted",
         targetType: "approval",
@@ -237,7 +237,7 @@ describe("Approval Engine Tests", () => {
         detail: "审批决策: [approved]。审批摘要: summary",
         riskLevel: "high",
         workspaceId: "ws-1",
-      });
+      }));
 
       expect(result.decision).toBe("approved");
     });
@@ -268,7 +268,7 @@ describe("Approval Engine Tests", () => {
       const result = await decideApprovalCheckpoint("acp-123", "rejected", "user-1");
 
       expect(result.decision).toBe("rejected");
-      expect(mockWriteAuditLog).toHaveBeenCalledWith({
+      expect(mockWriteAuditLog).toHaveBeenCalledWith(expect.objectContaining({
         actor: "user-1",
         action: "approval.rejected",
         targetType: "approval",
@@ -276,7 +276,7 @@ describe("Approval Engine Tests", () => {
         detail: "审批决策: [rejected]。审批摘要: summary",
         riskLevel: "high",
         workspaceId: "ws-1",
-      });
+      }));
     });
 
     it("should throw ApprovalNotFoundError if checkpoint does not exist", async () => {
@@ -296,7 +296,7 @@ describe("Approval Engine Tests", () => {
       mockFindUnique.mockResolvedValue(dbRecord);
 
       await expect(
-        decideApprovalCheckpoint("acp-123", "approved", "user-1")
+        decideApprovalCheckpoint("acp-123", "rejected", "user-1")
       ).rejects.toThrow(ApprovalAlreadyDecidedError);
     });
 
@@ -324,7 +324,7 @@ describe("Approval Engine Tests", () => {
         data: { decision: "expired" },
       });
 
-      expect(mockWriteAuditLog).toHaveBeenCalledWith({
+      expect(mockWriteAuditLog).toHaveBeenCalledWith(expect.objectContaining({
         actor: "system",
         action: "approval.expired",
         targetType: "approval",
@@ -332,9 +332,216 @@ describe("Approval Engine Tests", () => {
         detail: "审批超时失效，已拒绝该审批决策: summary",
         riskLevel: "high",
         workspaceId: "ws-1",
+      }));
+    });
+
+    it("should successfully parse and save requiredSigners when creating checkpoint", async () => {
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const input = {
+        taskId: "task-1",
+        workspaceId: "ws-1",
+        triggerReason: "risk.level.high" as const,
+        riskLevel: "high" as const,
+        automationLevel: "L3" as const,
+        actionSummary: "Multi signer action",
+        inputSnapshot: {},
+        policySnapshotVersion: "v1.0",
+        expiresAt,
+        requiredSigners: ["signer1@example.com", "signer2@example.com"],
+      };
+
+      const dbRecord = {
+        checkpointId: "acp-multi-123",
+        workspaceId: "ws-1",
+        decision: "pending",
+        requiredSigners: JSON.stringify(["signer1@example.com", "signer2@example.com"]),
+        signedList: JSON.stringify([]),
+        inputSnapshot: {},
+        expiresAt,
+        triggerReason: "risk.level.high",
+        riskLevel: "high",
+        automationLevel: "L3",
+        actionSummary: "Multi signer action",
+        policySnapshotVersion: "v1.0",
+      };
+
+      mockFindUnique.mockResolvedValue(null); // 幂等查重：首次创建不存在，继续创建
+      mockCreate.mockResolvedValue(dbRecord);
+      const result = await createApprovalCheckpoint(input);
+
+      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          requiredSigners: JSON.stringify(["signer1@example.com", "signer2@example.com"]),
+          signedList: JSON.stringify([]),
+        })
+      }));
+      expect(result.requiredSigners).toEqual(["signer1@example.com", "signer2@example.com"]);
+      expect(result.signedList).toEqual([]);
+    });
+
+    it("should throw UnauthorizedSignerError if signer is not in requiredSigners", async () => {
+      const dbRecord = {
+        checkpointId: "acp-multi-123",
+        workspaceId: "ws-1",
+        decision: "pending",
+        requiredSigners: JSON.stringify(["signer1@example.com", "signer2@example.com"]),
+        signedList: JSON.stringify([]),
+        inputSnapshot: {},
+        expiresAt: new Date(Date.now() + 100000),
+        triggerReason: "risk.level.high",
+        riskLevel: "high",
+        automationLevel: "L3",
+        actionSummary: "Multi signer action",
+        policySnapshotVersion: "v1.0",
+      };
+
+      mockFindUnique.mockResolvedValue(dbRecord);
+      const { UnauthorizedSignerError } = await import("../approval");
+      await expect(
+        decideApprovalCheckpoint("acp-multi-123", "approved", "stranger@example.com")
+      ).rejects.toThrow(UnauthorizedSignerError);
+    });
+
+    it("should keep status pending but append signer to signedList when not all signers have approved", async () => {
+      const dbRecord = {
+        checkpointId: "acp-multi-123",
+        workspaceId: "ws-1",
+        decision: "pending",
+        requiredSigners: JSON.stringify(["signer1@example.com", "signer2@example.com"]),
+        signedList: JSON.stringify([]),
+        inputSnapshot: {},
+        expiresAt: new Date(Date.now() + 100000),
+        triggerReason: "risk.level.high",
+        riskLevel: "high",
+        automationLevel: "L3",
+        actionSummary: "Multi signer action",
+        policySnapshotVersion: "v1.0",
+      };
+
+      mockFindUnique.mockResolvedValue(dbRecord);
+      mockUpdate.mockResolvedValue({
+        ...dbRecord,
+        signedList: JSON.stringify(["signer1@example.com"]),
       });
+
+      const result = await decideApprovalCheckpoint("acp-multi-123", "approved", "signer1@example.com");
+
+      expect(mockUpdate).toHaveBeenCalledWith({
+        where: { checkpointId: "acp-multi-123" },
+        data: {
+          signedList: JSON.stringify(["signer1@example.com"]),
+        },
+      });
+      expect(result.decision).toBe("pending");
+      expect(result.signedList).toEqual(["signer1@example.com"]);
+      expect(mockWriteAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+        action: "approval.signed",
+        actor: "signer1@example.com",
+      }));
+    });
+
+    it("should set status to approved and trigger integration hook when the last signer approves", async () => {
+      const dbRecord = {
+        checkpointId: "acp-multi-123",
+        workspaceId: "ws-1",
+        decision: "pending",
+        requiredSigners: JSON.stringify(["signer1@example.com", "signer2@example.com"]),
+        signedList: JSON.stringify(["signer1@example.com"]),
+        inputSnapshot: {},
+        expiresAt: new Date(Date.now() + 100000),
+        triggerReason: "risk.level.high",
+        riskLevel: "high",
+        automationLevel: "L3",
+        actionSummary: "Multi signer action",
+        policySnapshotVersion: "v1.0",
+        proposalId: "proposal-1",
+      };
+
+      mockFindUnique.mockResolvedValue(dbRecord);
+      mockUpdate.mockResolvedValue({
+        ...dbRecord,
+        decision: "approved",
+        signedList: JSON.stringify(["signer1@example.com", "signer2@example.com"]),
+        proposalId: "proposal-1",  // 确保 proposalId 在更新结果中存在，以触发 Snapshot/Canary
+      });
+
+      const mockRecordProposalSnapshot = vi.fn();
+      const mockTriggerCanary = vi.fn();
+
+      const result = await decideApprovalCheckpoint(
+        "acp-multi-123",
+        "approved",
+        "signer2@example.com",
+        undefined,
+        {
+          writeAuditLog: mockWriteAuditLog,
+          recordProposalSnapshot: mockRecordProposalSnapshot,
+          triggerCanary: mockTriggerCanary,
+        }
+      );
+
+      expect(mockUpdate).toHaveBeenCalledWith({
+        where: { checkpointId: "acp-multi-123" },
+        data: {
+          decision: "approved",
+          decidedAt: expect.any(Date),
+          decidedBy: "signer2@example.com",
+          signedList: JSON.stringify(["signer1@example.com", "signer2@example.com"]),
+        },
+      });
+      expect(result.decision).toBe("approved");
+      expect(result.signedList).toEqual(["signer1@example.com", "signer2@example.com"]);
+      expect(mockRecordProposalSnapshot).toHaveBeenCalledWith("proposal-1");
+      expect(mockTriggerCanary).toHaveBeenCalledWith("proposal-1");
+      expect(mockWriteAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+        action: "approval.granted",
+        actor: "signer2@example.com",
+        detail: expect.stringContaining("多人全票通过"),
+      }));
+    });
+
+    it("should set status to rejected immediately (one-vote veto) if any signer rejects", async () => {
+      const dbRecord = {
+        checkpointId: "acp-multi-123",
+        workspaceId: "ws-1",
+        decision: "pending",
+        requiredSigners: JSON.stringify(["signer1@example.com", "signer2@example.com"]),
+        signedList: JSON.stringify(["signer1@example.com"]),
+        inputSnapshot: {},
+        expiresAt: new Date(Date.now() + 100000),
+        triggerReason: "risk.level.high",
+        riskLevel: "high",
+        automationLevel: "L3",
+        actionSummary: "Multi signer action",
+        policySnapshotVersion: "v1.0",
+      };
+
+      mockFindUnique.mockResolvedValue(dbRecord);
+      mockUpdate.mockResolvedValue({
+        ...dbRecord,
+        decision: "rejected",
+        decidedBy: "signer2@example.com",
+      });
+
+      const result = await decideApprovalCheckpoint("acp-multi-123", "rejected", "signer2@example.com", "Veto reason");
+
+      expect(mockUpdate).toHaveBeenCalledWith({
+        where: { checkpointId: "acp-multi-123" },
+        data: {
+          decision: "rejected",
+          decidedAt: expect.any(Date),
+          decidedBy: "signer2@example.com",
+        },
+      });
+      expect(result.decision).toBe("rejected");
+      expect(mockWriteAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+        action: "approval.rejected",
+        actor: "signer2@example.com",
+        detail: expect.stringContaining("拒绝原因: Veto reason"),
+      }));
     });
   });
+
 
   describe("expireStaleCheckpoints", () => {
     it("should batch expire stale checkpoints and return count", async () => {

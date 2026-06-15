@@ -57,6 +57,8 @@ export interface WriteAuditLogInput {
   riskLevel?: AuditRiskLevel
   /** 工作空间 ID（多租户隔离） */
   workspaceId: string
+  /** 执行时的关键上下文快照 */
+  contextSnapshot?: Record<string, unknown>
 }
 
 // ==============================
@@ -136,6 +138,7 @@ export async function writeAuditLog(input: WriteAuditLogInput): Promise<void> {
         riskLevel: input.riskLevel ?? null,
         workspaceId: input.workspaceId,
         status: "success", // 旧接口无预记录概念，直接标记 success
+        contextSnapshot: input.contextSnapshot ? (input.contextSnapshot as any) : null,
       },
     })
   } catch (error) {

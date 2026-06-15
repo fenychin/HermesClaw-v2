@@ -1,4 +1,12 @@
 {
+  "functions": {
+    "src/app/api/cron/**/*": {
+      "maxDuration": 300
+    },
+    "src/app/api/**/*": {
+      "maxDuration": 60
+    }
+  },
   "crons": [
     {
       "path": "/api/harness/cron",
@@ -18,7 +26,7 @@
     },
     {
       "path": "/api/cron/workflow-timeout",
-      "schedule": "*/10 * * * *"
+      "schedule": "*/5 * * * *"
     }
   ]
 }

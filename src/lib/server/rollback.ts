@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import crypto from "crypto"
 import { writeAuditLog } from "@/lib/server/audit"
 import type { Prisma } from "@/generated/prisma-v2/client"
+import { logger } from "@/lib/logger"
 
 // ==============================
 // 顶层常量
@@ -102,6 +103,7 @@ export interface AuditInput {
   detail?: string
   riskLevel?: 'low' | 'medium' | 'high'
   workspaceId: string
+  contextSnapshot?: Record<string, unknown>
 }
 
 export interface RollbackDeps {
@@ -175,7 +177,8 @@ export async function executeRollback(
       targetId: canaryId,
       detail: `快照不存在，无法回滚。快照ID: ${snapshotId}`,
       riskLevel: 'high',
-      workspaceId
+      workspaceId,
+      contextSnapshot: { rollbackId: undefined, snapshotId, trigger: triggerType }
     })
     throw new SnapshotMissingForRollbackError(snapshotId)
   }
@@ -202,7 +205,15 @@ export async function executeRollback(
           }
         })
       } catch (err) {
-        console.error(`[executeRollback] Failed to mark timed-out rollback ${existingRollback.rollbackId} as failed:`, err)
+        logger.error(`[executeRollback] Failed to mark timed-out rollback ${existingRollback.rollbackId} as failed`, {
+          service: 'rollback',
+          action: 'rollback.timeout.update.failed',
+          traceId: existingRollback.rollbackId,
+          workspaceId,
+          errorCode: 'TIMEOUT_UPDATE_FAILED',
+          errorMessage: err instanceof Error ? err.message : String(err),
+          errorStack: err instanceof Error ? err.stack : undefined
+        })
       }
     }
   }
@@ -569,7 +580,8 @@ export async function executeRollback(
       targetId: canaryId,
       detail: `Rollback completed for canary ${canaryId} (agent: ${agentId}, trigger: ${triggerType}, restored fields: ${restoredFields.length})`,
       riskLevel: 'high',
-      workspaceId
+      workspaceId,
+      contextSnapshot: { rollbackId, snapshotId, trigger: triggerType }
     })
 
     // 10. 返回完整 HarnessRollback 对象
@@ -602,9 +614,17 @@ export async function executeRollback(
           errorMessage
         }
       })
-    } catch (dbError) {
-      console.error("[executeRollback] Failed to mark rollback as failed in DB:", dbError)
-    }
+     } catch (dbError) {
+      logger.error("[executeRollback] Failed to mark rollback as failed in DB", {
+        service: 'rollback',
+        action: 'rollback.db.failed',
+        traceId: rollbackId,
+        workspaceId,
+        errorCode: 'DB_UPDATE_FAILED',
+        errorMessage: dbError instanceof Error ? dbError.message : String(dbError),
+        errorStack: dbError instanceof Error ? dbError.stack : undefined
+      })
+     }
 
     try {
       await activeDeps.writeAuditLog({
@@ -614,11 +634,20 @@ export async function executeRollback(
         targetId: canaryId,
         detail: `Rollback failed for canary ${canaryId}. Error: ${errorMessage}`,
         riskLevel: 'high',
-        workspaceId
+        workspaceId,
+        contextSnapshot: { rollbackId, snapshotId, trigger: triggerType }
       })
-    } catch (auditError) {
-      console.error("[executeRollback] Failed to write failure audit log:", auditError)
-    }
+     } catch (auditError) {
+      logger.error("[executeRollback] Failed to write failure audit log", {
+        service: 'rollback',
+        action: 'rollback.audit.failed',
+        traceId: rollbackId,
+        workspaceId,
+        errorCode: 'AUDIT_WRITE_FAILED',
+        errorMessage: auditError instanceof Error ? auditError.message : String(auditError),
+        errorStack: auditError instanceof Error ? auditError.stack : undefined
+      })
+     }
 
     throw error
   }

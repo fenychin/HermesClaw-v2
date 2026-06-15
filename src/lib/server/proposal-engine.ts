@@ -22,37 +22,76 @@ export async function generateProposal(evaluationReport: EvaluationReport): Prom
   let problemStatement = "评估报告显示系统错误率偏高"
   let estimatedImpact = "优化工作流拓扑，预计降低失败率 30%"
   let automationLevel: "L1" | "L2" | "L3" | "L4" = "L2"
-  
-  if (errorRate > 0.3) {
-    targetComponent = "任务边界"
-    proposedChangeText = "WorkflowTemplate 调整：工作流节点路由与超时机制重构"
-    problemStatement = `评估窗口内系统失败率高达 ${(errorRate * 100).toFixed(1)}%，触发工作流自适应降级`
-    estimatedImpact = "解耦长任务节点路由，预计将运行失败率降低至 15% 以下"
-    automationLevel = "L2"
-  } else if (errorRate > 0.1) {
-    targetComponent = "工具接入"
-    proposedChangeText = "SkillBinding 调整：更换底层备用技能模型，提高识别准确率"
-    problemStatement = `系统存在一定的人工干预修正，失败率为 ${(errorRate * 100).toFixed(1)}%`
-    estimatedImpact = "提高工具参数匹配精度，预计人工修正率下降 50%"
-    automationLevel = "L3"
-  } else {
-    targetComponent = "上下文供给"
-    proposedChangeText = "MemoryPolicy 调整：压缩策略门禁优化，提前进行上下文摘要"
-    problemStatement = "检测到长周期会话中的上下文冗余，需要优化记忆存储分配"
-    estimatedImpact = "减少 Token 消耗，提高推理上下文响应速度"
-    automationLevel = "L3"
+  let proposalRiskLevel: 'low' | 'medium' | 'high' | 'critical' = 'low'
+
+  const errorRatePct = (errorRate * 100).toFixed(1)
+  const logSummary = `ErrorRate: ${errorRatePct}%\nSuccessRate: ${((evaluationReport.metrics.successRate ?? (1 - errorRate)) * 100).toFixed(1)}%\nTotal: ${evaluationReport.metrics.total}`
+
+  try {
+    const { selectModel } = await import("./model-router")
+    const { analyzeHarnessLogs } = await import("./harness-llm")
+
+    const routing = await selectModel({
+      workspaceId,
+      riskLevel: "low",
+      taskType: "workflow",
+      estimatedTokens: 1000,
+    })
+
+    const analysis = await analyzeHarnessLogs({
+      logSummary,
+      metrics: {
+        total: 10,
+        errors: Math.round(errorRate * 10),
+        success: 10 - Math.round(errorRate * 10),
+        errorRate: errorRate,
+        successRate: 1 - errorRate,
+        windowHours: 24,
+      },
+      provider: routing.provider,
+      model: routing.model,
+    })
+
+    if (analysis && analysis.draft) {
+      const draft = analysis.draft
+      targetComponent = (draft.targetComponent || "任务边界") as any
+      proposedChangeText = draft.proposedChange
+      problemStatement = draft.problemStatement
+      estimatedImpact = draft.estimatedImpact
+      proposalRiskLevel = draft.riskLevel as any
+      automationLevel = "L2" // 智能提案默认以 L2 安全等级进行灰度
+    }
+  } catch (err: any) {
+    // 柔性降级（保底）：若大模型调用异常或无密钥，安全降级至硬编码规则分流引擎
+    console.warn("[generateProposal] AI 提案生成失败，降级至硬编码规则分流:", err.message)
+    if (errorRate > 0.3) {
+      targetComponent = "任务边界"
+      proposedChangeText = "WorkflowTemplate 调整：工作流节点路由与超时机制重构"
+      problemStatement = `评估窗口内系统失败率高达 ${(errorRate * 100).toFixed(1)}%，触发工作流自适应降级`
+      estimatedImpact = "解耦长任务节点路由，预计将运行失败率降低至 15% 以下"
+      proposalRiskLevel = "high"
+      automationLevel = "L2"
+    } else if (errorRate > 0.1) {
+      targetComponent = "工具接入"
+      proposedChangeText = "SkillBinding 调整：更换底层备用技能模型，提高识别准确率"
+      problemStatement = `系统存在一定的人工干预修正，失败率为 ${(errorRate * 100).toFixed(1)}%`
+      estimatedImpact = "提高工具参数匹配精度，预计人工修正率下降 50%"
+      proposalRiskLevel = "medium"
+      automationLevel = "L3"
+    } else {
+      targetComponent = "上下文供给"
+      proposedChangeText = "MemoryPolicy 调整：压缩策略门禁优化，提前进行上下文摘要"
+      problemStatement = "检测到长周期会话中的上下文冗余，需要优化记忆存储分配"
+      estimatedImpact = "减少 Token 消耗，提高推理上下文响应速度"
+      proposalRiskLevel = "low"
+      automationLevel = "L3"
+    }
   }
 
   const proposalId = `HEP-${Date.now()}`
   const id = crypto.randomUUID()
   const evidence = evaluationReport.reportMd ? [evaluationReport.reportMd] : ["评估窗口内任务数据分析"]
   
-  // errorRate > 0.3 → riskLevel: 'high'（触发审批）
-  // errorRate > 0.1 → riskLevel: 'medium'
-  // else           → riskLevel: 'low'
-  const proposalRiskLevel: 'low' | 'medium' | 'high' | 'critical' =
-    errorRate > 0.3 ? 'high' : errorRate > 0.1 ? 'medium' : 'low'
-
   const proposedChange = {
     targetComponent,
     description: proposedChangeText,

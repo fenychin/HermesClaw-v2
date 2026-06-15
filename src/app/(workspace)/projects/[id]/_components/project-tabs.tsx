@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import {
   MessageSquare,
   ListTodo,
@@ -12,20 +14,99 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ProjectChat } from "./project-chat";
 import { ProjectContextPanel } from "./project-context-panel";
 
-/** 任务 Tab 的占位列表 */
+const PRIORITY_COLORS: Record<string, string> = {
+  LOW: "bg-success/10 text-success border-success/20",
+  MEDIUM: "bg-info/10 text-info border-info/20",
+  HIGH: "bg-warning/10 text-warning border-warning/20",
+  URGENT: "bg-danger/10 text-danger border-danger/20",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  OPEN: "未开始",
+  IN_PROGRESS: "进行中",
+  DONE: "已完成",
+  CANCELLED: "已取消",
+};
+
+/** 任务 Tab 真实接线面板 */
 function TasksTabContent() {
+  const { id: projectId } = useParams();
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["project-tasks", projectId],
+    queryFn: async () => {
+      const res = await fetch(`/api/tasks?projectId=${projectId}`);
+      if (!res.ok) throw new Error("获取项目任务失败");
+      const json = await res.json();
+      return json.data?.tasks || json.tasks || [];
+    },
+    enabled: !!projectId,
+  });
+
+  const tasks = data || [];
+
   return (
     <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-3xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-foreground text-sm font-semibold">项目任务</h3>
-          <span className="text-hint text-xs">后续版本接入真实 API</span>
+          <h3 className="text-foreground text-sm font-semibold">项目任务 ({tasks.length})</h3>
+          <span className="text-hint text-xs">从项目空间关联的任务库中实时读取</span>
         </div>
-        <div className="border border-border rounded-xl p-8 text-center">
-          <ListTodo className="size-8 text-hint mx-auto mb-2" />
-          <p className="text-muted-foreground text-sm">任务列表将通过 /api/projects/[id]/tasks 加载</p>
-          <p className="text-hint text-xs mt-1">端点已就绪，前端数据对接后续迭代补齐</p>
-        </div>
+
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 bg-accent/30 rounded-xl animate-pulse border border-border/40" />
+            ))}
+          </div>
+        ) : error ? (
+          <div className="border border-danger/20 bg-danger/5 text-danger text-xs rounded-xl p-4 text-center">
+            加载失败: {error instanceof Error ? error.message : "未知错误"}
+          </div>
+        ) : tasks.length === 0 ? (
+          <div className="border border-dashed border-border rounded-xl p-8 text-center bg-card/10">
+            <ListTodo className="size-8 text-hint mx-auto mb-2 opacity-50" />
+            <p className="text-muted-foreground text-sm">该项目空间暂无任务记录</p>
+            <p className="text-hint text-xs mt-1">关联智能体在分析询盘与跟进流程中将自动在此派发任务</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {tasks.map((task: any) => (
+              <div
+                key={task.id}
+                className="bg-card/45 border border-border rounded-xl p-4 hover:border-primary/20 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-foreground text-sm font-semibold">{task.title}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${PRIORITY_COLORS[task.priority] || "bg-accent text-muted-foreground"}`}>
+                      {task.priority || "MEDIUM"}
+                    </span>
+                  </div>
+                  {task.description && (
+                    <p className="text-muted-foreground text-xs leading-relaxed max-w-xl">
+                      {task.description}
+                    </p>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-3 shrink-0 text-xs">
+                  <span className="text-hint font-mono">
+                    {new Date(task.createdAt).toLocaleDateString()}
+                  </span>
+                  <span className={`px-2 py-1 rounded-lg font-medium ${
+                    task.status === "DONE" ? "bg-success/15 text-success" :
+                    task.status === "IN_PROGRESS" ? "bg-warning/15 text-warning" :
+                    task.status === "CANCELLED" ? "bg-muted text-muted-foreground" :
+                    "bg-accent text-foreground"
+                  }`}>
+                    {STATUS_LABELS[task.status] || task.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -137,6 +137,29 @@ export async function startWorkflowRun(
 ): Promise<any> {
   const activeWriteAuditLog = deps?.writeAuditLog || writeAuditLog
 
+  // 0. 幂等查重：检查是否已存在该 taskId 的运行记录
+  const taskId = (input as any).taskId || (input.inputContext?.taskId as string)
+  if (taskId) {
+    const existing = await prisma.workflowRun.findFirst({
+      where: {
+        workspaceId: input.workspaceId,
+        workflowId: input.workflowId,
+      }
+    })
+    if (existing) {
+      try {
+        const parsedInput = JSON.parse(existing.input)
+        if (parsedInput.taskId === taskId || existing.runId === taskId) {
+          return existing
+        }
+      } catch {}
+      const contextObj = existing.inputContext as Record<string, any>
+      if (contextObj && contextObj.taskId === taskId) {
+        return existing
+      }
+    }
+  }
+
   // 1. 加载 Workflow 定义
   const workflow = await prisma.workflow.findUnique({
     where: { id: input.workflowId }
@@ -232,7 +255,8 @@ export async function startWorkflowRun(
     targetId: input.workflowId,
     detail: `Workflow run ${runId} started`,
     riskLevel: 'low',
-    workspaceId: input.workspaceId
+    workspaceId: input.workspaceId,
+    contextSnapshot: { runId, workflowId: input.workflowId, triggeredBy: input.triggeredBy || 'system' }
   })
 
   return updatedRun
@@ -283,7 +307,8 @@ export async function executeWorkflowRun(
           targetId: run.workflowId,
           detail: `Workflow run ${runId} failed due to timeout`,
           riskLevel: 'high',
-          workspaceId
+          workspaceId,
+          contextSnapshot: { runId, errorCode: 'TIMEOUT', failedStepId: undefined }
         })
       } catch (err) {
         // 容错
@@ -376,7 +401,8 @@ export async function executeWorkflowRun(
               targetId: run.workflowId,
               detail: `Workflow run ${runId} failed at step ${step.nodeId}`,
               riskLevel: 'high',
-              workspaceId
+              workspaceId,
+              contextSnapshot: { runId, errorCode: err instanceof Error ? err.name || 'Error' : 'UNKNOWN_ERROR', failedStepId: step.nodeId }
             })
             throw err
           }
@@ -432,7 +458,8 @@ export async function executeWorkflowRun(
               targetId: run.workflowId,
               detail: `Workflow run ${runId} failed due to parallel step error: ${failMessage}`,
               riskLevel: 'high',
-              workspaceId
+              workspaceId,
+              contextSnapshot: { runId, errorCode: 'PARALLEL_ERROR', failedStepId: undefined }
             })
             throw new Error(failMessage)
           }
@@ -474,7 +501,8 @@ export async function executeWorkflowRun(
         targetId: run.workflowId,
         detail: `Workflow run ${runId} completed. Total steps: ${finalSteps.length}, Success: ${successCount}, Skipped: ${skippedCount}`,
         riskLevel: 'low',
-        workspaceId
+        workspaceId,
+        contextSnapshot: { runId, durationMs, stepCount: finalSteps.length }
       })
 
       return finalRun
@@ -513,6 +541,11 @@ export async function executeStep(
   })
   if (!step) {
     throw new StepRunNotFoundError(stepId)
+  }
+
+  // 1.5 幂等保护：若已完成直接短路返回其 outputData，避免重复执行
+  if (step.status === 'completed') {
+    return (step.outputData as Record<string, unknown>) || {}
   }
 
   // 2. 状态更新为 running

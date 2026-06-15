@@ -28,6 +28,7 @@ export interface AuditInput {
   detail?: string;
   riskLevel?: 'low' | 'medium' | 'high';
   workspaceId: string;
+  contextSnapshot?: Record<string, unknown>;
 }
 
 export interface ApprovalDeps {
@@ -70,6 +71,13 @@ export class ApprovalExpiredError extends Error {
   }
 }
 
+export class UnauthorizedSignerError extends Error {
+  constructor(checkpointId: string, signer: string) {
+    super(`Signer ${signer} is not authorized for checkpoint ${checkpointId}`);
+    this.name = 'UnauthorizedSignerError';
+  }
+}
+
 // ==============================
 // 辅助类型转换函数
 // ==============================
@@ -91,9 +99,22 @@ interface DbApprovalCheckpoint {
   actionSummary: string;
   inputSnapshot: unknown;
   policySnapshotVersion: string;
+  requiredSigners?: string | null;
+  signedList?: string | null;
 }
 
 function mapDbToCheckpoint(dbRecord: DbApprovalCheckpoint): HumanApprovalCheckpoint {
+  let requiredSigners: string[] | undefined = undefined;
+  let signedList: string[] | undefined = undefined;
+  try {
+    if (dbRecord.requiredSigners) {
+      requiredSigners = JSON.parse(dbRecord.requiredSigners);
+    }
+    if (dbRecord.signedList) {
+      signedList = JSON.parse(dbRecord.signedList);
+    }
+  } catch {}
+
   return {
     checkpointId: dbRecord.checkpointId,
     taskId: dbRecord.taskId ?? undefined,
@@ -111,6 +132,8 @@ function mapDbToCheckpoint(dbRecord: DbApprovalCheckpoint): HumanApprovalCheckpo
     actionSummary: dbRecord.actionSummary,
     inputSnapshot: dbRecord.inputSnapshot as Record<string, unknown>,
     policySnapshotVersion: dbRecord.policySnapshotVersion,
+    requiredSigners,
+    signedList,
   };
 }
 
@@ -130,7 +153,17 @@ export async function createApprovalCheckpoint(
   deps?: ApprovalDeps
 ): Promise<HumanApprovalCheckpoint> {
   const activeDeps = { ...defaultDeps, ...deps };
-  const checkpointId = `acp-${crypto.randomUUID()}`;
+  
+  // 支持在 input 中传递自定义的 checkpointId，方便幂等查重
+  const checkpointId = (input as any).checkpointId || `acp-${crypto.randomUUID()}`;
+
+  // 0. 幂等查重：若 checkpointId 已存在且匹配，则直接返回
+  const existing = await prisma.approvalCheckpoint.findUnique({
+    where: { checkpointId }
+  });
+  if (existing) {
+    return mapDbToCheckpoint(existing);
+  }
 
   // 1. 写入数据库记录
   const dbRecord = await prisma.approvalCheckpoint.create({
@@ -148,6 +181,8 @@ export async function createApprovalCheckpoint(
       inputSnapshot: input.inputSnapshot as Prisma.InputJsonValue,
       policySnapshotVersion: input.policySnapshotVersion,
       expiresAt: input.expiresAt,
+      requiredSigners: input.requiredSigners ? JSON.stringify(input.requiredSigners) : null,
+      signedList: input.requiredSigners ? JSON.stringify([]) : null,
     },
   });
 
@@ -160,6 +195,7 @@ export async function createApprovalCheckpoint(
     detail: input.actionSummary,
     riskLevel: RISK_LEVEL_MAP[input.riskLevel] || 'medium',
     workspaceId: input.workspaceId,
+    contextSnapshot: { checkpointId, riskLevel: input.riskLevel, actionType: input.actionSummary }
   });
 
   return mapDbToCheckpoint(dbRecord);
@@ -172,9 +208,20 @@ export async function decideApprovalCheckpoint(
   checkpointId: string,
   decision: 'approved' | 'rejected',
   decidedBy: string,
+  reasonOrDeps?: string | ApprovalDeps,
   deps?: ApprovalDeps
 ): Promise<HumanApprovalCheckpoint> {
-  const activeDeps = { ...defaultDeps, ...deps };
+  let reason: string | undefined = undefined;
+  let activeDeps = defaultDeps;
+  if (typeof reasonOrDeps === 'string') {
+    reason = reasonOrDeps;
+    if (deps) activeDeps = { ...defaultDeps, ...deps };
+  } else if (reasonOrDeps && typeof reasonOrDeps === 'object') {
+    activeDeps = { ...defaultDeps, ...reasonOrDeps };
+  } else if (deps) {
+    // reasonOrDeps 为 undefined，但第 5 参数 deps 仍然存在（如全票通过测试注入 hooks）
+    activeDeps = { ...defaultDeps, ...deps };
+  }
 
   // 1. 查询是否存在
   const record = await prisma.approvalCheckpoint.findUnique({
@@ -187,6 +234,10 @@ export async function decideApprovalCheckpoint(
 
   // 2. 检查是否已经是已决状态
   if (record.decision !== 'pending') {
+    if (record.decision === decision) {
+      // 决策相同，幂等成功，直接返回，不抛错
+      return mapDbToCheckpoint(record);
+    }
     throw new ApprovalAlreadyDecidedError(checkpointId, record.decision);
   }
 
@@ -212,38 +263,140 @@ export async function decideApprovalCheckpoint(
     throw new ApprovalExpiredError(checkpointId);
   }
 
-  // 4. 执行状态更新
-  const updatedRecord = await prisma.approvalCheckpoint.update({
-    where: { checkpointId },
-    data: {
-      decision,
-      decidedAt: new Date(),
-      decidedBy,
-    },
-  });
-
-  // 5. 写入审计日志
-  await activeDeps.writeAuditLog({
-    actor: decidedBy,
-    action: decision === 'approved' ? 'approval.granted' : 'approval.rejected',
-    targetType: 'approval',
-    targetId: checkpointId,
-    detail: `审批决策: [${decision}]。审批摘要: ${checkpoint.actionSummary}`,
-    riskLevel: RISK_LEVEL_MAP[checkpoint.riskLevel] || 'medium',
-    workspaceId: checkpoint.workspaceId,
-  });
-
-  // 6. 如果是 approved 并且有 proposalId，触发快照与 canary 灰度
-  if (decision === 'approved' && updatedRecord.proposalId) {
-    if (activeDeps.recordProposalSnapshot) {
-      await activeDeps.recordProposalSnapshot(updatedRecord.proposalId);
-    }
-    if (activeDeps.triggerCanary) {
-      await activeDeps.triggerCanary(updatedRecord.proposalId);
+  // 3.5 多签越权检查
+  const requiredList: string[] = checkpoint.requiredSigners || [];
+  const signed: string[] = checkpoint.signedList || [];
+  if (requiredList.length > 0) {
+    if (!requiredList.includes(decidedBy)) {
+      throw new UnauthorizedSignerError(checkpointId, decidedBy);
     }
   }
 
-  return mapDbToCheckpoint(updatedRecord);
+  // 4. 一票否决分支：拒绝 (rejected) 直接终止
+  if (decision === 'rejected') {
+    const updatedRecord = await prisma.approvalCheckpoint.update({
+      where: { checkpointId },
+      data: {
+        decision: 'rejected',
+        decidedAt: new Date(),
+        decidedBy,
+      },
+    });
+
+    await activeDeps.writeAuditLog({
+      actor: decidedBy,
+      action: 'approval.rejected',
+      targetType: 'approval',
+      targetId: checkpointId,
+      detail: `审批决策: [rejected]。${reason ? `拒绝原因: ${reason}。` : ''}审批摘要: ${checkpoint.actionSummary}`,
+      riskLevel: RISK_LEVEL_MAP[checkpoint.riskLevel] || 'medium',
+      workspaceId: checkpoint.workspaceId,
+      contextSnapshot: { checkpointId, decidedBy, reason }
+    });
+
+    return mapDbToCheckpoint(updatedRecord);
+  }
+
+  // 5. 同意分支 (approved)
+  if (requiredList.length > 0) {
+    // 多人串联审批流
+    if (signed.includes(decidedBy)) {
+      return checkpoint; // 已经签过字，直接幂等返回
+    }
+
+    const newSigned = [...signed, decidedBy];
+    const allApproved = requiredList.every((signer) => newSigned.includes(signer));
+
+    if (allApproved) {
+      // 所有人已全部同意 → 完成决策
+      const updatedRecord = await prisma.approvalCheckpoint.update({
+        where: { checkpointId },
+        data: {
+          decision: 'approved',
+          decidedAt: new Date(),
+          decidedBy,
+          signedList: JSON.stringify(newSigned),
+        },
+      });
+
+      await activeDeps.writeAuditLog({
+        actor: decidedBy,
+        action: 'approval.granted',
+        targetType: 'approval',
+        targetId: checkpointId,
+        detail: `审批决策: [approved] (多人全票通过)。审批摘要: ${checkpoint.actionSummary}`,
+        riskLevel: RISK_LEVEL_MAP[checkpoint.riskLevel] || 'medium',
+        workspaceId: checkpoint.workspaceId,
+        contextSnapshot: { checkpointId, decidedBy, requiredSigners: requiredList, signedList: newSigned }
+      });
+
+      // 触发快照与 canary 灰度
+      if (updatedRecord.proposalId) {
+        if (activeDeps.recordProposalSnapshot) {
+          await activeDeps.recordProposalSnapshot(updatedRecord.proposalId);
+        }
+        if (activeDeps.triggerCanary) {
+          await activeDeps.triggerCanary(updatedRecord.proposalId);
+        }
+      }
+
+      return mapDbToCheckpoint(updatedRecord);
+    } else {
+      // 还有人未签名 → 记录当前签名，保持 pending 状态
+      const updatedRecord = await prisma.approvalCheckpoint.update({
+        where: { checkpointId },
+        data: {
+          signedList: JSON.stringify(newSigned),
+        },
+      });
+
+      await activeDeps.writeAuditLog({
+        actor: decidedBy,
+        action: 'approval.signed',
+        targetType: 'approval',
+        targetId: checkpointId,
+        detail: `审批人 ${decidedBy} 已签字同意，当前进度: [${newSigned.length}/${requiredList.length}]，等待其他人审批。`,
+        riskLevel: RISK_LEVEL_MAP[checkpoint.riskLevel] || 'medium',
+        workspaceId: checkpoint.workspaceId,
+        contextSnapshot: { checkpointId, decidedBy, requiredSigners: requiredList, signedList: newSigned }
+      });
+
+      return mapDbToCheckpoint(updatedRecord);
+    }
+  } else {
+    // 经典单人一键审批
+    const updatedRecord = await prisma.approvalCheckpoint.update({
+      where: { checkpointId },
+      data: {
+        decision: 'approved',
+        decidedAt: new Date(),
+        decidedBy,
+      },
+    });
+
+    await activeDeps.writeAuditLog({
+      actor: decidedBy,
+      action: 'approval.granted',
+      targetType: 'approval',
+      targetId: checkpointId,
+      detail: `审批决策: [approved]。审批摘要: ${checkpoint.actionSummary}`,
+      riskLevel: RISK_LEVEL_MAP[checkpoint.riskLevel] || 'medium',
+      workspaceId: checkpoint.workspaceId,
+      contextSnapshot: { checkpointId, decidedBy }
+    });
+
+    // 触发快照与 canary 灰度
+    if (updatedRecord.proposalId) {
+      if (activeDeps.recordProposalSnapshot) {
+        await activeDeps.recordProposalSnapshot(updatedRecord.proposalId);
+      }
+      if (activeDeps.triggerCanary) {
+        await activeDeps.triggerCanary(updatedRecord.proposalId);
+      }
+    }
+
+    return mapDbToCheckpoint(updatedRecord);
+  }
 }
 
 /**

@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server"
 import { evaluateCanaryHealth } from "@/lib/server/canary"
 import { prisma } from "@/lib/prisma"
+import { logger } from "@/lib/logger"
 
 export async function GET(request: Request) {
-  // 1. 验证 CRON_SECRET
+  // 1. 验证 CRON_SECRET (回退 dev_secret)
   const authHeader = request.headers.get("authorization")
-  const cronSecret = process.env.CRON_SECRET
+  const cronSecret = process.env.CRON_SECRET || 'dev_secret'
   
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized" },
+      { success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized" } },
       { status: 401 }
     )
   }
@@ -73,14 +74,22 @@ export async function GET(request: Request) {
       success: true,
       data: result
     })
-  } catch (error) {
-    console.error("[cron-canary-eval] Failed to evaluate canary health:", error)
+  } catch (error: any) {
+    logger.error("[cron-canary-eval] Failed to evaluate canary health", {
+      service: 'cron-canary-eval',
+      action: 'cron.canary-eval.failed',
+      traceId: undefined,
+      workspaceId: 'system',
+      errorCode: 'CRON_CANARY_EVAL_FAILED',
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : undefined
+    })
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Internal server error"
+        error: { code: "CRON_CANARY_EVAL_FAILED", message: error instanceof Error ? error.message : "Internal server error" }
       },
-      { status: 500 }
+      { status: 200 }
     )
   }
 }

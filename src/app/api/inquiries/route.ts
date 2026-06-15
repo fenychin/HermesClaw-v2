@@ -46,6 +46,15 @@ export async function GET(request: Request) {
     const fromCountry = url.searchParams.get("fromCountry") || undefined
     const stage = url.searchParams.get("stage") || undefined
 
+    // 分页参数
+    const page = Math.max(Number(url.searchParams.get("page")) || 1, 1)
+    const limitParam = Number(url.searchParams.get("limit") || url.searchParams.get("pageSize"))
+    const limit =
+      Number.isFinite(limitParam) && limitParam > 0
+        ? Math.min(limitParam, 500)
+        : 20
+    const skip = (page - 1) * limit
+
     // 构建 Prisma where 条件：workspaceId 强制隔离 + 可选筛选
     const where: Record<string, unknown> = { workspaceId: ctx.workspaceId }
     if (fromCountry) where.fromCountry = fromCountry.toUpperCase()
@@ -55,11 +64,21 @@ export async function GET(request: Request) {
     //       Prisma schema 迁移：为 Inquiry 模型新增 status String @default("open")，枚举 open/closed
     //       迁移后此处改为: if (stage === "closed") where.status = "closed"
 
-    const inquiries = await prisma.inquiry.findMany({
-      where,
-      orderBy: { receivedAt: "desc" },
+    const [inquiries, total] = await prisma.$transaction([
+      prisma.inquiry.findMany({
+        where,
+        orderBy: { receivedAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.inquiry.count({ where }),
+    ])
+    return successResponse({
+      inquiries: inquiries.map(serializeInquiry),
+      total,
+      page,
+      limit,
     })
-    return successResponse({ inquiries: inquiries.map(serializeInquiry) })
   } catch (error) {
     logger.error('GET /api/inquiries: 失败', { error: error instanceof Error ? error.message : '未知错误' })
     return errorResponse("服务器内部错误")

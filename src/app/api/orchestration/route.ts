@@ -2,6 +2,7 @@ import { ApiResponse } from '@/lib/server/api-response'
 import { withRBAC } from '@/lib/server/api-handler'
 import { runOrchestration } from '@/lib/server/orchestrator'
 import { checkAutomationGate } from '@/lib/server/guardrail'
+import { logger } from '@/lib/logger'
 
 export const POST = withRBAC(
   async (req: Request, ctx: any) => {
@@ -72,7 +73,16 @@ export const POST = withRBAC(
 
       return ApiResponse.ok({ sessionId })
     } catch (err: any) {
-      return ApiResponse.error(err.message, 400)
+      logger.error('POST /api/orchestration: failed', {
+        service: 'api-orchestration',
+        action: 'orchestration.session.create.failed',
+        traceId: undefined,
+        workspaceId: ctx.workspaceId,
+        errorCode: 'ORCHESTRATION_FAILED',
+        errorMessage: err instanceof Error ? err.message : String(err),
+        errorStack: err instanceof Error ? err.stack : undefined
+      })
+      return ApiResponse.apiError(err.message, 400, 'ORCHESTRATION_FAILED')
     }
   },
   'MEMBER'

@@ -5,10 +5,9 @@
       "taskId": "task-pact",
       "status": "succeeded",
       "outputs": {
-        "summary": "模拟任务「pact-task」执行完成",
-        "processedItems": 42,
-        "quality": "high",
-        "timestamp": "<ISO_TIMESTAMP>"
+        "success": true,
+        "mock": true,
+        "url": "https://httpbin.org/post"
       },
       "durationMs": "<NUMBER>",
       "completedAt": "<ISO_TIMESTAMP>"

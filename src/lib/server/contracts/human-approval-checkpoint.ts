@@ -28,6 +28,8 @@ export interface HumanApprovalCheckpoint {
   actionSummary: string;        // 给审批人的人类可读摘要
   inputSnapshot: Record<string, unknown>;  // 审批时的完整输入快照
   policySnapshotVersion: string;
+  requiredSigners?: string[];   // 可选，指定多人审批链
+  signedList?: string[];        // 已完成签字的审批人列表
 }
 
 // 超时判断（expiresAt 已过且仍为 pending 则视为 expired）

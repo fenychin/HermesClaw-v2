@@ -319,12 +319,12 @@ model HarnessProposal {
   triggeredBy           String                     // "auto" | "manual"
   triggerReason         String
   problemStatement      String
-  evidence              Json      @default("[]")
+  evidence              Json      @default(dbgenerated("'[]'"))
   proposedChange        Json                       // { targetComponent, description, riskLevel, automationLevel }
   targetSkillId         String?                    // 关联具体 Skill（L3 审批门禁据此匹配；null 表示非 skill 类提案）
   requiresHumanApproval Boolean   @default(true)
   estimatedImpact       String
-  affectedAgents        Json      @default("[]")
+  affectedAgents        Json      @default(dbgenerated("'[]'"))
   rollbackPlan          String
   status                String    @default("pending") // ProposalStatus enum values
   reviewedBy            String?
@@ -586,7 +586,7 @@ model WorkflowRun {
   triggerType     String   @default("manual")
   // 'manual' | 'scheduled' | 'event' | 'agent-dispatch'
 
-  inputContext    Json     @default("{}")
+  inputContext    Json     @default(dbgenerated("'{}'"))
   outputContext   Json?
   errorMessage    String?
 
@@ -651,7 +651,7 @@ model StepRun {
   status          String   @default("pending")
   // 'pending' | 'running' | 'waiting' | 'skipped' | 'completed' | 'failed'
 
-  inputData       Json     @default("{}")
+  inputData       Json     @default(dbgenerated("'{}'"))
   outputData      Json?
   errorCode       String?
   errorMessage    String?
@@ -687,7 +687,7 @@ model OrchestrationSession {
   mode                     String   @default("sequential")
   status                   String   @default("initializing")
   goal                     String
-  inputContext             Json     @default("{}")
+  inputContext             Json     @default(dbgenerated("'{}'"))
   mergedOutput             Json?
   startedAt                DateTime @default(now())
   completedAt              DateTime?
@@ -711,7 +711,7 @@ model SubAgentTask {
   workspaceId   String
   agentId       String
   instruction   String
-  inputData     Json     @default("{}")
+  inputData     Json     @default(dbgenerated("'{}'"))
   status        String   @default("pending")
   output        Json?
   errorCode     String?
@@ -744,10 +744,11 @@ model AgentMessage {
   correlationId   String?
   taskId          String?
   stepId          String?
+  timestamp       DateTime @default(now())
   protocolVersion String   @default("1.0")
   createdAt       DateTime @default(now())
 
-  @@index([sessionId, createdAt])
+  @@index([sessionId, messageType])
   @@index([taskId])
 }
 
@@ -814,6 +815,8 @@ model ApprovalCheckpoint {
   decidedAt            DateTime?
   decidedBy            String?
   expiresAt            DateTime
+  requiredSigners       String?  // 可选，指定多人审批链（JSON 数组）
+  signedList            String?  // 已签字人列表（JSON 数组）
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

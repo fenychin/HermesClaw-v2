@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { writeAuditLog } from "@/lib/server/audit"
 import { randomUUID } from "crypto"
 import type { WriteAuditLogInput } from "@/lib/server/audit"
+import { logger } from "@/lib/logger"
 
 // ─── 顶层常量（不可作为运行时参数覆盖）────────────────────────────────────
 export const ORCHESTRATOR_VERSION = '1.0'
@@ -501,7 +502,15 @@ export async function runOrchestration(
         if (s.status === 'fulfilled') {
           successResults.push(s.value)
         } else {
-          console.log(`[PARALLEL FAIL] agentId: ${agentId}, error:`, s.reason)
+          logger.error(`[PARALLEL FAIL] agentId: ${agentId}`, {
+            service: "orchestrator",
+            action: "orchestration.subagent.failed",
+            traceId: sessionId,
+            workspaceId: input.workspaceId,
+            errorCode: "SUBAGENT_FAILED",
+            errorMessage: s.reason?.message || String(s.reason),
+            errorStack: s.reason?.stack,
+          })
           failureResults.push({ agentId, error: s.reason.message || 'Execution failed' })
         }
       }
