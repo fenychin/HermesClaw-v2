@@ -7,9 +7,9 @@
  *
  * 响应：{ success, data: { suggestions, snapshot, provider, model } }
  */
-import { generateHermesSuggestions } from "@/lib/server/hermes-suggestions"
+import { generateHermesSuggestions } from "@/lib/server/hermes/hermes-suggestions"
 import { logger } from '@/lib/logger';
-import { writeAgentLog } from "@/lib/server/agent-log"
+import { writeAgentLog } from "@/lib/server/shared/agent-log"
 import { successResponse, errorResponse } from "@/lib/api-utils"
 
 export const runtime = "nodejs"

@@ -1,0 +1,87 @@
+# =============================================
+# HermesClaw-v2 工具注册表（AGENTS.md §4.3）
+# =============================================
+#
+# —— 所有工具须在此注册方可在系统中调用。
+#    高危工具（riskLevel=high）须双人审批后方可签发短期 Token（≤ 1h）。
+#    工具定义与 Prisma ToolRegistry 表保持同步。
+#
+# 格式：
+#   - id: 工具唯一标识（与 ToolRegistry.name 一致）
+#     description: 工具说明
+#     category: connector | skill | data | api | system
+#     scopes: [权限范围列表]
+#     riskLevel: low | mid | high
+#     enabled: true | false
+#     automationLevel: L1 | L2 | L3 | L4（可选，默认按 riskLevel 派生）
+#
+# =============================================
+
+tools:
+  # ========== 邮件连接器 ==========
+  - id: email.read
+    description: "读取邮箱邮件（IMAP）"
+    category: connector
+    scopes: [read]
+    riskLevel: low
+    enabled: true
+    automationLevel: L1
+
+  - id: email-imap-smtp
+    description: "Email 连接器（IMAP 收信 + SMTP 发信），用于外贸询盘邮件处理"
+    category: connector
+    scopes: [read, send]
+    riskLevel: mid
+    enabled: true
+    automationLevel: L2
+
+  # ========== CRM ==========
+  - id: crm.read
+    description: "读取 CRM 客户与交易"
+    category: connector
+    scopes: [contacts, deals]
+    riskLevel: low
+    enabled: true
+    automationLevel: L1
+
+  - id: crm.write
+    description: "写入 CRM 数据"
+    category: connector
+    scopes: [write]
+    riskLevel: mid
+    enabled: true
+    automationLevel: L2
+
+  # ========== 数据服务 ==========
+  - id: customs.query
+    description: "查询海关进出口数据"
+    category: data
+    scopes: [query]
+    riskLevel: low
+    enabled: true
+    automationLevel: L1
+
+  - id: fx.rates
+    description: "获取实时汇率"
+    category: data
+    scopes: [rates]
+    riskLevel: low
+    enabled: true
+    automationLevel: L1
+
+  # ========== 高危操作 ==========
+  - id: payment.charge
+    description: "发起付款 / 收款（资金调度）"
+    category: api
+    scopes: [payments]
+    riskLevel: high
+    enabled: true
+    automationLevel: L3
+
+  - id: memory.write
+    description: "写入组织记忆"
+    category: system
+    scopes: [write]
+    riskLevel: mid
+    enabled: true
+    automationLevel: L2

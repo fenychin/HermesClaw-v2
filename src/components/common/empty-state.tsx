@@ -5,7 +5,6 @@ interface EmptyStateProps {
   icon?: LucideIcon;
   title: string;
   description?: string;
-  /** 可选操作按钮 */
   action?: {
     label: string;
     onClick: () => void;
@@ -23,27 +22,26 @@ export function EmptyState({
   action,
 }: EmptyStateProps) {
   return (
-    <div className="border-border bg-card flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-16 text-center">
-      <div className="bg-accent text-brand flex size-12 items-center justify-center rounded-xl">
-        <Icon className="size-6" />
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="bg-card rounded-2xl p-4 mb-4">
+        <Icon className="size-8 text-muted-foreground" />
       </div>
-      <div className="space-y-1">
-        <p className="text-foreground text-sm font-medium">{title}</p>
-        {description ? (
-          <p className="text-hint mx-auto max-w-sm text-xs leading-relaxed">
-            {description}
-          </p>
-        ) : null}
-      </div>
-      {action ? (
+      <div className="text-foreground font-medium text-sm">{title}</div>
+      {description && (
+        <p className="text-muted-foreground text-sm mt-1 max-w-xs">
+          {description}
+        </p>
+      )}
+      {action && (
         <button
           type="button"
           onClick={action.onClick}
-          className="bg-primary text-primary-foreground hover:bg-primary/80 mt-2 rounded-lg px-4 py-1.5 text-sm font-medium transition-colors"
+          className="bg-primary/10 text-primary rounded-xl px-4 py-2 text-sm mt-4 hover:bg-primary/20 transition-colors"
         >
           {action.label}
         </button>
-      ) : null}
+      )}
     </div>
   );
 }
+

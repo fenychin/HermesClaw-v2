@@ -1,0 +1,23 @@
+{
+  "id": "exhibition-leads",
+  "title": "展会线索整理",
+  "description": "整理展会名片与线索，自动分级跟进",
+  "steps": [
+    {
+      "id": "step-n1-sort",
+      "title": "线索分类分级",
+      "description": "输入展会收集的线索信息，AI 自动分类分级",
+      "status": "pending",
+      "inputs": [
+        { "key": "leads_text", "label": "线索内容", "type": "textarea", "required": true, "placeholder": "粘贴展会收集的名片信息 / 客户需求记录..." },
+        { "key": "exhibition_name", "label": "展会名称", "type": "text", "required": false, "placeholder": "如：广交会第137届" }
+      ]
+    },
+    {
+      "id": "step-n2-plan",
+      "title": "生成跟进计划",
+      "description": "按优先级生成分天跟进计划",
+      "status": "pending"
+    }
+  ]
+}

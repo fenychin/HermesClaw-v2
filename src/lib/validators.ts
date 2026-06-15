@@ -3,6 +3,7 @@
  * —— 使用 Zod 对所有 POST/PATCH 接口的请求体做严格校验，防止恶意输入。
  */
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 // ==============================
 // 智能体
@@ -19,6 +20,7 @@ export const AgentCreateSchema = z.object({
   bindConnectors: z.array(z.string()).optional().default([]),
   memoryPermission: z.enum(["read", "read-write", "none"]).optional().default("read"),
   harnessVersion: z.string().max(20).optional().default("v1.0.0"),
+  automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional().default("L2"),
   canDo: z.array(z.string()).optional().default([]),
   cannotDo: z.array(z.string()).optional().default([]),
   statsJson: z.record(z.string(), z.unknown()).optional().default({}),
@@ -36,12 +38,14 @@ export const AgentUpdateSchema = z.object({
   bindConnectors: z.array(z.string()).optional(),
   memoryPermission: z.enum(["read", "read-write", "none"]).optional(),
   harnessVersion: z.string().max(20).optional(),
+  automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional(),
   canDo: z.array(z.string()).optional(),
   cannotDo: z.array(z.string()).optional(),
   statsJson: z.record(z.string(), z.unknown()).optional(),
   lastActive: z.string().nullable().optional(),
-  // 二次确认字段
-  confirm: z.string().optional(),
+  // 二次确认字段（AGENTS.md §4.5 高危操作门禁）
+  confirm: z.boolean().optional(),
+  reason: z.string().max(500).optional(),
 });
 
 /** Agent 执行请求 */
@@ -98,8 +102,9 @@ export const MemoryUpdateSchema = z.object({
   content: z.string().max(10000).optional(),
   summary: z.string().max(500).optional(),
   confidence: z.number().min(0).max(1).optional(),
-  confirm: z.string().optional(),
+  confirm: z.boolean().optional(),
   reason: z.string().max(500).optional(),
+  tags: z.array(z.string()).optional(),
 });
 
 // ==============================
@@ -109,12 +114,22 @@ export const MemoryUpdateSchema = z.object({
 export const ConversationCreateSchema = z.object({
   title: z.string().max(200).optional().default("新对话"),
   projectId: z.string().uuid().nullable().optional().default(null),
-  initialMessage: z.string().max(10000).optional(),
+  initialMessage: z.string().max(100000).optional(),
+  // 批量导入：一次性带入完整消息（用于本地 pending 队列原子回放，对话+消息单事务落库）
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1).max(100000),
+      }),
+    )
+    .max(100)
+    .optional(),
 });
 
 export const ConversationMessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
-  content: z.string().min(1).max(10000),
+  content: z.string().min(1).max(100000),
 });
 
 // ==============================
@@ -147,7 +162,7 @@ export const ToolCreateSchema = z.object({
   description: z.string().max(500).optional().default(""),
   category: z.string().max(50).optional().default("system"),
   scopes: z.array(z.string()).optional().default([]),
-  riskLevel: z.enum(["low", "mid", "high"]).optional().default("low"),
+  riskLevel: z.enum(["low", "medium", "high"]).optional().default("low"),
   enabled: z.boolean().optional().default(true),
 });
 
@@ -174,7 +189,7 @@ export const HarnessProposalCreateSchema = z.object({
   evidence: z.array(z.unknown()).optional().default([]),
   targetComponent: z.string().min(1).max(100),
   proposedChange: z.string().min(1).max(2000),
-  riskLevel: z.enum(["low", "mid", "high"]).optional().default("low"),
+  riskLevel: z.enum(["low", "medium", "high"]).optional().default("low"),
   automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional(),
   status: z.enum(["pending", "approved", "rejected", "implemented"]).optional().default("pending"),
   estimatedImpact: z.string().max(500).optional().default(""),
@@ -211,11 +226,62 @@ export const ChatMessageSchema = z.object({
     .min(1)
     .max(50),
   systemPrompt: z.string().max(5000).optional(),
+  /** 客户端模型偏好（如 "claude-sonnet-4-6"），用于覆写策略路由的默认模型 */
+  modelId: z.string().max(100).optional(),
 });
 
 export const TaskExecuteSchema = z.object({
   taskType: z.string().min(1).max(50),
   input: z.string().min(1).max(5000),
+});
+
+// ==============================
+// 技能（"沉淀为技能"功能）
+// ==============================
+
+export const SkillCreateSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().min(1).max(1000),
+  version: z.string().max(20).optional(),
+  category: z.string().max(100).optional(),
+  inputSchema: z.string().max(5000).optional(),
+  outputSchema: z.string().max(5000).optional(),
+  scenarios: z.string().max(2000).optional(),
+  automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional(),
+});
+
+// ==============================
+// 外贸询盘
+// ==============================
+
+/** 询盘创建请求 Schema（对接真实业务写入链路） */
+export const InquiryCreateSchema = z.object({
+  fromEmail: z.string().email().max(200),
+  subject: z.string().min(1).max(500),
+  content: z.string().min(1).max(10000),
+  countryCode: z.string().min(2).max(3).optional().default("US"),
+});
+
+// ==============================
+// 外贸报价
+// ==============================
+
+/** 报价创建请求 Schema */
+export const QuotationCreateSchema = z.object({
+  inquiryId: z.string().min(1).max(100),
+  totalAmount: z.string().min(1).max(100),
+  currency: z.string().min(1).max(10).optional().default("USD"),
+  version: z.number().int().min(1).max(999).optional().default(1),
+});
+
+// ==============================
+// 工作流
+// ==============================
+
+/** 工作流执行请求（POST /api/workflows/[id]/run） */
+export const WorkflowRunSchema = z.object({
+  /** 工作流输入变量（可选，键为字符串，值限于基础 JSON 类型） */
+  input: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
 // ==============================
@@ -232,6 +298,12 @@ export const TaskExecuteSchema = z.object({
 export function validateBody<T>(body: unknown, schema: z.ZodSchema<T>): T | Response {
   const result = schema.safeParse(body);
   if (!result.success) {
+    logger.warn("请求体 schema 校验失败（validateBody）", {
+      issues: result.error.issues.map((i) => ({
+        path: i.path.join("."),
+        message: i.message,
+      })),
+    });
     return Response.json(
       {
         success: false,

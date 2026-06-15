@@ -1,26 +1,24 @@
-import { prisma } from "@/lib/prisma"
-import { logger } from '@/lib/logger';
-import { successResponse, errorResponse } from "@/lib/api-utils"
+/**
+ * @deprecated 自 v0.12.12 起，外贸专属 API 收敛到 /api/packs/foreign-trade/* 命名空间。
+ * 本文件保留 308 永久重定向作为兼容层；计划在 v0.13 删除。
+ */
+import { NextResponse } from "next/server"
 
-/** 序列化 Quotation，将 DateTime 转为 ISO 字符串 */
-function serializeQuotation(quotation: {
-  createdAt: Date
-} & Record<string, unknown>) {
-  return {
-    ...quotation,
-    createdAt: quotation.createdAt.toISOString(),
-  }
+const NEW_PREFIX = "/api/packs/foreign-trade/quotations"
+const OLD_PREFIX = "/api/quotations"
+
+function redirect(req: Request) {
+  const url = new URL(req.url)
+  url.pathname = url.pathname.replace(OLD_PREFIX, NEW_PREFIX)
+  return NextResponse.redirect(url, {
+    status: 308,
+    headers: {
+      Deprecation: "true",
+      Sunset: "v0.13",
+      Link: `<${url.pathname}>; rel="successor-version"`,
+    },
+  })
 }
 
-/** GET /api/quotations —— 获取报价列表（按创建时间倒序） */
-export async function GET() {
-  try {
-    const quotations = await prisma.quotation.findMany({
-      orderBy: { createdAt: "desc" },
-    })
-    return successResponse({ quotations: quotations.map(serializeQuotation) })
-  } catch (error) {
-    logger.error('GET /api/quotations: 失败', { error: error instanceof Error ? error.message : '未知错误' })
-    return errorResponse("服务器内部错误")
-  }
-}
+export const GET = redirect
+export const POST = redirect

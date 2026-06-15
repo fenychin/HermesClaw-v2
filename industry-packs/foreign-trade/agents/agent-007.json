@@ -1,0 +1,21 @@
+{
+  "id": "agent-007",
+  "name": "Sophia",
+  "role": "外贸销售助手",
+  "description": "全流程销售辅助：从线索激活、需求沟通、样品跟进到订单促成，一站式赋能外贸业务员",
+  "status": "running",
+  "source": "builtin",
+  "category": ["外贸销售", "全流程"],
+  "bindSkills": ["skill-001", "skill-002", "skill-004", "skill-008"],
+  "bindConnectors": ["conn-002", "conn-005", "conn-007", "conn-008", "conn-017", "conn-019"],
+  "memoryPermission": "read-write",
+  "harnessVersion": "2.3.1",
+  "automationLevel": "L2",
+  "canDo": ["全流程销售辅助", "协调各专项智能体", "汇总客户全渠道互动记录", "销售预测与建议"],
+  "cannotDo": ["直接签署合同", "单独决定大额折扣", "绕过合规审查流程"],
+  "stats": { "todayTasks": 31, "successRate": 0.89, "avgDuration": "5m 50s" },
+  "lastActive": "2026-06-06T10:50:00Z",
+  "createdAt": "2025-12-20T08:00:00Z",
+  "industryId": "foreign-trade",
+  "templateId": "ft-sales-assistant"
+}

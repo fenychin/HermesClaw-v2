@@ -1,0 +1,21 @@
+{
+  "name": "email",
+  "kind": "channel",
+  "industryPack": "foreign-trade",
+  "description": "外贸邮件渠道连接器：IMAP 拉取询盘 + SMTP 发送开发信/报价",
+  "capabilities": [
+    "inquiry.intake",
+    "outreach.send",
+    "quote.send",
+    "followup.send"
+  ],
+  "implementation": {
+    "type": "internal-reference",
+    "module": "src/lib/server/connectors/email",
+    "note": "v0.x 阶段实现仍在 src/lib/server/connectors/email；v0.13+ monorepo 化后会迁入本 pack。"
+  },
+  "config": {
+    "imap": { "host": "string", "port": 993, "user": "string", "pass": "secret" },
+    "smtp": { "host": "string", "port": 465, "user": "string", "pass": "secret" }
+  }
+}

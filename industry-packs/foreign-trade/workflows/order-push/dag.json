@@ -1,0 +1,36 @@
+{
+  "id": "order-push",
+  "name": "order-push",
+  "description": "订单推进：监控订单进度，自动提醒关键节点（备料/排产/验货/出运）",
+  "templateId": "ft-order-push",
+  "requiredSkills": [],
+  "automationLevel": "L2",
+  "riskLevel": "medium",
+  "nodes": [
+    {
+      "id": "n1-status",
+      "kind": "task",
+      "name": "订单状态快照",
+      "handler": "log-order-status",
+      "config": { "automationLevel": "L2" }
+    },
+    {
+      "id": "n2-check",
+      "kind": "task",
+      "name": "关键节点检查",
+      "handler": "log-node-check",
+      "config": { "automationLevel": "L1" }
+    },
+    {
+      "id": "n3-remind",
+      "kind": "task",
+      "name": "生成提醒任务",
+      "handler": "log-reminder-task",
+      "config": { "automationLevel": "L1" }
+    }
+  ],
+  "edges": [
+    { "from": "n1-status", "to": "n2-check" },
+    { "from": "n2-check", "to": "n3-remind" }
+  ]
+}

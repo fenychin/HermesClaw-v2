@@ -59,7 +59,7 @@ describe('automationLevelFromRisk', () => {
   })
 
   it('mid → L2', () => {
-    expect(automationLevelFromRisk('mid')).toBe('L2')
+    expect(automationLevelFromRisk('medium')).toBe('L2')
   })
 
   it('low → L1', () => {
