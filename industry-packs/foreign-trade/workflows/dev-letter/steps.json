@@ -1,0 +1,58 @@
+{
+  "id": "dev-letter",
+  "title": "开发信生成",
+  "description": "基于客户信息与产品特点，生成个性化外贸开发信",
+  "steps": [
+    {
+      "id": "customer-info",
+      "title": "填写客户信息",
+      "description": "输入客户基本信息",
+      "status": "pending",
+      "inputs": [
+        { "key": "company_name", "label": "客户公司名", "type": "text", "required": true, "placeholder": "ABC Trading Co." },
+        { "key": "country", "label": "所在国家", "type": "text", "required": true, "placeholder": "美国、德国..." },
+        { "key": "business_type", "label": "业务类型", "type": "select", "required": true, "options": [
+          { "label": "进口商/贸易商", "value": "importer" },
+          { "label": "品牌商/制造商", "value": "brand" },
+          { "label": "零售商", "value": "retailer" },
+          { "label": "工程商", "value": "engineer" }
+        ]},
+        { "key": "pain_points", "label": "客户痛点/需求（选填）", "type": "textarea", "required": false, "placeholder": "已了解到的客户需求或痛点..." }
+      ]
+    },
+    {
+      "id": "product-select",
+      "title": "选择推介产品",
+      "description": "选择拟推介产品",
+      "status": "pending",
+      "inputs": [
+        { "key": "product_name", "label": "产品名称", "type": "text", "required": true },
+        { "key": "key_advantages", "label": "核心优势（每行一条）", "type": "textarea", "required": true, "placeholder": "如：\n通过CE/UL认证\n最小起订量500pcs\n14天快速打样" },
+        { "key": "tone", "label": "邮件语气", "type": "select", "required": true, "options": [
+          { "label": "专业正式", "value": "formal" },
+          { "label": "友好亲切", "value": "friendly" },
+          { "label": "简洁直接", "value": "concise" }
+        ]}
+      ]
+    },
+    {
+      "id": "generate-letter",
+      "title": "AI 生成开发信",
+      "description": "系统自动生成初稿",
+      "status": "pending",
+      "outputs": [
+        { "key": "subject", "label": "邮件主题", "type": "text" },
+        { "key": "body", "label": "邮件正文", "type": "markdown" }
+      ]
+    },
+    {
+      "id": "review-edit",
+      "title": "审阅与编辑",
+      "description": "人工审阅开发信正文",
+      "status": "pending",
+      "inputs": [
+        { "key": "edited_body", "label": "编辑邮件正文", "type": "textarea", "required": true }
+      ]
+    }
+  ]
+}

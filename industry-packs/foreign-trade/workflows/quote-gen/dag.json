@@ -1,0 +1,26 @@
+{
+  "id": "quote-gen",
+  "name": "quote-gen",
+  "description": "报价生成：核算产品成本 + 生成专业报价单，输出多贸易术语明细",
+  "templateId": "ft-quote-gen",
+  "requiredSkills": ["ft-cost-accounting", "ft-quotation-pdf"],
+  "automationLevel": "L2",
+  "riskLevel": "medium",
+  "nodes": [
+    {
+      "id": "n1-cost",
+      "kind": "skill",
+      "name": "成本核算",
+      "config": { "skillId": "skill-ft-cost-accounting", "automationLevel": "L2" }
+    },
+    {
+      "id": "n2-pdf",
+      "kind": "skill",
+      "name": "生成报价单",
+      "config": { "skillId": "skill-ft-quotation-pdf", "automationLevel": "L2" }
+    }
+  ],
+  "edges": [
+    { "from": "n1-cost", "to": "n2-pdf" }
+  ]
+}

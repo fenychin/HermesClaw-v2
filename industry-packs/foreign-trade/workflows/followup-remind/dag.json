@@ -1,0 +1,18 @@
+{
+  "id": "followup-remind",
+  "name": "followup-remind",
+  "description": "客户跟进提醒：根据客户阶段与上次沟通时间，自动生成跟进提醒与建议话术",
+  "templateId": "ft-followup-remind",
+  "requiredSkills": ["ft-follow-up-crm"],
+  "automationLevel": "L2",
+  "riskLevel": "low",
+  "nodes": [
+    {
+      "id": "n1-analyze",
+      "kind": "skill",
+      "name": "客户跟进分析",
+      "config": { "skillId": "skill-ft-follow-up-crm", "automationLevel": "L2" }
+    }
+  ],
+  "edges": []
+}

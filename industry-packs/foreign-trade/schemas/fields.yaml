@@ -1,0 +1,18 @@
+fields:
+  - name: hsCode
+    label: HS编码
+    description: 国际贸易中用于申报货物的海关编码
+    type: string
+    required: true
+  - name: tradeTerms
+    label: 报价条款
+    description: 如 FOB, CIF 等国际贸易术语
+    type: select
+    options:
+      - FOB
+      - CIF
+      - EXW
+  - name: customerProfile
+    label: 客户画像
+    description: 包含客户公司背景、采购偏好、资信记录的多维档案
+    type: object

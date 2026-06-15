@@ -1,0 +1,40 @@
+id: inquiry-followup
+name: 询盘跟进工作流
+description: 自动化分析入站询盘、评估风险并智能起草回复或转交人工的黄金流程。
+templateId: ft-inquiry-followup
+automationLevel: L3
+riskLevel: medium
+requiredSkills:
+  - ft-inquiry-analysis
+  - ft-write-development-letter
+nodes:
+  - id: analyze-inquiry
+    kind: skill
+    name: 询盘意图分析
+    config:
+      skillId: skill-ft-inquiry-analysis
+      automationLevel: L3
+  - id: check-risk
+    kind: condition
+    name: 贸易风险评估
+    config:
+      trueBranch: auto-reply
+      falseBranch: manual-review
+  - id: auto-reply
+    kind: skill
+    name: AI 自动起草回复
+    config:
+      skillId: skill-ft-write-development-letter
+      automationLevel: L3
+  - id: manual-review
+    kind: noop
+    name: 人工合规审查
+edges:
+  - from: analyze-inquiry
+    to: check-risk
+  - from: check-risk
+    to: auto-reply
+    when: no-risk
+  - from: check-risk
+    to: manual-review
+    when: has-risk

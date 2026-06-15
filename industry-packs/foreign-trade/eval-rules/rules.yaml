@@ -1,0 +1,8 @@
+id: ft-inquiry-followup-rate
+name: 询盘跟进率监测规则
+metric: inquiry_followup_rate
+condition: lt
+threshold: 60
+action: trigger_proposal
+proposalTemplateId: ft-inquiry-optimization-proposal
+description: 当询盘跟进率低于60%时，系统将自动触发优化提案，调整工作流和人员分配。
