@@ -1,3 +1,8 @@
+packages:
+  - 'packages/*'
+  - 'apps/*'
+  - 'industry-packs/*'
+
 onlyBuiltDependencies: better-sqlite3
 nodeLinker: hoisted
 allowBuilds:

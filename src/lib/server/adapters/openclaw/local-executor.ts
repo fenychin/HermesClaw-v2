@@ -179,7 +179,10 @@ export async function executeLocalTask(
   return {
     taskId,
     status: 'succeeded',
-    outputs: typeof llmOutput === 'object' && llmOutput !== null ? llmOutput : { raw: llmOutput },
+    outputs:
+      typeof llmOutput === 'object' && llmOutput !== null
+        ? (llmOutput as Record<string, unknown>)
+        : { raw: llmOutput },
     durationMs,
     completedAt: new Date().toISOString(),
   }

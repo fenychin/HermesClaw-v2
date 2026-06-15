@@ -25,6 +25,11 @@ import { withRBAC, type RouteContext } from "@/lib/server/shared/api-handler"
 import type { WorkspaceContext } from "@/lib/workspace"
 import { z } from "zod"
 import { validateBody } from "@/lib/validators"
+import {
+  readIdempotencyKey,
+  checkIdempotencyKey,
+  storeIdempotencyKey,
+} from "@/lib/idempotency"
 
 // ==============================
 // 请求体校验 Schema
@@ -155,6 +160,19 @@ export const POST = withRBAC(
     try {
       const { id } = await routeCtx.params
 
+      // AGENTS.md §3.4：高危治理动作必须具备幂等保护
+      const idempotencyKey = readIdempotencyKey(req)
+      if (idempotencyKey) {
+        const hit = await checkIdempotencyKey(ctx.workspaceId, idempotencyKey)
+        if (hit) {
+          return ApiResponse.ok({
+            idempotent: true,
+            proposalId: hit.taskId,
+            rolledBackAt: hit.createdAt.toISOString(),
+          })
+        }
+      }
+
       // 1. 频率限制
       const rateError = checkRateLimit(id)
       if (rateError) return rateError
@@ -269,6 +287,16 @@ export const POST = withRBAC(
           completedAt: new Date().toISOString(),
         },
       })
+
+      // 持久化幂等键 → proposalId
+      if (idempotencyKey) {
+        await storeIdempotencyKey({
+          workspaceId: ctx.workspaceId,
+          key: idempotencyKey,
+          taskId: result.proposalId,
+          scope: '/api/harness/proposals/rollback',
+        })
+      }
 
       logger.info("POST /api/harness/proposals/[id]/rollback 成功", {
         proposalId: result.proposalId,

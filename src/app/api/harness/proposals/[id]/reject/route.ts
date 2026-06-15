@@ -5,13 +5,33 @@ import { checkAutomationGate } from '@/lib/server/hermes/guardrail'
 import { createAuditEntry, updateAuditEntry, actorFromSession } from '@/lib/server/shared/audit'
 import { resolveAutomationLevel } from '@/types'
 import type { WorkspaceContext } from '@/lib/workspace'
+import {
+  readIdempotencyKey,
+  checkIdempotencyKey,
+  storeIdempotencyKey,
+} from '@/lib/idempotency'
 
 // POST /api/harness/proposals/:id/reject
 // 拒绝提案（RBAC: 仅 ADMIN/OWNER）
 // —— AGENTS.md §5 #3 禁止静默执行：拒绝前写入预记录审计
+// —— AGENTS.md §3.4：高危治理动作必须具备幂等保护
 export const POST = withRBAC(
-  async (_req: Request, ctx: WorkspaceContext, routeCtx: RouteContext<{ id: string }>) => {
+  async (req: Request, ctx: WorkspaceContext, routeCtx: RouteContext<{ id: string }>) => {
     const { id } = await routeCtx.params
+
+    // 幂等键命中直接返回缓存的结果
+    const idempotencyKey = readIdempotencyKey(req)
+    if (idempotencyKey) {
+      const hit = await checkIdempotencyKey(ctx.workspaceId, idempotencyKey)
+      if (hit) {
+        return ApiResponse.ok({
+          idempotent: true,
+          proposalId: hit.taskId,
+          rejectedAt: hit.createdAt.toISOString(),
+        })
+      }
+    }
+
     try {
       // 从 Prisma 获取提案
       const queryWhere = id.startsWith("HEP-")
@@ -84,6 +104,16 @@ export const POST = withRBAC(
           rejectedAt: new Date().toISOString(),
         },
       })
+
+      // 持久化幂等键 → proposalId
+      if (idempotencyKey) {
+        await storeIdempotencyKey({
+          workspaceId: ctx.workspaceId,
+          key: idempotencyKey,
+          taskId: proposal.proposalId,
+          scope: '/api/harness/proposals/reject',
+        })
+      }
 
       return ApiResponse.ok({ proposalId: proposal.proposalId, rejectedAt: new Date().toISOString() })
     } catch (error) {

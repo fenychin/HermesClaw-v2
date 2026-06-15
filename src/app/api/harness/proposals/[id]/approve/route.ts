@@ -4,6 +4,11 @@ import { checkAutomationGate } from '@/lib/server/hermes/guardrail'
 import { withRBAC, type RouteContext } from '@/lib/server/shared/api-handler'
 import { createAuditEntry, updateAuditEntry, writeAuditLog, actorFromSession } from '@/lib/server/shared/audit'
 import type { WorkspaceContext } from '@/lib/workspace'
+import {
+  readIdempotencyKey,
+  checkIdempotencyKey,
+  storeIdempotencyKey,
+} from '@/lib/idempotency'
 import { z } from "zod"
 
 /** POST /api/harness/proposals/:id/approve 请求体——仅 confirmText 可选 */
@@ -17,6 +22,19 @@ export const POST = withRBAC(
   async (req: Request, ctx: WorkspaceContext, routeCtx: RouteContext<{ id: string }>) => {
     const { id } = await routeCtx.params
     const actor = await actorFromSession()
+
+    // AGENTS.md §3.4：高危治理动作必须具备幂等保护
+    const idempotencyKey = readIdempotencyKey(req)
+    if (idempotencyKey) {
+      const hit = await checkIdempotencyKey(ctx.workspaceId, idempotencyKey)
+      if (hit) {
+        return ApiResponse.ok({
+          idempotent: true,
+          proposalId: hit.taskId,
+          approvedAt: hit.createdAt.toISOString(),
+        })
+      }
+    }
 
     try {
       // 处理空 body：safeParse 容错，无效 JSON 或 schema 不符时 default 为 {}
@@ -122,6 +140,16 @@ export const POST = withRBAC(
           gateLevel: gate.level,
         },
       })
+
+      // 持久化幂等键 → proposalId（24h 内重复请求直接命中）
+      if (idempotencyKey) {
+        await storeIdempotencyKey({
+          workspaceId: ctx.workspaceId,
+          key: idempotencyKey,
+          taskId: proposal.proposalId,
+          scope: '/api/harness/proposals/approve',
+        })
+      }
 
       return ApiResponse.ok({ proposalId: proposal.proposalId, approvedAt: new Date().toISOString() })
     } catch (error) {

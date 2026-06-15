@@ -30,6 +30,7 @@ model Workspace {
   connectors          Connector[]
   skills              Skill[]
   harnessProposals    HarnessProposal[]
+  harnessBundles      HarnessBundle[]
   conversations       Conversation[]
   conversationMessages ConversationMessage[]
   auditLogs           AuditLog[]
@@ -46,6 +47,7 @@ model Workspace {
   tasks               Task[]
   reports             Report[]
   settings            WorkspaceSettings?
+  automationPolicies  AutomationPolicy[]
 }
 
 // ============================================================
@@ -71,6 +73,38 @@ model WorkspaceMember {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([workspaceId, userId])
+}
+
+// ============================================================
+// 自动化授权等级三级粒度策略（AGENTS.md §4.7 / §5.2 / §6.2）
+// —— 三级回退：(workspaceId, agentId, actionType) action-specific
+//             → (workspaceId, agentId, null)        agent-default
+//             → (workspaceId, null, null)           workspace-default
+//             → 无任何记录                          system-default L1
+//   SQLite 把 NULL 视为 distinct，三级行可以共存于唯一约束之下。
+// —— enum 在应用层用 AutomationLevelSchema / RiskLevelSchema (zod) 校验，
+//   写入前归一化、读出时 safeParse 兜底。
+// ============================================================
+model AutomationPolicy {
+  id                 String    @id @default(cuid())
+  workspaceId        String
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agentId            String?                       // null = workspace-default
+  actionType         String?                       // null = agent-default 或 workspace-default
+  automationLevel    String    @default("L1")      // 应用层 AutomationLevelSchema 校验
+  riskLevel          String    @default("low")     // 应用层 RiskLevelSchema 校验
+  requireApproval    Boolean   @default(false)
+  requireApproverIds String    @default("[]")      // JSON 数组：用户 ID
+  priority           Int       @default(0)         // 同 source 内并列时取 priority 大者
+  description        String?
+  createdBy          String
+  updatedBy          String
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([workspaceId, agentId, actionType])
+  @@index([workspaceId])
+  @@index([agentId])
 }
 
 // ============================================================
@@ -324,12 +358,86 @@ model HarnessProposal {
   reviewedBy            String?
   reviewedAt            DateTime?
   previousSnapshot      String?                    // JSON: 变更前关联 Agent 的任务边界与工具访问快照，用于一键回滚
+  // —— Bundle 生命周期（CLAUDE.md §4.2）：Proposal 可关联到一个 HarnessBundle，
+  //    审批通过后通过 bundle 的 DRAFT→CANARY→ACTIVE 状态机统一灰度/激活/回滚。
+  bundleId              String?
+  bundle                HarnessBundle? @relation("BundleProposals", fields: [bundleId], references: [bundleId])
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
   @@index([workspaceId])
   @@index([status])
   @@index([targetSkillId])
+  @@index([createdAt])
+  @@index([bundleId])
+}
+
+// ============================================================
+// HarnessBundle —— Hermes Source of Truth（CLAUDE.md §4.2）
+// 生命周期：DRAFT → CANARY → ACTIVE → DEPRECATED | ROLLED_BACK
+// （SQLite 无原生 enum，状态以 String 列承载，合法值见下行注释）
+// ============================================================
+model HarnessBundle {
+  id              String    @id @default(cuid())
+  bundleId        String    @unique @default(cuid())
+  workspaceId     String    @default("default")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
+  agentId         String?
+  name            String
+  description     String?
+
+  /// "DRAFT" | "CANARY" | "ACTIVE" | "DEPRECATED" | "ROLLED_BACK"
+  status          String    @default("DRAFT")
+  version         String
+  previousVersion String?
+
+  // Harness 7 件套（CLAUDE.md §2.3），全部可空。结构对齐
+  // packages/harness-schema/src/harness-bundle.ts，应用层走 zod 校验。
+  agentPolicies     Json?
+  workflowTemplates Json?
+  skillBindings     Json?
+  contextPolicy     Json?
+  memoryPolicy      Json?
+  connectorPolicies Json?
+  guardrailPolicy   Json?
+  evalRuleSet       Json?
+  industryBinding   Json?
+
+  canaryPercent   Int       @default(0)
+  canaryStartedAt DateTime?
+  canaryEndsAt    DateTime?
+
+  /// 指向最近一次快照的 snapshotId（HarnessBundleSnapshot.snapshotId）
+  currentSnapshotId String?
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  activatedAt  DateTime?
+  deprecatedAt DateTime?
+
+  snapshots HarnessBundleSnapshot[]
+  proposals HarnessProposal[]       @relation("BundleProposals")
+
+  @@index([workspaceId])
+  @@index([status])
+}
+
+// HarnessBundleSnapshot —— 用于回滚的深度快照（CLAUDE.md §4.5 / §8.1）
+model HarnessBundleSnapshot {
+  id         String   @id @default(cuid())
+  snapshotId String   @unique @default(cuid())
+  bundleId   String
+  version    String
+  /// 完整 bundle 字段（7 件套 + canary 配置）的深度快照，不含关系
+  content    Json
+  /// "pre-canary" | "pre-activation" | "manual"
+  reason     String
+  createdBy  String
+  createdAt  DateTime @default(now())
+
+  bundle     HarnessBundle @relation(fields: [bundleId], references: [bundleId])
+
+  @@index([bundleId])
   @@index([createdAt])
 }
 
@@ -651,4 +759,59 @@ model Report {
 
   @@index([workspaceId, generatedAt])
   @@map("ft_report")
+}
+
+// ============================================================
+// 幂等键（AGENTS.md §3.4：所有写操作必须具备幂等保护）
+// —— 同一 (workspaceId, key) 在 expiresAt 之前重复请求返回缓存的 taskId
+// —— 不持有完整请求体，调用方需自行校验请求等效性
+// ============================================================
+model IdempotencyKey {
+  id           String    @id @default(cuid())
+  /// 客户端提供的幂等键（x-idempotency-key），(workspaceId, key) 全局唯一
+  key          String
+  /// 命中时返回给调用方的 taskId（或其他领域 id）
+  taskId       String
+  workspaceId  String
+  /// 写操作所在端点路径（便于排查不同路径误用同一 key）
+  scope        String?
+  createdAt    DateTime  @default(now())
+  /// 过期时间，过期记录由 cleanup 任务清理；NULL 表示永久
+  expiresAt    DateTime?
+
+  @@unique([workspaceId, key])
+  @@index([key])
+  @@index([expiresAt])
+}
+
+// ============================================================
+// ExecutionEvent 持久化日志（AGENTS.md §3.3 / CLAUDE.md §8.2 Receipt Store）
+// —— OpenClaw → Hermes 回流的事件原文落库，供审计与回放
+// —— eventId 全局唯一，重复提交基于 eventId 去重
+// ============================================================
+model ExecutionEventLog {
+  id            String   @id @default(cuid())
+  /// ExecutionEvent.eventId（契约层全局唯一）
+  eventId       String   @unique
+  taskId        String
+  workflowRunId String
+  runtimeId     String
+  eventType     String
+  status        String
+  /// 事件 payload，存 JSON 字符串（SQLite 无 native JSON）
+  payload       String
+  connectorId   String?
+  deviceId      String?
+  receiptHash   String?
+  parentWorkflowRunId String?
+  version       String   @default("1.0.0")
+  /// 事件原始时间（来自 OpenClaw runtime）
+  timestamp     DateTime
+  /// 写入本表的服务端时间
+  receivedAt    DateTime @default(now())
+
+  @@index([taskId])
+  @@index([workflowRunId])
+  @@index([eventType])
+  @@index([receivedAt])
 }

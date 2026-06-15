@@ -26,6 +26,7 @@ import {
   Mic,
   ImageIcon,
   ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConnectorsSettings } from "./_components/connectors-settings";
@@ -42,6 +43,7 @@ const NAV_ITEMS = [
   { key: "model-routing", label: "模型路由", icon: Cpu },
   { key: "connectors", label: "连接器授权", icon: Plug },
   { key: "harness", label: "Harness 审批", icon: GitBranch, isRoute: true },
+  { key: "automation", label: "自动化等级", icon: ShieldCheck, isRoute: true },
   { key: "audit", label: "审计日志", icon: ScrollText },
   { key: "agents-rules", label: "AGENTS 规则", icon: ShieldAlert },
   { key: "brand", label: "品牌设置", icon: Palette },

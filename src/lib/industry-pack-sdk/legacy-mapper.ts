@@ -44,8 +44,11 @@ interface LegacyManifest {
 /**
  * 把旧版（或本仓库当前的简化版）manifest data 映射为符合
  * IndustryManifestSchema 的对象，供后续 zod 强校验。
+ *
+ * 返回值统一为 `Record<string, unknown>`：当传入非对象时直接 wrap 成 `{ value: val }`，
+ * 避免上游误把 `unknown` 当 `Record` 用（multi-pack.test.ts 解构 .id/.name 受此影响）。
  */
-export function mapLegacyManifest(val: unknown): Record<string, unknown> | unknown {
+export function mapLegacyManifest(val: unknown): Record<string, unknown> {
   if (val && typeof val === "object") {
     const obj = val as LegacyManifest
     const packId = obj.packId || obj.id
@@ -82,5 +85,5 @@ export function mapLegacyManifest(val: unknown): Record<string, unknown> | unkno
       version_field,
     }
   }
-  return val
+  return { value: val }
 }

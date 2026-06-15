@@ -129,7 +129,6 @@ describe("外贸主链路 — 契约流转", () => {
       version: CONTRACT_VERSION,
     })
     expect(inquiryEvent.taskId).toBe(envelope.taskId)
-    // @ts-expect-error payload is typed
     expect(inquiryEvent.payload.grade).toBe("A")
 
     // Step 1c: ActionReceipt 回执（成功）
@@ -219,7 +218,6 @@ describe("外贸主链路 — 契约流转", () => {
       version: CONTRACT_VERSION,
     })
     expect(quotationEnvelope.actionType).toBe("trade.create-quotation")
-    // @ts-expect-error input is typed
     expect(quotationEnvelope.input.inquiryId).toBe(INQUIRY_ID)
 
     // 报价完成后 inquiry 状态应为 quoted（replied=true）
@@ -240,7 +238,6 @@ describe("外贸主链路 — 契约流转", () => {
       version: CONTRACT_VERSION,
     })
     expect(quotationReceipt.outcome).toBe("success")
-    // @ts-expect-error response is typed
     expect(quotationReceipt.response.inquiryReplied).toBe(true)
   })
 
@@ -305,7 +302,6 @@ describe("外贸主链路 — 契约流转", () => {
       version: CONTRACT_VERSION,
     })
     expect(acceptedReceipt.outcome).toBe("success")
-    // @ts-expect-error response is typed
     expect(acceptedReceipt.response.quotationStatus).toBe("accepted")
 
     // 全链路 ExecutionSummary
@@ -449,12 +445,13 @@ describe("外贸主链路 — 边界与失败路径", () => {
 
   it("L3 级别的 dev-letter 必须 requiresApproval=true", () => {
     // L3 级别的开发信生成需要人工审批后才能发送
-    const automationLevel = "L3"
+    // 显式标注为宽 string 类型，避免 TS 把字面量比较视作 unintentional。
+    const automationLevel: string = "L3"
     const requiresApproval = automationLevel === "L3" || automationLevel === "L4"
     expect(requiresApproval).toBe(true)
 
     // L2 报价不需要审批
-    const quotationLevel = "L2"
+    const quotationLevel: string = "L2"
     expect(quotationLevel === "L3" || quotationLevel === "L4").toBe(false)
   })
 

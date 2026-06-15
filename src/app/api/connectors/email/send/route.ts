@@ -14,6 +14,11 @@ import { createAuditEntry, updateAuditEntry, writeAuditLog, actorFromSession } f
 import { createEmailConnector } from "@/lib/server/connectors/email/email-connector"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 import { writeAgentLog } from "@/lib/server/shared/agent-log"
+import {
+  readIdempotencyKey,
+  checkIdempotencyKey,
+  storeIdempotencyKey,
+} from "@/lib/idempotency"
 
 export const runtime = "nodejs"
 
@@ -42,6 +47,19 @@ export async function POST(request: Request) {
   const ctx = await buildWorkspaceContext(request)
   requireWritable(ctx.role)
   const actor = await actorFromSession()
+
+  // AGENTS.md §3.4：高危对外动作必须具备幂等保护，防止客户端重试触发重复发信
+  const idempotencyKey = readIdempotencyKey(request)
+  if (idempotencyKey) {
+    const hit = await checkIdempotencyKey(ctx.workspaceId, idempotencyKey)
+    if (hit) {
+      return successResponse({
+        idempotent: true,
+        messageId: hit.taskId, // 复用 taskId 列存 messageId
+        message: "邮件已通过幂等键命中，未重复发送",
+      })
+    }
+  }
 
   // 解析并校验请求体
   let rawBody: unknown
@@ -165,6 +183,16 @@ export async function POST(request: Request) {
         sentAt: new Date().toISOString(),
       },
     })
+
+    // 持久化幂等键 → messageId 映射（24h 内重复请求直接命中，不再发送）
+    if (idempotencyKey && result.messageId) {
+      await storeIdempotencyKey({
+        workspaceId: ctx.workspaceId,
+        key: idempotencyKey,
+        taskId: result.messageId,
+        scope: "/api/connectors/email/send",
+      })
+    }
 
     logger.info("Email send: 发送成功", {
       to,

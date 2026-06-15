@@ -272,8 +272,8 @@ ${HARD_REDLINES.map((red, idx) => `${idx + 1}. ${red}`).join("\n")}
 async function auditBoundaryCheck(
   agentId: string,
   action: string,
+  workspaceId: string,
   decision: BoundaryDecision,
-  workspaceId?: string,
 ) {
   try {
     const actor = await actorFromSession()

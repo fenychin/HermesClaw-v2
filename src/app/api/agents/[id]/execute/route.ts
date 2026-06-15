@@ -132,26 +132,30 @@ export async function POST(
     // 1. 边界强制（运行时，含 workspaceId 隔离）
     const boundary = await assertWithinBoundary(id, action, ctx.workspaceId)
     if (!boundary.allowed) {
+      // BoundaryDecision 契约（v0.12.13+）以 reason / matchedRule 替代旧 violation 字段
+      const violationDetail = boundary.matchedRule
+        ? `${boundary.matchedRule}（${boundary.reason}）`
+        : boundary.reason
       await writeAgentLog({
         agentId: id,
         source: "agent",
         taskName: action.slice(0, 40),
         status: "error",
         duration: elapsed(),
-        detail: `边界拦截：${boundary.violation}`,
+        detail: `边界拦截：${violationDetail}`,
       })
       await writeAuditLog({
         actor: await actorFromSession(),
         action: "boundary.block",
         targetType: "agent",
         targetId: id,
-        detail: `拒绝越界动作：${boundary.violation}`,
+        detail: `拒绝越界动作：${violationDetail}`,
         riskLevel: "high",
         workspaceId: ctx.workspaceId,
       })
       return successResponse({
         status: "blocked",
-        violation: boundary.violation,
+        violation: violationDetail,
         reason: `该动作超出「${agent.name}」的任务边界，已被运行时护栏拒绝`,
       })
     }

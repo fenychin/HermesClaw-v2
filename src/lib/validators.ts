@@ -104,6 +104,7 @@ export const MemoryUpdateSchema = z.object({
   confidence: z.number().min(0).max(1).optional(),
   confirm: z.boolean().optional(),
   reason: z.string().max(500).optional(),
+  tags: z.array(z.string()).optional(),
 });
 
 // ==============================

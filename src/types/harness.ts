@@ -83,8 +83,11 @@ export function mapAutomationToAuditRisk(level: AutomationLevel): AuditRiskLevel
 
 /**
  * 将 AutomationLevel 映射为 AgentLog riskLevel 字符串。
+ *
+ * 返回值与 RiskLevelSchema enum 对齐（low|medium|high|critical），
+ * 保证可直接喂给 TaskEnvelope.riskLevel 等契约字段，无需类型断言。
  */
-export function mapAutomationToLogRisk(level: AutomationLevel): string {
+export function mapAutomationToLogRisk(level: AutomationLevel): "low" | "medium" | "high" | "critical" {
   switch (level) {
     case 'L1':
     case 'L2':
