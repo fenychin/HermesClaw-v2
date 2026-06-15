@@ -169,6 +169,28 @@ export async function validateTaskAutomationLevel(
 
   if (taskWeight > allowedWeight) {
     const errorMsg = `安全护栏拦截：任务要求的自动化等级为 ${taskLevel}，已超出 Workspace 允许的最高等级 ${maxAllowedLevel}`
+
+    if (envelope.riskLevel === 'high' || envelope.riskLevel === 'critical') {
+      try {
+        const { createApprovalCheckpoint } = await import('./approval')
+        await createApprovalCheckpoint({
+          taskId: envelope.taskId,
+          workflowRunId: envelope.workflowRunId,
+          workspaceId: envelope.workspaceId,
+          triggerReason: 'risk.level.high',
+          riskLevel: envelope.riskLevel,
+          automationLevel: envelope.automationLevel ?? 'L3',
+          actionSummary: `高危动作被护栏拦截，等待人工审批：${envelope.actionType}`,
+          inputSnapshot: envelope.input ?? {},
+          policySnapshotVersion: envelope.policySnapshotVersion ?? 'unknown',
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),  // 24 小时有效期
+          creator: actor,
+        })
+      } catch (err) {
+        console.error("[validateTaskAutomationLevel] Failed to create approval checkpoint:", err)
+      }
+    }
+
     
     // 写入 AuditLog
     await writeAuditLog({
@@ -199,7 +221,7 @@ export async function validateTaskAutomationLevel(
             taskId: envelope.taskId,
             actionType: envelope.actionType,
           },
-          automationLevel: taskLevel as any,
+          automationLevel: taskLevel as string,
           triggeredBy: "system",
           status: "failed",
         }

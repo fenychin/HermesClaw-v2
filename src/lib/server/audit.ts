@@ -30,6 +30,17 @@ export type TriggeredBy = "user" | "system" | "cron"
 /** 审计条目状态（预记录模式） */
 export type AuditStatus = "pending" | "success" | "failed"
 
+/** 审计事件定义，供评估引擎等模块引用 */
+export interface AuditEvent {
+  id: string
+  action: string
+  detail?: string
+  taskId?: string
+  workflowRunId?: string
+  checkpointId?: string   // 关联 HumanApprovalCheckpoint
+  receiptId?: string      // 关联 ActionReceipt
+}
+
 // ==============================
 // 旧版兼容类型（保留 writeAuditLog 向后兼容）
 // ==============================

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { writeAuditLog } from "@/lib/server/audit"
 import type { HarnessProposal } from "@/contracts/harness-proposal"
 import type { EvaluationReport } from "@/contracts/evaluation-report"
+import type { Prisma } from "@/generated/prisma-v2/client"
 import crypto from "crypto"
 
 /**
@@ -71,7 +72,7 @@ export async function generateProposal(evaluationReport: EvaluationReport): Prom
     triggerReason: "评估窗口指标触发自适应优化规则",
     problemStatement,
     evidence: JSON.stringify(evidence),
-    proposedChange: proposedChange as any,
+    proposedChange: proposedChange as unknown as Prisma.InputJsonValue,
     targetSkillId: null,
     requiresHumanApproval: true,
     estimatedImpact,
@@ -106,19 +107,35 @@ export async function generateProposal(evaluationReport: EvaluationReport): Prom
     triggerReason: created.triggerReason,
     problemStatement: created.problemStatement,
     evidence: JSON.parse(created.evidence as string) as string[],
-    proposedChange: created.proposedChange as any,
+    proposedChange: created.proposedChange as unknown as HarnessProposal["proposedChange"],
     targetSkillId: created.targetSkillId,
     requiresHumanApproval: created.requiresHumanApproval,
     estimatedImpact: created.estimatedImpact,
     affectedAgents: JSON.parse(created.affectedAgents as string) as string[],
     rollbackPlan: created.rollbackPlan,
-    status: created.status as any,
+    status: created.status as unknown as HarnessProposal["status"],
     reviewedBy: created.reviewedBy,
     reviewedAt: created.reviewedAt ? new Date(created.reviewedAt) : null,
     previousSnapshot: created.previousSnapshot ? JSON.parse(created.previousSnapshot) : null,
     createdAt: created.createdAt,
     updatedAt: created.updatedAt,
     version: "1.0.0"
+  }
+
+  // 在 generateProposal 返回前追加（使用动态 import 防止循环依赖）
+  if (proposal.proposedChange && (proposal.proposedChange.riskLevel === 'high' || proposal.proposedChange.riskLevel === 'critical')) {
+    const { createApprovalCheckpoint } = await import('./approval')
+    await createApprovalCheckpoint({
+      proposalId: proposal.id,
+      workspaceId: proposal.workspaceId,
+      triggerReason: 'eval.proposal.generated',
+      riskLevel: proposal.proposedChange.riskLevel,
+      automationLevel: 'L3',
+      actionSummary: `自动进化提案待审批：${proposal.proposedChange.description ?? proposal.id}`,
+      inputSnapshot: proposal as unknown as Record<string, unknown>,
+      policySnapshotVersion: 'unknown',
+      expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000),  // 72 小时有效期
+    })
   }
 
   return proposal

@@ -185,6 +185,16 @@ Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私
 - 无回执的写操作默认视为高风险，必须走审批流或被禁止。  
 - OpenClaw Gateway 如发现事件重放或序列缺口时，必须依靠幂等键保护下游系统。
 
+### 3.5 实现状态与补充约定（2026-06-15 v3.02.00-dev）
+- 契约层已实现：[contracts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/contracts/)
+- 合规版本：`CONTRACT_VERSION = '1.0'`
+- 已接入：`harness-eval.ts` / `connectors.ts` / `audit.ts`
+- 待接入：`workflow/` 目录中的 `WorkflowRun` 调度器
+- **审批引擎补充约定**：
+  - **时效管理**：提案审批默认 72 小时时效，高危动作默认 24 小时时效。审批超时必须提取为顶层常量（如 `PROPOSAL_APPROVAL_EXPIRY_MS`），严禁在函数内硬编码。
+  - **状态与审计强关联**：审批检查点（`ApprovalCheckpoint`）生命周期的状态跃迁，必须与 AuditLog 的 `approval.*` 审计链（`requested` / `granted` / `rejected` / `expired`）强关联绑定，做到一客一审，审计与拦截可追溯。
+
+
 ---
 
 ## 第四章：Harness Runtime 定义
@@ -311,6 +321,7 @@ Harness Runtime 至少由以下对象组成：
 - `model.route` / 高危模型变更  
 - `connector.execute`（高危写操作）  
 - `proposal.create / approve / reject / rollback`  
+- `approval.requested / granted / rejected / expired`（审批检查点创建/通过/驳回/超时）  
 - `industry.pack.install / activate / rollback`  
 - `automation.level.change`（尤其是 L3/L4）  
 

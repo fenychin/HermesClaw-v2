@@ -646,3 +646,31 @@ model Report {
 
   @@index([workspaceId, generatedAt])
 }
+
+model ApprovalCheckpoint {
+  id                   String   @id @default(cuid())
+  checkpointId         String   @unique
+  workspaceId          String
+  taskId               String?
+  workflowRunId        String?
+  proposalId           String?
+  decision             String   @default("pending")
+  // 'pending' | 'approved' | 'rejected' | 'expired' | 'auto-approved'
+  triggerReason        String
+  riskLevel            String
+  automationLevel      String
+  actionSummary        String
+  inputSnapshot        Json
+  policySnapshotVersion String
+  requestedAt          DateTime @default(now())
+  decidedAt            DateTime?
+  decidedBy            String?
+  expiresAt            DateTime
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([workspaceId, decision])
+  @@index([proposalId])
+  @@index([taskId])
+}
+

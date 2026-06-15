@@ -27,15 +27,12 @@ export interface AgentLog {
   taskName?: string
 }
 
-export interface AuditEvent {
-  id: string
-  action: string
-  detail?: string
-}
+import type { AuditEvent } from "@/lib/server/audit"
 
 export interface ConnectorResult {
   connectorId: string
   success: boolean
+  receiptId?: string
 }
 
 export interface HumanCorrection {
@@ -111,7 +108,7 @@ const defaultDeps: EvaluationEngineDeps = {
   },
   generateProposal: async (report) => {
     const { generateProposal: gp } = await import("@/lib/server/proposal-engine");
-    return gp(report);
+    return gp(report as Parameters<typeof gp>[0]);
   }
 }
 

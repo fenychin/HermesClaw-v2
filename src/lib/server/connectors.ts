@@ -9,6 +9,7 @@
 import { prisma } from "@/lib/prisma";
 import { serializeConnector } from "@/lib/api-utils";
 import type { Connector } from "@/types";
+import type { ActionReceipt } from "./contracts";
 
 export interface ConnectorsDeps {
   prisma: typeof prisma;
@@ -68,3 +69,15 @@ export async function getEnrichedConnectors(
     };
   });
 }
+
+/**
+ * 连接器执行结果契约接口
+ * 用于在执行函数中增加返回 ActionReceipt 的能力（渐进接入）
+ */
+export interface ConnectorExecutionResult {
+  success: boolean;
+  output?: Record<string, unknown>;
+  error?: string;
+  receipt?: ActionReceipt;
+}
+
