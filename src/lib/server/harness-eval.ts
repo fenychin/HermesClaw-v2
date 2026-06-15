@@ -1,223 +1,336 @@
-/**
- * Harness 自演化引擎 —— 评估核心（Level 2 评估层调度）
- *
- * 负责：读取评估窗口内的智能体运行日志 → 统计指标 → 判断是否达到触发条件
- *       → 调用 AI 分析层产出升级提案 → 写入 HarnessProposal。
- *
- * 被 /api/harness/evaluate（手动）与 /api/harness/cron（定时）复用，
- * 符合 CLAUDE.md「复杂业务逻辑下沉至 src/lib/server/*」的约定。
- */
-import { prisma } from "@/lib/prisma"
-import { stringifyJsonField } from "@/lib/api-utils"
-import { analyzeHarnessLogs } from "@/lib/harness-llm"
-import { automationLevelFromRisk } from "@/types"
-import type {
-  HarnessMetrics,
-  HarnessEvaluateResult,
-  HarnessProposal,
-  RiskLevel,
-  AutomationLevel,
-  ProposalStatus,
-} from "@/types"
+import { FOREIGN_TRADE_BASELINE } from "@/lib/server/industry-health"
 
-/** 评估窗口（小时）—— AGENTS.md 第四章 4.6：每 72 小时自动评估一次 */
-export const EVAL_WINDOW_HOURS = 72
-/** 失败率触发阈值（>15% 即触发；等价于工具/任务成功率 < 85%） */
-const ERROR_RATE_THRESHOLD = 0.15
-/** 最多纳入分析的日志条数 */
-const MAX_LOGS = 100
-/** 进入摘要的日志条数 */
-const SUMMARY_LOGS = 20
+// 保留原有的 re-export 声明，确保渐进迁移兼容性
+export {
+  runHarnessEvaluation,
+  type HarnessEvalDeps,
+} from "@/lib/server/harness/orchestrator"
 
-/** 写一条进化日志（P1-⑤；失败静默吞错，不阻断评估主流程） */
-async function writeEvolutionLog(input: {
-  triggeredBy: "auto" | "manual"
-  triggered: boolean
-  metrics: HarnessMetrics
-  provider: "anthropic" | "deepseek" | null
-  model: string | null
-  proposalId?: string
-  reason?: string
+export {
+  EVAL_WINDOW_HOURS,
+  isTrendingUp,
+  isErrorStatus,
+  buildLogSummary,
+  computeMetrics,
+} from "@/lib/server/harness/metrics"
+
+export { buildEvaluationReport } from "@/lib/server/harness/report-builder"
+
+// ==============================
+// 类型与接口定义
+// ==============================
+
+export interface AgentLog {
+  id: string
+  status: string
+  durationMs?: number
+  taskName?: string
+}
+
+import type { AuditEvent } from "@/lib/server/audit"
+
+export interface ConnectorResult {
+  connectorId: string
+  success: boolean
+  receiptId?: string
+}
+
+export interface HumanCorrection {
+  runId: string
+  correctionMade: boolean
+}
+
+export interface MemoryMissEvent {
+  key: string
+  missed: boolean
+}
+
+export interface IndustryKpiSnapshot {
+  actualSuccessRate: number
+  actualAvgDurationMs: number
+}
+
+export interface EvalAnomaly {
+  dimension: string
+  message: string
+  severity: "low" | "medium" | "high"
+}
+
+export interface EvalInput {
+  workflowRunId: string
+  agentLogs: AgentLog[]
+  auditEvents: AuditEvent[]
+  connectorResults: ConnectorResult[]
+  humanCorrections: HumanCorrection[]
+  memoryMissEvents: MemoryMissEvent[]
+  industryKpiSnapshot: IndustryKpiSnapshot
+}
+
+export interface EvalReport {
+  runId: string
+  evaluatedAt: Date
+  overallScore: number // 0-100
+  dimensions: {
+    connectorSuccessRate: number
+    workflowCompletionRate: number
+    humanCorrectionRate: number
+    memoryHitRate: number
+    kpiDriftIndex: number
+  }
+  anomalies: EvalAnomaly[]
+  proposalEligible: boolean
+  reportId?: string
   reportMd?: string
-}): Promise<void> {
-  try {
-    await prisma.evolutionLog.create({
-      data: {
-        triggeredBy: input.triggeredBy,
-        triggered: input.triggered,
-        errorRate: input.metrics.errorRate,
-        successRate: input.metrics.successRate,
-        totalLogs: input.metrics.total,
-        provider: input.provider,
-        model: input.model,
-        proposalId: input.proposalId ?? null,
-        reason: input.reason ?? null,
-        reportMd: input.reportMd ?? null,
-      },
-    })
-  } catch (error) {
-    // 不阻断评估主流程，但进化历史丢失须醒目上报（AGENTS.md 4.6 历史存档），
-    // 故升级为 error 级别；切勿降级为静默 warn。
-    console.error(
-      "[writeEvolutionLog] 进化日志写入失败，评估历史已丢失，须排查：",
-      { triggeredBy: input.triggeredBy, triggered: input.triggered, proposalId: input.proposalId },
-      error,
-    )
+}
+
+// 审计入参类型
+export interface EvalAuditInput {
+  actor: string
+  action: string
+  targetType: string
+  targetId: string
+  detail?: string
+  riskLevel?: "low" | "medium" | "high"
+  workspaceId: string
+}
+
+// 可替换依赖，供测试 mock
+export interface EvaluationEngineDeps {
+  writeAuditLog: (input: EvalAuditInput) => Promise<void>
+  generateProposal: (report: unknown) => Promise<unknown>
+}
+
+// 使用动态导入，断开测试时对 next-auth 与 next/server 的静态加载链
+const defaultDeps: EvaluationEngineDeps = {
+  writeAuditLog: async (input) => {
+    const { writeAuditLog: wal } = await import("@/lib/server/audit");
+    return wal(input);
+  },
+  generateProposal: async (report) => {
+    const { generateProposal: gp } = await import("@/lib/server/proposal-engine");
+    return gp(report as Parameters<typeof gp>[0]);
   }
 }
 
-/** 判断单条日志是否为失败状态（兼容中英文写法） */
-export function isErrorStatus(status: string): boolean {
-  const v = status.toLowerCase().trim()
-  return (
-    v === "error" ||
-    v === "failed" ||
-    v === "failure" ||
-    v === "timeout" ||
-    status.includes("失败") ||
-    status.includes("超时") ||
-    status.includes("异常")
-  )
-}
+// ==============================
+// 核心评估引擎实现
+// ==============================
 
 /**
- * 执行一次 Harness 评估。
- * @param triggeredBy 触发来源：auto（定时/cron）| manual（人工触发）
+ * evaluateHarnessRun — 评估引擎核心入口
+ * 读取执行结果并驱动自演化提案流程
  */
-export async function runHarnessEvaluation(
-  triggeredBy: "auto" | "manual" = "auto",
-): Promise<HarnessEvaluateResult> {
-  // 1. 读取评估窗口内的运行日志
-  const since = new Date(Date.now() - EVAL_WINDOW_HOURS * 60 * 60 * 1000)
-  const logs = await prisma.agentLog.findMany({
-    where: { createdAt: { gte: since } },
-    select: {
-      id: true,
-      status: true,
-      taskName: true,
-      duration: true,
-      detail: true,
-      createdAt: true,
-      agentId: true,
-      agent: {
-        select: { id: true, name: true, role: true },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-    take: MAX_LOGS,
-  })
+export async function evaluateHarnessRun(
+  input: EvalInput,
+  workspaceId: string = "default",
+  deps: EvaluationEngineDeps = defaultDeps
+): Promise<EvalReport> {
+  const runId = input.workflowRunId || `eval-run-${Date.now()}`;
+  
+  // 1. 写入审计日志：评估开始
+  await deps.writeAuditLog({
+    actor: "system",
+    action: "EvalStarted",
+    targetType: "evaluation",
+    targetId: runId,
+    detail: `开始对工作流运行进行 Harness 评估，运行ID: ${runId}`,
+    riskLevel: "low",
+    workspaceId,
+  });
 
-  // 2. 统计指标
-  const total = logs.length
-  const errors = logs.filter((l) => isErrorStatus(l.status)).length
-  const success = total - errors
-  const errorRate = total > 0 ? errors / total : 0
-  const successRate = total > 0 ? success / total : 1
-  const metrics: HarnessMetrics = {
-    total,
-    errors,
-    success,
-    errorRate,
-    successRate,
-    windowHours: EVAL_WINDOW_HOURS,
+  // 2. 指标计算与默认降级逻辑（防空集崩溃）
+  
+  // 2.1 Connector 成功率
+  let connectorSuccessRate = 1.0;
+  if (input.connectorResults && input.connectorResults.length > 0) {
+    const successCount = input.connectorResults.filter(c => c.success).length;
+    connectorSuccessRate = successCount / input.connectorResults.length;
   }
 
-  // 3. 触发判断：失败率超阈值，或窗口内零日志（无日志的执行属违规信号）
-  const shouldTrigger = errorRate > ERROR_RATE_THRESHOLD || total === 0
-  if (!shouldTrigger) {
-    const reason = `指标健康（失败率 ${(errorRate * 100).toFixed(1)}% ≤ ${(
-      ERROR_RATE_THRESHOLD * 100
-    ).toFixed(0)}%），未达评估触发条件`
-    // 进化日志：未触发也落一条，保证可观测性（AGENTS.md 4.6 历史存档）
-    await writeEvolutionLog({
-      triggeredBy,
-      triggered: false,
-      metrics,
-      provider: null,
-      model: null,
-      reason,
-    })
-    return {
-      triggered: false,
-      metrics,
-      provider: null,
-      model: null,
-      reason,
+  // 2.2 工作流完成率
+  let workflowCompletionRate = 1.0;
+  if (input.agentLogs && input.agentLogs.length > 0) {
+    const completedCount = input.agentLogs.filter(log => log.status === "completed" || log.status === "success").length;
+    workflowCompletionRate = completedCount / input.agentLogs.length;
+  }
+
+  // 2.3 人工纠错率
+  let humanCorrectionRate = 0.0;
+  if (input.humanCorrections && input.humanCorrections.length > 0) {
+    const correctionCount = input.humanCorrections.filter(c => c.correctionMade).length;
+    humanCorrectionRate = correctionCount / input.humanCorrections.length;
+  }
+
+  // 2.4 记忆命中率
+  let memoryHitRate = 1.0;
+  if (input.memoryMissEvents && input.memoryMissEvents.length > 0) {
+    const missCount = input.memoryMissEvents.filter(m => m.missed).length;
+    memoryHitRate = 1.0 - (missCount / input.memoryMissEvents.length);
+  }
+
+  // 2.5 KPI 偏移指数计算
+  // kpiDriftIndex = abs(actual - baseline) / baseline
+  let kpiDriftIndex = 0.0;
+  if (input.industryKpiSnapshot) {
+    const baselineSR = FOREIGN_TRADE_BASELINE.successRate;
+    const baselineDur = FOREIGN_TRADE_BASELINE.avgDurationMs;
+    
+    const srDrift = baselineSR > 0 ? Math.abs(input.industryKpiSnapshot.actualSuccessRate - baselineSR) / baselineSR : 0;
+    const durDrift = baselineDur > 0 ? Math.abs(input.industryKpiSnapshot.actualAvgDurationMs - baselineDur) / baselineDur : 0;
+    
+    kpiDriftIndex = Math.max(srDrift, durDrift);
+  }
+
+  // 3. 综合评分计算 (overallScore)
+  // 线性加权算法依据：
+  // - 成功率及完成率是控制层稳定度核心，各分配 25% 权重。
+  // - 人工纠正率严重破坏自动化流程效率，分配 20% 权重。
+  // - 记忆效率和 KPI 偏移属于中高阶演化指标，各分配 15% 权重。
+  const scoreConnector = connectorSuccessRate * 100;
+  const scoreWorkflow = workflowCompletionRate * 100;
+  const scoreCorrection = Math.max(0, (1 - humanCorrectionRate) * 100);
+  const scoreMemory = memoryHitRate * 100;
+  const scoreDrift = Math.max(0, (1 - Math.min(kpiDriftIndex, 1)) * 100);
+
+  const overallScore = Math.round(
+    scoreConnector * 0.25 +
+    scoreWorkflow * 0.25 +
+    scoreCorrection * 0.20 +
+    scoreMemory * 0.15 +
+    scoreDrift * 0.15
+  );
+
+  // 4. 多维异常检测
+  const anomalies: EvalAnomaly[] = [];
+
+  if (connectorSuccessRate < 0.85) {
+    anomalies.push({
+      dimension: "connectorSuccessRate",
+      message: `连接器执行成功率异常偏低: ${(connectorSuccessRate * 100).toFixed(1)}% (低于 85% 告警线)`,
+      severity: "high",
+    });
+  }
+
+  if (humanCorrectionRate > 0.15) {
+    anomalies.push({
+      dimension: "humanCorrectionRate",
+      message: `人工纠错率过高: ${(humanCorrectionRate * 100).toFixed(1)}% (高于 15% 告警线)`,
+      severity: "medium",
+    });
+  }
+
+  if (memoryHitRate < 0.70) {
+    anomalies.push({
+      dimension: "memoryHitRate",
+      message: `短期记忆命中率不足: ${(memoryHitRate * 100).toFixed(1)}% (低于 70% 告警线)`,
+      severity: "medium",
+    });
+  }
+
+  if (kpiDriftIndex > 0.20) {
+    anomalies.push({
+      dimension: "kpiDriftIndex",
+      message: `行业关键 KPI 指标偏离度过大: ${(kpiDriftIndex * 100).toFixed(1)}% (高于 20% 告警线)`,
+      severity: "high",
+    });
+  }
+
+  // 4.1 写入异常审计日志
+  for (const anomaly of anomalies) {
+    await deps.writeAuditLog({
+      actor: "system",
+      action: "EvalAnomalyDetected",
+      targetType: "evaluation",
+      targetId: runId,
+      detail: `[评估检测到异常] 维度: ${anomaly.dimension}, 严重等级: ${anomaly.severity}, 详情: ${anomaly.message}`,
+      riskLevel: anomaly.severity === "high" ? "high" : "medium",
+      workspaceId,
+    });
+  }
+
+  // 5. 触发升级提案判定
+  const proposalEligible =
+    connectorSuccessRate < 0.85 ||
+    humanCorrectionRate > 0.15 ||
+    memoryHitRate < 0.70 ||
+    kpiDriftIndex > 0.20 ||
+    overallScore < 60;
+
+  const report: EvalReport = {
+    runId,
+    evaluatedAt: new Date(),
+    overallScore,
+    dimensions: {
+      connectorSuccessRate,
+      workflowCompletionRate,
+      humanCorrectionRate,
+      memoryHitRate,
+      kpiDriftIndex,
+    },
+    anomalies,
+    proposalEligible,
+  };
+
+  // 5.1 自动联动提案引擎生成自演化提案
+  if (proposalEligible) {
+    const triggerReasons = [];
+    if (connectorSuccessRate < 0.85) triggerReasons.push(`连接器成功率 ${(connectorSuccessRate * 100).toFixed(1)}% 低于 85%`);
+    if (humanCorrectionRate > 0.15) triggerReasons.push(`人工纠偏率 ${(humanCorrectionRate * 100).toFixed(1)}% 高于 15%`);
+    if (memoryHitRate < 0.70) triggerReasons.push(`记忆命中率 ${(memoryHitRate * 100).toFixed(1)}% 低于 70%`);
+    if (kpiDriftIndex > 0.20) triggerReasons.push(`KPI 漂移度 ${(kpiDriftIndex * 100).toFixed(1)}% 高于 20%`);
+    if (overallScore < 60) triggerReasons.push(`健康综合评分 ${overallScore} 不及格`);
+    
+    const triggerDetail = triggerReasons.join("；");
+    
+    report.reportMd = `## Harness 评估触发报告\n\n评估触发原因：${triggerDetail}\n\n- 运行 ID: ${runId}\n- 综合评分: ${overallScore} 分\n- 异常项数: ${anomalies.length}`;
+
+    // 写入提案触发审计日志
+    await deps.writeAuditLog({
+      actor: "system",
+      action: "EvalProposalTriggered",
+      targetType: "evaluation",
+      targetId: runId,
+      detail: `评估自动触发自演化升级提案生成。触发指征: ${triggerDetail}`,
+      riskLevel: "medium",
+      workspaceId,
+    });
+
+    try {
+      await deps.generateProposal({
+        ...report,
+        workspaceId,
+        metrics: {
+          total: input.agentLogs?.length || 0,
+          errors: Math.round((input.agentLogs?.length || 0) * (1 - workflowCompletionRate)),
+          errorRate: 1 - workflowCompletionRate,
+          successRate: workflowCompletionRate,
+          windowHours: 24,
+        },
+      } as unknown);
+    } catch (proposalError) {
+      console.error("[evaluateHarnessRun] 联动生成升级提案失败", proposalError);
+      await deps.writeAuditLog({
+        actor: "system",
+        action: "EvalProposalFailed",
+        targetType: "evaluation",
+        targetId: runId,
+        detail: `联动提案生成器失败: ${proposalError instanceof Error ? proposalError.message : "未知错误"}`,
+        riskLevel: "high",
+        workspaceId,
+      });
     }
   }
 
-  // 4. 构造日志摘要交给 AI 分析
-  const logSummary =
-    logs
-      .slice(0, SUMMARY_LOGS)
-      .map(
-        (l) =>
-          `[${l.status}] ${l.agent?.name ?? l.agentId} · ${l.taskName}（${l.duration}）${
-            l.detail ? ` — ${l.detail}` : ""
-          }`,
-      )
-      .join("\n") || "（最近 72 小时无任何运行日志）"
+  // 6. 写入审计日志：评估完成
+  await deps.writeAuditLog({
+    actor: "system",
+    action: "EvalCompleted",
+    targetType: "evaluation",
+    targetId: runId,
+    detail: `Harness 评估完成，综合评分: ${overallScore} 分，触发升级提案: ${proposalEligible}`,
+    riskLevel: "low",
+    workspaceId,
+  });
 
-  const analysis = await analyzeHarnessLogs({ logSummary, metrics })
-  const { draft } = analysis
-
-  // 5. 写入升级提案（id 无 DB 默认值，须显式生成）
-  //    automationLevel 由 AI 给出的 riskLevel 派生（AGENTS.md §4.7）
-  const automationLevel: AutomationLevel = automationLevelFromRisk(
-    draft.riskLevel as RiskLevel,
-  )
-  const created = await prisma.harnessProposal.create({
-    data: {
-      id: crypto.randomUUID(),
-      proposalId: `HEP-${Date.now()}`,
-      triggeredBy,
-      problemStatement: draft.problemStatement,
-      evidence: stringifyJsonField(draft.evidence),
-      targetComponent: draft.targetComponent,
-      proposedChange: draft.proposedChange,
-      riskLevel: draft.riskLevel,
-      automationLevel,
-      status: "pending",
-      estimatedImpact: draft.estimatedImpact,
-    },
-  })
-
-  // 6. 序列化返回（evidence 反序列化为数组，时间转 ISO）
-  const proposal: HarnessProposal = {
-    id: created.id,
-    proposalId: created.proposalId,
-    triggeredBy: created.triggeredBy as "auto" | "manual",
-    problemStatement: created.problemStatement,
-    evidence: draft.evidence,
-    targetComponent: created.targetComponent,
-    proposedChange: created.proposedChange,
-    riskLevel: created.riskLevel as RiskLevel,
-    automationLevel: created.automationLevel as AutomationLevel,
-    requiresApproval: true,
-    status: created.status as ProposalStatus,
-    estimatedImpact: created.estimatedImpact,
-    createdAt: created.createdAt.toISOString(),
-    reviewedBy: created.reviewedBy ?? undefined,
-    reviewedAt: created.reviewedAt ?? undefined,
-  }
-
-  // 进化日志：触发并产出提案，记录报告与溯源
-  await writeEvolutionLog({
-    triggeredBy,
-    triggered: true,
-    metrics,
-    provider: analysis.provider,
-    model: analysis.model,
-    proposalId: created.proposalId,
-    reportMd: draft.reportMd,
-  })
-
-  return {
-    triggered: true,
-    metrics,
-    provider: analysis.provider,
-    model: analysis.model,
-    proposal,
-    reportMd: draft.reportMd,
-  }
+  return report;
 }

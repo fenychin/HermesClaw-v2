@@ -16,4 +16,7 @@ export interface Connector {
   lastSync?: string
   permissions: string[]
   usedByAgents: string[]
+  failureCount?: number
+  authScope?: 'readonly' | 'readwrite'
+  configStatus?: 'connected' | 'error' | 'pending_config'
 }

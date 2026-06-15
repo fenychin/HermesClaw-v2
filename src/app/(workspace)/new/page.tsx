@@ -1,135 +1,162 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { motion } from "framer-motion";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { PageTransition } from "@/components/common/PageTransition";
 import { CommandBox } from "@/components/pages/new/command-box";
 import { QuickCards } from "@/components/pages/new/quick-cards";
 import { QuickTaskPanel } from "@/components/pages/new/quick-task-panel";
 import { ConversationArea } from "@/components/pages/new/conversation-area";
-import { ModelSelector } from "@/components/pages/new/model-selector";
 import { SuggestionPanel } from "@/components/pages/new/suggestion-panel";
+import { RecentPanel } from "@/components/pages/new/recent-panel";
 import { useChat } from "@/hooks/useChat";
-import { useAgentStore } from "@/stores/agent-store";
-import { useProjectStore } from "@/stores/project-store";
-import type { ModelProvider } from "@/types/chat";
+import { useModelPreference } from "@/hooks/use-model-preference";
+import { useUiStore } from "@/stores/ui-store";
 
 /**
- * 新话题页面（超级入口）
- * —— 核心输入区 + AI 流式对话 | 智能建议
- *    对应 PRD 10.2 新话题
+ * 新话题页面（超级入口）— PRD §10.2
+ * —— 简约居中布局：输入框 + 双排快捷入口 | 右侧 AI 建议
+ * —— 支持 ?load=conversationId 自动加载历史对话（从 /recent 跳转）
  */
 export default function NewTopicPage() {
-  // ---- 对话状态（useChat hook 管理流式 API 交互）----
+  return (
+    <Suspense fallback={null}>
+      <NewTopicPageInner />
+    </Suspense>
+  );
+}
+
+function NewTopicPageInner() {
   const {
     messages,
     isStreaming,
     streamingContent,
     error,
+    conversationId,
     sendMessage,
     stopStreaming,
     clearMessages,
+    loadConversation,
   } = useChat();
 
-  // ---- 预加载智能体和项目列表（供 @ 和 # 下拉使用）----
-  const loadAgents = useAgentStore((s) => s.loadAgents);
-  const loadProjects = useProjectStore((s) => s.loadProjects);
+  // 从 Zustand ui-store 读取/写入输入态（PRD §10.2 要求）
+  const input = useUiStore((s) => s.newTopicInput);
+  const setInput = useUiStore((s) => s.setNewTopicInput);
+  const pendingSystemPrompt = useUiStore((s) => s.newTopicPendingSystemPrompt);
+  const setPendingSystemPrompt = useUiStore((s) => s.setNewTopicPendingSystemPrompt);
+  const clearNewTopicInput = useUiStore((s) => s.clearNewTopicInput);
+  const storeSetModelId = useUiStore((s) => s.setNewTopicModelId);
 
+  // 模型选择偏好 Hook（localStorage 恢复 + 持久化，同步到 Zustand ui-store）
+  const { selectedModelId, handleModelChange, getApiModelId } = useModelPreference(
+    storeSetModelId,
+  );
+
+  // 从 /recent 点击跳转时通过 ?load=conversationId 自动加载历史对话
+  const searchParams = useSearchParams();
   useEffect(() => {
-    loadAgents();
-    loadProjects();
-  }, [loadAgents, loadProjects]);
+    const loadId = searchParams.get("load");
+    if (loadId) {
+      loadConversation(loadId);
+    }
+  }, [searchParams, loadConversation]);
 
-  // ---- 本地 UI 状态 ----
-  const [input, setInput] = useState("");
-  const [provider, setProvider] = useState<ModelProvider>("deepseek");
-  const [focusKey, setFocusKey] = useState(0);
-  // 由快捷卡片带入的专属 system prompt（外贸专项角色）；发送后清空
-  const [pendingSystemPrompt, setPendingSystemPrompt] = useState<
-    string | undefined
-  >(undefined);
-
-  // ---- 是否有对话消息 ----
   const hasMessages = messages.length > 0;
 
-  // ---- 发送消息（携带专属 system prompt，若有）----
+  // 快捷任务面板折叠态（仅空态展示）
+  const [showQuickTask, setShowQuickTask] = useState(false);
+
   const handleSend = useCallback(() => {
     if (!input.trim() || isStreaming) return;
-    sendMessage(input.trim(), pendingSystemPrompt);
-    setInput("");
-    setPendingSystemPrompt(undefined);
-  }, [input, isStreaming, sendMessage, pendingSystemPrompt]);
+    const apiModelId = getApiModelId();
 
-  // ---- 快捷卡片点击 → 填入输入框并聚焦，记录专属 system prompt ----
-  const handleQuickCardSelect = useCallback(
+    // 解析输入中的 @智能体、#项目、/命令
+    const agentMentions = input.match(/@(\S+)/g)?.map((m: string) => m.slice(1)) ?? [];
+    const projectRefs = input.match(/#(\S+)/g)?.map((m: string) => m.slice(1)) ?? [];
+    const slashCommands = input.match(/\/ft-\S+/g) ?? [];
+
+    // 构建增强的 system prompt（合并命令、智能体上下文）
+    let enhancedSystemPrompt = pendingSystemPrompt;
+    if (slashCommands.length > 0) {
+      const cmdContext = `用户触发了以下技能命令: ${slashCommands.join(", ")}。请按对应技能的职责处理请求。`;
+      enhancedSystemPrompt = enhancedSystemPrompt
+        ? `${enhancedSystemPrompt}\n\n${cmdContext}`
+        : cmdContext;
+    }
+    if (agentMentions.length > 0) {
+      const agentCtx = `用户 @提及了以下智能体: ${agentMentions.join(", ")}。请以协作模式与这些智能体配合。`;
+      enhancedSystemPrompt = enhancedSystemPrompt
+        ? `${enhancedSystemPrompt}\n\n${agentCtx}`
+        : agentCtx;
+    }
+    if (projectRefs.length > 0) {
+      const projectCtx = `用户引用了以下项目空间: ${projectRefs.join(", ")}。请将结果关联至对应项目。`;
+      enhancedSystemPrompt = enhancedSystemPrompt
+        ? `${enhancedSystemPrompt}\n\n${projectCtx}`
+        : projectCtx;
+    }
+
+    sendMessage(input.trim(), enhancedSystemPrompt, apiModelId);
+    clearNewTopicInput();
+  }, [input, isStreaming, sendMessage, pendingSystemPrompt, getApiModelId, clearNewTopicInput]);
+
+  const handleQuickActionSelect = useCallback(
     (prompt: string, systemPrompt?: string) => {
       setInput(prompt);
       setPendingSystemPrompt(systemPrompt);
-      setFocusKey((k) => k + 1);
     },
-    [],
+    [setInput, setPendingSystemPrompt],
   );
 
-  // ---- 右侧 @智能体 → 填入输入框 ----
-  const handleMentionAgent = (agentName: string) => {
-    setInput(
-      `${input.trimEnd()}${input.trimEnd() ? " " : ""}@${agentName} `,
-    );
-    setFocusKey((k) => k + 1);
-  };
-
-  // ---- 右侧建议点击 → 填入输入框（清除卡片专属角色，走 Hermes 规划助手）----
-  const handleSuggestionSelect = (text: string) => {
+  const handleSuggestionSelect = useCallback((text: string) => {
     setInput(text);
-    setPendingSystemPrompt(undefined);
-    setFocusKey((k) => k + 1);
-  };
+  }, [setInput]);
+
+  const handleMentionAgent = useCallback(
+    (agentName: string) => {
+      setInput((prev: string) => {
+        const trimmed = prev.trimEnd();
+        return trimmed ? `${trimmed} @${agentName} ` : `@${agentName} `;
+      });
+    },
+    [setInput],
+  );
 
   return (
     <PageTransition>
-      <div className="flex h-full gap-0">
-        {/* ======== 中栏：核心对话区 ======== */}
-        <div className="flex-1 flex flex-col px-8 py-8 overflow-hidden">
-          <div className="w-full max-w-2xl mx-auto flex flex-col flex-1 min-h-0 space-y-4">
-            {/* 欢迎头部（无消息时显示） */}
-            {!hasMessages && (
-              <motion.div
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                className="text-center space-y-1.5 shrink-0"
-              >
-                <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-                  今天想交给数字员工做什么？
-                </h1>
-                <p className="text-muted-foreground text-sm">
-                  一次需求输入，可同时生成对话、任务、项目空间与技能资产
-                </p>
-              </motion.div>
-            )}
-
-            {/* 对话消息区域（有消息时展开） */}
-            {hasMessages && (
-              <ConversationArea
-                messages={messages}
-                isStreaming={isStreaming}
-                streamingContent={streamingContent}
-                onClearMessages={clearMessages}
-              />
-            )}
-
-            {/* 核心输入区域 */}
-            <div className="shrink-0">
-              {/* 模型选择器（右上角） */}
-              <div className="flex justify-end mb-2">
-                <ModelSelector
-                  value={provider}
-                  onChange={setProvider}
-                  disabled={isStreaming}
+      <div className="h-full flex bg-background">
+        {/* 左栏：对话区撑满上方，输入框 + 快捷入口由 layout 动画在居中/底部之间切换 */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+          {/* 对话历史 — 仅在有消息时占据上方空间，内部滚动 */}
+          {hasMessages && (
+            <div className="flex-1 min-h-0 overflow-hidden px-4 md:px-8 pt-6">
+              <div className="h-full max-w-2xl mx-auto">
+                <ConversationArea
+                  messages={messages}
+                  isStreaming={isStreaming}
+                  streamingContent={streamingContent}
+                  conversationId={conversationId}
+                  onClearMessages={clearMessages}
                 />
               </div>
+            </div>
+          )}
 
-              {/* 核心命令输入框 */}
+          {/* 输入框 + 快捷入口 — layout 动画：空态居中 ↔ 有消息沉底 */}
+          <motion.div
+            layout
+            transition={{ type: "spring", stiffness: 350, damping: 30 }}
+            className={cn(
+              "px-4 md:px-8",
+              hasMessages
+                ? "shrink-0 pb-4 pt-2"
+                : "flex-1 flex flex-col items-center justify-center",
+            )}
+          >
+            <div className="w-full max-w-2xl mx-auto">
               <CommandBox
                 value={input}
                 onChange={setInput}
@@ -137,39 +164,62 @@ export default function NewTopicPage() {
                 onStop={stopStreaming}
                 isStreaming={isStreaming}
                 error={error}
-                focusKey={focusKey}
+                selectedModelId={selectedModelId}
+                onModelChange={handleModelChange}
               />
             </div>
 
-            {/* 快捷任务卡片（无消息时显示，有消息时隐藏腾出空间） */}
+            {/* 快捷入口：仅空状态展示，置于输入框下方 */}
             {!hasMessages && (
-              <div className="shrink-0">
-                <p className="text-muted-foreground text-xs font-medium mb-3 px-0.5">
-                  快捷工作流
-                </p>
-                <QuickCards onSelect={handleQuickCardSelect} />
-              </div>
-            )}
+              <div className="w-full max-w-2xl mx-auto mt-5 space-y-4">
+                <QuickCards onSelect={handleQuickActionSelect} />
 
-            {/* 结构化快捷任务（直连 /api/task，含置信度护栏）。无消息时显示 */}
-            {!hasMessages && (
-              <div className="shrink-0">
-                <p className="text-muted-foreground text-xs font-medium mb-3 px-0.5">
-                  结构化快捷任务
-                </p>
-                <QuickTaskPanel />
+                {/* 结构化快捷任务（置信度护栏）— 可折叠 */}
+                <div className="border-t border-border pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickTask((v) => !v)}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ChevronDown
+                      className={cn(
+                        "size-3.5 transition-transform duration-200",
+                        showQuickTask && "rotate-180",
+                      )}
+                    />
+                    结构化任务
+                    <span className="text-hint font-normal">（带置信度护栏，低置信度自动提示人工复核）</span>
+                  </button>
+                  <AnimatePresence>
+                    {showQuickTask && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pt-3">
+                          <QuickTaskPanel />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
             )}
-          </div>
+          </motion.div>
         </div>
 
-        {/* ======== 右栏：智能建议 ======== */}
-        <div className="w-72 shrink-0 border-l border-border px-4 py-5 overflow-hidden">
+        <aside className="w-64 xl:w-72 shrink-0 border-l border-border overflow-y-auto hidden xl:flex flex-col p-3">
           <SuggestionPanel
-            onMentionAgent={handleMentionAgent}
             onSelectSuggestion={handleSuggestionSelect}
+            onMentionAgent={handleMentionAgent}
           />
-        </div>
+          {/* 分隔线 */}
+          <div className="border-t border-border my-3" />
+          <RecentPanel />
+        </aside>
       </div>
     </PageTransition>
   );

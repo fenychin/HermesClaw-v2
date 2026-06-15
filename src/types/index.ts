@@ -15,6 +15,12 @@ export type {
   Project,
   ProjectType,
   ProjectStatus,
+  ProjectSpace,
+  ProjectSkill,
+  ProjectConnection,
+  ProjectInstruction,
+  ProjectFile,
+  ProjectContext,
 } from './project'
 
 // ---- Memory 记忆 ----
@@ -48,8 +54,16 @@ export type {
   HarnessStatus,
   HarnessEvaluateResult,
   EvolutionLogEntry,
+  TargetComponent,
 } from './harness'
-export { TRADE_ACTIONS, automationLevelFromRisk } from './harness'
+export {
+  TRADE_ACTIONS,
+  automationLevelFromRisk,
+  resolveAutomationLevel,
+  mapAutomationToAuditRisk,
+  mapAutomationToLogRisk,
+  mapAutomationToRouteRisk,
+} from './harness'
 
 // ---- Trade 外贸 ----
 export type {
@@ -75,9 +89,7 @@ export type {
   ModelProvider,
   ChatMessage,
   ChatRequest,
-  ModelOption,
 } from "./chat";
-export { AVAILABLE_MODELS } from "./chat";
 
 // ---- Hermes 控制面（今日主动建议）----
 export type {

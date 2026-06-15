@@ -12,6 +12,30 @@ export interface Notification {
   createdAt: string;
 }
 
+/** 新话题附件引用 */
+export interface TopicAttachment {
+  name: string
+  url: string
+  size?: number
+  type?: string
+}
+
+/** OpenClaw 智能体执行状态快照 */
+export interface AgentExecutionState {
+  /** 智能体 ID */
+  agentId: string
+  /** 当前执行状态 */
+  status: 'idle' | 'executing' | 'succeeded' | 'failed' | 'cancelled'
+  /** 当前正在执行的任务名称 */
+  currentTask?: string
+  /** 执行进度（0-100），可选 */
+  progress?: number
+  /** 最近一次事件时间戳 */
+  lastEventAt?: string
+  /** 最近一次错误信息 */
+  lastError?: string
+}
+
 /**
  * 全局 UI 状态（纯客户端交互态）
  * —— 约定：Zustand 仅承载 UI / 客户端状态；服务端数据一律交由 TanStack Query 管理。
@@ -33,8 +57,34 @@ interface UiState {
   notifications: Notification[];
   /** 待审批 Harness 提案数量 */
   upgradeProposalCount: number;
+  /** 项目空间系统指令是否已保存（用于编辑器保存状态指示） */
+  projectSystemPromptSaved: boolean;
+  /** OpenClaw 智能体执行状态映射（agentId → 执行快照） */
+  agentExecutionStates: Record<string, AgentExecutionState>;
+
+  // ---- 新话题（/new）输入态 ----
+  /** 新话题输入框内容 */
+  newTopicInput: string;
+  /** 新话题选中的模型 ID */
+  newTopicModelId: string;
+  /** 新话题待提交的 system prompt（快捷卡片注入） */
+  newTopicPendingSystemPrompt: string | undefined;
+  /** 新话题已上传的附件列表 */
+  newTopicAttachments: TopicAttachment[];
 
   // ---- 操作方法 ----
+  /** 设置新话题输入框内容 */
+  setNewTopicInput: (input: string | ((prev: string) => string)) => void;
+  /** 设置新话题选中模型 */
+  setNewTopicModelId: (modelId: string) => void;
+  /** 设置新话题 pending system prompt */
+  setNewTopicPendingSystemPrompt: (prompt: string | undefined) => void;
+  /** 添加附件到新话题 */
+  addNewTopicAttachment: (attachment: TopicAttachment) => void;
+  /** 移除新话题附件 */
+  removeNewTopicAttachment: (index: number) => void;
+  /** 清空新话题所有输入态 */
+  clearNewTopicInput: () => void;
   /** 切换侧边栏折叠态 */
   toggleSidebar: () => void;
   /** 显式设置侧边栏折叠态 */
@@ -63,6 +113,12 @@ interface UiState {
   removeNotification: (id: string) => void;
   /** 设置升级提案计数 */
   setUpgradeProposalCount: (count: number) => void;
+  /** 设置项目系统指令保存状态 */
+  setProjectSystemPromptSaved: (saved: boolean) => void;
+  /** 更新指定智能体的执行状态（由 SSE 事件驱动） */
+  updateAgentExecutionState: (state: AgentExecutionState) => void;
+  /** 清除指定智能体的执行状态 */
+  clearAgentExecutionState: (agentId: string) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -74,6 +130,8 @@ export const useUiStore = create<UiState>((set) => ({
   activeRightPanel: null,
   notifications: [],
   upgradeProposalCount: 0,
+  projectSystemPromptSaved: false,
+  agentExecutionStates: {},
 
   toggleSidebar: () =>
     set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
@@ -124,4 +182,51 @@ export const useUiStore = create<UiState>((set) => ({
     })),
 
   setUpgradeProposalCount: (count) => set({ upgradeProposalCount: count }),
+
+  setProjectSystemPromptSaved: (saved) => set({ projectSystemPromptSaved: saved }),
+
+  updateAgentExecutionState: (execState) =>
+    set((state) => ({
+      agentExecutionStates: {
+        ...state.agentExecutionStates,
+        [execState.agentId]: {
+          ...state.agentExecutionStates[execState.agentId],
+          ...execState,
+        },
+      },
+    })),
+
+  clearAgentExecutionState: (agentId) =>
+    set((state) => {
+      const next = { ...state.agentExecutionStates }
+      delete next[agentId]
+      return { agentExecutionStates: next }
+    }),
+
+  // ---- 新话题输入态 ----
+  newTopicInput: "",
+  newTopicModelId: "deepseek-v4-pro",
+  newTopicPendingSystemPrompt: undefined,
+  newTopicAttachments: [],
+
+  setNewTopicInput: (input) =>
+    set((state) => ({
+      newTopicInput: typeof input === "function" ? input(state.newTopicInput) : input,
+    })),
+  setNewTopicModelId: (modelId) => set({ newTopicModelId: modelId }),
+  setNewTopicPendingSystemPrompt: (prompt) => set({ newTopicPendingSystemPrompt: prompt }),
+  addNewTopicAttachment: (attachment) =>
+    set((state) => ({
+      newTopicAttachments: [...state.newTopicAttachments, attachment],
+    })),
+  removeNewTopicAttachment: (index) =>
+    set((state) => ({
+      newTopicAttachments: state.newTopicAttachments.filter((_, i) => i !== index),
+    })),
+  clearNewTopicInput: () =>
+    set({
+      newTopicInput: "",
+      newTopicPendingSystemPrompt: undefined,
+      newTopicAttachments: [],
+    }),
 }));

@@ -5,12 +5,12 @@
 import { describe, it, expect } from 'vitest'
 import {
   AgentCreateSchema,
-  HarnessProposalUpdateSchema,
   ChatMessageSchema,
   ProjectCreateSchema,
   MemoryCreateSchema,
   AgentLogCreateSchema,
-} from '@/lib/validators'
+} from '@/lib/server/validators'
+import { HarnessProposalUpdateSchema } from '@/contracts'
 
 // ==============================
 // AgentCreateSchema

@@ -25,7 +25,8 @@ export type VectorIndexStatus = "indexed" | "unindexed"
 export interface FileVersion {
   id: string
   fileName: string
-  size: string
+  /** 文件大小（字节） */
+  size: number
   operator: string
   createdAt: string
   note?: string
@@ -40,8 +41,8 @@ export interface FileItem {
   type: string
   /** 分类 */
   category: FileCategory
-  /** 文件大小 */
-  size: string
+  /** 文件大小（字节），展示时用 Intl.NumberFormat 格式化 */
+  size: number
   /** 关联项目 ID */
   relatedProjectId?: string
   /** 关联项目名称 */

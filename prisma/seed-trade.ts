@@ -6,13 +6,14 @@
  * 用法：pnpm seed:trade   （或 pnpm exec tsx prisma/seed-trade.ts）
  */
 import 'dotenv/config'
-import { PrismaClient } from '../src/generated/prisma/client'
+import { PrismaClient } from '../src/generated/prisma-v2/client'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import {
   mockInquiries,
   mockIntelligence,
   mockQuotations,
-} from '../src/lib/mock-data'
+  mockExchangeRates,
+} from '../src/lib/server/__mocks__/mock-data'
 
 const adapter = new PrismaBetterSqlite3({
   url: process.env['DATABASE_URL'] ?? 'file:./dev.db',
@@ -63,6 +64,24 @@ async function main() {
     })
   }
 
+  // ---- 汇率 ----
+  console.log(`→ 汇率（${mockExchangeRates.length} 条）...`)
+  // ExchangeRate 用 unique([workspaceId, pair])，id 与 rate 前缀均为 rate-
+  const EXCHANGE_RATE_IDS = (
+    await prisma.exchangeRate.findMany({ select: { id: true } })
+  ).map((r) => r.id)
+  for (const r of mockExchangeRates) {
+    if (EXCHANGE_RATE_IDS.includes(r.id)) {
+      await prisma.exchangeRate.update({ where: { id: r.id }, data: { value: r.value, change24h: r.change24h } })
+      console.log(`  🔄 ${r.pair}（已更新）`)
+    } else {
+      await prisma.exchangeRate.create({
+        data: { id: r.id, workspaceId: 'default', pair: r.pair, value: r.value, change24h: r.change24h },
+      })
+      console.log(`  ✅ ${r.pair}（新建）`)
+    }
+  }
+
   // ---- 报价 ----
   console.log(`→ 报价（${mockQuotations.length} 条）...`)
   for (const u of mockQuotations) {
@@ -84,6 +103,7 @@ async function main() {
   console.log('\n✅ Trade 种子数据写入完成！')
   console.log(`   - 询盘：${mockInquiries.length} 条`)
   console.log(`   - 市场情报：${mockIntelligence.length} 条`)
+  console.log(`   - 汇率：${mockExchangeRates.length} 条`)
   console.log(`   - 报价：${mockQuotations.length} 条`)
 }
 

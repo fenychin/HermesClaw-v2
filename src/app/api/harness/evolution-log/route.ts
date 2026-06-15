@@ -7,6 +7,7 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 export const runtime = "nodejs"
 
@@ -21,6 +22,7 @@ function serialize(log: { evaluatedAt: Date; createdAt: Date } & Record<string, 
 
 export async function GET(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const { searchParams } = new URL(request.url)
     const limitParam = Number(searchParams.get("limit"))
     const limit =
@@ -29,6 +31,7 @@ export async function GET(request: Request) {
         : 50
 
     const logs = await prisma.evolutionLog.findMany({
+      where: { workspaceId: ctx.workspaceId },
       orderBy: { createdAt: "desc" },
       take: limit,
     })

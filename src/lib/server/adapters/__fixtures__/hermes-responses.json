@@ -1,0 +1,56 @@
+{
+  "contractVersion": 1,
+  "responses": {
+    "/workflows/run": {
+      "executionId": "mock-exec-001",
+      "status": "completed",
+      "outputs": {
+        "summary": "模拟工作流执行完成",
+        "generatedContent": "这是 Mock 模式生成的示例内容",
+        "confidence": 0.92,
+        "timestamp": "<ISO_TIMESTAMP>"
+      },
+      "durationMs": 1234
+    },
+    "/harness/evaluate": {
+      "proposalId": "<HEP_ID>",
+      "triggeredBy": "自动评估",
+      "problemStatement": "模拟检测到工具调用成功率低于阈值（82%），需要评估当前 Harness 配置",
+      "proposedChange": "建议调整超时阈值并增加重试机制，优化工具接入层的容错能力",
+      "riskLevel": "medium",
+      "automationLevel": "L2",
+      "requiresHumanApproval": true,
+      "estimatedImpact": "预计将工具调用成功率提升至 95% 以上，降低任务中断频率",
+      "createdAt": "<ISO_TIMESTAMP>"
+    },
+    "/memory/write": {
+      "success": true
+    },
+    "/memory/read": {
+      "key": "pact-key",
+      "value": "pact-value",
+      "level": "short",
+      "writtenAt": "<ISO_TIMESTAMP>"
+    },
+    "/sessions/create": {
+      "sessionId": "<SESSION_ID>",
+      "agentId": "agent-pact",
+      "workspaceId": "ws-pact",
+      "createdAt": "<ISO_TIMESTAMP>"
+    },
+    "/sessions/close": {
+      "archived": true
+    },
+    "/sessions/tool-calls": {
+      "accepted": true
+    },
+    "/harness/report": {
+      "reportId": "report-pact"
+    },
+    "/health": {
+      "ok": true,
+      "version": "mock-0.3.2",
+      "latencyMs": 0
+    }
+  }
+}
