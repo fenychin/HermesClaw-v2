@@ -69,6 +69,10 @@ export const POST = withRBAC(
         return ApiResponse.apiError('Agent not found', 404, 'NOT_FOUND')
       }
 
+      if (agent.status === 'rolled-back') {
+        return ApiResponse.apiError('Agent 不可用 (rolled-back)', 409, 'AGENT_ROLLED_BACK')
+      }
+
       // 3. 风险等级自动判定逻辑 (L3 Agent 下发写操作或包含高危词即 high)
       let riskLevel: 'low' | 'medium' | 'high' | 'critical' = 'low'
       const inputLower = input.toLowerCase()

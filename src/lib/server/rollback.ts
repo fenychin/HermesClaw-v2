@@ -310,7 +310,10 @@ export async function executeRollback(
 
       await tx.agent.update({
         where: { id: agentId },
-        data: agentUpdateData
+        data: {
+          ...agentUpdateData,
+          status: 'rolled-back'
+        }
       })
 
       // 5b. 恢复 WorkflowTemplate 列表
