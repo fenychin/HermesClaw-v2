@@ -1,34 +1,29 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import {
-  parseJsonField,
   stringifyJsonField,
+  serializeConnector,
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { ConnectorCreateSchema, validateBody } from "@/lib/validators"
+import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
+import { ConnectorCreateSchema, validateBody } from "@/lib/server/validators"
+import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
+import type { Connector } from "@/types"
 
-/** 序列化 Connector，将 JSON 字符串字段反序列化 */
-function serializeConnector(connector: Record<string, unknown>) {
-  return {
-    ...connector,
-    permissions: parseJsonField(connector.permissions as string, []),
-    usedByAgents: parseJsonField(connector.usedByAgents as string, []),
-  }
-}
+import { getEnrichedConnectors } from "@/lib/server/connectors"
 
 /** GET /api/connectors —— 获取所有连接器列表（CDN 缓存 60s，过期后可 revalidate 30s） */
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const connectors = await prisma.connector.findMany({
-      orderBy: { createdAt: "desc" },
-    })
+    const ctx = await buildWorkspaceContext(request)
+    const enrichedConnectors = await getEnrichedConnectors(ctx.workspaceId)
 
     return Response.json(
       {
         success: true,
         data: {
-          connectors: connectors.map((c) => serializeConnector(c as unknown as Record<string, unknown>)),
+          connectors: enrichedConnectors,
         },
       },
       {
@@ -43,9 +38,11 @@ export async function GET() {
   }
 }
 
-/** POST /api/connectors —— 创建新连接器 */
+/** POST /api/connectors —— 创建新连接器（AGENTS.md §4.3：连接器变更须留审计） */
 export async function POST(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
+    requireWritable(ctx.role)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, ConnectorCreateSchema)
     if (parsed instanceof Response) return parsed
@@ -54,6 +51,7 @@ export async function POST(request: Request) {
     const connector = await prisma.connector.create({
       data: {
         id: crypto.randomUUID(),
+        workspaceId: ctx.workspaceId,
         name: body.name,
         iconEmoji: body.iconEmoji,
         description: body.description,
@@ -63,6 +61,17 @@ export async function POST(request: Request) {
         permissions: stringifyJsonField(body.permissions),
         usedByAgents: stringifyJsonField(body.usedByAgents),
       },
+    })
+
+    // AGENTS.md §4.3 连接器变更审计：创建新连接器须留痕
+    await writeAuditLog({
+      actor: await actorFromSession(),
+      action: "connector.create",
+      targetType: "connector",
+      targetId: connector.id,
+      detail: `创建连接器 ${body.name}（${body.category}）`,
+      riskLevel: "medium",
+      workspaceId: ctx.workspaceId,
     })
 
     return successResponse(

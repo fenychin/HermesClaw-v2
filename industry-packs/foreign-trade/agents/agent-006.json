@@ -1,0 +1,21 @@
+{
+  "id": "agent-006",
+  "name": "Athena",
+  "role": "市场研究员",
+  "description": "持续监测行业趋势、竞品动作、政策变化，输出市场周报和机会洞察",
+  "status": "running",
+  "source": "builtin",
+  "category": ["市场研究", "商业情报"],
+  "bindSkills": ["skill-006", "skill-012"],
+  "bindConnectors": ["conn-010", "conn-013", "conn-016", "conn-018"],
+  "memoryPermission": "read-write",
+  "harnessVersion": "2.1.0",
+  "automationLevel": "L1",
+  "canDo": ["采集行业与竞品数据", "生成市场周报/月报", "识别市场机会与风险", "生成情报分发建议"],
+  "cannotDo": ["执行交易操作", "修改客户数据", "对外发布未经审阅的情报"],
+  "stats": { "todayTasks": 5, "successRate": 0.95, "avgDuration": "12m 40s" },
+  "lastActive": "2026-06-06T09:00:00Z",
+  "createdAt": "2026-03-01T08:00:00Z",
+  "industryId": "foreign-trade",
+  "templateId": "ft-market-researcher"
+}

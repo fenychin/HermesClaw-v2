@@ -1,0 +1,28 @@
+id: ft-kpi-funnel
+title: 外贸跟进漏斗 (大盘 Drill-down)
+description: 反映客户生命周期的流转效率，点击节点可直达工作流控制台
+steps:
+  - label: 客户询盘
+    trend: "+12%"
+    color: "bg-primary/5 text-primary border-primary/20 hover:border-primary/50"
+    wfId: inquiry-grade
+    desc: 询盘智能分级评估
+    field: todayInquiries
+  - label: 客户画像
+    trend: "+8%"
+    color: "bg-brand-blue/5 text-brand-blue border-brand-blue/20 hover:border-brand-blue/50"
+    wfId: customer-profile
+    desc: 多维客户背景建档
+    field: followingCustomers
+  - label: 发送报价
+    trend: "-3%"
+    color: "bg-warning/5 text-warning border-warning/20 hover:border-warning/50"
+    wfId: quote-gen
+    desc: 多术语智能成本报价
+    field: quotationsCount
+  - label: 订单推进
+    trend: "+15%"
+    color: "bg-success/5 text-success border-success/20 hover:border-success/50"
+    wfId: order-push
+    desc: 跟单节点合规监控
+    field: acceptedQuotationsCount

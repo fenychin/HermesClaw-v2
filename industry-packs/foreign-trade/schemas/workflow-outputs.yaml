@@ -1,0 +1,36 @@
+# foreign-trade 行业包 — 工作流输出结构声明
+# 此文件定义各工作流节点的标准输出字段契约
+# SDK 的通用输出提取器将依据此声明进行解析，解耦前端与 nodeId 的强绑定
+
+outputSchemas:
+  # 开发信草稿输出（由 dev-letter 工作流生成）
+  devLetterDraft:
+    description: "开发信草稿，从工作流任意节点输出中提取"
+    fields:
+      - key: subject
+        type: string
+        description: "邮件主题"
+      - key: body
+        type: string
+        description: "邮件正文"
+    extractStrategy: "scanNodeOutputs"
+    # 所有节点的 result 或顶层字段都会被扫描，找到同时包含 subject 和 body 的即为命中
+
+  # 询盘分级信息（由 inquiry-grade 工作流生成）
+  inquiryGradeInfo:
+    description: "询盘分级结果，从工作流任意节点输出中提取"
+    fields:
+      - key: grade
+        type: string
+        required: true
+        description: "询盘等级（A / B / C）"
+      - key: score
+        type: number
+        description: "询盘评分（0-100）"
+      - key: analysis
+        type: string
+        description: "分级分析说明"
+      - key: suggestedAction
+        type: string
+        description: "建议跟进动作"
+    extractStrategy: "scanNodeOutputs"
