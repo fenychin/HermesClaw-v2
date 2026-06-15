@@ -1,7 +1,7 @@
 import { ApiResponse } from '@/lib/server/api-response'
 import { prisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/server/audit'
-import { MAX_WORKFLOW_RUN_DURATION_MS } from '@/lib/server/workflow/runtime-engine'
+import { MAX_WORKFLOW_RUN_DURATION_MS, DEFAULT_STEP_TIMEOUT_MS } from '@/lib/server/workflow/runtime-engine'
 import { logger } from '@/lib/logger'
 import { NextResponse } from 'next/server'
 
@@ -76,19 +76,46 @@ export async function GET(req: Request) {
       timedOutCount++
     }
 
+    // 4. 巡检 StepRun 超时
+    const staleStepCutoff = new Date(Date.now() - DEFAULT_STEP_TIMEOUT_MS)
+    const timedOutSteps = await prisma.stepRun.findMany({
+      where: { status: 'running', startedAt: { lt: staleStepCutoff } }
+    })
+    for (const step of timedOutSteps) {
+      await prisma.stepRun.update({
+        where: { stepId: step.stepId },
+        data: {
+          status: 'failed',
+          errorCode: 'STEP_TIMEOUT',
+          errorMessage: 'Step timed out via cron sweep',
+          completedAt: new Date(),
+        }
+      })
+      await writeAuditLog({
+        actor: 'system',
+        action: 'workflow.step.timeout',
+        targetType: 'workflow',
+        targetId: step.nodeId,
+        detail: `StepRun ${step.stepId} timed out`,
+        riskLevel: 'high',
+        workspaceId: step.workspaceId,
+        contextSnapshot: { stepId: step.stepId, runId: step.runId }
+      })
+    }
+
     // 写入 Cron 汇总审计日志
     await writeAuditLog({
       actor: 'system',
       action: 'cron.workflow-timeout.completed',
       targetType: 'cron',
       targetId: 'workflow-timeout',
-      detail: `Workflow timeout watchdog cron execution completed. Timed out runs count: ${timedOutCount}`,
+      detail: `Workflow timeout watchdog cron execution completed. Timed out runs count: ${timedOutCount}, Timed out steps count: ${timedOutSteps.length}`,
       riskLevel: 'low',
       workspaceId: 'system',
-      contextSnapshot: { timedOutCount }
+      contextSnapshot: { timedOutCount, timedOutStepsCount: timedOutSteps.length }
     })
 
-    return ApiResponse.ok({ timedOutCount })
+    return ApiResponse.ok({ timedOutCount, timedOutStepsCount: timedOutSteps.length })
   } catch (err: any) {
     logger.error('CRON workflow-timeout: execution failed', {
       service: 'cron-workflow-timeout',

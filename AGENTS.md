@@ -226,6 +226,9 @@ Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私
   - **时效管理**：提案审批默认 72 小时时效，高危动作默认 24 小时时效。审批超时必须提取为顶层常量（如 `PROPOSAL_APPROVAL_EXPIRY_MS`），严禁在函数内硬编码。
   - **状态与审计强关联**：审批检查点（`ApprovalCheckpoint`）生命周期的状态跃迁，必须与 AuditLog 的 `approval.*` 审计链（`requested` / `granted` / `rejected` / `expired`）强关联绑定，做到一客一审，审计与拦截可追溯。
   - **高危租约校验约定**：高危或批量操作的 `leaseToken` 可直接复用以已授权审批检查点 `acp-` 开头的 ID。执行面连接器必须主动查验该 `ApprovalCheckpoint` 的状态为 `approved` 且在有效期内，查验通过后记录 `approval.verified` 审计日志，建立物理发信与审批核验的完整可追溯链条。
+- **执行引擎补充约定（v3.11）**：
+  - **Serverless 超时机制**：明确声明 Serverless 环境下的超时控制不得使用应用内本地 `Promise.race`，必须统一委托给后台 `Cron` 巡检补偿器（如 `/api/cron/workflow-timeout`）驱动。
+  - **快速失败 (Fast-fail) 契约**：所有 `Execution Runtime`（执行引擎）在接收到属于“权限阻断（如 Grant Missing 等策略异常）”或“人工拒绝（Approval Rejected）”等明确的安全拦截与硬错误时，必须立刻跳过常规容错重试机制（Fast-fail），立即终止执行并抛出错误。
 
 
 ---
@@ -326,6 +329,9 @@ Harness Runtime 至少由以下对象组成：
 - **API 路由**：`POST /api/workflow-runs`（启动）/ `POST /api/workflow-runs/[id]/execute`（执行）/ `POST /api/workflow-runs/[id]/cancel`（取消）/ `GET /api/workflow-runs/[id]/status`（状态查询）
 - **审计动作**：`workflow.run.started` / `workflow.run.completed` / `workflow.run.failed` / `workflow.run.cancelled` / `workflow.run.resumed` / `orchestration.session.started` / `orchestration.session.completed` / `orchestration.session.failed` / `orchestration.subagent.completed` / `orchestration.session.resumed`
 - **单元测试**：[runtime-engine.test.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/workflow/__tests__/runtime-engine.test.ts)（28 个测试用例） / [orchestrator.test.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/__tests__/orchestrator.test.ts)（14 个测试用例）
+- **Legacy 引擎**：`dag-engine.ts` + `dag-runner.ts` 为历史遗留并行实现，
+  已标记 `@deprecated`，操作 `WorkflowNodeRun` 表，不接受新功能对接。
+  所有新工作流逻辑必须使用 `runtime-engine.ts`。
 
 ---
 

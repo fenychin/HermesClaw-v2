@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import React, { type ReactNode } from "react"
 
 interface SkeletonListProps {
   /** 骨架条目数 */
@@ -18,5 +18,13 @@ interface SkeletonListProps {
  *   </SkeletonList>
  */
 export function SkeletonList({ count, children }: SkeletonListProps) {
-  return <>{Array.from({ length: count }, (_, i) => children(i))}</>
+  return (
+    <>
+      {Array.from({ length: count }, (_, i) => (
+        <React.Fragment key={i}>
+          {children(i)}
+        </React.Fragment>
+      ))}
+    </>
+  )
 }

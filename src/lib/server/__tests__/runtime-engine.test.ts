@@ -91,6 +91,13 @@ describe('Workflow Runtime Engine 单元测试', () => {
   it('startWorkflowRun 成功：创建 WorkflowRun + StepRun，写入 AuditLog', async () => {
     const run = await startWorkflowRun({ workflowId, workspaceId })
     expect(prisma.workflowRun.create).toHaveBeenCalled()
+    expect(prisma.workflowRun.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          runId: expect.stringMatching(/^run-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+        })
+      })
+    )
     expect(prisma.stepRun.create).toHaveBeenCalledTimes(2)
     expect(prisma.workflowRun.update).toHaveBeenCalled()
     expect(writeAuditLog).toHaveBeenCalled()
@@ -388,35 +395,6 @@ describe('Workflow Runtime Engine 单元测试', () => {
     )
   })
 
-  // 11. executeWorkflowRun 整体超时
-  it('executeWorkflowRun 整体超时：抛出 WorkflowRunTimeoutError，Run.status="failed"', async () => {
-    const runId = 'run-timeout'
-    const mockSteps = [
-      { stepId: 'step1', nodeId: 'node1', nodeType: 'delay', status: 'pending', parentStepId: null, childStepIds: '[]', inputData: { delayMs: 1000 } }
-    ]
-    vi.mocked(prisma.workflowRun.findUnique).mockResolvedValue({
-      runId,
-      status: 'running',
-      mode: 'sequential',
-      workflowId,
-      workspaceId,
-      inputContext: {}
-    } as any)
-    vi.mocked(prisma.stepRun.findMany).mockResolvedValue(mockSteps as any)
-    vi.mocked(prisma.stepRun.findUnique).mockResolvedValue(mockSteps[0] as any)
-
-    vi.useFakeTimers()
-    const promise = executeWorkflowRun(runId, workspaceId, {
-      writeAuditLog: vi.fn()
-    })
-
-    // 推进超过最大运行时长（30 分钟 = 1800000ms）
-    await vi.advanceTimersByTimeAsync(1800001)
-
-    await expect(promise).rejects.toThrow(WorkflowRunTimeoutError)
-
-    vi.useRealTimers()
-  })
 
   // 12. cancelWorkflowRun
   it('cancelWorkflowRun：pending/running 步骤全部 skipped，Run.status="cancelled"', async () => {

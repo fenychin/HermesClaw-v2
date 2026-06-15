@@ -1,4 +1,17 @@
 /**
+ * @deprecated LEGACY ADAPTER — DO NOT USE FOR NEW FEATURES
+ *
+ * This engine was introduced in parallel with runtime-engine.ts and operates
+ * on the WorkflowNodeRun table. It is NOT registered in AGENTS.md.
+ *
+ * All new workflow logic MUST use runtime-engine.ts (StepRun table).
+ * This file is retained only for backward compatibility with any existing
+ * WorkflowNodeRun records. It will be removed after data migration.
+ *
+ * See AGENTS.md §4.6.1 for the authoritative Workflow Runtime specification.
+ */
+
+/**
  * DAG 核心执行器 —— 轻量级拓扑分层 + 并行节点调度
  *
  * 职责：纯编排（拓扑排序、分层并行、条件分支路由、handler 分派）。
@@ -21,19 +34,39 @@ import type {
   NodeExecutionResult,
   RunStatus,
 } from './dag-types'
+import { writeAuditLog } from '@/lib/server/audit'
+import { topoSortLayers, TopoNode, TopoEdge } from './utils/topo-sort'
 
 // ---- 内部常量 ----
 
 /** 跳过标记前缀，存入 ctx.nodeOutputs 以避免与正常输出键冲突 */
 const SKIPPED_PREFIX = '__skipped__'
 
-/** 安全调用生命周期钩子：异常日志警告但吞食，不阻断引擎主流程 */
-async function safeHook(fn: () => Promise<void>): Promise<void> {
+/** 安全调用生命周期钩子：异常日志警告并写入 AuditLog，不阻断引擎主流程 */
+async function safeHook(
+  fn: () => Promise<void>,
+  context?: { workspaceId?: string; hookName?: string }
+): Promise<void> {
   try {
     await fn()
   } catch (error) {
-    // 钩子异常记录警告，不阻断引擎执行
-    console.warn('[dag-engine] 引擎生命周期钩子执行失败：', error)
+    const message = error instanceof Error ? error.message : String(error)
+    // 钩子异常记录错误，不阻断引擎执行
+    console.error('[dag-engine] hook error:', error)
+    try {
+      await writeAuditLog({
+        actor: 'system',
+        action: 'workflow.hook.error',
+        targetType: 'workflow',
+        targetId: context?.hookName || 'unknown-hook',
+        detail: `safeHook caught error: ${message}`,
+        riskLevel: 'high',
+        workspaceId: context?.workspaceId || 'system',
+        contextSnapshot: { hookName: context?.hookName, errorMessage: message }
+      })
+    } catch (auditError) {
+      console.error('[dag-engine] CRITICAL: failed to write AuditLog for hook error', auditError)
+    }
   }
 }
 
@@ -66,12 +99,14 @@ async function propagateSkip(
     if (activeNodes.has(curr)) {
       activeNodes.delete(curr)
       markNodeSkipped(ctx, curr)
-      await safeHook(() =>
-        hooks.onNodeFinish?.(curr, ctx, {
-          status: 'skipped',
-          output: null,
-          error: reason,
-        }) ?? Promise.resolve(),
+      await safeHook(
+        () =>
+          hooks.onNodeFinish?.(curr, ctx, {
+            status: 'skipped',
+            output: null,
+            error: reason,
+          }) ?? Promise.resolve(),
+        { workspaceId: ctx.workspaceId, hookName: 'onNodeFinish' }
       )
     }
 
@@ -139,80 +174,7 @@ const BUILTIN_HANDLERS: Record<string, NodeHandler> = {
 
 // ---- 拓扑排序与分层 ----
 
-interface InternalNode {
-  id: string
-  kind: string
-}
-
-interface TopoLayer {
-  nodeIds: string[]
-  level: number
-}
-
-/**
- * Kahn 拓扑分层。
- * - 返回分层数组 [layer0, layer1, …]，同层节点可并行。
- * - 若有环则抛出 Error（含未处理节点 id，供上层审计）。
- */
-function topoSort(
-  nodes: InternalNode[],
-  edges: WorkflowEdge[],
-): TopoLayer[] {
-  const adj = new Map<string, string[]>()
-  const inDegree = new Map<string, number>()
-
-  for (const n of nodes) {
-    adj.set(n.id, [])
-    inDegree.set(n.id, 0)
-  }
-
-  for (const e of edges) {
-    if (!adj.has(e.from) || !adj.has(e.to)) continue // 悬挂边忽略
-    const out = adj.get(e.from)
-    if (out) out.push(e.to)
-    inDegree.set(e.to, (inDegree.get(e.to) ?? 0) + 1)
-  }
-
-  const layers: TopoLayer[] = []
-  const queue: string[] = []
-  for (const [id, deg] of inDegree) {
-    if (deg === 0) queue.push(id)
-  }
-
-  let level = 0
-  let processed = 0
-
-  while (queue.length > 0) {
-    const layerSize = queue.length
-    const layerNodeIds: string[] = []
-    for (let i = 0; i < layerSize; i++) {
-      const nodeId = queue.shift()
-      if (!nodeId) continue
-      layerNodeIds.push(nodeId)
-      processed++
-      const outgoing = adj.get(nodeId) ?? []
-      for (const neighbor of outgoing) {
-        const newDeg = (inDegree.get(neighbor) ?? 1) - 1
-        inDegree.set(neighbor, newDeg)
-        if (newDeg === 0) {
-          queue.push(neighbor)
-        }
-      }
-    }
-    layers.push({ nodeIds: layerNodeIds, level })
-    level++
-  }
-
-  if (processed !== nodes.length) {
-    const remaining = nodes.filter((n) => (inDegree.get(n.id) ?? 0) > 0)
-    throw new Error(
-      `DAG 环路检测失败：${remaining.length} 个节点存在循环依赖 ` +
-      `(${remaining.map((n) => n.id).join(', ')})`,
-    )
-  }
-
-  return layers
-}
+// 使用统一提取的 topoSortLayers
 
 // ---- handler 解析 ----
 
@@ -300,11 +262,10 @@ export async function runDag(
   }
 
   // 1. 拓扑分层
-  const internalNodes: InternalNode[] = def.nodes.map((n) => ({
+  const internalNodes: TopoNode[] = def.nodes.map((n) => ({
     id: n.id,
-    kind: n.kind,
   }))
-  const layers = topoSort(internalNodes, def.edges)
+  const layers = topoSortLayers(internalNodes, def.edges)
 
   // 2. 构建出边表（条件路由用）
   const edgeTable = buildEdgeTable(def.edges)
@@ -337,8 +298,8 @@ export async function runDag(
             status: 'failed',
             error: `节点 ${nodeId} 未在工作流定义中找到`,
           }
-          await safeHook(() => hooks.onNodeStart?.(nodeId, ctx) ?? Promise.resolve())
-          await safeHook(() => hooks.onNodeFinish?.(nodeId, ctx, missingResult) ?? Promise.resolve())
+          await safeHook(() => hooks.onNodeStart?.(nodeId, ctx) ?? Promise.resolve(), { workspaceId: ctx.workspaceId, hookName: 'onNodeStart' })
+          await safeHook(() => hooks.onNodeFinish?.(nodeId, ctx, missingResult) ?? Promise.resolve(), { workspaceId: ctx.workspaceId, hookName: 'onNodeFinish' })
           return { nodeId, result: missingResult }
         }
 
@@ -349,13 +310,13 @@ export async function runDag(
             status: 'failed',
             error: `无可用 handler：${node.handler ?? node.kind}（节点 ${nodeId}）`,
           }
-          await safeHook(() => hooks.onNodeStart?.(nodeId, ctx) ?? Promise.resolve())
-          await safeHook(() => hooks.onNodeFinish?.(nodeId, ctx, missingResult) ?? Promise.resolve())
+          await safeHook(() => hooks.onNodeStart?.(nodeId, ctx) ?? Promise.resolve(), { workspaceId: ctx.workspaceId, hookName: 'onNodeStart' })
+          await safeHook(() => hooks.onNodeFinish?.(nodeId, ctx, missingResult) ?? Promise.resolve(), { workspaceId: ctx.workspaceId, hookName: 'onNodeFinish' })
           return { nodeId, result: missingResult }
         }
 
         // 5b. onNodeStart 钩子
-        await safeHook(() => hooks.onNodeStart?.(nodeId, ctx) ?? Promise.resolve())
+        await safeHook(() => hooks.onNodeStart?.(nodeId, ctx) ?? Promise.resolve(), { workspaceId: ctx.workspaceId, hookName: 'onNodeStart' })
 
         // 5c. 执行 handler
         let result: NodeExecutionResult
@@ -374,7 +335,7 @@ export async function runDag(
         }
 
         // 5e. onNodeFinish 钩子
-        await safeHook(() => hooks.onNodeFinish?.(nodeId, ctx, result) ?? Promise.resolve())
+        await safeHook(() => hooks.onNodeFinish?.(nodeId, ctx, result) ?? Promise.resolve(), { workspaceId: ctx.workspaceId, hookName: 'onNodeFinish' })
 
         return { nodeId, result }
       }),
@@ -441,19 +402,21 @@ export async function runDag(
     if (!covered && !ctx.nodeOutputs[skipKey]) {
       activeNodes.delete(n.id)
       markNodeSkipped(ctx, n.id)
-      await safeHook(() =>
-        hooks.onNodeFinish?.(n.id, ctx, {
-          status: 'skipped',
-          output: null,
-          error: '节点未在任何拓扑层中，已跳过',
-        }) ?? Promise.resolve(),
+      await safeHook(
+        () =>
+          hooks.onNodeFinish?.(n.id, ctx, {
+            status: 'skipped',
+            output: null,
+            error: '节点未在任何拓扑层中，已跳过',
+          }) ?? Promise.resolve(),
+        { workspaceId: ctx.workspaceId, hookName: 'onNodeFinish' }
       )
     }
   }
 
   const finalStatus = anyFailed ? 'failed' : 'completed'
   // 调用工作流完成钩子，通知 runner 进行全局收尾
-  await safeHook(() => hooks.onWorkflowComplete?.(ctx, finalStatus) ?? Promise.resolve())
+  await safeHook(() => hooks.onWorkflowComplete?.(ctx, finalStatus) ?? Promise.resolve(), { workspaceId: ctx.workspaceId, hookName: 'onWorkflowComplete' })
 
   return finalStatus
 }

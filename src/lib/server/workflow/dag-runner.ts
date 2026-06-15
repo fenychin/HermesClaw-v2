@@ -1,4 +1,17 @@
 /**
+ * @deprecated LEGACY ADAPTER — DO NOT USE FOR NEW FEATURES
+ *
+ * This engine was introduced in parallel with runtime-engine.ts and operates
+ * on the WorkflowNodeRun table. It is NOT registered in AGENTS.md.
+ *
+ * All new workflow logic MUST use runtime-engine.ts (StepRun table).
+ * This file is retained only for backward compatibility with any existing
+ * WorkflowNodeRun records. It will be removed after data migration.
+ *
+ * See AGENTS.md §4.6.1 for the authoritative Workflow Runtime specification.
+ */
+
+/**
  * DAG Runner —— 数据库装配层（Hermes Control Kernel 域）
  *
  * 职责：从 Prisma 加载工作流定义 → 构造运行时上下文 → 调用 dag-engine 执行

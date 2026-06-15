@@ -1,5 +1,13 @@
+// TIMEOUT STRATEGY NOTE:
+// In-process setTimeout is NOT used for timeout enforcement — Vercel Serverless
+// functions do not guarantee timer execution after request completion.
+// Timeout enforcement is delegated to /api/cron/workflow-timeout (runs every 5 min).
+// MAX_WORKFLOW_RUN_DURATION_MS and DEFAULT_STEP_TIMEOUT_MS are used by the Cron job.
+
 import { prisma } from "@/lib/prisma"
 import { writeAuditLog } from "@/lib/server/audit"
+import { randomUUID } from 'crypto'
+import { topoSortFlat } from './utils/topo-sort'
 
 // 1. 顶层常量
 export const RUNTIME_ENGINE_VERSION = '1.0'
@@ -81,44 +89,43 @@ export interface RuntimeEngineDeps {
   requestHumanApproval?: (stepId: string, context: Record<string, unknown>) => Promise<boolean>
 }
 
-// 拓扑排序辅助函数
-function topoSort(nodes: any[], edges: any[]): any[] {
-  const adj = new Map<string, string[]>()
-  const inDegree = new Map<string, number>()
-
-  for (const n of nodes) {
-    adj.set(n.id, [])
-    inDegree.set(n.id, 0)
-  }
-
-  for (const e of edges) {
-    if (!adj.has(e.from) || !adj.has(e.to)) continue
-    adj.get(e.from)!.push(e.to)
-    inDegree.set(e.to, (inDegree.get(e.to) ?? 0) + 1)
-  }
-
-  const queue: string[] = []
-  for (const [id, deg] of inDegree) {
-    if (deg === 0) queue.push(id)
-  }
-
-  const result: string[] = []
-  while (queue.length > 0) {
-    const curr = queue.shift()!
-    result.push(curr)
-    for (const neighbor of adj.get(curr) || []) {
-      inDegree.set(neighbor, inDegree.get(neighbor)! - 1)
-      if (inDegree.get(neighbor) === 0) {
-        queue.push(neighbor)
+// 内部辅助函数：处理失败工作流状态与审计
+async function failWorkflowRunAndAudit(
+  runId: string,
+  workflowId: string,
+  workspaceId: string,
+  errorMessage: string,
+  errorCode: string,
+  failedStepId: string | undefined,
+  activeWriteAuditLog: any
+) {
+  try {
+    await prisma.workflowRun.update({
+      where: { runId },
+      data: {
+        status: 'failed',
+        errorMessage,
+        completedAt: new Date()
       }
-    }
+    })
+  } catch (dbErr) {
+    console.error(`[runtime-engine] CRITICAL: Failed to update WorkflowRun ${runId} to failed status:`, dbErr)
   }
 
-  if (result.length !== nodes.length) {
-    throw new Error('DAG contains cycles')
+  try {
+    await activeWriteAuditLog({
+      actor: 'system',
+      action: 'workflow.run.error', // changed from failed to error to align with dag-engine / high risk
+      targetType: 'workflow',
+      targetId: workflowId,
+      detail: `Workflow run ${runId} failed: ${errorMessage}`,
+      riskLevel: 'high',
+      workspaceId,
+      contextSnapshot: { runId, errorCode, failedStepId }
+    })
+  } catch (auditErr) {
+    console.error(`[runtime-engine] CRITICAL: failed to write AuditLog for workflow run error`, auditErr)
   }
-
-  return result.map(id => nodes.find(n => n.id === id))
 }
 
 // 4. startWorkflowRun
@@ -180,9 +187,9 @@ export async function startWorkflowRun(
   }
 
   // 计算拓扑排序
-  const sortedNodes = topoSort(nodes, edges)
+  const sortedNodes = topoSortFlat(nodes, edges)
 
-  const runId = `run-${Math.random().toString(36).substring(2, 9)}`
+  const runId = `run-${randomUUID()}`
 
   // 3. 创建 WorkflowRun 记录
   const run = await prisma.workflowRun.create({
@@ -287,37 +294,7 @@ export async function executeWorkflowRun(
     throw new WorkflowRunAlreadyCompletedError(runId, run.status)
   }
 
-  // 2. 超时竞态控制
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(async () => {
-      // 超时处理：标记 WorkflowRun 状态为 failed
-      try {
-        await prisma.workflowRun.update({
-          where: { runId },
-          data: {
-            status: 'failed',
-            errorMessage: 'WorkflowRun duration limit exceeded',
-            completedAt: new Date()
-          }
-        })
-        await activeWriteAuditLog({
-          actor: 'system',
-          action: 'workflow.run.failed',
-          targetType: 'workflow',
-          targetId: run.workflowId,
-          detail: `Workflow run ${runId} failed due to timeout`,
-          riskLevel: 'high',
-          workspaceId,
-          contextSnapshot: { runId, errorCode: 'TIMEOUT', failedStepId: undefined }
-        })
-      } catch (err) {
-        // 容错
-      }
-      reject(new WorkflowRunTimeoutError(runId))
-    }, MAX_WORKFLOW_RUN_DURATION_MS)
-  })
-
-  const executionPromise = (async () => {
+  return (async () => {
     let currentInput = { ...(run.inputContext as Record<string, any>) }
 
     // 开始执行
@@ -386,24 +363,15 @@ export async function executeWorkflowRun(
             currentInput = { ...currentInput, ...output }
           } catch (err) {
             // 步骤执行抛错
-            await prisma.workflowRun.update({
-              where: { runId },
-              data: {
-                status: 'failed',
-                errorMessage: err instanceof Error ? err.message : 'Step failed',
-                completedAt: new Date()
-              }
-            })
-            await activeWriteAuditLog({
-              actor: 'system',
-              action: 'workflow.run.failed',
-              targetType: 'workflow',
-              targetId: run.workflowId,
-              detail: `Workflow run ${runId} failed at step ${step.nodeId}`,
-              riskLevel: 'high',
+            await failWorkflowRunAndAudit(
+              runId,
+              run.workflowId,
               workspaceId,
-              contextSnapshot: { runId, errorCode: err instanceof Error ? err.name || 'Error' : 'UNKNOWN_ERROR', failedStepId: step.nodeId }
-            })
+              err instanceof Error ? err.message : 'Step failed',
+              err instanceof Error ? err.name || 'Error' : 'UNKNOWN_ERROR',
+              step.nodeId,
+              activeWriteAuditLog
+            )
             throw err
           }
         } else if (run.mode === 'parallel' || run.mode === 'conditional' || run.mode === 'human-in-loop') {
@@ -443,24 +411,15 @@ export async function executeWorkflowRun(
           }
 
           if (hasFailure) {
-            await prisma.workflowRun.update({
-              where: { runId },
-              data: {
-                status: 'failed',
-                errorMessage: failMessage,
-                completedAt: new Date()
-              }
-            })
-            await activeWriteAuditLog({
-              actor: 'system',
-              action: 'workflow.run.failed',
-              targetType: 'workflow',
-              targetId: run.workflowId,
-              detail: `Workflow run ${runId} failed due to parallel step error: ${failMessage}`,
-              riskLevel: 'high',
+            await failWorkflowRunAndAudit(
+              runId,
+              run.workflowId,
               workspaceId,
-              contextSnapshot: { runId, errorCode: 'PARALLEL_ERROR', failedStepId: undefined }
-            })
+              failMessage,
+              'PARALLEL_ERROR',
+              undefined,
+              activeWriteAuditLog
+            )
             throw new Error(failMessage)
           }
         }
@@ -508,23 +467,18 @@ export async function executeWorkflowRun(
       return finalRun
     } catch (err) {
       // 容错并标记失败
-      try {
-        await prisma.workflowRun.update({
-          where: { runId },
-          data: {
-            status: 'failed',
-            errorMessage: err instanceof Error ? err.message : 'Unknown execution error',
-            completedAt: new Date()
-          }
-        })
-      } catch {
-        // 忽略
-      }
+      await failWorkflowRunAndAudit(
+        runId,
+        run.workflowId,
+        workspaceId,
+        err instanceof Error ? err.message : 'Unknown execution error',
+        'UNKNOWN_EXECUTION_ERROR',
+        undefined,
+        activeWriteAuditLog
+      )
       throw err
     }
   })()
-
-  return Promise.race([executionPromise, timeoutPromise])
 }
 
 // 6. executeStep
@@ -560,25 +514,7 @@ export async function executeStep(
 
   const startTime = Date.now()
 
-  // 单步超时控制
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(async () => {
-      await prisma.stepRun.update({
-        where: { stepId },
-        data: {
-          status: 'failed',
-          errorCode: 'STEP_TIMEOUT',
-          errorMessage: 'Step execution timeout',
-          completedAt: new Date(),
-          durationMs: Date.now() - startTime
-        }
-      })
-      reject(new Error(`Step execution timeout for step: ${stepId}`))
-    }, DEFAULT_STEP_TIMEOUT_MS)
-  })
-
-  // 执行核心分发逻辑
-  const processPromise = (async () => {
+  return (async () => {
     let output: Record<string, unknown> = {}
     let retries = 0
 
@@ -712,8 +648,14 @@ export async function executeStep(
           throw err
         }
 
+        const isFastFail = err instanceof Error && (
+          err.message === 'Human approval rejected' ||
+          err.name.includes('Grant') ||
+          err.name.includes('Policy')
+        )
+
         // 重试逻辑
-        if (retries < MAX_STEP_RETRIES) {
+        if (!isFastFail && retries < MAX_STEP_RETRIES) {
           retries++
           await prisma.stepRun.update({
             where: { stepId },
@@ -721,25 +663,42 @@ export async function executeStep(
           })
           await sleep(STEP_RETRY_DELAY_MS)
         } else {
-          // 重试耗尽，失败
+          // 重试耗尽或命中短路，失败
           const durationMs = Date.now() - startTime
+          const errorMessage = err instanceof Error ? err.message : 'Execution error'
+          const errorCode = isFastFail ? 'STEP_EXECUTION_REJECTED' : 'STEP_EXECUTION_ERROR'
+
           await prisma.stepRun.update({
             where: { stepId },
             data: {
               status: 'failed',
-              errorCode: 'STEP_EXECUTION_ERROR',
-              errorMessage: err instanceof Error ? err.message : 'Execution error',
+              errorCode,
+              errorMessage,
               completedAt: new Date(),
               durationMs
             }
           })
+
+          try {
+            await activeWriteAuditLog({
+              actor: 'system',
+              action: 'workflow.step.error',
+              targetType: 'workflow',
+              targetId: step.nodeId,
+              detail: `Step ${step.nodeId} failed: ${errorMessage}`,
+              riskLevel: 'high',
+              workspaceId: step.workspaceId,
+              contextSnapshot: { stepId, errorCode }
+            })
+          } catch (auditErr) {
+            console.error(`[runtime-engine] CRITICAL: failed to write AuditLog for step error`, auditErr)
+          }
+
           throw err
         }
       }
     }
   })()
-
-  return Promise.race([processPromise, timeoutPromise])
 }
 
 // 递归标记后续依赖节点为 skipped

@@ -1,8 +1,17 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { runDag } from '../dag-engine'
 import type { WorkflowDefinition, WorkflowRunContext, NodeHandler, DagEngineHooks } from '../dag-types'
+import { writeAuditLog } from '@/lib/server/audit'
+
+vi.mock('@/lib/server/audit', () => ({
+  writeAuditLog: vi.fn(),
+}))
 
 describe('DAG Engine 纯编排单元测试', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   // 构造基础 Context
   const createContext = (variables: Record<string, unknown> = {}): WorkflowRunContext => ({
     runId: 'test-run-id',
@@ -298,5 +307,46 @@ describe('DAG Engine 纯编排单元测试', () => {
       status: 'skipped',
       error: expect.stringContaining('上游节点 B 失败'),
     }))
+  })
+
+  // 6. safeHook 异常处理测试
+  it('应当在 hooks 抛出异常时记录 AuditLog 并且不阻断引擎主流程', async () => {
+    const def: WorkflowDefinition = {
+      id: 'hook-fail-wf',
+      name: 'Hook Fail Workflow',
+      nodes: [
+        { id: 'A', kind: 'noop', name: 'Node A' },
+      ],
+      edges: [],
+    }
+
+    const ctx = createContext()
+    const hooks: DagEngineHooks = {
+      onNodeStart: vi.fn().mockRejectedValue(new Error('Simulated hook error')),
+      onNodeFinish: vi.fn(),
+    }
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const status = await runDag(def, ctx, {}, hooks)
+
+    expect(status).toBe('completed')
+    expect(hooks.onNodeStart).toHaveBeenCalledTimes(1)
+    expect(hooks.onNodeFinish).toHaveBeenCalledTimes(1)
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[dag-engine] hook error:'),
+      expect.any(Error)
+    )
+
+    expect(writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'workflow.hook.error',
+      targetId: 'onNodeStart',
+      detail: expect.stringContaining('safeHook caught error: Simulated hook error'),
+      riskLevel: 'high',
+      workspaceId: 'test-workspace',
+    }))
+
+    consoleErrorSpy.mockRestore()
   })
 })

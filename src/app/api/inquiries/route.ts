@@ -8,6 +8,7 @@ import { actorFromSession } from "@/lib/server/audit"
 import { auditedWrite } from "@/lib/server/audited-write"
 import { ApiResponse } from "@/lib/server/api-response"
 import { countryCodeToFlag } from "@/lib/country-utils"
+// LEGACY ENGINE ROUTE: Operating on WorkflowNodeRun table.
 import { runWorkflow } from '@/lib/server/workflow/dag-runner'
 import { WorkflowNotFoundError } from '@/lib/server/exceptions'
 
@@ -255,6 +256,7 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
             where: { workspaceId: ctx.workspaceId, name: "inquiry-grading" },
           })
           if (workflow) {
+            // LEGACY ROUTE: Using deprecated local workflow runner.
             wfRef.value = await runWorkflow(workflow.id, {
               inquiryId,
               subject: body.subject,

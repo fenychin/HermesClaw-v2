@@ -303,12 +303,15 @@ describe('Workflow Runtime Engine 单元测试', () => {
       vi.mocked(prisma.stepRun.findUnique).mockResolvedValue(step as any)
       vi.mocked(prisma.stepRun.update).mockResolvedValue({ ...step, status: 'failed' } as any)
 
-      const p = executeStep('step-run-abc-node-A', {}, { writeAuditLog: vi.fn() })
+      let error: any
+      const p = executeStep('step-run-abc-node-A', {}, { writeAuditLog: vi.fn() }).catch(e => error = e)
       // 推进 MAX_STEP_RETRIES 次重试延时（3 次 * 3000ms = 9000ms）
       for (let i = 0; i <= 3; i++) {
         await vi.advanceTimersByTimeAsync(3100)
       }
-      await expect(p).rejects.toThrow('callCapability not configured')
+      await p
+      expect(error).toBeDefined()
+      expect(error.message).toMatch('callCapability not configured')
       vi.useRealTimers()
     })
 
@@ -390,14 +393,17 @@ describe('Workflow Runtime Engine 单元测试', () => {
       vi.mocked(prisma.stepRun.update).mockResolvedValue({ ...step, status: 'failed' } as any)
 
       const mockRequestHumanApproval = vi.fn().mockResolvedValue(false)
+      let error: any
       const p = executeStep('step-run-abc-node-A', {}, {
         writeAuditLog: vi.fn(),
         requestHumanApproval: mockRequestHumanApproval,
-      })
+      }).catch(e => error = e)
       for (let i = 0; i <= 3; i++) {
         await vi.advanceTimersByTimeAsync(3100)
       }
-      await expect(p).rejects.toThrow('Human approval rejected')
+      await p
+      expect(error).toBeDefined()
+      expect(error.message).toMatch('Human approval rejected')
       vi.useRealTimers()
     })
 
@@ -439,17 +445,20 @@ describe('Workflow Runtime Engine 单元测试', () => {
 
       const mockCallCapability = vi.fn().mockRejectedValue(new Error('persistent error'))
 
+      let error: any
       const p = executeStep('step-run-abc-node-A', {}, {
         writeAuditLog: vi.fn(),
         callCapability: mockCallCapability,
-      })
+      }).catch(e => error = e)
 
       // 推进所有重试延时（MAX_STEP_RETRIES=3 次，每次 3100ms）
       for (let i = 0; i <= MAX_STEP_RETRIES; i++) {
         await vi.advanceTimersByTimeAsync(3100)
       }
 
-      await expect(p).rejects.toThrow('persistent error')
+      await p
+      expect(error).toBeDefined()
+      expect(error.message).toMatch('persistent error')
 
       // 至少调用 MAX_STEP_RETRIES + 1 次
       expect(mockCallCapability.mock.calls.length).toBeGreaterThan(MAX_STEP_RETRIES)

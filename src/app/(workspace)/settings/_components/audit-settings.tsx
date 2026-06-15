@@ -178,7 +178,7 @@ export function AuditSettings() {
       <div className="flex-1 overflow-y-auto min-h-0 space-y-2">
         {isLoading ? (
           <SkeletonList count={8}>
-            {() => <div className="h-14 bg-accent/40 rounded-xl animate-pulse" />}
+            {(i) => <div key={i} className="h-14 bg-accent/40 rounded-xl animate-pulse" />}
           </SkeletonList>
         ) : logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">

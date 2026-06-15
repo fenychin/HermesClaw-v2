@@ -12,6 +12,7 @@ import { logger } from "@/lib/logger"
 import { writeAuditLog, actorFromSession, type AuditRiskLevel } from "@/lib/server/audit"
 import { writeAgentLog } from "@/lib/server/agent-log"
 import { hermesClient } from "@/lib/server/adapters/hermes"
+// LEGACY ENGINE ROUTE: Operating on WorkflowNodeRun table.
 import { runWorkflow as runLocalWorkflow } from "@/lib/server/workflow/dag-runner"
 import { TypedTaskInputSchema, isCriticalActionType } from "@/contracts"
 import { TaskInputValidationError, HermesApiError } from "@/lib/server/exceptions"
@@ -174,6 +175,7 @@ export class WorkflowSchedulerService {
           ...(agentId ? { agentId } : {}),
           ...(projectId ? { projectId } : {}),
         }
+        // LEGACY ROUTE: Using deprecated local workflow runner.
         const result = await runLocalWorkflow(workflowId, localInputs)
         return {
           runId: result.runId,
