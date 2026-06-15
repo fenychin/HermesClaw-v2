@@ -1,0 +1,12 @@
+- id: email
+  name: 外贸邮件连接器
+  description: 映射至外贸邮件收发服务（基于 http-connector）
+  category: trade
+  status: connected
+  provider: http-connector
+- id: crm
+  name: 客户关系管理(CRM)连接器
+  description: 自动同步客户画像与报价历史至 CRM 系统（基于 http-connector）
+  category: trade
+  status: connected
+  provider: http-connector

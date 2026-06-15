@@ -1,246 +1,359 @@
-# AGENTS.md — HermesClaw-v2 项目最高规则文档
+# AGENTS.md — HermesClaw-v3 项目最高规则文档
 
-> **版本**: v2.1.0-alpha  
-> **项目**: HermesClaw-v2（空间项目）  
-> **状态**: 🟢 生效中  
-> **最后更新**: 2026-06-07
+> 版本: v3.0.0  
+> 项目: HermesClaw  
+> 状态: 生效中  
+> 最后更新: 2026-06-12
 
-***
+---
 
 ## 第〇层：元规则（Meta-Rules）
 
-> 本文档是 HermesClaw-v2 的最高行为准则。所有 Agent、子系统、工具链均须以本文档为最终裁决依据。
-> 任何与本文档冲突的局部配置，以本文档为准。
+1. 本文档是 HermesClaw 的最高行为准则，适用于：  
+   - 所有控制内核（Hermes 变体或其他符合规范的控制核）  
+   - 所有执行运行时（OpenClaw 变体或其他符合规范的执行核）  
+   - 所有 Industry Pack、Workflow、Connector、审批流与自动化策略  
 
-***
+2. 任意以下对象，一旦与本文件冲突，均以本文件为准：  
+   - 本仓库内其他文档（含 PRD、CLAUDE.md 等）  
+   - 任意 Prompt / Skill / 行业模板 / 连接器适配层 / 运行时配置  
+   - 上游 Hermes / OpenClaw 工作区中的本地 AGENTS/SOUL/TOOLS 约定  
 
-## 第一章：项目哲学 — AI-First 系统工程
+3. HermesClaw 允许替换控制核与执行核实现（例如：  
+   - 使用 Hermes Agent 作为 Hermes Control Kernel  
+   - 使用 OpenClaw 作为 Execution Runtime  
+   - 或自研内核），前提是必须完整满足本文件的契约、边界与安全治理要求。
 
-### 1.1 核心信条
+4. 组织级 AGENTS.md 与上游工作区 AGENTS/SOUL/TOOLS 的关系：  
+   - 本文件为「组织级 / 多租户级」约束，定义系统级边界。  
+   - 上游 runtime 的 `AGENTS.md / SOUL.md / TOOLS.md / SKILL.md` 视为「节点级实现细则」，可在本规则允许的范围内自由扩展，但不得削弱或绕过本规则。  
+   - 出现冲突时，必须通过配置与兼容层调整上游行为，而不是直接修改本文件。
 
-HermesClaw-v2 是一个 **AI-First 的自演化空间系统工程**，而非传统意义上的"AI 辅助软件"。
+---
 
-- **AI 不是工具，是第一工程主体**：系统的设计、执行、优化均以 AI Agent 为主角，人类工程师扮演策略制定者和最终审批者。
-- **代码是输出，不是核心**：系统的真正价值在于 Harness 结构本身的稳定性与进化能力，代码只是它的一种表达形式。
-- **环境决定表现**：同一个模型，在优质 Harness 和劣质 Harness 中，表现可能相差巨大。HermesClaw-v2 的核心投资在于 Harness 质量，而非模型选型。
+## 第一章：系统重新定义
 
-### 1.2 AI-First 三原则
+### 1.1 一句话定义
 
-| 原则 | 含义 | 违禁行为 |
-|------|------|----------|
-| **主体优先** | Agent 拥有完整执行权，人类不干预过程，只审批边界 | 在 Agent 执行中途强行接管、改写中间状态 |
-| **环境驱动** | 系统行为由 Harness 环境定义，而非硬编码逻辑 | 绕过 Harness 直接调用底层 API |
-| **数据主权** | Agent 的所有决策均须留下可溯源的上下文快照 | 无日志的静默执行 |
+HermesClaw 不是「简单把 Hermes Agent 与 OpenClaw 打包」的工程项目。
 
-***
+HermesClaw 是面向中小企业的 AI 数字员工操作系统，由三大运行域组成：
 
-## 第二章：Harness 核心定义
+- **Hermes Control Kernel**：控制内核，负责意图理解、规划、记忆、编排、策略、治理与进化。  
+- **OpenClaw Execution Runtime**：执行运行时，负责多通道会话、连接器动作、设备协作、现场数据采集与事件回传。  
+- **Industry Pack Layer**：行业插件层，负责行业模板、岗位技能、知识包、工作流模板、指标模型与连接器映射。
 
-### 2.1 什么是 HermesClaw-v2 中的 Harness
+### 1.2 三域原则
 
-> **Harness = 驾驭层**
-> 它是连接模型能力与真实世界交付物之间的全部工程结构。
+- Hermes 不直接承担具体渠道 / 设备的常驻执行职责。  
+- OpenClaw 不拥有最终策略解释权与治理权。  
+- Industry Pack 不得侵入 Hermes / OpenClaw 核心代码，仅通过公开 schema 注入资产。  
+- 任一行业能力必须可装载、可停用、可升级、可回滚。  
+- 所有高风险动作必须经治理门禁，不得因执行便利绕过 Hermes。
 
-**公式**：
+### 1.3 AI-First 再定义
 
-```
-Agent = Model + Harness
-HermesClaw-v2 = ∑(Agent) + 动态进化引擎
-```
+HermesClaw 的 AI-First 不是「AI 直接改代码」，而是：
 
-Harness 不是一段配置文件，不是一套 Prompt 模板。它是一个**有生命的系统**，包含：
+- AI 优先完成：规划 → 执行 → 反馈 → 评估 → 提案。  
+- 人类负责：边界设定 → 审批 → 复盘 → 追责。  
+- 系统进化优先作用于 Harness Runtime 对象（策略 / 工作流 / 记忆 / 连接器策略等），源码变更必须经过人工工程流程。
 
-- 任务边界定义（Agent 能做什么、不能碰什么）
-- 上下文供给链（知识版本化管理）
-- 工具接入层（权限受控、可审计）
-- 反馈闭环（执行结果回流 → 下次决策）
-- 安全护栏（高危操作人工审批）
-- 进化调度器（Harness 自身的升级机制）
+---
 
-### 2.2 静态 Harness vs 动态 Harness
+## 第二章：三域架构与所有权
 
-HermesClaw-v2 **明确拒绝静态 Harness 设计**。
+### 2.1 Hermes Control Kernel
 
-| 维度 | 静态 Harness（禁止） | 动态 Harness（HermesClaw-v2 标准） |
-|------|---------------------|-------------------------------------|
-| 配置方式 | 写死在代码或配置文件中 | 运行时可加载、热更新 |
-| 知识更新 | 需要人工重新部署 | Agent 可自主触发知识库同步 |
-| 规则迭代 | 版本发布才能生效 | 经过审批后实时生效 |
-| 失败响应 | 报错后等待人工处理 | 自动触发降级策略 + 上报 |
-| 进化机制 | 无 | 内置自我评估 + 升级提案 |
+Hermes 是唯一控制内核，拥有以下所有权：
 
-***
+- Intent 解释权（将自然语言目标结构化为 Task / Workflow）  
+- Workflow 生成与编排权（DAG Workflow + Node 配置）  
+- Memory 管理权（会话 / 项目 / 组织三级记忆）  
+- Model Router 策略权（模型与推理参数路由）  
+- Harness Evaluation / Proposal / Approval / Rollback 治理权  
+- Agent Policy 最终解释权与冲突裁决权  
+- Audit 真相源（治理与策略变更的 Source of Truth）
 
-## 第三章：动态 Harness — 自演化架构
+Hermes 不负责：
 
-这是 HermesClaw-v2 区别于一切传统 Agent 框架的核心能力。
+- 直接托管所有外部渠道会话（交由 Runtime）  
+- 直接承担设备常驻代理与在线状态维护  
+- 在未注册执行能力的情况下发起盲目动作
 
-### 3.1 自演化的四个层次
+### 2.2 OpenClaw Execution Runtime
 
-```
-Level 0 — 执行层：Agent 按 Harness 规则完成当前任务
-Level 1 — 反馈层：执行结果回流，更新上下文记忆
-Level 2 — 评估层：系统定期自评，识别 Harness 瓶颈
-Level 3 — 进化层：提交 Harness 升级提案，经审批后部署
-```
+OpenClaw 是执行运行时，拥有以下所有权：
 
-- **Level 0-1** 完全自主，无需人工介入。
-- **Level 2** 自主运行，产生评估报告，推送给项目维护者。
-- **Level 3** 必须经由人类审批（Harness 变更不可绕过审批门禁）。
+- Channel / Device / Connector 的在线状态与路由决策  
+- 执行动作的现场上下文（设备状态、网络环境、渠道特性）  
+- 任务执行过程状态（排队、执行中、重试、退避等）  
+- Action Receipt 与 ExecutionEvent 的事实回传  
+- 本地 / 移动端代理动作与事件缓冲（例如移动端节点、桌面节点）
 
-### 3.2 进化触发条件
+OpenClaw 不负责：
 
-以下任一条件满足，系统自动进入 Level 2 评估：
+- 修改 Agent Policy 或任何 Harness 治理对象  
+- 独立变更风险等级与自动化等级设定  
+- 决定是否放行高危动作（如资金、删除、对外承诺）  
+- 越过 Hermes 直接执行未授权动作
 
-- 连续 3 次任务失败（同类型任务）
-- 工具调用成功率低于 85%
-- 上下文供给缺口导致任务中断超过 2 次/天
-- 新工具/新模型接入后首次全量运行完成
-- 人类维护者手动触发（`/harness evaluate`）
+### 2.3 Industry Pack Layer
 
-### 3.3 进化提案格式（Evolution Proposal）
+Industry Pack 是行业插件层，不是业务代码散装集合。
 
-每一份 Harness 升级提案须包含：
+每个 Industry Pack 必须通过标准 manifest 装载，仅能通过公开 runtime schema 注入以下资产：
 
-```yaml
-proposal_id: HEP-{timestamp}
-triggered_by: [自动评估 | 手动触发]
-problem_statement: |
-  描述当前 Harness 瓶颈
-evidence:
-  - 失败日志引用
-  - 性能数据
-proposed_change:
-  target_component: [任务边界 | 上下文供给 | 工具接入 | 反馈闭环 | 安全护栏]
-  description: |
-    具体变更内容
-  risk_level: [低 | 中 | 高]
-requires_human_approval: true  # 永远为 true
-estimated_impact: |
-  预期效果描述
-```
-
-***
-
-## 第四章：六大核心组件规范
-
-### 4.1 任务边界（Task Boundary）
+- Agent Template  
+- Workflow Template  
+- Skill Pack  
+- Knowledge Pack  
+- Connector Mapping  
+- Dashboard Schema  
+- Eval Rules  
+- Domain KPI Model
+
+禁止行业包直接修改：
+
+- Hermes 核心治理逻辑与执行顺序  
+- OpenClaw 核心事件协议与 Gateway 配置结构  
+- RBAC 机制与租户 / Workspace 边界  
+- 审批门禁规则与高危动作白名单
 
-- **必须声明**：每个 Agent 的 `can_do` 和 `cannot_do` 列表
-- **边界冲突处理**：优先拒绝执行，记录冲突日志，上报维护者
-- **边界热更新**：边界变更须附带 HEP 提案编号
+---
 
-```yaml
-# 示例：空间数据 Agent 的任务边界
-agent_id: spatial-data-agent-v2
-can_do:
-  - 读取空间坐标数据
-  - 执行几何计算
-  - 生成可视化报告（草稿）
-cannot_do:
-  - 直接写入生产数据库
-  - 修改其他 Agent 的配置
-  - 调用未注册工具
-```
+## 第三章：运行时契约（Runtime Contracts）
+
+### 3.1 核心契约对象
+
+Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私有模块耦合。
+
+最小契约对象包括：
 
-### 4.2 上下文供给链（Context Supply Chain）
+- `TaskEnvelope`（任务封装）  
+- `ExecutionEvent`（执行事件）  
+- `ActionReceipt`（动作回执）  
+- `ExecutionSummary`（执行摘要；工程中增加 `summaryId` 字段用于去重与索引，§3.3 最小清单未列此项）  
+- `CapabilityRegistration`（能力注册）  
+- `ConnectorLease`（连接器使用租约）  
+- `HumanApprovalCheckpoint`（人工审批检查点）
 
-- 所有知识文档须版本化（`knowledge-base/v{N}/`）
-- Agent 只能引用**当前激活版本**的知识
-- 知识更新须通过 `知识变更日志（KCL）` 记录，不允许静默替换
-- 禁止将关键上下文散落在 Slack、注释、口头约定中
+### 3.2 任务真相与执行真相
 
-### 4.3 受控工具接入（Controlled Tool Access）
+- Hermes 是 **Task Truth Source**：任务定义、策略、风险等级、自动化等级、审批状态。  
+- OpenClaw 是 **Execution Truth Source**：动作是否执行、执行到哪一步、设备 / 连接器在线状态。  
+- 最终任务状态由 Hermes 汇总裁定，但不得篡改 OpenClaw 回传的原始执行回执与事件轨迹。
+
+### 3.3 必备字段（最小集）
 
-- 所有工具须在 `tools/registry.yaml` 中注册
-- 生产环境工具调用使用**短期 Token**（≤ 1小时有效期）
-- 高危工具（删除、写入生产环境、外部 API 调用）须双重审批
-- 工具调用全程记录至审计日志
+所有 `TaskEnvelope` 至少必须包含：
 
-### 4.4 闭环反馈（Closed-Loop Feedback）
+- `taskId`  
+- `workflowRunId`  
+- `workspaceId`  
+- `industryId`  
+- `agentId`  
+- `actionType`  
+- `input`  
+- `automationLevel`  
+- `riskLevel`  
+- `idempotencyKey`  
+- `callbackTarget`  
+- `policySnapshotVersion`  
+- `version`（契约版本）
 
-- Agent 必须接收每次执行的结果快照（日志、状态码、输出摘要）
-- 禁止"盲飞执行"（Agent 发出指令后不检查结果）
-- 反馈数据须结构化存储，供 Level 2 评估使用
+所有 `ExecutionEvent` 至少必须包含：
 
-### 4.5 安全护栏（Safety Guardrails）
+- `eventId`  
+- `taskId`  
+- `workflowRunId`  
+- `runtimeId`  
+- `eventType`（需映射到标准事件族，如 `run.*` / `session.*` / `tool.*`）  
+- `status`  
+- `timestamp`  
+- `payload`  
+- `connectorId`（可选）  
+- `deviceId`（可选）  
+- `receiptHash`（可选）  
+- `version`（事件版本）
 
-- **人机切换阈值**：置信度 < 0.7 时，自动暂停并请求人工确认
-- **高危操作门禁**：以下操作永远需要人工审批：
-  - 删除任何持久化数据
-  - 修改 AGENTS.md 本身
-  - 变更另一个 Agent 的任务边界
-  - 外部资金或资源调度
-- 护栏规则本身的变更须经 Level 3 进化流程
+### 3.4 幂等与补偿
 
-### 4.6 进化调度器（Evolution Scheduler）
+- 所有动作必须具备幂等键（`idempotencyKey`）。  
+- 所有对外写操作的连接器必须返回清晰的 `receipt` 或错误码。  
+- 对外部系统的不可逆写操作必须声明 `compensationStrategy`。  
+- 无回执的写操作默认视为高风险，必须走审批流或被禁止。  
+- OpenClaw Gateway 如发现事件重放或序列缺口时，必须依靠幂等键保护下游系统。
 
-- 每 72 小时自动运行一次 Level 2 全系统评估
-- 评估报告推送至项目维护者（Markdown 格式）
-- 历史进化记录存档于 `harness/evolution-log/`
+### 3.5 实现状态与补充约定（2026-06-15 v3.02.00-dev）
+- 契约层已实现：[contracts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/contracts/)
+- 合规版本：`CONTRACT_VERSION = '1.0'`
+- 已接入：`harness-eval.ts` / `connectors.ts` / `audit.ts`
+- 待接入：`workflow/` 目录中的 `WorkflowRun` 调度器
+- **审批引擎补充约定**：
+  - **时效管理**：提案审批默认 72 小时时效，高危动作默认 24 小时时效。审批超时必须提取为顶层常量（如 `PROPOSAL_APPROVAL_EXPIRY_MS`），严禁在函数内硬编码。
+  - **状态与审计强关联**：审批检查点（`ApprovalCheckpoint`）生命周期的状态跃迁，必须与 AuditLog 的 `approval.*` 审计链（`requested` / `granted` / `rejected` / `expired`）强关联绑定，做到一客一审，审计与拦截可追溯。
 
-### 4.7 自动化授权分级（L1–L4 Automation Levels）
 
-> 本节细化 4.5 安全护栏，为每一个 Agent **业务动作**与每一份 **Harness 升级提案** 标注自动化授权等级。
-> 与第三章「Level 0-3 自演化层次」是**两个不同维度**：Level 0-3 描述 Harness *演化阶段*；L1-L4 描述单次*动作*能否自动执行。两者不可混用。
+---
 
-| 等级 | 含义 | 执行约束 |
-|------|------|----------|
-| **L1** | 全自动执行 | 无需审批，直接执行 |
-| **L2** | 建议执行（默认） | 可自动执行，但系统留痕，事后可审查 |
-| **L3** | 需人工确认 | 高风险操作，必须人工二次确认后才执行，确认后立即生效且不可撤销 |
-| **L4** | 绝对禁止自动 | 系统永不自动执行；必须由人工在源业务系统发起，审批通道亦不得放行 |
+## 第四章：Harness Runtime 定义
 
-- **L4 不可绕过**：任何带密码、带 Token、带二次确认的「自动批准 L4」均属违规——L4 的语义是*禁止自动*，而非*提高自动门槛*。审批 API 对 L4 动作的 `approve` 必须硬拒绝（403）。
-- **L3 强制二次确认**：审批 API 缺少显式确认时返回 409，前端弹确认对话框，复用 4.5 高危操作护栏机制。
-- **派生规则**：未显式标注 `automationLevel` 的 Harness 提案，按 `riskLevel` 派生（high→L3 / mid→L2 / low→L1）。
-- 授权分级本身的变更须经 HEP 流程（见第七章）。
+### 4.1 Harness 不是 Prompt
 
-***
+HermesClaw 中的 Harness 是可运行时加载的治理对象集合，而不是一段提示词。
 
-## 第五章：禁止行为清单（Anti-Patterns）
+Harness Runtime 至少由以下对象组成：
 
-以下行为在 HermesClaw-v2 中被视为**严重违规**，触发自动回滚并告警：
+- `AgentPolicy`  
+- `WorkflowTemplate`  
+- `SkillBinding`  
+- `ContextPolicy`  
+- `MemoryPolicy`  
+- `ConnectorPolicy`  
+- `GuardrailPolicy`  
+- `EvalRuleSet`  
+- `IndustryBinding`  
 
-1. ❌ 静默绕过 Harness 直接调用底层能力
-2. ❌ 未注册工具的调用
-3. ❌ 无日志的执行（任何执行必须留下可溯源记录）
-4. ❌ 上下文知识的静默替换（未经 KCL 记录）
-5. ❌ Harness 规则的单方面修改（未经 HEP 流程）
-6. ❌ 模型输出直接进入生产环境（未经校验层）
-7. ❌ 忽略置信度阈值强行执行高风险任务
+### 4.2 可进化对象边界
 
-***
+允许被 Level 2/3 评估与提案系统自动修改的对象：
 
-## 第六章：工程师角色定义
+- `WorkflowTemplate`  
+- `SkillBinding`  
+- `ContextPolicy`  
+- `MemoryPolicy`  
+- `EvalRuleSet`  
+- `ConnectorPolicy`（非高危部分）
 
-在 AI-First 体系下，人类工程师的角色**从"写代码"转向"设计系统"**。
+默认禁止自动修改的对象：
 
-| 角色 | 职责 | 不应做的事 |
-|------|------|------------|
-| **Harness 架构师** | 设计组件结构、进化机制、审批流 | 微观干预 Agent 执行过程 |
-| **知识策展人** | 维护知识库版本、确保上下文质量 | 让知识散落在非结构化介质中 |
-| **审批者** | 审核 Level 3 进化提案 | 无条件拒绝或无条件批准 |
-| **监控员** | 阅读 Level 2 评估报告，识别趋势 | 忽略系统上报的瓶颈信号 |
+- 本文件（AGENTS.md）  
+- L4 Guardrail 与高危动作策略白名单  
+- 核心 RBAC 规则与 Workspace 权限结构  
+- 资金 / 删除 / 外部承诺类动作的执行策略  
+- OpenClaw / Hermes 源码和上游仓库配置
 
-***
+### 4.3 版本与灰度
 
-## 第七章：文档维护规则
+每个 Harness Bundle 必须支持如下生命周期状态：
 
-- **本文档（AGENTS.md）是最高规则**，优先级高于所有子系统配置
-- 任何对本文档的修改，须提交 HEP 提案并经人工审批
-- 每次版本更新须在文档顶部更新版本号和日期
-- 本文档须对所有 Agent 可读，是 Agent 启动时加载的第一份上下文
+- `draft`  
+- `canary`  
+- `active`  
+- `deprecated`  
+- `rolled-back`
 
-***
+任何提案生效流程必须经过：
 
-## 附录：版本历史
+1. Proposal 生成  
+2. Previous Snapshot 记录  
+3. 审批（可多级）  
+4. Canary 灰度发布  
+5. 指标观察窗口  
+6. 全量激活或回滚
 
-| 版本 | 日期 | 变更摘要 |
-|------|------|----------|
-| v2.0.0-alpha | 2026-06-06 | 初始版本，确立动态 Harness 自演化架构与 AI-First 最高规则 |
-| v2.1.0-alpha | 2026-06-07 | HEP-004：新增 §4.7 L1-L4 自动化授权分级，L4 绝对禁止自动、L3 强制人工确认 |
+---
 
-***
+## 第五章：动态进化机制
 
-*本文档由 HermesClaw-v2 项目组制定，依据 AI-First 系统工程原则与动态 Harness 架构理念构建。*
+### 5.1 进化闭环
+
+进化闭环固定为：
+
+> 执行 → 反馈 → 评估 → 提案 → 审批 → 灰度 → 生效 → 复盘
+
+### 5.2 Level 与 Automation 分离
+
+- **Level 0–3**：描述系统在某一领域的进化阶段与成熟度（会不会根据数据提出合理提案）。  
+- **L1–L4**：描述单个动作的自动化授权等级（能不能自动执行）。
+
+两者严禁混用。
+
+授权等级示例（建议）：
+
+- **L1**：仅建议级，AI 生成方案，人类手工执行。  
+- **L2**：半自动，AI 生成，人工点按触发执行。  
+- **L3**：自动执行低风险动作，高风险动作需审批。  
+- **L4**：全部动作自动执行，仅在异常时告警（默认禁止，仅在极少数可证明安全的场景启用）。
+
+### 5.3 评估输入
+
+评估引擎至少读取以下数据：
+
+- `WorkflowRun / WorkflowNodeRun`  
+- `AgentLog / AuditLog`  
+- `Connector success rate`  
+- `Human correction events`  
+- `Memory miss events`  
+- `Knowledge gap records`  
+- `Industry KPI drift`  
+- Canary / Rollback 结果与原因
+
+### 5.4 提案输出
+
+评估引擎可以输出以下类型提案：
+
+- 调整 WorkflowTemplate（拆解方式 / 节点并发 / 超时与重试）  
+- 调整 SkillBinding（优先使用哪类技能 / 工具组合）  
+- 调整 MemoryPolicy（哪些事实需要持久化 / 哪些应被压缩）  
+- 调整 ConnectorPolicy（但不得调整高危白名单）  
+- 调整 EvalRuleSet（触发阈值、观察窗口、告警策略）  
+
+所有提案都必须通过 Hermes 的审批与灰度机制才能生效。
+
+---
+
+## 第六章：治理、安全与审计
+
+### 6.1 RBAC 与租户边界
+
+- 所有 Workspace 和 Industry Pack 的管理操作必须在 RBAC 体系下完成。  
+- 不允许通过行业包或连接器绕过 Workspace 边界修改他人数据。  
+- 多租户部署必须在配置层显式声明租户隔离策略。
+
+### 6.2 审计必备
+
+以下行为必须记录在 AuditLog 中：
+
+- `workflow.generate`  
+- `task.dispatch` / `task.cancel`  
+- `model.route` / 高危模型变更  
+- `connector.execute`（高危写操作）  
+- `proposal.create / approve / reject / rollback`  
+- `approval.requested / granted / rejected / expired`（审批检查点创建/通过/驳回/超时）  
+- `industry.pack.install / activate / rollback`  
+- `automation.level.change`（尤其是 L3/L4）  
+
+### 6.3 主会话与 Sandbox
+
+- 主会话（通常为系统管理员 / Owner）可在本机拥有完整工具权限，但仍须遵守高危动作审批与审计要求。  
+- 非主会话默认运行于 sandbox（容器、远程节点或受限环境），只能使用经过 allowlist 的工具。  
+- 不允许通过 OpenClaw 的 channel 配置直接为第三方用户开启与主会话等价的权限。
+
+### 6.4 安全事件与处置历史
+
+- **事件时间**: 2026-06-15
+- **泄露文件名**: `dev.db.bak-20260611-215642`
+- **泄露数据类型**: 测试环境用户账户数据（包含用户名、邮箱 `admin@hermesclaw.ai` 及 BCrypt 密码 Hash）
+- **处置方案**: 
+  1. 使用 `git filter-branch` 工具彻底清除所有 Git 历史分支中的该文件。
+  2. 强制推送更新所有分支与 tags，并进行仓库强力垃圾回收（GC）。
+  3. 在 `.gitignore` 中追加全局数据库文件（如 `*.db.bak-*` 等）忽略策略。
+  4. 建议所有团队成员与部署环境轮换此前泄露的用户凭据，避免使用包含该 Hash 的旧密码。
+
+---
+
+## 第七章：与上游项目的兼容性
+
+1. HermesClaw 必须尊重并集成上游 Hermes Agent 与 OpenClaw 的既有机制：  
+   - Hermes 的 memory / skills / session / compression 等机制只能通过公开 API 与配置扩展，不能直接改私有实现。  
+   - OpenClaw Gateway 的事件协议与安全配置必须按其官方文档使用，仅通过配置与扩展点集成。
+
+2. HermesClaw 的任何实现，如需修改上游仓库源代码，必须满足：  
+   - 改动最小化且兼容上游发展路线。  
+   - 在本仓库 CLAUDE.md 中显式记录，并通过 Harness 层尽量吸收差异。  
+
+3. HermesClaw 不以「修改上游源码」作为首选路径，而是：  
+   - 优先通过配置、Industry Pack、Harness、Connector 等扩展点实现业务目标。  
+   - 仅在证明无法通过扩展层实现时，采用「上游贡献 PR + 本地兼容层」方案。

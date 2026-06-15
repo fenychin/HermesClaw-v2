@@ -1,0 +1,6 @@
+{
+  "id": "inquiry-grade",
+  "title": "询盘分级",
+  "description": "自动对询盘内容进行质量评估，识别高意向客户，优先分配跟进资源",
+  "icon": "Filter"
+}

@@ -1,0 +1,27 @@
+{
+  "id": "exhibition-leads",
+  "name": "exhibition-leads",
+  "description": "展会线索整理：整理展会名片与线索，自动分类分级并生成跟进计划",
+  "templateId": "ft-exhibition-leads",
+  "requiredSkills": ["ft-inquiry-sorter"],
+  "automationLevel": "L2",
+  "riskLevel": "low",
+  "nodes": [
+    {
+      "id": "n1-sort",
+      "kind": "skill",
+      "name": "线索分类分级",
+      "config": { "skillId": "skill-ft-inquiry-sorter", "automationLevel": "L2" }
+    },
+    {
+      "id": "n2-plan",
+      "kind": "task",
+      "name": "生成跟进计划",
+      "handler": "log-followup-plan",
+      "config": { "automationLevel": "L2" }
+    }
+  ],
+  "edges": [
+    { "from": "n1-sort", "to": "n2-plan" }
+  ]
+}

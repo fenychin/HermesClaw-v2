@@ -1,0 +1,51 @@
+id: inquiry-followup
+title: 询盘跟进工作流
+description: 自动化分析入站询盘、评估风险并智能起草回复或转交人工的黄金流程
+steps:
+  - id: step-analyze-inquiry
+    title: 询盘分析
+    description: 自动分析询盘意图，提取客户关注点、关键产品及采买诉求
+    status: pending
+    inputs:
+      - key: inquiry_content
+        label: 原始询盘内容
+        type: textarea
+        required: true
+        placeholder: "请输入收到的原始询盘邮件内容..."
+      - key: customer_company
+        label: 客户公司名称
+        type: text
+        required: false
+        placeholder: "如：BrightPath Trading LLC"
+    outputs:
+      - key: analyzed_data
+        label: 意图分析结果
+        type: json
+  - id: step-check-risk
+    title: 风险评估
+    description: 针对敏感国家、贸易壁垒、异常条款等进行贸易合规审查
+    status: pending
+    outputs:
+      - key: risk_report
+        label: 风险评估报告
+        type: markdown
+  - id: step-auto-reply
+    title: AI 起草开发信
+    description: 根据分析结果和企业知识库，自动生成高匹配度的开发回复邮件
+    status: pending
+    inputs:
+      - key: reply_tone
+        label: 邮件语气
+        type: select
+        required: true
+        options:
+          - label: 专业商务 (Professional)
+            value: professional
+          - label: 热情亲和 (Friendly)
+            value: friendly
+          - label: 简练高效 (Direct)
+            value: direct
+    outputs:
+      - key: drafted_email
+        label: AI 邮件草稿
+        type: markdown
