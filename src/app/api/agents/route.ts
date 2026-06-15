@@ -62,14 +62,9 @@ export const GET = withRBAC(
 
         const taskCount = completedCountMap.get(agent.id) || 0
 
+        const serialized = serializeAgent(agent as unknown as Record<string, unknown>)
         return {
-          id: agent.id,
-          name: agent.name,
-          role: agent.role,
-          automationLevel: agent.automationLevel,
-          status: agent.status,
-          source: agent.source,
-          industryId: agent.industryId,
+          ...serialized,
           tags,
           skillCount,
           connectorCount,
@@ -78,7 +73,7 @@ export const GET = withRBAC(
         }
       })
 
-      return ApiResponse.ok(data)
+      return ApiResponse.ok({ agents: data })
     } catch (error) {
       logger.error('GET /api/agents: 失败', { error: error instanceof Error ? error.message : '未知错误' })
       return ApiResponse.apiError("服务器内部错误", 500)

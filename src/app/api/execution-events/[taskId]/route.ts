@@ -16,9 +16,9 @@ import crypto from "crypto"
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
-  const taskId = params.taskId;
+  const { taskId } = await params;
   const encoder = new TextEncoder();
 
   let unsubscribe: (() => void) | null = null;

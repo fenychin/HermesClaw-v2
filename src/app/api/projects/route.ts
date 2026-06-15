@@ -40,71 +40,87 @@ export async function GET(request: Request) {
       prisma.project.count({ where })
     ])
 
+    // 一次性获取当前 workspace 的最近 runs，在内存中进行匹配和计数，避免 N+1 查询导致 SQLite 锁死或卡顿
+    const runs = await prisma.workflowRun.findMany({
+      where: { workspaceId: ctx.workspaceId },
+      orderBy: { createdAt: "desc" },
+      take: 2000,
+      select: {
+        inputContext: true,
+        input: true,
+        createdAt: true,
+      }
+    })
+
     // 为列表项动态计算关联项
-    const processedProjects = await Promise.all(
-      projects.map(async (project) => {
-        // 1. 获取工作流执行次数 (使用 JSON 模糊匹配 inputContext 中的 projectId 或者是 input 中的项目 ID)
-        const workflowRunCount = await prisma.workflowRun.count({
-          where: {
-            workspaceId: ctx.workspaceId,
-            OR: [
-              { inputContext: { path: "$.projectId", equals: project.id } },
-              { input: { contains: project.id } }
-            ]
+    const processedProjects = projects.map((project) => {
+      let workflowRunCount = 0
+      let lastRunTime = project.updatedAt.getTime()
+
+      for (const run of runs) {
+        let isMatch = false
+        // 匹配 inputContext
+        try {
+          const ctxObj = (typeof run.inputContext === 'string' 
+            ? JSON.parse(run.inputContext) 
+            : run.inputContext) as Record<string, unknown>
+          if (ctxObj && ctxObj.projectId === project.id) {
+            isMatch = true
           }
-        })
+        } catch {}
 
-        // 2. 获取最晚活跃时间（最近一次工作流执行的 createdAt，如没有则使用 project.updatedAt）
-        const lastRun = await prisma.workflowRun.findFirst({
-          where: {
-            workspaceId: ctx.workspaceId,
-            OR: [
-              { inputContext: { path: "$.projectId", equals: project.id } },
-              { input: { contains: project.id } }
-            ]
-          },
-          orderBy: { createdAt: "desc" },
-          select: { createdAt: true }
-        })
-        const lastActivityAt = lastRun?.createdAt ? lastRun.createdAt.toISOString() : project.updatedAt.toISOString()
-
-        // 3. 计算成员数 (activeAgents 解析后的长度 + 1)
-        const agentsCount = (() => {
-          try {
-            const parsed = JSON.parse(project.activeAgents || "[]")
-            return Array.isArray(parsed) ? parsed.length : 0
-          } catch {
-            return 0
-          }
-        })()
-        const memberCount = agentsCount + 1
-
-        const parsedTags = (() => {
-          try {
-            return JSON.parse(project.tags || "[]")
-          } catch {
-            return []
-          }
-        })()
-
-        return {
-          id: project.id,
-          name: project.name,
-          description: project.productLine || "",
-          productLine: project.productLine || "",
-          status: project.status,
-          createdAt: project.createdAt.toISOString(),
-          updatedAt: project.updatedAt.toISOString(),
-          memberCount,
-          workflowRunCount,
-          lastActivityAt,
-          tags: parsedTags,
-          owner: project.owner,
-          country: project.country,
-          relatedClient: project.relatedClient,
+        // 匹配 input 模糊包含
+        if (!isMatch && run.input && run.input.includes(project.id)) {
+          isMatch = true
         }
-      })
-    )
+
+        if (isMatch) {
+          workflowRunCount++
+          const t = run.createdAt.getTime()
+          if (t > lastRunTime) {
+            lastRunTime = t
+          }
+        }
+      }
+
+      const lastActivityAt = new Date(lastRunTime).toISOString()
+
+      // 3. 计算成员数 (activeAgents 解析后的长度 + 1)
+      const agentsCount = (() => {
+        try {
+          const parsed = JSON.parse(project.activeAgents || "[]")
+          return Array.isArray(parsed) ? parsed.length : 0
+        } catch {
+          return 0
+        }
+      })()
+      const memberCount = agentsCount + 1
+
+      const parsedTags = (() => {
+        try {
+          return JSON.parse(project.tags || "[]")
+        } catch {
+          return []
+        }
+      })()
+
+      return {
+        id: project.id,
+        name: project.name,
+        description: project.productLine || "",
+        productLine: project.productLine || "",
+        status: project.status,
+        createdAt: project.createdAt.toISOString(),
+        updatedAt: project.updatedAt.toISOString(),
+        memberCount,
+        workflowRunCount,
+        lastActivityAt,
+        tags: parsedTags,
+        owner: project.owner,
+        country: project.country,
+        relatedClient: project.relatedClient,
+      }
+    })
 
     return successResponse({
       projects: processedProjects,

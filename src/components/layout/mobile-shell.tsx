@@ -10,17 +10,17 @@ import { useMobileCheckin } from "@/hooks/use-mobile-checkin";
 /** 底部 Tab 导航定义 */
 const MOBILE_TABS = [
   {
-    href: "/tasks",
+    href: "/mobile/tasks",
     label: "任务",
     icon: ClipboardList,
   },
   {
-    href: "/approvals",
+    href: "/mobile/approvals",
     label: "审批",
     icon: ShieldCheck,
   },
   {
-    href: "/notifications",
+    href: "/mobile/notifications",
     label: "通知",
     icon: Bell,
   },

@@ -299,6 +299,45 @@ export interface OpenChatStreamOptions {
 /** 文本增量回调：每收到一个 text delta 即调用 */
 export type TextDeltaCallback = (text: string) => void | Promise<void>
 
+interface MockStreamArgs {
+  provider: string
+  model: string
+  messages: StreamMessage[]
+  onDelta: TextDeltaCallback
+}
+
+async function streamMockShared({
+  provider,
+  model,
+  messages,
+  onDelta,
+}: MockStreamArgs): Promise<void> {
+  const lastUserMsg = messages[messages.length - 1]?.content || ""
+  const mockText = `✨ **[HermesClaw 开发环境 Mock 降级模式]** ✨
+
+您好！由于系统目前没有配置 \`${provider.toUpperCase()}_API_KEY\`，为了保证您的使用体验不中断，系统已自动切换至本地虚拟智能体模式。
+
+您刚才发送的内容是：
+> "${lastUserMsg}"
+
+**为了启用真实的大模型能力，请完成以下步骤：**
+1. 在项目根目录的 \`.env\` 文件中添加密钥：
+   \`\`\`env
+   DEEPSEEK_API_KEY="您的 DeepSeek API 密钥"
+   # 或
+   ANTHROPIC_API_KEY="您的 Claude API 密钥"
+   \`\`\`
+2. 保存并重启开发服务后，重新发送消息即可生效。
+
+目前我只能作为回显机器人为您提供开发调试参考，感谢您的理解！`
+
+  const words = mockText.split("")
+  for (const char of words) {
+    await onDelta(char)
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+}
+
 /**
  * 打开 LLM 流式对话，按 Provider 分流式分支，通过统一回调推送文本增量。
  * —— 将 DeepSeek SSE 透传与 Anthropic messages.stream 收敛为同一接口，
@@ -311,6 +350,12 @@ export async function openChatStream(
   onDelta: TextDeltaCallback,
 ): Promise<void> {
   const { provider, model, system, messages, maxTokens = 2048 } = options
+
+  // 检查对应的 API Key 是否存在，若不可用则进行打字机形式 Mock 回显，防止报错导致 Failed to fetch
+  if (!isProviderAvailable(provider)) {
+    await streamMockShared({ provider, model, messages, onDelta })
+    return
+  }
 
   if (provider === "anthropic") {
     await streamAnthropicShared({ model, system, messages, maxTokens, onDelta })

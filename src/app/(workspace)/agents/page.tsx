@@ -8,7 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { AgentCard } from "./_components/agent-card";
 import { NewAgentDialog } from "./_components/new-agent-dialog";
-import { useOpenClawStream } from "@/hooks/use-openclaw-stream";
 import { cn } from "@/lib/utils";
 
 export interface AgentData {
@@ -80,9 +79,6 @@ function toAgentData(api: any): AgentData {
 }
 
 export default function AgentsPage() {
-  // 订阅全局 SSE 实时事件流
-  useOpenClawStream();
-
   // 当前展开的智能体 ID
   const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
 
@@ -99,7 +95,7 @@ export default function AgentsPage() {
       if (!res.ok) throw new Error("获取智能体列表失败");
       const json = await res.json();
       if (!json.success) throw new Error(json.error ?? "未知错误");
-      const list = json.data as any[];
+      const list = (json.data?.agents || []) as any[];
       return list.map(toAgentData);
     },
     staleTime: 30_000,

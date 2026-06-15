@@ -2,7 +2,6 @@
 
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
-import { useOpenClawStream } from "@/hooks/use-openclaw-stream";
 import {
   Loader2,
   CheckCircle2,
@@ -81,9 +80,6 @@ export function AgentStatusBadge({
   showPulse = true,
   showLabel = true,
 }: AgentStatusBadgeProps) {
-  // 订阅 SSE 事件流（自动更新 Zustand agentExecutionStates）
-  useOpenClawStream({ agentId });
-
   // 从 store 读取执行状态
   const execState = useUiStore(
     (s) => s.agentExecutionStates[agentId],

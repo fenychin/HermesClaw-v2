@@ -5,7 +5,8 @@ import { prisma } from '@/lib/prisma'
 
 export const POST = withRBAC(
   async (req: Request, ctx: any, routeCtx: any) => {
-    const { workflowId } = await routeCtx.params
+    const { id } = await routeCtx.params
+    const workflowId = id;
 
     let body: any = {}
     try {
@@ -37,7 +38,8 @@ export const POST = withRBAC(
 
 export const GET = withRBAC(
   async (req: Request, ctx: any, routeCtx: any) => {
-    const { workflowId } = await routeCtx.params
+    const { id } = await routeCtx.params
+    const workflowId = id;
 
     const runs = await prisma.workflowRun.findMany({
       where: {

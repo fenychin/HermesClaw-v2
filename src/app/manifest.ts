@@ -14,8 +14,8 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "HermesClaw",
     description:
       "HermesClaw 外勤销售移动端 PWA — 任务执行追踪、Harness 审批、系统通知",
-    start_url: "/tasks",
-    scope: "/",
+    start_url: "/mobile/tasks",
+    scope: "/mobile",
     display: "standalone",
     display_override: ["standalone", "minimal-ui"],
     orientation: "portrait",
