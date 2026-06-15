@@ -17,6 +17,11 @@
     "test": "vitest",
     "contracts:check": "tsx scripts/check-contract-usage.ts",
     "routes:check": "tsx scripts/check-route-prisma.ts",
+    "smoke": "tsx scripts/e2e-smoke.ts",
+    "smoke:ci": "tsx scripts/e2e-smoke.ts",
+    "smoke:harness": "tsx scripts/harness-smoke.ts",
+    "smoke:all": "pnpm smoke && pnpm smoke:harness",
+    "check:middleware": "tsx scripts/check-middleware-sync.ts",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage"
   },
