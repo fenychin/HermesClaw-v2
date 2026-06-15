@@ -22,16 +22,27 @@
 
 # misc
 .DS_Store
-*.pem
 
 # user uploaded files
 /public/uploads/
 
 # tmp / cache
 /.tmp/
-dev.db
-dev.db-journal
-dev.db.bak-*
+
+# ===== 数据库文件 =====
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ===== 数据库备份文件 =====
+*.db.bak
+*.db.bak-*
+*.sqlite.bak
+dev.db*
+*.db-backup
 
 # debug
 npm-debug.log*
@@ -39,10 +50,21 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# ===== 本地开发环境文件 =====
+.env
 .env.local
-.env.production
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*
+
+# ===== 敏感配置 =====
+*.pem
+*.key
+*.p12
+secrets/
+credentials/
 
 # vercel
 .vercel
