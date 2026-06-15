@@ -11,23 +11,26 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
-import { EVAL_WINDOW_HOURS } from "@/lib/server/harness-eval"
+import { EVAL_WINDOW_HOURS } from "@/lib/server/hermes/harness-eval"
 import type { HarnessStatus } from "@/types"
+import { buildWorkspaceContext } from "@/lib/workspace"
 
 export const runtime = "nodejs"
 
 /** 路由段缓存：5 分钟内复用评估状态（Harness 评估周期为 72 小时，状态不常变） */
 export const revalidate = 300
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const [latest, pendingCount, totalProposals] = await Promise.all([
       prisma.harnessProposal.findFirst({
+        where: { workspaceId: ctx.workspaceId },
         orderBy: { createdAt: "desc" },
         select: { createdAt: true },
       }),
-      prisma.harnessProposal.count({ where: { status: "pending" } }),
-      prisma.harnessProposal.count(),
+      prisma.harnessProposal.count({ where: { status: "pending", workspaceId: ctx.workspaceId } }),
+      prisma.harnessProposal.count({ where: { workspaceId: ctx.workspaceId } }),
     ])
 
     const lastEvaluatedAt = latest?.createdAt.toISOString() ?? null

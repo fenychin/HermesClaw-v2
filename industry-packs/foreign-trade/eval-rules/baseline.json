@@ -1,0 +1,38 @@
+{
+  "name": "baseline",
+  "industryPack": "foreign-trade",
+  "version": "1.0.0",
+  "description": "外贸 pack 基线评估规则集 (Harness 自演化引擎消费)",
+  "rules": [
+    {
+      "id": "ft-error-rate",
+      "metric": "errorRate",
+      "scope": "workflow:inquiry-grade",
+      "threshold": 0.05,
+      "windowHours": 24,
+      "action": "raiseProposal",
+      "severity": "high",
+      "description": "询盘分级工作流 24h 错误率超过 5% 触发 Harness 提案"
+    },
+    {
+      "id": "ft-followup-coverage",
+      "metric": "followupCoverage",
+      "scope": "workflow:followup-remind",
+      "threshold": 0.7,
+      "windowDays": 7,
+      "action": "raiseProposal",
+      "severity": "mid",
+      "description": "近 7 天跟进覆盖率低于 70% 触发提案（兜底，鼓励补齐跟进任务）"
+    },
+    {
+      "id": "ft-quote-conversion",
+      "metric": "quoteAcceptanceRate",
+      "scope": "workflow:quote-gen",
+      "thresholdLow": 0.1,
+      "windowDays": 14,
+      "action": "raiseProposal",
+      "severity": "low",
+      "description": "近 14 天报价接受率过低提示报价策略需调优"
+    }
+  ]
+}

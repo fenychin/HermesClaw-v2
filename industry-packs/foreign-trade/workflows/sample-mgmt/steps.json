@@ -1,0 +1,33 @@
+{
+  "id": "sample-mgmt",
+  "title": "样品管理",
+  "description": "跟踪样品寄送状态与客户反馈",
+  "steps": [
+    {
+      "id": "step-n1-dispatch",
+      "title": "登记样品寄送",
+      "description": "记录样品寄送信息",
+      "status": "pending",
+      "inputs": [
+        { "key": "customer_name", "label": "客户名称", "type": "text", "required": true },
+        { "key": "sample_items", "label": "样品清单", "type": "textarea", "required": true, "placeholder": "每行一个样品..." },
+        { "key": "tracking_number", "label": "快递单号", "type": "text", "required": false }
+      ]
+    },
+    {
+      "id": "step-n2-track",
+      "title": "追踪物流状态",
+      "description": "自动查询物流进度",
+      "status": "pending"
+    },
+    {
+      "id": "step-n3-feedback",
+      "title": "记录客户反馈",
+      "description": "登记客户对样品的反馈意见",
+      "status": "pending",
+      "inputs": [
+        { "key": "feedback", "label": "客户反馈", "type": "textarea", "required": false, "placeholder": "质量 / 价格 / 交期反馈..." }
+      ]
+    }
+  ]
+}

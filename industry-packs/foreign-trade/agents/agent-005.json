@@ -1,0 +1,21 @@
+{
+  "id": "agent-005",
+  "name": "Diana",
+  "role": "产品资料员",
+  "description": "管理和生成产品资料，将产品参数转化为多渠道适配的产品描述、规格书与目录",
+  "status": "idle",
+  "source": "builtin",
+  "category": ["产品管理", "内容生产"],
+  "bindSkills": ["skill-009"],
+  "bindConnectors": ["conn-004", "conn-013", "conn-014", "conn-015"],
+  "memoryPermission": "read",
+  "harnessVersion": "2.0.2",
+  "automationLevel": "L2",
+  "canDo": ["生成多平台产品描述", "产品资料版本管理", "从技术文档提取产品参数", "管理产品图片与附件"],
+  "cannotDo": ["修改产品定价", "发布至未经审核的平台", "删除已归档产品资料"],
+  "stats": { "todayTasks": 8, "successRate": 0.92, "avgDuration": "5m 12s" },
+  "lastActive": "2026-06-05T18:30:00Z",
+  "createdAt": "2026-01-22T08:00:00Z",
+  "industryId": "foreign-trade",
+  "templateId": "ft-product-manager"
+}

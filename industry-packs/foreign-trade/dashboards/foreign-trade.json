@@ -1,0 +1,21 @@
+{
+  "name": "foreign-trade",
+  "title": "外贸工作台",
+  "industryPack": "foreign-trade",
+  "description": "外贸首页：询盘 / 报价 / 汇率 / 情报 / 工作流健康度",
+  "layout": {
+    "header": {
+      "stats": ["urgentInquiries", "monthlyDeals", "quotations", "intelligence"]
+    },
+    "primaryColumn": [
+      { "type": "workflow-grid", "source": "industryPack:foreign-trade.workflows" },
+      { "type": "exchange-rates", "source": "/api/packs/foreign-trade/exchange-rates" },
+      { "type": "intelligence", "source": "/api/packs/foreign-trade/intelligence" }
+    ],
+    "sideColumn": [
+      { "type": "inquiry-quick-entry", "submitTo": "/api/packs/foreign-trade/inquiries" },
+      { "type": "workflow-health-monitor", "source": "/api/packs/foreign-trade/health" }
+    ]
+  },
+  "renderedBy": "src/app/(workspace)/foreign-trade/page.tsx"
+}
