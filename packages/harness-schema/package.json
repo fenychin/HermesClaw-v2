@@ -1,6 +1,6 @@
 {
   "name": "@hermesclaw/harness-schema",
-  "version": "0.12.17",
+  "version": "0.12.18",
   "private": true,
   "description": "HermesClaw Harness Runtime objects (HarnessBundle / WorkflowTemplate / AgentPolicy / SkillBinding / ContextPolicy / MemoryPolicy / ConnectorPolicy / EvalRuleSet) + HarnessProposal / EvolutionProposal / EvaluationReport / IndustryManifest.",
   "type": "module",
