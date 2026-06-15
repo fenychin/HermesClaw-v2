@@ -272,6 +272,10 @@ model Connector {
   lastSync     String?
   permissions  String    // JSON 数组
   usedByAgents String    // JSON 数组
+  config         Json?    // 连接器配置（SMTP: host/port/auth；IMAP: host/port 等）
+  rateLimit      Int      @default(100)  // 每小时最大发送数
+  rateLimitUsed  Int      @default(0)    // 当前小时已使用量
+  rateLimitResetAt DateTime?             // 速率限制重置时间
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -775,4 +779,164 @@ model HarnessRollback {
   @@index([canaryId])
   @@index([agentId])
 }
+
+// ============================================================
+// 能力版本管理与能力调用遥测
+// ============================================================
+model CapabilityVersion {
+  id                   String   @id @default(cuid())
+  capabilityId         String   // 关联的 Skill.id / Connector.id / Workflow.id
+  capabilityType       String   // 'skill' | 'connector' | 'workflow'
+  version              String   // semver 格式，如 '1.2.3'
+  workspaceId          String
+  
+  // 能力描述（对齐 CapabilityRegistration 契约）
+  displayName          String
+  description          String   @default("")
+  inputSchema          Json     // JSON Schema 格式
+  outputSchema         Json     // JSON Schema 格式
+  tags                 String   @default("[]")  // JSON 数组
+  
+  // 运行时状态
+  status               String   @default("active")
+  // 'draft' | 'active' | 'deprecated' | 'yanked'
+  
+  // 健康度指标（滚动 24h 统计）
+  successCount         Int      @default(0)
+  failureCount         Int      @default(0)
+  avgLatencyMs         Float    @default(0)
+  lastHealthCheckAt    DateTime?
+  healthStatus         String   @default("unknown")
+  // 'healthy' | 'degraded' | 'unhealthy' | 'unknown'
+
+  // 变更说明
+  changelog            String   @default("")
+  publishedAt          DateTime @default(now())
+  publishedBy          String   @default("system")
+  deprecatedAt         DateTime?
+  deprecatedBy         String?
+  deprecationReason    String?
+  
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([capabilityId, version])
+  @@index([workspaceId, capabilityType, status])
+  @@index([capabilityId, status])
+}
+
+model CapabilityUsageLog {
+  id               String   @id @default(cuid())
+  capabilityId     String
+  capabilityType   String
+  version          String
+  workspaceId      String
+  agentId          String?
+  taskId           String?
+  status           String   // 'success' | 'failure' | 'timeout'
+  latencyMs        Int
+  errorCode        String?
+  calledAt         DateTime @default(now())
+
+  @@index([capabilityId, calledAt])
+  @@index([workspaceId, calledAt])
+}
+
+// ============================================================
+// 邮件模板与邮件发送日志
+// ============================================================
+model EmailTemplate {
+  id             String   @id @default(cuid())
+  templateId     String   @unique
+  workspaceId    String
+  name           String
+  subject        String
+  bodyHtml       String   
+  bodyText       String   // 纯文本降级版
+  variables      String   @default("[]")  // JSON 数组，模板变量名列表
+  category       String   @default("transactional")
+  // 'transactional' | 'marketing' | 'notification' | 'alert'
+  
+  status         String   @default("active")  // 'active' | 'archived'
+  version        Int      @default(1)          // 每次更新递增
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdBy      String   @default("system")
+
+  @@index([workspaceId, category, status])
+}
+
+model EmailSendLog {
+  id             String   @id @default(cuid())
+  sendId         String   @unique
+  workspaceId    String
+  connectorId    String
+  templateId     String?
+  
+  // 收发信息
+  fromAddress    String
+  toAddresses    String   // JSON 数组
+  ccAddresses    String   @default("[]")
+  subject        String
+  
+  // 发送状态
+  status         String   @default("pending")
+  // 'pending' | 'sent' | 'failed' | 'bounced' | 'unsubscribed'
+  
+  // 关联上下文
+  agentId        String?
+  taskId         String?
+  leaseToken     String?   // 关联的 ConnectorLease token
+  
+  // 错误信息
+  errorCode      String?
+  errorMessage   String?
+  retryCount     Int      @default(0)
+  
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([workspaceId, status, createdAt])
+  @@index([connectorId, createdAt])
+}
+
+model IndustryPackInstallation {
+  id                   String   @id @default(cuid())
+  installationId       String   @unique
+  workspaceId          String
+  packId               String
+  packName             String
+  packVersion          String
+  
+  // 安装状态
+  status               String   @default("installing")
+  // 'installing' | 'installed' | 'failed' | 'uninstalling' | 'uninstalled'
+  
+  // 安装内容记录（安装了哪些能力）
+  installedCapabilities String  @default("[]")  // JSON 数组，CapabilityVersion.id 列表
+  
+  // 前置 Pack 依赖记录
+  resolvedDependencies  String  @default("[]")  // JSON 数组，{ packId, version } 列表
+  
+  manifest             Json     // 完整 Manifest 快照
+  installedAt          DateTime?
+  installedBy          String   @default("system")
+  
+  uninstalledAt        DateTime?
+  uninstalledBy        String?
+  
+  // 失败原因
+  errorMessage         String?
+  
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([workspaceId, packId, packVersion])
+  @@index([workspaceId, status])
+  @@index([packId])
+}
+
+
 

@@ -138,11 +138,28 @@ Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私
 - `ConnectorLease`（连接器使用租约）  
 - `HumanApprovalCheckpoint`（人工审批检查点）
 
+#### 3.1.1 Capability Registry 实现（2026-06-15 v3.04.00-dev）
+- **Registry 服务**：[capability-registry.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/capability-registry.ts)
+- **版本管理**：使用 `CapabilityVersion`（prisma schema）实现，支持基于内联 semver 语义化排序的版本解析与运行时发现。
+- **健康度刷新**：通过 [/api/cron/capability-health](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/app/api/cron/capability-health/route.ts) 每小时自动调度刷新。
+- **能力下线**：支持 `deprecate`（仍可用，写 WARNING 审计日志）和 `yank`（立即不可用，彻底阻断并写入 high 风险审计日志）。
+- **审计动作**：支持 `capability.registered` / `capability.yanked` / `capability.health.degraded` 审计留痕溯源。
+
 ### 3.2 任务真相与执行真相
 
 - Hermes 是 **Task Truth Source**：任务定义、策略、风险等级、自动化等级、审批状态。  
 - OpenClaw 是 **Execution Truth Source**：动作是否执行、执行到哪一步、设备 / 连接器在线状态。  
 - 最终任务状态由 Hermes 汇总裁定，但不得篡改 OpenClaw 回传的原始执行回执与事件轨迹。
+
+3.2.1 Industry Pack Loader v2 实现（2026-06-15 v3.06.00-dev）
+- **Loader 核心**：[industry-pack-loader.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/industry-pack-loader.ts)
+- **Manifest 契约**：[industry-pack-manifest.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/contracts/industry-pack-manifest.ts)
+- **安装流程**：Manifest 校验（非空/SemVer/重复能力 ID/自循环依赖） → 依赖解析与深度检测（最大深度为 5，防无限循环） → 组件表实体创建/更新 → 敏感词前缀转换（如密码等转为 `'env:PLACEHOLDER'`） → 版本化注册至 Registry（已注册视为幂等跳过） → 更新为 `installed` 状态。
+- **异常回滚**：注册失败时，遍历已成功注册的能力列表逐一调用 `deprecateCapability` 进行软标记废弃（禁止 deleteMany 物理删除），更新安装状态为 `failed`。
+- **卸载策略**：Graceful Deprecation 策略，逐个废弃所安装能力，更新安装记录状态为 `uninstalled`，禁止物理删除任何 Skill / Workflow / Connector 记录。
+- **健康度统计**：基于 Capability Registry 的各能力 24h 调用监控，对包整体状态执行聚合计数。
+- **数据模型**：`IndustryPackInstallation`（Prisma Schema）。
+- **审计动作**：支持 `pack.install.started` / `pack.installed` / `pack.install.failed` / `pack.uninstalled` 等审计留痕。
 
 ### 3.3 必备字段（最小集）
 
@@ -177,6 +194,21 @@ Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私
 - `receiptHash`（可选）  
 - `version`（事件版本）
 
+#### 3.3.1 Built-in Email Connector 实现（2026-06-15 v3.05.00-dev）
+- **核心服务**：[email-connector.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/connectors/email-connector.ts)
+- **核心能力**：
+  - **SMTP 发送**：使用 Node.js 原生 `net`/`tls` 进行握手与内容组装，非测试/开发环境下使用真实 socket 发送。
+  - **速率限制**：小时级额度校验，在 Prisma 事务中悲观锁定 Connector 记录并原子更新已使用额度；超限时抛出 `RateLimitExceededError`。
+  - **模板渲染**：基于 Mustache 格式 `{{key}}` 进行动态替换。若渲染时缺少占位变量，保留原占位符并记 `email.template.warning` 审计日志。
+  - **退订链接**：支持指定 `unsubscribeUrl` 并在邮件中（正文末尾或占位符处）自动注入退订区块。
+  - **重试退避**：遭遇网络或繁忙错误时进行最高 3 次的退避重试，测试环境下延迟自动缩减至 1ms。
+- **高危门禁拦截**：
+  - 单次收件人数量 `to > 10` 判定为批量高危，必须传入通过 `checkAutomationGate` (L3 / high / confirm=true) 授权发放的 `leaseToken`，否则拒绝发送。
+- **隐私与密码防范**：
+  - **密码防泄漏**：支持 `env:ENV_NAME` 前缀形式从环境变量加载，库中只存前缀配置，绝不持久化明文。
+  - **隐私防泄漏**：`AuditLog` 及 `EmailSendLog` 表中绝对不记录邮件的 `bodyHtml` 及 `bodyText` 字段，防范现场信息及凭据溢出。
+- **审计动作**：支持 `email.sent` / `email.failed` / `email.template.warning` 审计动作。
+
 ### 3.4 幂等与补偿
 
 - 所有动作必须具备幂等键（`idempotencyKey`）。  
@@ -193,6 +225,7 @@ Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私
 - **审批引擎补充约定**：
   - **时效管理**：提案审批默认 72 小时时效，高危动作默认 24 小时时效。审批超时必须提取为顶层常量（如 `PROPOSAL_APPROVAL_EXPIRY_MS`），严禁在函数内硬编码。
   - **状态与审计强关联**：审批检查点（`ApprovalCheckpoint`）生命周期的状态跃迁，必须与 AuditLog 的 `approval.*` 审计链（`requested` / `granted` / `rejected` / `expired`）强关联绑定，做到一客一审，审计与拦截可追溯。
+  - **高危租约校验约定**：高危或批量操作的 `leaseToken` 可直接复用以已授权审批检查点 `acp-` 开头的 ID。执行面连接器必须主动查验该 `ApprovalCheckpoint` 的状态为 `approved` 且在有效期内，查验通过后记录 `approval.verified` 审计日志，建立物理发信与审批核验的完整可追溯链条。
 
 
 ---

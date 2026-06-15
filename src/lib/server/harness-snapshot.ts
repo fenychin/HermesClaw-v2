@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import crypto from "crypto"
 import { writeAuditLog } from "@/lib/server/audit"
 import type { Prisma } from "@/generated/prisma-v2/client"
+import { resolveCapability } from "./capability-registry"
 
 // ==============================
 // 错误类型定义
@@ -182,14 +183,29 @@ export async function captureSnapshot(
         workspaceId
       }
     })
-    skillBindings = skills.map(skill => ({
-      bindingId: `sb-${agentId}-${skill.id}`,
-      skillId: skill.id,
-      targetType: 'agent',
-      targetId: agentId,
-      overrides: {},
-      version: skill.version || '1.0.0'
-    }))
+    skillBindings = await Promise.all(
+      skills.map(async (skill) => {
+        let registeredVersion = skill.version || '1.0.0'
+        try {
+          const resolved = await resolveCapability({
+            capabilityId: skill.id,
+            capabilityType: 'skill',
+            workspaceId
+          })
+          registeredVersion = resolved.registration.version
+        } catch {
+          // Registry 无记录时降级到 skill.version
+        }
+        return {
+          bindingId: `sb-${agentId}-${skill.id}`,
+          skillId: skill.id,
+          targetType: 'agent',
+          targetId: agentId,
+          overrides: {},
+          version: registeredVersion
+        }
+      })
+    )
   }
 
   // 4. 读取关联的 Connector 绑定列表
@@ -202,14 +218,29 @@ export async function captureSnapshot(
         workspaceId
       }
     })
-    connectorBindings = connectors.map(conn => ({
-      policyId: `cp-${agentId}-${conn.id}`,
-      connectorId: conn.id,
-      allowedScopes: parseJsonArray(conn.permissions),
-      riskLevel: 'medium',
-      requiresApproval: false,
-      version: '1.0.0'
-    }))
+    connectorBindings = await Promise.all(
+      connectors.map(async (conn) => {
+        let registeredVersion = '1.0.0'
+        try {
+          const resolved = await resolveCapability({
+            capabilityId: conn.id,
+            capabilityType: 'connector',
+            workspaceId
+          })
+          registeredVersion = resolved.registration.version
+        } catch {
+          // Registry 无记录时降级
+        }
+        return {
+          policyId: `cp-${agentId}-${conn.id}`,
+          connectorId: conn.id,
+          allowedScopes: parseJsonArray(conn.permissions),
+          riskLevel: 'medium',
+          requiresApproval: false,
+          version: registeredVersion
+        }
+      })
+    )
   }
 
   // 5. 构造默认 Memory 策略 (Agent 本身没有直接对应的字段，赋予 Zod 默认策略)
