@@ -32,9 +32,9 @@ export interface AuditInput {
 
 export interface ApprovalDeps {
   writeAuditLog: (input: AuditInput) => Promise<void>;
-  // P1 预留：提案执行放行后调用 canary 灰度
+  // P1-B 实现：提案执行放行后调用 canary 灰度
   triggerCanary?: (proposalId: string) => Promise<void>;
-  // P1 预留：提案执行放行后调用 rollback 检查点
+  // P1-A 实现：approval 通过后立即触发快照
   recordProposalSnapshot?: (proposalId: string) => Promise<void>;
 }
 
@@ -233,9 +233,14 @@ export async function decideApprovalCheckpoint(
     workspaceId: checkpoint.workspaceId,
   });
 
-  // 6. 如果是 approved 并且有 proposalId，触发 canary 灰度 (P1 预留)
-  if (decision === 'approved' && updatedRecord.proposalId && activeDeps.triggerCanary) {
-    await activeDeps.triggerCanary(updatedRecord.proposalId);
+  // 6. 如果是 approved 并且有 proposalId，触发快照与 canary 灰度
+  if (decision === 'approved' && updatedRecord.proposalId) {
+    if (activeDeps.recordProposalSnapshot) {
+      await activeDeps.recordProposalSnapshot(updatedRecord.proposalId);
+    }
+    if (activeDeps.triggerCanary) {
+      await activeDeps.triggerCanary(updatedRecord.proposalId);
+    }
   }
 
   return mapDbToCheckpoint(updatedRecord);

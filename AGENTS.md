@@ -253,6 +253,32 @@ Harness Runtime 至少由以下对象组成：
 5. 指标观察窗口  
 6. 全量激活或回滚
 
+### 4.3.1 快照实现（2026-06-15 v3.02.01-dev）
+- **快照服务**：[harness-snapshot.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/harness-snapshot.ts)
+- **触发时机**：Approval 通过后、Canary 启动前（由 [approval.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/approval.ts) `recordProposalSnapshot` 钩子触发）
+- **数据模型**：`HarnessSnapshot`（prisma schema）
+- **审计动作**：`harness.snapshot.created` / `harness.snapshot.restored`
+
+### 4.4.1 Canary 实现（2026-06-15 v3.02.02-dev）
+- **Canary 服务**：[canary.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/canary.ts)
+- **晋级阈值**：`errorRate < 5%`，`successRate > 90%`
+- **自动回滚阈值**：`errorRate > 20%`（超出此阈值立即触发 Early Abort 紧急中止）
+- **观察窗口**：默认 24h，可在提案中自定义
+- **定时评估**：[/api/cron/canary-eval](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/app/api/cron/canary-eval/route.ts)（每 5 分钟由 Cron 调度）
+- **审计动作**：`canary.started` / `canary.promoted` / `canary.aborted`
+
+### 4.5.1 回滚实现（2026-06-15 v3.02.03-dev）
+- **回滚服务**：[rollback.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/rollback.ts)
+- **触发入口**：
+  - **自动触发**：由巡检 Cron（[/api/cron/canary-eval](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/app/api/cron/canary-eval/route.ts)）检测到健康度恶化自动调用。
+  - **手动触发**：通过管理员接口 `POST /api/rollbacks` 与重试接口 `POST /api/rollbacks/[id]/retry`。
+- **机制与约束**：
+  - **原子事务性**：使用单个 Prisma 事务原子恢复 Agent 状态，将灰度期间新建的关联 Workflow、Skill、Connector 置为 `'deprecated'`。
+  - **双向关系解绑**：自动清退灰度期间新增的技能绑定与连接器绑定关系（双向清退 usedByAgents 列表）。
+  - **幂等保护**：已处于 `completed` 状态的回滚请求，若再次重试应直接短路返回，防范并发与重复回滚风险。
+  - **高危操作二次确认**：手动触发 API（`POST /api/rollbacks` 及 `POST /api/rollbacks/[id]/retry`）属于 `critical` 级高危操作，强制通过 `checkConfirmValue(confirm)` 进行二次确认（要求 `confirm === true`）。
+- **审计动作**：`harness.rollback.completed` / `harness.rollback.failed`。
+
 ---
 
 ## 第五章：动态进化机制

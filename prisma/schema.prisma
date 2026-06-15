@@ -674,3 +674,105 @@ model ApprovalCheckpoint {
   @@index([taskId])
 }
 
+model HarnessSnapshot {
+  id                   String   @id @default(cuid())
+  snapshotId           String   @unique
+  workspaceId          String
+  agentId              String
+  proposalId           String?  // 触发此快照的提案 ID（可选，人工快照无提案）
+  snapshotType         String   @default("pre-canary")
+  // 'pre-canary' | 'pre-active' | 'manual' | 'scheduled'
+
+  // Agent Harness 运行时状态（完整序列化）
+  agentConfig          Json     // Agent 完整配置（canDo/cannotDo/skills/connectors 等）
+  workflowTemplates    Json     // 关联的 WorkflowTemplate 配置列表
+  skillBindings        Json     // 关联的 Skill 绑定列表
+  connectorBindings    Json     // 关联的 Connector 绑定列表
+  memoryPolicy         Json?    // Memory 策略配置（可选）
+  policySnapshotVersion String  // 当前策略版本号
+
+  // 状态
+  status               String   @default("active")
+  // 'active'（当前最新快照）| 'superseded'（已被更新快照取代）| 'rolled-back-to'（已被用于回滚）
+
+  createdAt            DateTime @default(now())
+  createdBy            String   @default("system")
+  restoredAt           DateTime? // 若被 rollback 使用，记录恢复时间
+  restoredBy           String?
+
+  @@index([workspaceId, agentId, status])
+  @@index([proposalId])
+}
+
+model HarnessCanary {
+  id                   String   @id @default(cuid())
+  canaryId             String   @unique
+  workspaceId          String
+  proposalId           String   @unique  // 一个提案只能有一个 canary
+  agentId              String
+  snapshotId           String            // 关联的 pre-canary 快照 ID
+  
+  // 流量分配
+  trafficPercent       Int      @default(10)  // 灰度流量比例（1-100）
+  
+  // 观察窗口
+  observationWindowMs  Int      @default(86400000)  // 默认 24 小时
+  startedAt            DateTime @default(now())
+  endsAt               DateTime // startedAt + observationWindowMs
+  
+  // 状态
+  status               String   @default("running")
+  // 'running' | 'promoting' | 'promoted' | 'rolling-back' | 'rolled-back' | 'failed'
+  
+  // 晋级/回滚决策
+  promotedAt           DateTime?
+  promotedBy           String?   // 'auto'（指标正常自动晋级）| userId（手动晋级）
+  rolledBackAt         DateTime?
+  rolledBackBy         String?
+  rollbackReason       String?
+  
+  // 观察指标快照（canary 结束时写入）
+  observationMetrics   Json?     // 观察窗口内的关键指标摘要
+  
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([agentId, status])
+}
+
+model HarnessRollback {
+  id                   String   @id @default(cuid())
+  rollbackId           String   @unique
+  workspaceId          String
+  canaryId             String   // 触发回滚的 Canary ID
+  proposalId           String
+  agentId              String
+  snapshotId           String   // 用于恢复的快照 ID
+  
+  // 回滚原因
+  reason               String
+  triggeredBy          String   @default("system")
+  triggerType          String
+  // 'auto'（评估触发）| 'manual'（人工触发）| 'emergency'（紧急中止）
+  
+  // 回滚状态
+  status               String   @default("pending")
+  // 'pending' | 'in-progress' | 'completed' | 'failed'
+  
+  // 回滚内容记录
+  restoredFields       Json     // 记录哪些字段被恢复，恢复前后的值对比
+  
+  startedAt            DateTime @default(now())
+  completedAt          DateTime?
+  
+  errorMessage         String?  // 若 status='failed'，记录错误信息
+  
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([canaryId])
+  @@index([agentId])
+}
+
