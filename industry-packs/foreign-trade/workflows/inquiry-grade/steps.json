@@ -1,0 +1,82 @@
+{
+  "id": "inquiry-grade",
+  "title": "询盘分级",
+  "description": "自动对询盘内容进行质量评估，识别高意向客户，优先分配跟进资源",
+  "steps": [
+    {
+      "id": "input-inquiry",
+      "title": "输入询盘内容",
+      "description": "粘贴客户询盘邮件原文",
+      "status": "pending",
+      "inputs": [
+        {
+          "key": "inquiry_text",
+          "label": "询盘原文",
+          "type": "textarea",
+          "required": true,
+          "placeholder": "粘贴客户询盘邮件内容..."
+        },
+        {
+          "key": "customer_country",
+          "label": "客户国家",
+          "type": "select",
+          "required": false,
+          "options": [
+            { "label": "美国", "value": "US" },
+            { "label": "德国", "value": "DE" },
+            { "label": "英国", "value": "GB" },
+            { "label": "法国", "value": "FR" },
+            { "label": "澳大利亚", "value": "AU" },
+            { "label": "加拿大", "value": "CA" },
+            { "label": "日本", "value": "JP" },
+            { "label": "韩国", "value": "KR" },
+            { "label": "印度", "value": "IN" },
+            { "label": "巴西", "value": "BR" },
+            { "label": "俄罗斯", "value": "RU" },
+            { "label": "阿联酋", "value": "AE" },
+            { "label": "沙特阿拉伯", "value": "SA" },
+            { "label": "其他", "value": "OTHER" }
+          ]
+        },
+        {
+          "key": "product_line",
+          "label": "产品线",
+          "type": "text",
+          "required": false,
+          "placeholder": "如：太阳能板、LED灯具"
+        }
+      ]
+    },
+    {
+      "id": "ai-analysis",
+      "title": "AI 质量分析",
+      "description": "HermesClaw 分析询盘意向度与需求明确性",
+      "status": "pending",
+      "outputs": [
+        { "key": "grade", "label": "询盘等级", "type": "text" },
+        { "key": "score", "label": "综合评分", "type": "text" },
+        { "key": "analysis", "label": "分析摘要", "type": "markdown" },
+        { "key": "suggested_action", "label": "建议动作", "type": "text" }
+      ]
+    },
+    {
+      "id": "assign-action",
+      "title": "分配跟进动作",
+      "description": "确认跟进策略并创建任务",
+      "status": "pending",
+      "inputs": [
+        {
+          "key": "confirm_action",
+          "label": "跟进方式",
+          "type": "select",
+          "required": true,
+          "options": [
+            { "label": "立即回复（高优先级）", "value": "urgent" },
+            { "label": "今日回复（普通优先级）", "value": "normal" },
+            { "label": "暂缓跟进", "value": "defer" }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+id: foreign-trade-tracker
+agentId: foreign-trade-tracker
+name: 外贸跟单员
+role: 负责外贸订单生产跟进、物流状态追踪和交期预警协调。
+description: 能够根据合同条款核查订单生产状态，通过物流连接器实时追踪集装箱动态，并在延误时动态编写开发信。
+skills:
+  - ft-follow-up-crm
+  - write-development-letter
+bindSkills:
+  - ft-follow-up-crm
+  - write-development-letter
+bindConnectors:
+  - conn-001
+  - conn-008
+defaultPolicy: 正常流转订单，当遭遇重大汇率波动或大额运价调整时必须生成 HEP 提案交由业务经理人工审核。
+automationLevel: L2
+canDo:
+  - 检索并统计短期/中期记忆
+  - 自动更新 CRM 的客户交互记录
+  - 自动向客户发送标准出货提醒
+cannotDo:
+  - 自行更改合同样本中的付款方式
+  - 绕过风控审查向高风险国家结汇
+status: running
+source: builtin
+category:
+  - 外贸跟单
+  - 订单管理
+harnessVersion: 1.0.0
+lastActive: "2026-06-15T00:00:00Z"
+createdAt: "2026-06-15T00:00:00Z"
+industryId: foreign-trade
+templateId: ft-order-tracker

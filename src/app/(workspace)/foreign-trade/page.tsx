@@ -1,350 +1,237 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
+  MessageSquare,
+  Users,
+  ClipboardList,
+  DollarSign,
   TrendingUp,
   TrendingDown,
-  Search,
-  Mail,
-  UserSearch,
-  FileText,
-  Package,
-  Truck,
-  MapPin,
-  BarChart2,
-  RefreshCw,
-  Star,
   ChevronRight,
-  ArrowUpRight,
-  Users,
-  MailOpen,
-  FileCheck,
-  Percent,
+  AlertTriangle,
+  Sparkles,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { SectionTitle } from "@/components/common/section-title";
-import { StatusBadge } from "@/components/common/status-badge";
-import { RiskBadge } from "@/components/common/risk-badge";
-import { useTradeStore } from "@/stores/trade-store";
-import { useAgentStore } from "@/stores/agent-store";
-import { useConnectorStore } from "@/stores/connector-store";
+import { PageHeader } from "@/components/common/page-header";
+import { StatCard } from "@/components/common/stat-card";
 import { PageTransition } from "@/components/common/PageTransition";
+import { WorkflowCard } from "./_components/workflow-card";
+import { InquiryQuickEntry } from "./_components/inquiry-quick-entry";
+import { WorkflowHealthMonitor } from "./_components/workflow-health-monitor";
+import { useForeignTradeCapabilities } from "@/hooks/use-foreign-trade-capabilities";
+import {
+  useDashboardStats,
+  useQuotations,
+  useInquiries,
+  computeMonthlyAmount,
+  countUrgentInquiries,
+} from "@/hooks/use-dashboard-stats";
+import { useIntelligence, filterRiskItems } from "@/hooks/use-intelligence";
+import { useExchangeRates } from "@/hooks/use-exchange-rates";
+
+import {
+  AgentSection,
+  SkillSection,
+  ConnectorSection,
+} from "./_components/trade-resource-cards";
+import type { MarketIntelligence } from "@/types/trade";
+import type { ExchangeRateItem } from "@/hooks/use-exchange-rates";
 import { cn } from "@/lib/utils";
-import type { Agent } from "@/types";
-import type { IntelligenceType } from "@/types";
 
 // ============================================================
-// KPI 数据（静态演示数据）
+// 子组件：外贸跟进漏斗 (与大盘指标联动，提供 Drill-down 入口)
+// NOTE: 点击漏斗节点可以直接跳转到对应的外贸工作流，数据从数据库实时聚合
 // ============================================================
-type KpiTone = "success" | "warning" | "muted";
-
-interface KpiItem {
-  label: string;
-  value: number | string;
-  change: number | null;
-  changeLabel: string | null;
-  tone: KpiTone;
-  icon: typeof TrendingUp;
-}
-
-const KPI_DATA: KpiItem[] = [
-  {
-    label: "今日新询盘",
-    value: 12,
-    change: 3,
-    changeLabel: "较昨日",
-    tone: "success",
-    icon: TrendingUp,
-  },
-  {
-    label: "跟进中客户",
-    value: 47,
-    change: null,
-    changeLabel: null,
-    tone: "muted",
-    icon: Users,
-  },
-  {
-    label: "待回复邮件",
-    value: 8,
-    change: null,
-    changeLabel: "需尽快处理",
-    tone: "warning",
-    icon: MailOpen,
-  },
-  {
-    label: "本月报价数",
-    value: 23,
-    change: null,
-    changeLabel: null,
-    tone: "muted",
-    icon: FileCheck,
-  },
-  {
-    label: "成交转化率",
-    value: "18.6%",
-    change: 2.3,
-    changeLabel: "较上月",
-    tone: "success",
-    icon: Percent,
-  },
-];
-
-// ============================================================
-// 工作流列表
-// ============================================================
-interface WorkflowItem {
-  title: string;
-  description: string;
-  icon: typeof Search;
-  color: "blue" | "purple" | "green" | "orange";
-}
-
-const WORKFLOWS: WorkflowItem[] = [
-  {
-    title: "询盘分级处理",
-    description: "AI 自动识别询盘意图与优先级，过滤虚假询盘，按规则路由至对应销售",
-    icon: Search,
-    color: "blue",
-  },
-  {
-    title: "生成开发信",
-    description: "根据客户画像与产品信息，自动生成多语种个性化开发信，支持 A/B 测试",
-    icon: Mail,
-    color: "purple",
-  },
-  {
-    title: "客户画像构建",
-    description: "从邮件、聊天、交易历史中提取客户特征，构建 360° 客户画像",
-    icon: UserSearch,
-    color: "green",
-  },
-  {
-    title: "报价单生成",
-    description: "基于实时汇率、成本、运费自动计算多币种专业报价单，支持版本管理",
-    icon: FileText,
-    color: "orange",
-  },
-  {
-    title: "样品跟进管理",
-    description: "跟踪打样全流程：从需求确认、生产进度到寄样反馈，自动提醒关键节点",
-    icon: Package,
-    color: "blue",
-  },
-  {
-    title: "订单推进跟踪",
-    description: "监控订单执行状态，预警交期风险，自动同步生产与物流进度至项目空间",
-    icon: Truck,
-    color: "purple",
-  },
-  {
-    title: "展会线索整理",
-    description: "将展会名片、聊天记录、照片等碎片信息结构化，输出可跟进线索清单",
-    icon: MapPin,
-    color: "green",
-  },
-  {
-    title: "市场情报分析",
-    description: "持续采集行业数据、竞品动作、政策变化，自动推送机会洞察与风险预警",
-    icon: BarChart2,
-    color: "orange",
-  },
-  {
-    title: "邮件自动跟进",
-    description: "按客户阶段与行为触发跟进邮件，支持多轮序列与渠道适配，提升回复率",
-    icon: RefreshCw,
-    color: "blue",
-  },
-];
-
-/** 工作流颜色 → Tailwind 工具类映射 */
-const WORKFLOW_COLOR_MAP = {
-  blue: { text: "text-brand-blue", bg: "bg-brand-blue/10" },
-  purple: { text: "text-brand", bg: "bg-brand/10" },
-  green: { text: "text-success", bg: "bg-success/10" },
-  orange: { text: "text-warning", bg: "bg-warning/10" },
-} as const;
-
-// ============================================================
-// 情报类型 → 标签配置
-// ============================================================
-const INTEL_TYPE_CONFIG: Record<
-  IntelligenceType,
-  { label: string; className: string }
-> = {
-  currency: { label: "汇率", className: "bg-warning/10 text-warning" },
-  tariff: { label: "关税", className: "bg-danger/10 text-danger" },
-  competitor: { label: "竞品", className: "bg-brand/10 text-brand" },
-  market: { label: "市场", className: "bg-success/10 text-success" },
-  logistics: { label: "物流", className: "bg-brand-blue/10 text-brand-blue" },
-};
-
-// ============================================================
-// 工具函数
-// ============================================================
-
-/** 格式化相对时间（简单版） */
-function formatRelativeTime(iso: string): string {
-  const now = Date.now();
-  const diff = now - new Date(iso).getTime();
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 60) return `${minutes} 分钟前`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} 小时前`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days} 天前`;
-  const months = Math.floor(days / 30);
-  return `${months} 个月前`;
-}
-
-/** 可信度星级渲染 */
-function CredibilityStars({ score }: { score: number }) {
-  const stars = Math.round(score * 5);
-  return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Star
-          key={i}
-          className={cn(
-            "size-2.5",
-            i < stars ? "fill-warning text-warning" : "text-hint/30",
-          )}
-        />
-      ))}
-    </div>
-  );
-}
-
-// ============================================================
-// KPI 卡片组件
-// ============================================================
-function KpiCard({
-  label,
-  value,
-  change,
-  changeLabel,
-  tone,
-  icon: Icon,
-}: KpiItem) {
-  return (
-    <div className="bg-card rounded-xl border border-border p-4">
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs text-muted-foreground">{label}</span>
-        {change !== null && tone === "success" ? (
-          <TrendingUp className="text-success size-3.5" />
-        ) : change !== null ? (
-          <TrendingDown className="text-warning size-3.5" />
-        ) : (
-          <Icon className="text-hint size-3.5" />
-        )}
-      </div>
-      <div className="text-foreground mt-2 text-3xl font-bold">
-        {typeof value === "number" ? value.toLocaleString() : value}
-      </div>
-      {changeLabel ? (
-        <div
-          className={cn(
-            "mt-1 flex items-center gap-1 text-xs",
-            tone === "success" && "text-success",
-            tone === "warning" && "text-warning",
-            tone === "muted" && "text-hint",
-          )}
-        >
-          {change !== null ? (
-            <span className="font-medium">
-              {change > 0 ? `↑${change}` : `↓${Math.abs(change)}`}
-            </span>
-          ) : null}
-          <span>{changeLabel}</span>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-// ============================================================
-// 工作流卡片组件
-// ============================================================
-function WorkflowCard({ title, description, icon: Icon, color }: WorkflowItem) {
-  const c = WORKFLOW_COLOR_MAP[color];
-
-  return (
-    <div className="bg-card group rounded-xl border border-border p-5 transition-all duration-200 hover:-translate-y-[2px] hover:shadow-md">
-      {/* 图标容器 */}
-      <div
-        className={cn(
-          "flex size-12 items-center justify-center rounded-xl",
-          c.bg,
-        )}
-      >
-        <Icon className={cn("size-5", c.text)} />
-      </div>
-      {/* 标题 */}
-      <h4 className="text-foreground mt-3 text-sm font-medium">{title}</h4>
-      {/* 说明 */}
-      <p className="text-hint mt-1 line-clamp-2 text-xs leading-relaxed">
-        {description}
-      </p>
-      {/* 操作按钮 */}
-      <div className="mt-4 flex items-center justify-between">
-        <Button variant="ghost" size="xs">
-          执行
-        </Button>
-        <ArrowUpRight className="text-hint size-3 opacity-0 transition-opacity group-hover:opacity-100" />
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// 智能体推荐卡组件
-// ============================================================
-/** Agent 渐变背景色盘（按名字首字母 hash） */
-const AGENT_GRADIENTS = [
-  "from-brand to-brand-blue",
-  "from-success to-brand-blue",
-  "from-warning to-brand",
-  "from-brand-blue to-success",
-  "from-brand to-warning",
-];
-
-function AgentRecommendCard({
-  agent,
-  index,
+function TradeFunnelDrillDown({
+  dashboards,
+  todayInquiries,
+  followingCustomers,
+  quotationsCount,
+  acceptedQuotationsCount,
 }: {
-  agent: Agent;
-  index: number;
+  dashboards: any[];
+  todayInquiries: number;
+  followingCustomers: number;
+  quotationsCount: number;
+  acceptedQuotationsCount: number;
 }) {
-  const gradient = AGENT_GRADIENTS[index % AGENT_GRADIENTS.length];
+  const router = useRouter();
+
+  // 从 dashboards 中找出漏斗定义 (以 id === 'ft-kpi-funnel' 为准)
+  const funnelDashboard = dashboards?.find((d) => d && d.id === "ft-kpi-funnel");
+  
+  // 提取配置的 steps
+  const stepsConfig = funnelDashboard?.steps || [];
+
+  // 映射数量值
+  const valMap: Record<string, number> = {
+    todayInquiries,
+    followingCustomers,
+    quotationsCount,
+    acceptedQuotationsCount,
+  };
+
+  const funnelSteps = stepsConfig.map((step: any) => ({
+    label: step.label,
+    count: valMap[step.field] ?? 0,
+    trend: step.trend,
+    color: step.color,
+    wfId: step.wfId,
+    desc: step.desc,
+  }));
+
+  if (funnelSteps.length === 0) {
+    return null;
+  }
 
   return (
-    <div className="bg-card flex w-[200px] shrink-0 flex-col rounded-xl border border-border p-4">
-      {/* 头像 */}
-      <div
-        className={cn(
-          "flex size-10 items-center justify-center rounded-full bg-gradient-to-br text-sm font-bold text-white",
-          gradient,
-        )}
-      >
-        {agent.name.charAt(0)}
-      </div>
-      {/* 名称 + 状态 */}
-      <div className="mt-3 flex items-center gap-2">
-        <span className="text-foreground text-sm font-medium">
-          {agent.name}
+    <section className="bg-card/45 backdrop-blur-md rounded-2xl border border-border p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-foreground text-sm font-semibold">
+            {funnelDashboard?.title || "外贸跟进漏斗 (大盘 Drill-down)"}
+          </h3>
+          <p className="text-hint text-xs mt-0.5">
+            {funnelDashboard?.description || "反映客户生命周期的流转效率，点击节点可直达工作流控制台"}
+          </p>
+        </div>
+        <span className="text-[10px] text-hint bg-background border border-border rounded px-2 py-0.5 font-medium">
+          实时大盘数据
         </span>
-        <StatusBadge status={agent.status} />
       </div>
-      {/* 角色描述 */}
-      <p className="text-hint mt-1 line-clamp-2 text-xs leading-relaxed">
-        {agent.role} · {agent.description}
-      </p>
-      {/* 操作 */}
-      <Button variant="outline" size="xs" className="mt-3 w-full">
-        激活
-      </Button>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {funnelSteps.map((step: any, idx: number) => (
+          <div
+            key={idx}
+            onClick={() => router.push(`/foreign-trade/workflows/${step.wfId}`)}
+            className={cn(
+              "p-4 rounded-xl border cursor-pointer transition-all duration-200",
+              "hover:shadow-sm hover:scale-[1.01] active:scale-[0.99]",
+              step.color,
+            )}
+          >
+            <div className="flex justify-between items-start">
+              <span className="text-xs font-semibold leading-none">{step.label}</span>
+              <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-background/60 font-mono">
+                {step.trend}
+              </span>
+            </div>
+            <div className="mt-3 flex items-baseline gap-1">
+              <span className="text-2xl font-bold font-mono leading-none">{step.count}</span>
+              <span className="text-[10px] opacity-75">笔</span>
+            </div>
+            <p className="mt-2 text-[10px] opacity-60 leading-tight">
+              {step.desc}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ============================================================
+// 子组件：汇率卡片（接入 /api/exchange-rates 真实数据）
+// ============================================================
+function ExchangeRateCard({
+  rates,
+  isLoading,
+}: {
+  rates: ExchangeRateItem[];
+  isLoading: boolean;
+}) {
+  return (
+    <div className="bg-card/45 backdrop-blur-md rounded-2xl border border-border p-4">
+      {/* 卡片标题 */}
+      <p className="text-muted-foreground mb-3 text-xs font-medium">汇率监测</p>
+      {isLoading ? (
+        <div className="space-y-3">
+          {[0, 1].map((i) => (
+            <div key={i} className="h-5 bg-accent/40 rounded animate-pulse" />
+          ))}
+        </div>
+      ) : rates.length === 0 ? (
+        <p className="text-hint text-xs">暂无汇率数据</p>
+      ) : (
+        <div className="space-y-3">
+          {rates.map((rate) => {
+            const isUp = rate.change24h >= 0;
+            return (
+              <div key={rate.pair} className="flex items-center justify-between">
+                {/* 货币对 */}
+                <span className="text-foreground text-sm font-medium">{rate.pair}</span>
+                <div className="flex items-center gap-2">
+                  {/* 汇率值 */}
+                  <span className="text-foreground text-sm font-semibold tabular-nums">
+                    {rate.value.toFixed(4)}
+                  </span>
+                  {/* 24h 变化 */}
+                  <div
+                    className={cn(
+                      "flex items-center gap-0.5 text-xs font-medium",
+                      isUp ? "text-success" : "text-danger",
+                    )}
+                  >
+                    {isUp ? (
+                      <TrendingUp className="size-3" />
+                    ) : (
+                      <TrendingDown className="size-3" />
+                    )}
+                    <span>{isUp ? "+" : ""}{rate.change24h.toFixed(2)}%</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
+  );
+}
+
+// ============================================================
+// 子组件：单条风险提醒（来自 MarketIntelligence 真实数据）
+// ============================================================
+function RiskItemCard({ item }: { item: MarketIntelligence }) {
+  return (
+    <div className="bg-destructive/10 rounded-xl p-3 mb-2 border border-destructive/20">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="text-danger mt-0.5 size-3.5 shrink-0" />
+        <div className="min-w-0">
+          <p className="text-danger text-sm font-medium leading-snug">{item.title}</p>
+          <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed line-clamp-3">
+            {item.summary}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// 子组件：AI 晨报入口
+// ============================================================
+function AIMorningReportCard() {
+  return (
+    <Link
+      href="/dashboard"
+      className={cn(
+        "bg-primary/10 rounded-2xl p-4 flex items-center justify-between border border-primary/20",
+        "hover:bg-primary/15 transition-colors duration-150 cursor-pointer",
+      )}
+    >
+      <div className="flex items-center gap-3">
+        <div className="bg-primary/20 rounded-xl p-2">
+          <Sparkles className="text-primary size-4" />
+        </div>
+        <div>
+          <p className="text-foreground text-sm font-medium">查看今日 AI 晨报</p>
+          <p className="text-muted-foreground text-xs mt-0.5">智能摘要 · 已更新</p>
+        </div>
+      </div>
+      <ChevronRight className="text-primary size-4 shrink-0" />
+    </Link>
   );
 }
 
@@ -352,205 +239,178 @@ function AgentRecommendCard({
 // 页面主体
 // ============================================================
 export default function ForeignTradePage() {
-  const intelligence = useTradeStore((s) => s.intelligence);
-  const loadIntelligence = useTradeStore((s) => s.loadIntelligence);
-  const storeAgents = useAgentStore((s) => s.agents);
-  const loadAgents = useAgentStore((s) => s.loadAgents);
-  const connectors = useConnectorStore((s) => s.connectors);
-  const loadConnectors = useConnectorStore((s) => s.loadConnectors);
+  const {
+    workflows,
+    agents: tradeAgents,
+    skills: tradeSkills,
+    connectors: tradeConnectors,
+    dashboards,
+    isLoading: capabilitiesLoading,
+  } = useForeignTradeCapabilities();
+  // 大盘统计数据（TanStack Query，staleTime: 30s）
+  const { stats, isLoading: statsLoading } = useDashboardStats();
+  // 报价数据（用于计算本月成交金额及漏斗转化数）
+  const { quotations, isLoading: quotationsLoading } = useQuotations();
+  // 询盘数据（用于统计紧急任务数）
+  const { inquiries } = useInquiries();
+  // 市场情报（行业动态 / 风险提醒，真实 DB 数据）
+  const { items: intelligence, isLoading: intelLoading } = useIntelligence();
+  // 汇率监测（真实数据源）
+  const { items: rates, isLoading: ratesLoading } = useExchangeRates();
 
-  // 加载智能体、市场情报、连接器
-  useEffect(() => {
-    loadAgents();
-    loadIntelligence();
-    loadConnectors();
-  }, [loadAgents, loadIntelligence, loadConnectors]);
+  // 从情报中筛选风险提醒（关税 / 物流 / 竞品 且影响非低）
+  const riskItems = filterRiskItems(intelligence).slice(0, 3);
 
-  const topIntel = useMemo(() => intelligence.slice(0, 5), [intelligence]);
-  const topAgents = useMemo(() => storeAgents.slice(0, 5), [storeAgents]);
-  const recommendedConnectors = useMemo(
-    () =>
-      connectors
-        .filter((c) =>
-          ["email", "im", "crm"].includes(c.category),
-        )
-        .slice(0, 5),
-    [connectors],
-  );
+  const isLoading = statsLoading || quotationsLoading;
+
+  // 从真实数据计算指标
+  const todayInquiries = stats?.todayInquiries ?? 0;
+  const todayInquiriesChange = stats?.todayInquiriesChange ?? 0;
+  const followingCustomers = stats?.followingCustomers ?? 0;
+  const pendingTasks = stats?.pendingTasks ?? 0;
+  const urgentTasks = countUrgentInquiries(inquiries);
+  const monthlyAmount = computeMonthlyAmount(quotations);
+
+  // 漏斗联动统计 (动态获取)
+  const quotationsCount = quotations?.length ?? 0;
+  const acceptedQuotationsCount = quotations?.filter((q) => q.status === "accepted").length ?? 0;
 
   return (
     <PageTransition>
-    <div className="space-y-6 p-6">
-      {/* ================================================ */}
-      {/*  1. 顶部 KPI 区                                   */}
-      {/* ================================================ */}
-      <div className="grid grid-cols-5 gap-4">
-        {KPI_DATA.map((kpi) => (
-          <KpiCard key={kpi.label} {...kpi} />
-        ))}
-      </div>
+      {/* 外层容器：左主区 + 右侧面板 */}
+      <div className="flex flex-col lg:flex-row h-full min-h-0 p-6 gap-6 overflow-y-auto lg:overflow-hidden">
+        {/* ================================================ */}
+        {/* 左主区                                          */}
+        {/* ================================================ */}
+        <div className="flex-1 min-w-0 lg:overflow-y-auto space-y-6">
+          {/* 页头：外贸工作台 */}
+          <PageHeader
+            title="外贸工作台"
+            description="外贸 Industry Pack · 智能跟进启动面板"
+          />
 
-      {/* ================================================ */}
-      {/*  2. 工作流网格                                    */}
-      {/* ================================================ */}
-      <section>
-        <SectionTitle
-          title="外贸工作流"
-          subtitle="覆盖外贸全链路：从询盘到订单、从线索到复购"
-        />
-        <div className="mt-4 grid grid-cols-3 gap-4">
-          {WORKFLOWS.map((wf) => (
-            <WorkflowCard key={wf.title} {...wf} />
-          ))}
+          {/* ---- 经营概览 StatCard 4列网格（接入真实整合数据） ---- */}
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+            {/* 今日询盘 */}
+            <StatCard
+              title="今日询盘"
+              value={todayInquiries}
+              icon={MessageSquare}
+              change={{ value: todayInquiriesChange, label: "较昨日" }}
+              isLoading={isLoading}
+            />
+
+            {/* 跟进中客户 */}
+            <StatCard
+              title="跟进中客户"
+              value={followingCustomers}
+              icon={Users}
+              description={pendingTasks > 0 ? `待回复 ${pendingTasks} 条` : "全部已回复"}
+              isLoading={isLoading}
+            />
+
+            {/* 待处理任务 */}
+            <StatCard
+              title="待处理任务"
+              value={pendingTasks}
+              icon={ClipboardList}
+              description={urgentTasks > 0 ? `紧急 ${urgentTasks} 项` : "无紧急任务"}
+              isLoading={isLoading}
+            />
+
+            {/* 本月成交金额 */}
+            <StatCard
+              title="本月成交金额"
+              value={monthlyAmount > 0 ? `$${(monthlyAmount / 1000).toFixed(1)}k` : "$0"}
+              icon={DollarSign}
+              isLoading={isLoading}
+            />
+          </div>
+
+          {/* ---- 外贸跟进漏斗 (与大盘指标联动，提供 Drill-down 入口) ---- */}
+          <TradeFunnelDrillDown
+            dashboards={dashboards}
+            todayInquiries={todayInquiries}
+            followingCustomers={followingCustomers}
+            quotationsCount={quotationsCount}
+            acceptedQuotationsCount={acceptedQuotationsCount}
+          />
+
+          {/* ---- 询盘快速录入与自动分级处理 ---- */}
+          <InquiryQuickEntry />
+
+          {/* ---- 常用工作流 ---- */}
+          <section className="mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-foreground font-semibold text-sm">常用工作流控制台</h3>
+              <span className="text-xs text-hint">一键启动，自动通过底层 DAG 运行引擎执行</span>
+            </div>
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+              {workflows.map((wf) => (
+                <WorkflowCard key={wf.id} workflow={wf} />
+              ))}
+            </div>
+          </section>
+
+          {/* ---- 外贸专属智能体推荐 ---- */}
+          <div className="mt-6">
+            <AgentSection agents={tradeAgents} isLoading={capabilitiesLoading} />
+          </div>
+
+          {/* ---- 外贸知识与Skill模板 ---- */}
+          <div className="mt-6">
+            <SkillSection skills={tradeSkills} isLoading={capabilitiesLoading} />
+          </div>
+
+          {/* ---- 连接器推荐 ---- */}
+          <div className="mt-6">
+            <ConnectorSection connectors={tradeConnectors} isLoading={capabilitiesLoading} />
+          </div>
         </div>
-      </section>
 
-      {/* ================================================ */}
-      {/*  3. 推荐数字员工                                  */}
-      {/* ================================================ */}
-      <section>
-        <SectionTitle
-          title="推荐数字员工"
-          action={
-            <Link
-              href="/agents"
-              className="text-brand hover:text-brand/80 flex items-center gap-1 text-xs font-medium transition-colors"
-            >
-              查看全部
-              <ChevronRight className="size-3.5" />
-            </Link>
-          }
-        />
-        <div className="mt-4 flex gap-4 overflow-x-auto pb-2">
-          {topAgents.map((agent, i) => (
-            <AgentRecommendCard key={agent.id} agent={agent} index={i} />
-          ))}
-        </div>
-      </section>
+        {/* ================================================ */}
+        {/* 右侧面板：健康、汇率与风险监测                     */}
+        {/* ================================================ */}
+        <aside
+          className={cn(
+            "w-full lg:w-72 shrink-0 lg:border-l border-border",
+            "lg:overflow-y-auto lg:pl-6 space-y-4",
+          )}
+        >
+          {/* 自演化与健康监测卡片 */}
+          <WorkflowHealthMonitor />
 
-      {/* ================================================ */}
-      {/*  4. 两列布局：市场情报 + 连接器推荐                */}
-      {/* ================================================ */}
-      <div className="grid grid-cols-3 gap-6">
-        {/* ---- 左列：外贸市场情报预览（占 2/3） ---- */}
-        <section className="col-span-2">
-          <SectionTitle
-            title="外贸市场情报预览"
-            subtitle="行业动态、汇率波动、竞品动作实时监控"
-            action={
+          {/* 汇率监测卡片 */}
+          <ExchangeRateCard rates={rates} isLoading={ratesLoading} />
+
+          {/* 风险提醒列表 */}
+          <div className="bg-card/45 backdrop-blur-md rounded-2xl border border-border p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-foreground font-medium text-xs">贸易风险预警</h2>
               <Link
                 href="/dashboard"
-                className="text-brand hover:text-brand/80 flex items-center gap-1 text-xs font-medium transition-colors"
-              >
-                查看大盘
-                <ChevronRight className="size-3.5" />
-              </Link>
-            }
-          />
-          <div className="mt-4 space-y-3">
-            {topIntel.map((item) => {
-              const typeConfig = INTEL_TYPE_CONFIG[item.type];
-              return (
-                <div
-                  key={item.id}
-                  className="bg-card rounded-xl border border-border p-4 transition-colors hover:border-border/80"
-                >
-                  <div className="flex items-start gap-3">
-                    {/* 类型标签 */}
-                    <span
-                      className={cn(
-                        "inline-flex shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium",
-                        typeConfig.className,
-                      )}
-                    >
-                      {typeConfig.label}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      {/* 标题 */}
-                      <h4 className="text-foreground text-sm font-medium">
-                        {item.title}
-                      </h4>
-                      {/* 摘要（2 行） */}
-                      <p className="text-hint mt-1 line-clamp-2 text-xs leading-relaxed">
-                        {item.summary}
-                      </p>
-                      {/* 元信息行：可信度 + 影响等级 + 时间 + 操作 */}
-                      <div className="mt-2 flex items-center gap-3">
-                        <CredibilityStars score={item.credibility} />
-                        <RiskBadge level={item.impactLevel} />
-                        <span className="text-hint text-[11px]">
-                          {formatRelativeTime(item.publishedAt)}
-                        </span>
-                        <div className="flex-1" />
-                        <Button variant="ghost" size="xs">
-                          派给智能体
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* ---- 右列：连接器推荐（占 1/3） ---- */}
-        <section className="col-span-1">
-          <SectionTitle
-            title="连接器推荐"
-            subtitle="高效连接邮箱、IM、CRM，打通数据孤岛"
-            action={
-              <Link
-                href="/brain/connectors"
-                className="text-brand hover:text-brand/80 flex items-center gap-1 text-xs font-medium transition-colors"
+                className="text-primary text-[10px] hover:text-primary/80 transition-colors"
               >
                 全部
-                <ChevronRight className="size-3.5" />
               </Link>
-            }
-          />
-          <div className="mt-4 space-y-2">
-            {recommendedConnectors.map((conn) => (
-              <div
-                key={conn.id}
-                className="bg-card flex items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:border-border/80"
-              >
-                {/* emoji 图标 */}
-                <span className="text-lg">{conn.iconEmoji}</span>
-                {/* 名称 + 状态 */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-foreground text-sm font-medium">
-                      {conn.name}
-                    </span>
-                    {/* 状态点 */}
-                    <span
-                      className={cn(
-                        "size-1.5 rounded-full",
-                        conn.status === "connected" && "bg-success",
-                        conn.status === "connecting" && "bg-warning",
-                        conn.status === "error" && "bg-danger",
-                        conn.status === "available" && "bg-hint",
-                      )}
-                    />
-                  </div>
-                  <p className="text-hint mt-0.5 truncate text-[11px]">
-                    {conn.description}
-                  </p>
-                </div>
-                {/* 连接按钮 */}
-                <Button
-                  variant={conn.status === "connected" ? "ghost" : "outline"}
-                  size="xs"
-                >
-                  {conn.status === "connected" ? "已连" : "连接"}
-                </Button>
+            </div>
+            {intelLoading ? (
+              <div className="space-y-2">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="h-16 bg-accent/40 rounded-xl animate-pulse" />
+                ))}
               </div>
-            ))}
+            ) : riskItems.length === 0 ? (
+              <p className="text-hint text-xs px-1">暂无风险提醒</p>
+            ) : (
+              riskItems.map((item) => <RiskItemCard key={item.id} item={item} />)
+            )}
           </div>
-        </section>
+
+          {/* AI 晨报入口卡片 */}
+          <AIMorningReportCard />
+        </aside>
       </div>
-    </div>
     </PageTransition>
   );
 }

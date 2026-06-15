@@ -1,0 +1,21 @@
+{
+  "id": "agent-002",
+  "name": "Clara",
+  "role": "询盘分拣员",
+  "description": "自动分拣入站询盘，识别虚假询盘与高价值询盘，按优先级路由到对应销售或跟进流程",
+  "status": "running",
+  "source": "builtin",
+  "category": ["外贸分析", "询盘 management"],
+  "bindSkills": ["skill-002", "skill-005"],
+  "bindConnectors": ["conn-001", "conn-004", "conn-017"],
+  "memoryPermission": "read-write",
+  "harnessVersion": "2.0.1",
+  "automationLevel": "L1",
+  "canDo": ["分析入站询盘意图", "评分与优先级排序", "检测虚假询盘模式", "自动分配至对应销售"],
+  "cannotDo": ["直接回复客户", "修改报价数据", "访问 ERP 财务模块"],
+  "stats": { "todayTasks": 47, "successRate": 0.91, "avgDuration": "45s" },
+  "lastActive": "2026-06-06T10:45:00Z",
+  "createdAt": "2025-12-01T08:00:00Z",
+  "industryId": "foreign-trade",
+  "templateId": "ft-inquiry-sorter"
+}

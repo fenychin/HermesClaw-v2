@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Settings,
   Building2,
   Users,
   Cpu,
@@ -31,7 +30,7 @@ import {
   Lock,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
-import { StatusBadge } from "@/components/common/status-badge";
+import { StatusBadge, type StatusBadgeStatus } from "@/components/common/status-badge";
 import { RiskBadge } from "@/components/common/risk-badge";
 import { AutomationBadge } from "@/components/common/automation-badge";
 import { MarkdownRenderer } from "@/components/common/markdown-renderer";
@@ -45,7 +44,8 @@ import {
 } from "@/components/ui/dialog";
 import { useTradeStore } from "@/stores/trade-store";
 import { apiClient, ConfirmationRequiredError } from "@/lib/api-client";
-import type { HarnessProposal } from "@/types";
+import type { HarnessProposal, ProposalStatus } from "@/types";
+import { automationLevelFromRisk } from "@/types";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -60,6 +60,12 @@ function formatHarnessTime(iso: string | null | undefined, fallback = "—"): st
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(
     d.getHours(),
   )}:${pad(d.getMinutes())}`;
+}
+
+/** 将 ProposalStatus 映射为 StatusBadgeStatus（'rolled-back' → 'error'，其余直接透传） */
+function toStatusBadgeStatus(status: ProposalStatus): StatusBadgeStatus {
+  if (status === "rolled-back") return "error";
+  return status as StatusBadgeStatus;
 }
 
 // ============================================================
@@ -425,11 +431,11 @@ function AuditSection() {
   /** 风险等级 → 徽章样式 */
   const riskBadge = (risk: string | null) => {
     if (risk === "high") return "bg-danger/10 text-danger";
-    if (risk === "mid") return "bg-warning/10 text-warning";
+    if (risk === "medium") return "bg-warning/10 text-warning";
     return "bg-success/10 text-success";
   };
   const riskLabel = (risk: string | null) =>
-    risk === "high" ? "高风险" : risk === "mid" ? "中风险" : "低风险";
+    risk === "high" ? "高风险" : risk === "medium" ? "中风险" : "低风险";
 
   return (
     <SectionBlock title="审计与日志" subtitle="记录所有关键操作，满足合规与溯源需求">
@@ -569,11 +575,11 @@ function ToolRegistryBlock() {
   const riskBadge = (risk: string) =>
     risk === "high"
       ? "bg-danger/10 text-danger"
-      : risk === "mid"
+      : risk === "medium"
         ? "bg-warning/10 text-warning"
         : "bg-success/10 text-success";
   const riskLabel = (risk: string) =>
-    risk === "high" ? "高危·双审批" : risk === "mid" ? "中" : "低";
+    risk === "high" ? "高危·双审批" : risk === "medium" ? "中" : "低";
 
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden max-w-2xl mt-4">
@@ -863,8 +869,8 @@ function HarnessSection() {
     loadProposals();
   }, [loadProposals]);
 
-  const pendingProposals = harnessProposals.filter((p) => p.status === "pending");
-  const historyProposals = harnessProposals.filter(
+  const pendingProposals = (harnessProposals || []).filter((p) => p.status === "pending");
+  const historyProposals = (harnessProposals || []).filter(
     (p) => p.status === "approved" || p.status === "rejected",
   );
 
@@ -882,7 +888,7 @@ function HarnessSection() {
       // 审批成功后失效 Harness 状态查询，确保 /brain 面板实时联动
       queryClient.invalidateQueries({ queryKey: ["harness-status"] });
       queryClient.invalidateQueries({ queryKey: ["harness-evolution-log"] });
-      const target = harnessProposals.find((p) => p.id === id);
+      const target = (harnessProposals || []).find((p) => p.id === id);
       toast.success(
         target ? `提案 ${target.proposalId} 已批准` : "提案已批准",
         { description: "系统将在下次评估时应用此变更" },
@@ -890,7 +896,7 @@ function HarnessSection() {
     } catch (err) {
       // L3 缺确认（409）→ 弹确认；L4（403）/ 其他 → 错误提示
       if (err instanceof ConfirmationRequiredError) {
-        const target = harnessProposals.find((p) => p.id === id) ?? null;
+        const target = (harnessProposals || []).find((p) => p.id === id) ?? null;
         setConfirmTarget(target);
         return;
       }
@@ -901,12 +907,13 @@ function HarnessSection() {
   // 点击「批准」：按授权等级分流（AGENTS.md §4.7）
   const handleApprove = (proposal: HarnessProposal) => {
     setActionError(null);
-    if (proposal.automationLevel === "L4") {
+    const automationLevel = proposal.proposedChange.automationLevel || automationLevelFromRisk(proposal.proposedChange.riskLevel);
+    if (automationLevel === "L4") {
       // L4 绝对禁止自动，审批通道不放行（按钮本应禁用，此处兜底）
       setActionError("L4 操作绝对禁止自动执行，须由人工在源业务系统发起");
       return;
     }
-    if (proposal.automationLevel === "L3") {
+    if (automationLevel === "L3") {
       setConfirmTarget(proposal);
       return;
     }
@@ -915,7 +922,7 @@ function HarnessSection() {
 
   const handleReject = (id: string) => {
     setActionError(null);
-    const target = harnessProposals.find((p) => p.id === id);
+    const target = (harnessProposals || []).find((p) => p.id === id);
     rejectProposal(id, "管理员");
     // 拒绝后失效 Harness 状态查询，确保 /brain 面板实时联动
     queryClient.invalidateQueries({ queryKey: ["harness-status"] });
@@ -1038,12 +1045,12 @@ function HarnessSection() {
         </div>
 
         {/* 加载中 */}
-        {loading && harnessProposals.length === 0 ? (
+        {loading && (harnessProposals || []).length === 0 ? (
           <div className="bg-card border-border rounded-2xl border p-8 text-center">
             <div className="bg-accent mx-auto size-10 animate-pulse rounded-xl" />
             <p className="text-muted-foreground mt-3 text-sm">正在加载提案…</p>
           </div>
-        ) : error && harnessProposals.length === 0 ? (
+        ) : error && (harnessProposals || []).length === 0 ? (
           /* 错误 */
           <div className="bg-card border-border rounded-2xl border p-8 text-center">
             <div className="bg-danger/10 mx-auto flex size-12 items-center justify-center rounded-2xl">
@@ -1071,7 +1078,7 @@ function HarnessSection() {
         ) : null}
 
         {/* 待审批提案 */}
-        {!(loading && harnessProposals.length === 0) && !(error && harnessProposals.length === 0) && pendingProposals.length === 0 ? (
+        {!(loading && (harnessProposals || []).length === 0) && !(error && (harnessProposals || []).length === 0) && pendingProposals.length === 0 ? (
           <div className="bg-card border border-border rounded-2xl p-8 text-center">
             <ShieldCheck className="size-8 text-success mx-auto mb-3" />
             <p className="text-sm font-medium text-foreground">暂无待审批提案</p>
@@ -1093,9 +1100,9 @@ function HarnessSection() {
                   <span className="font-mono text-xs text-muted-foreground">
                     {proposal.proposalId}
                   </span>
-                  <StatusBadge status={proposal.status} />
-                  <RiskBadge level={proposal.riskLevel} />
-                  <AutomationBadge level={proposal.automationLevel} />
+                  <StatusBadge status={toStatusBadgeStatus(proposal.status)} />
+                  <RiskBadge level={proposal.proposedChange.riskLevel} />
+                  <AutomationBadge level={proposal.proposedChange.automationLevel || automationLevelFromRisk(proposal.proposedChange.riskLevel)} />
                   <span
                     className={cn(
                       "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
@@ -1135,14 +1142,14 @@ function HarnessSection() {
                     变更说明：
                   </p>
                   <div className="bg-black/20 rounded-lg p-3 text-sm text-muted-foreground">
-                    {proposal.proposedChange}
+                    {proposal.proposedChange.description}
                   </div>
                 </div>
 
                 {/* 目标组件 */}
                 <p className="text-xs text-muted-foreground">
                   <span className="font-medium">目标组件：</span>
-                  {proposal.targetComponent}
+                  {proposal.proposedChange.targetComponent}
                 </p>
 
                 {/* 预期效果 */}
@@ -1153,7 +1160,7 @@ function HarnessSection() {
 
                 {/* 底部操作按钮 */}
                 <div className="flex items-center gap-3 pt-2 border-t border-border">
-                  {proposal.automationLevel === "L4" ? (
+                  {(proposal.proposedChange.automationLevel || automationLevelFromRisk(proposal.proposedChange.riskLevel)) === "L4" ? (
                     /* L4：绝对禁止自动，审批通道不放行 → 批准按钮禁用 */
                     <button
                       type="button"
@@ -1223,9 +1230,9 @@ function HarnessSection() {
                           <span className="font-mono text-xs text-muted-foreground">
                             {proposal.proposalId}
                           </span>
-                          <StatusBadge status={proposal.status} />
-                          <RiskBadge level={proposal.riskLevel} />
-                          <AutomationBadge level={proposal.automationLevel} />
+                          <StatusBadge status={toStatusBadgeStatus(proposal.status)} />
+                          <RiskBadge level={proposal.proposedChange.riskLevel} />
+                          <AutomationBadge level={proposal.proposedChange.automationLevel || automationLevelFromRisk(proposal.proposedChange.riskLevel)} />
                         </div>
                         <p className="text-sm text-foreground line-clamp-1">
                           {proposal.problemStatement}
@@ -1364,9 +1371,8 @@ export function SettingsPageClient() {
     <div className="flex flex-col h-full p-6">
       {/* 页头 */}
       <PageHeader
-        icon={Settings}
         title="设置"
-        subtitle="企业信息、团队权限、模型路由、连接器授权与 Harness 升级审批中心"
+        description="企业信息、团队权限、模型路由、连接器授权与 Harness 升级审批中心"
       />
 
       {/* 双栏布局 */}

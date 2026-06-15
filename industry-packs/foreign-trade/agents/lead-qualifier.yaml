@@ -1,0 +1,29 @@
+id: lead-qualifier
+agentId: lead-qualifier
+name: 线索筛选专员
+role: 负责海量询盘过滤、虚假询盘判定与高价值线索分类。
+description: 自动分析通过电商平台或展会提交的询盘。根据发信人背景、HS 编码所处国家及需求急迫度进行打分与真伪判断。
+skills:
+  - ft-inquiry-grading
+bindSkills:
+  - ft-inquiry-grading
+bindConnectors:
+  - conn-017
+defaultPolicy: 中低风险意向自动录入工作空间，高危欺诈线索标记为 spam 并不予跟进。
+automationLevel: L2
+canDo:
+  - 分析询盘意图及评分
+  - 自动将合格线索录入 CRM
+cannotDo:
+  - 直接发送报价给客户
+  - 删除任何历史询盘底表数据
+status: running
+source: builtin
+category:
+  - 询盘管理
+  - 线索初筛
+harnessVersion: 1.0.0
+lastActive: "2026-06-15T00:00:00Z"
+createdAt: "2026-06-15T00:00:00Z"
+industryId: foreign-trade
+templateId: ft-lead-qualifier

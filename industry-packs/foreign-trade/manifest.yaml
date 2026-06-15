@@ -1,0 +1,61 @@
+packId: foreign-trade
+id: foreign-trade
+name: 外贸行业包
+version: 1.0.0
+industry: foreign-trade
+description: 外贸行业数字化协同操作系统行业包，提供外贸专属智能体模板及询盘跟进工作流。
+author: HermesClaw Team
+compatibleHermesApi: ">=0.12.0"
+compatibleRuntimeApi: ">=0.12.0"
+directories:
+  agents: true
+  workflows: true
+  skills: true
+  knowledge: true
+  connectors: true
+  schemas: true
+  dashboards: true
+  evalRules: true
+  prompts: true
+directory:
+  agents:
+    - foreign-trade-tracker
+    - lead-qualifier
+    - agent-001
+    - agent-002
+    - agent-003
+    - agent-004
+    - agent-005
+    - agent-006
+    - agent-007
+    - agent-008
+  workflows:
+    - inquiry-followup
+    - inquiry-grade
+    - dev-letter
+    - customer-profile
+    - quote-gen
+    - sample-mgmt
+    - order-push
+    - exhibition-leads
+    - followup-remind
+  skills:
+    - write-development-letter
+    - generate-quotation
+  connectors:
+    - email
+    - crm
+  prompts:
+    - workflow-templates
+    - hermes
+    - inquiry-analysis
+    - development-letter
+    - quotation
+    - customer-profile
+languages:
+  - zh-CN
+status: active
+createdAt: "2026-06-15T00:00:00Z"
+updatedAt: "2026-06-15T00:00:00Z"
+version_field: "1.0.0"
+migrationRules: []

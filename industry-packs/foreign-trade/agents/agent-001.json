@@ -1,0 +1,21 @@
+{
+  "id": "agent-001",
+  "name": "Leon",
+  "role": "开发信写手",
+  "description": "专精多语种开发信写作与 A/B 测试，根据客户画像和产品特性自动生成高转化率触达邮件",
+  "status": "running",
+  "source": "builtin",
+  "category": ["外贸写作", "客户触达"],
+  "bindSkills": ["skill-001", "skill-008"],
+  "bindConnectors": ["conn-001", "conn-014"],
+  "memoryPermission": "read-write",
+  "harnessVersion": "2.1.3",
+  "automationLevel": "L2",
+  "canDo": ["撰写多语种开发信", "A/B 版本对比测试", "调用客户画像数据", "记录触达结果到中期记忆"],
+  "cannotDo": ["直接发送未经人工审核的邮件", "修改客户核心数据", "调用支付相关连接器"],
+  "stats": { "todayTasks": 23, "successRate": 0.94, "avgDuration": "2m 18s" },
+  "lastActive": "2026-06-06T10:32:00Z",
+  "createdAt": "2025-11-15T08:00:00Z",
+  "industryId": "foreign-trade",
+  "templateId": "ft-email-writer"
+}

@@ -1,0 +1,105 @@
+/**
+ * Industry Pack SDK — 旧 manifest 格式映射器
+ *
+ * 历史 manifest.json 用 `directory: { agents: [], workflows: [] }`（数组形式），
+ * 新 schema（src/contracts/industry-manifest.ts）改为 `directories: { agents: bool }` + `directory: { ... }`。
+ * 本文件是兼容层，确保旧 pack 文件可被现 IndustryManifestSchema 接受。
+ *
+ * 来源：原 src/lib/server/industry-pack-loader.ts:mapLegacyManifest，迁移至 SDK。
+ */
+
+interface LegacyManifest {
+  packId?: string
+  id?: string
+  directories?: {
+    agents?: boolean
+    workflows?: boolean
+    skills?: boolean
+    connectors?: boolean
+    knowledge?: boolean
+    schemas?: boolean
+    dashboards?: boolean
+    evalRules?: boolean
+    prompts?: boolean
+  }
+  directory?: {
+    agents?: string[]
+    workflows?: string[]
+    skills?: string[]
+    connectors?: string[]
+    prompts?: string[]
+  }
+  industry?: string
+  createdAt?: string
+  updatedAt?: string
+  version_field?: string
+  version?: string
+  [key: string]: unknown
+}
+
+function parseVersionRange(val: unknown): unknown {
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    // 匹配 ">=0.12.0"
+    const matchGtEq = trimmed.match(/^>=([\d\.]+)$/);
+    if (matchGtEq) {
+      return { min: matchGtEq[1], max: "2.0.0" };
+    }
+    // 匹配 "^0.12.0" 或 "~0.12.0"
+    const matchHat = trimmed.match(/^[\^\~]([\d\.]+)$/);
+    if (matchHat) {
+      return { min: matchHat[1], max: "2.0.0" };
+    }
+    return { min: trimmed, max: "2.0.0" };
+  }
+  return val;
+}
+
+/**
+ * 把旧版（或本仓库当前的简化版）manifest data 映射为符合
+ * IndustryManifestSchema 的对象，供后续 zod 强校验。
+ */
+export function mapLegacyManifest(val: unknown): Record<string, unknown> | unknown {
+  if (val && typeof val === "object") {
+    const obj = val as LegacyManifest
+    const packId = obj.packId || obj.id
+    const id = obj.id || obj.packId
+
+    let directories = obj.directories
+    if (obj.directory && !directories) {
+      directories = {
+        agents: Array.isArray(obj.directory.agents) && obj.directory.agents.length > 0,
+        workflows: Array.isArray(obj.directory.workflows) && obj.directory.workflows.length > 0,
+        skills: Array.isArray(obj.directory.skills) && obj.directory.skills.length > 0,
+        connectors: Array.isArray(obj.directory.connectors) && obj.directory.connectors.length > 0,
+        knowledge: false,
+        schemas: false,
+        dashboards: false,
+        evalRules: false,
+        prompts: Array.isArray(obj.directory.prompts) && obj.directory.prompts.length > 0,
+      }
+    }
+
+    const industry = obj.industry || packId
+    const createdAt = obj.createdAt || new Date().toISOString()
+    const updatedAt = obj.updatedAt || new Date().toISOString()
+    const version_field = obj.version_field || obj.version || "1.0.0"
+
+    const compatibleHermesApi = parseVersionRange(obj.compatibleHermesApi)
+    const compatibleRuntimeApi = parseVersionRange(obj.compatibleRuntimeApi)
+
+    return {
+      ...obj,
+      packId,
+      id,
+      industry,
+      directories,
+      compatibleHermesApi,
+      compatibleRuntimeApi,
+      createdAt,
+      updatedAt,
+      version_field,
+    }
+  }
+  return val
+}
