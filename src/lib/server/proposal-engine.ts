@@ -47,10 +47,16 @@ export async function generateProposal(evaluationReport: EvaluationReport): Prom
   const id = crypto.randomUUID()
   const evidence = evaluationReport.reportMd ? [evaluationReport.reportMd] : ["评估窗口内任务数据分析"]
   
+  // errorRate > 0.3 → riskLevel: 'high'（触发审批）
+  // errorRate > 0.1 → riskLevel: 'medium'
+  // else           → riskLevel: 'low'
+  const proposalRiskLevel: 'low' | 'medium' | 'high' | 'critical' =
+    errorRate > 0.3 ? 'high' : errorRate > 0.1 ? 'medium' : 'low'
+
   const proposedChange = {
     targetComponent,
     description: proposedChangeText,
-    riskLevel: "medium" as const,
+    riskLevel: proposalRiskLevel,
     automationLevel,
   }
 
@@ -133,7 +139,7 @@ export async function generateProposal(evaluationReport: EvaluationReport): Prom
       automationLevel: 'L3',
       actionSummary: `自动进化提案待审批：${proposal.proposedChange.description ?? proposal.id}`,
       inputSnapshot: proposal as unknown as Record<string, unknown>,
-      policySnapshotVersion: 'unknown',
+      policySnapshotVersion: snapshot.agentId || 'unknown',
       expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000),  // 72 小时有效期
     })
   }
