@@ -32,6 +32,14 @@ const eslintConfig = defineConfig([
       }]
     }
   },
+  {
+    files: ["src/lib/*.ts", "src/lib/*.tsx"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: ["*/lib/server/*", "../server/*"]
+      }]
+    }
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
