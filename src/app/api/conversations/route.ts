@@ -4,7 +4,7 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { ConversationCreateSchema, validateBody } from "@/lib/validators"
+import { ConversationCreateSchema, validateBody } from "@/lib/server/validators"
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
 import { actorFromSession } from "@/lib/server/audit"
 import { auditedWrite } from "@/lib/server/audited-write"

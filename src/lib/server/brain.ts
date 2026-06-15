@@ -213,3 +213,7 @@ export async function getBrainStats(
     };
   }
 }
+
+// 统一门面暴露：使外部可通过 brain 模块调用意图解析服务以生成任务
+export { parseIntentToTaskEnvelope } from "./intent-service";
+

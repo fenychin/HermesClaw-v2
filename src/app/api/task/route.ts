@@ -1,8 +1,9 @@
 import { TRADE_AGENT_PROMPTS } from "@/lib/system-prompts";
 import { writeAgentLog } from "@/lib/server/agent-log";
 import { rateLimit } from "@/lib/rate-limit";
-import { TaskExecuteSchema, validateBody } from "@/lib/validators";
+import { TaskExecuteSchema, validateBody } from "@/lib/server/validators";
 import { TypedTaskInputSchema, isCriticalActionType } from "@/contracts";
+import { loadIndustryPrompt } from "@/lib/industry-pack-sdk";
 import { logger } from "@/lib/logger";
 import type { WorkspaceContext } from "@/lib/workspace";
 import { withRBAC } from "@/lib/server/api-handler";
@@ -182,11 +183,19 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
     }
   }
 
-  const systemPrompt = TRADE_AGENT_PROMPTS[taskType as TaskType];
-  if (!systemPrompt) {
+  const promptKey = TRADE_AGENT_PROMPTS[taskType as TaskType];
+  if (!promptKey) {
     return Response.json(
       { error: `不支持的任务类型: ${taskType}` },
       { status: 400 },
+    );
+  }
+
+  const systemPrompt = loadIndustryPrompt("foreign-trade", promptKey);
+  if (!systemPrompt) {
+    return Response.json(
+      { error: `未能加载该任务类型的 prompt: ${promptKey}` },
+      { status: 500 },
     );
   }
 

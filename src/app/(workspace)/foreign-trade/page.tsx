@@ -29,12 +29,7 @@ import {
 } from "@/hooks/use-dashboard-stats";
 import { useIntelligence, filterRiskItems } from "@/hooks/use-intelligence";
 import { useExchangeRates } from "@/hooks/use-exchange-rates";
-import {
-  useAgents,
-  useSkills,
-  useConnectors,
-  filterByCategory,
-} from "@/hooks/use-foreign-trade-resources";
+
 import {
   AgentSection,
   SkillSection,
@@ -49,11 +44,13 @@ import { cn } from "@/lib/utils";
 // NOTE: 点击漏斗节点可以直接跳转到对应的外贸工作流，数据从数据库实时聚合
 // ============================================================
 function TradeFunnelDrillDown({
+  dashboards,
   todayInquiries,
   followingCustomers,
   quotationsCount,
   acceptedQuotationsCount,
 }: {
+  dashboards: any[];
   todayInquiries: number;
   followingCustomers: number;
   quotationsCount: number;
@@ -61,50 +58,42 @@ function TradeFunnelDrillDown({
 }) {
   const router = useRouter();
 
-  const funnelSteps = [
-    {
-      label: "客户询盘",
-      count: todayInquiries,
-      trend: "+12%",
-      color: "bg-primary/5 text-primary border-primary/20 hover:border-primary/50",
-      wfId: "inquiry-grade",
-      desc: "询盘智能分级评估",
-    },
-    {
-      label: "客户画像",
-      count: followingCustomers,
-      trend: "+8%",
-      color: "bg-brand-blue/5 text-brand-blue border-brand-blue/20 hover:border-brand-blue/50",
-      wfId: "customer-profile",
-      desc: "多维客户背景建档",
-    },
-    {
-      label: "发送报价",
-      count: quotationsCount,
-      trend: "-3%",
-      color: "bg-warning/5 text-warning border-warning/20 hover:border-warning/50",
-      wfId: "quote-gen",
-      desc: "多术语智能成本报价",
-    },
-    {
-      label: "订单推进",
-      count: acceptedQuotationsCount,
-      trend: "+15%",
-      color: "bg-success/5 text-success border-success/20 hover:border-success/50",
-      wfId: "order-push",
-      desc: "跟单节点合规监控",
-    },
-  ];
+  // 从 dashboards 中找出漏斗定义 (以 id === 'ft-kpi-funnel' 为准)
+  const funnelDashboard = dashboards?.find((d) => d && d.id === "ft-kpi-funnel");
+  
+  // 提取配置的 steps
+  const stepsConfig = funnelDashboard?.steps || [];
+
+  // 映射数量值
+  const valMap: Record<string, number> = {
+    todayInquiries,
+    followingCustomers,
+    quotationsCount,
+    acceptedQuotationsCount,
+  };
+
+  const funnelSteps = stepsConfig.map((step: any) => ({
+    label: step.label,
+    count: valMap[step.field] ?? 0,
+    trend: step.trend,
+    color: step.color,
+    wfId: step.wfId,
+    desc: step.desc,
+  }));
+
+  if (funnelSteps.length === 0) {
+    return null;
+  }
 
   return (
     <section className="bg-card/45 backdrop-blur-md rounded-2xl border border-border p-5 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-foreground text-sm font-semibold">
-            外贸跟进漏斗 (大盘 Drill-down)
+            {funnelDashboard?.title || "外贸跟进漏斗 (大盘 Drill-down)"}
           </h3>
           <p className="text-hint text-xs mt-0.5">
-            反映客户生命周期的流转效率，点击节点可直达工作流控制台
+            {funnelDashboard?.description || "反映客户生命周期的流转效率，点击节点可直达工作流控制台"}
           </p>
         </div>
         <span className="text-[10px] text-hint bg-background border border-border rounded px-2 py-0.5 font-medium">
@@ -112,7 +101,7 @@ function TradeFunnelDrillDown({
         </span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {funnelSteps.map((step, idx) => (
+        {funnelSteps.map((step: any, idx: number) => (
           <div
             key={idx}
             onClick={() => router.push(`/foreign-trade/workflows/${step.wfId}`)}
@@ -250,7 +239,14 @@ function AIMorningReportCard() {
 // 页面主体
 // ============================================================
 export default function ForeignTradePage() {
-  const workflows = useForeignTradeCapabilities();
+  const {
+    workflows,
+    agents: tradeAgents,
+    skills: tradeSkills,
+    connectors: tradeConnectors,
+    dashboards,
+    isLoading: capabilitiesLoading,
+  } = useForeignTradeCapabilities();
   // 大盘统计数据（TanStack Query，staleTime: 30s）
   const { stats, isLoading: statsLoading } = useDashboardStats();
   // 报价数据（用于计算本月成交金额及漏斗转化数）
@@ -261,15 +257,6 @@ export default function ForeignTradePage() {
   const { items: intelligence, isLoading: intelLoading } = useIntelligence();
   // 汇率监测（真实数据源）
   const { items: rates, isLoading: ratesLoading } = useExchangeRates();
-  // 外贸智能体 / 知识模板 / 连接器
-  const { items: agents, isLoading: agentsLoading } = useAgents();
-  const { items: skills, isLoading: skillsLoading } = useSkills();
-  const { items: connectors, isLoading: connectorsLoading } = useConnectors();
-
-  // 按外贸行业筛选
-  const tradeAgents = filterByCategory(agents, "trade");
-  const tradeSkills = filterByCategory(skills, "foreign-trade");
-  const tradeConnectors = filterByCategory(connectors, "trade");
 
   // 从情报中筛选风险提醒（关税 / 物流 / 竞品 且影响非低）
   const riskItems = filterRiskItems(intelligence).slice(0, 3);
@@ -342,6 +329,7 @@ export default function ForeignTradePage() {
 
           {/* ---- 外贸跟进漏斗 (与大盘指标联动，提供 Drill-down 入口) ---- */}
           <TradeFunnelDrillDown
+            dashboards={dashboards}
             todayInquiries={todayInquiries}
             followingCustomers={followingCustomers}
             quotationsCount={quotationsCount}
@@ -366,17 +354,17 @@ export default function ForeignTradePage() {
 
           {/* ---- 外贸专属智能体推荐 ---- */}
           <div className="mt-6">
-            <AgentSection agents={tradeAgents} isLoading={agentsLoading} />
+            <AgentSection agents={tradeAgents} isLoading={capabilitiesLoading} />
           </div>
 
           {/* ---- 外贸知识与Skill模板 ---- */}
           <div className="mt-6">
-            <SkillSection skills={tradeSkills} isLoading={skillsLoading} />
+            <SkillSection skills={tradeSkills} isLoading={capabilitiesLoading} />
           </div>
 
           {/* ---- 连接器推荐 ---- */}
           <div className="mt-6">
-            <ConnectorSection connectors={tradeConnectors} isLoading={connectorsLoading} />
+            <ConnectorSection connectors={tradeConnectors} isLoading={capabilitiesLoading} />
           </div>
         </div>
 

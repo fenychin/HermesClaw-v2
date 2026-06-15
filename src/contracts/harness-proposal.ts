@@ -15,6 +15,10 @@ export const ProposalStatusSchema = z.enum([
   "approved",
   "rejected",
   "rolled-back",
+  "draft",
+  "canary",
+  "active",
+  "deprecated",
 ])
 export type ProposalStatus = z.infer<typeof ProposalStatusSchema>
 
@@ -87,3 +91,41 @@ export const HarnessProposalSchema = z.object({
 })
 
 export type HarnessProposal = z.infer<typeof HarnessProposalSchema>
+
+// ==============================
+// Harness 评估 / 提案 API 输入校验 Schema（契约层）
+// ==============================
+
+export const HarnessEvaluateSchema = z.object({
+  triggeredBy: z.enum(["auto", "manual"]).optional().default("manual"),
+});
+
+export const HarnessProposalCreateSchema = z.object({
+  proposalId: z.string().max(50).optional(),
+  triggeredBy: z.enum(["auto", "manual"]).optional().default("auto"),
+  problemStatement: z.string().min(1).max(2000),
+  evidence: z.array(z.unknown()).optional().default([]),
+  targetComponent: z.string().min(1).max(100),
+  proposedChange: z.string().min(1).max(2000),
+  riskLevel: z.enum(["low", "medium", "high"]).optional().default("low"),
+  automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional(),
+  status: z.enum(["pending", "approved", "rejected", "implemented"]).optional().default("pending"),
+  estimatedImpact: z.string().max(500).optional().default(""),
+  reviewedBy: z.string().max(50).nullable().optional().default(null),
+  reviewedAt: z.string().nullable().optional().default(null),
+});
+
+export const HarnessProposalUpdateSchema = z.object({
+  action: z.enum(["approve", "reject"]).optional(),
+  reviewedBy: z.string().max(50).optional().default("system"),
+  confirm: z.boolean().optional(),
+  status: z.string().max(20).optional(),
+  reviewedAt: z.string().optional(),
+});
+
+export const HarnessSpecGenerateSchema = z.object({
+  businessIntent: z.string().min(1).max(1000),
+  industry: z.string().min(1).max(100),
+  agentRole: z.string().min(1).max(100),
+});
+

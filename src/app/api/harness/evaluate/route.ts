@@ -3,7 +3,7 @@ import { withRBAC } from '@/lib/server/api-handler'
 import type { WorkspaceContext } from "@/lib/workspace"
 import { ApiResponse } from '@/lib/server/api-response'
 import { z } from "zod"
-import { validateBody } from "@/lib/validators"
+import { validateBody } from "@/lib/server/validators"
 
 /** POST /api/harness/evaluate 请求体 schema（对齐 HermesHarnessEvaluateRequest） */
 const HarnessEvaluateSchema = z.object({

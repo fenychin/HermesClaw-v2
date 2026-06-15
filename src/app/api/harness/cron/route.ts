@@ -12,6 +12,7 @@ import { logger } from '@/lib/logger';
 import { prisma } from "@/lib/prisma"
 import { runHarnessEvaluation, EVAL_WINDOW_HOURS } from "@/lib/server/harness-eval"
 import { successResponse, errorResponse } from "@/lib/api-utils"
+import { rollbackHarnessProposal } from "@/lib/server/harness/harness-rollback"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -51,6 +52,61 @@ export async function GET(request: NextRequest) {
     const results = []
     for (const wsId of targetWorkspaces) {
       try {
+        // --- Canary 提案自动监测与自动回退逻辑开始 ---
+        const canaryProposals = await prisma.harnessProposal.findMany({
+          where: {
+            workspaceId: wsId,
+            status: "canary"
+          }
+        })
+
+        for (const proposal of canaryProposals) {
+          const monitorSince = proposal.reviewedAt 
+            ? new Date(proposal.reviewedAt) 
+            : new Date(proposal.createdAt)
+
+          const logs = await prisma.agentLog.findMany({
+            where: {
+              workspaceId: wsId,
+              createdAt: {
+                gte: monitorSince
+              }
+            },
+            select: {
+              status: true
+            }
+          })
+
+          const totalLogs = logs.length
+          const errorLogs = logs.filter(l => l.status === "failed" || l.status === "error")
+          const totalErrors = errorLogs.length
+          const errorRate = totalLogs > 0 ? totalErrors / totalLogs : 0
+
+          if (totalLogs >= 5 && errorRate > 0.15) {
+            // 自动触发回退
+            await rollbackHarnessProposal(proposal.id, "system")
+
+            // 写入 proposal.rollback 审计日志，以完全对齐 AGENTS.md
+            await prisma.auditLog.create({
+              data: {
+                actor: "system",
+                action: "proposal.rollback",
+                targetType: "proposal",
+                targetId: proposal.id,
+                detail: `${proposal.proposalId} · 灰度运行数 ${totalLogs}，失败率 ${(errorRate * 100).toFixed(1)}%，超标自动回滚`,
+                riskLevel: "high",
+                workspaceId: wsId,
+                automationLevel: "L3",
+                triggeredBy: "system",
+                status: "success",
+              }
+            })
+
+            logger.info(`[cron] 提案 ${proposal.proposalId} 灰度失败率 ${(errorRate * 100).toFixed(1)}% 超标，触发自动回滚`)
+          }
+        }
+        // --- Canary 提案自动监测与自动回退逻辑结束 ---
+
         const evalResult = await runHarnessEvaluation(wsId, "auto")
         results.push({
           workspaceId: wsId,

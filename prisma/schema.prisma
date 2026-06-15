@@ -18,6 +18,7 @@ model Workspace {
   id        String            @id @default(cuid())
   name      String
   plan      String            @default("free") // free | pro | enterprise
+  automationLevel String      @default("L2")   // 自动化授权等级（AGENTS.md §5.2）：L1/L2/L3/L4
   createdAt DateTime          @default(now())
   members   WorkspaceMember[]
 

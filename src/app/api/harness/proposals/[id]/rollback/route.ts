@@ -24,76 +24,76 @@ import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/serv
 import { withRBAC, type RouteContext } from "@/lib/server/api-handler"
 import type { WorkspaceContext } from "@/lib/workspace"
 import { z } from "zod"
-import { validateBody } from "@/lib/validators"
+import { validateBody } from "@/lib/server/validators"
 
 // ==============================
-// 请求体校验 Schema
+// 请求体 Schema
 // ==============================
-
 const RollbackRequestSchema = z.object({
-  /** L3 二次确认 Token（L3 操作必须提供，且须与预期值匹配） */
+  operatorId: z.string().min(1, "operatorId 不能为空"),
   confirmationToken: z.string().optional(),
-  /** 操作者标识（用户邮箱 / 用户名） */
-  operatorId: z.string().min(1).max(100),
 })
 
 // ==============================
-// 频率限制（简单 in-memory，高危操作防滥用）
+// 频率限制（基于 AuditLog DB 计数，支持多实例部署环境）
 // ==============================
 
-/** 同一 proposalId 回滚的最小间隔（毫秒） */
-const ROLLBACK_COOLDOWN_MS = 60_000
-/** 全局回滚操作的滑动窗口（毫秒） */
-const GLOBAL_WINDOW_MS = 60_000
+/** 同一 proposalId 回滚的最小间隔（秒） */
+const ROLLBACK_COOLDOWN_SEC = 60
+/** 全局回滚操作的滑动窗口（秒） */
+const GLOBAL_WINDOW_SEC = 60
 /** 全局窗口内最大回滚次数 */
 const GLOBAL_MAX_ROLLBACKS = 3
 
-const rollbackTimestamps = new Map<string, number[]>()
-const globalTimestamps: number[] = []
-
 /**
- * 简单 in-memory 频率限制：清理过期记录 → 检查窗口内计数。
+ * 基于 AuditLog 的分布式频率限制（取代 in-memory Map）
+ * 查询最近 ROLLBACK_COOLDOWN_SEC 秒内对指定 proposalId 的成功回滚次数，
+ * 以及全局 GLOBAL_WINDOW_SEC 秒内的成功回滚次数。
  * 返回 null 表示通过；返回 Response 表示被限流。
  */
-function checkRateLimit(proposalId: string): Response | null {
-  const now = Date.now()
+async function checkRateLimit(proposalId: string, workspaceId: string): Promise<Response | null> {
+  const now = new Date()
+  const cooldownThreshold = new Date(now.getTime() - ROLLBACK_COOLDOWN_SEC * 1000)
+  const globalThreshold = new Date(now.getTime() - GLOBAL_WINDOW_SEC * 1000)
 
-  // 清理全局过期记录
-  while (globalTimestamps.length > 0 && globalTimestamps[0] < now - GLOBAL_WINDOW_MS) {
-    globalTimestamps.shift()
-  }
+  // 全局窗口限制：查询最近一分钟内 workspace 的所有成功回滚次数
+  const globalCount = await prisma.auditLog.count({
+    where: {
+      workspaceId,
+      action: "rollback.proposal",
+      status: "success",
+      createdAt: { gte: globalThreshold },
+    },
+  })
 
-  // 全局限制
-  if (globalTimestamps.length >= GLOBAL_MAX_ROLLBACKS) {
-    return ApiResponse.error("回滚操作过于频繁，请稍后再试", 429)
-  }
-
-  // 单提案冷却
-  const history = rollbackTimestamps.get(proposalId) ?? []
-  const last = history[history.length - 1]
-  if (last && now - last < ROLLBACK_COOLDOWN_MS) {
+  if (globalCount >= GLOBAL_MAX_ROLLBACKS) {
     return ApiResponse.error(
-      `该提案刚刚执行过回滚，请等待 ${Math.ceil((ROLLBACK_COOLDOWN_MS - (now - last)) / 1000)} 秒后再试`,
+      `回滚操作过于频繁（${GLOBAL_WINDOW_SEC}秒内最多 ${GLOBAL_MAX_ROLLBACKS} 次），请稍后再试`,
+      429,
+    )
+  }
+
+  // 单提案冷却：查询该提案最近一次成功回滚
+  const lastRollback = await prisma.auditLog.findFirst({
+    where: {
+      targetId: proposalId,
+      action: "rollback.proposal",
+      status: "success",
+      createdAt: { gte: cooldownThreshold },
+    },
+    orderBy: { createdAt: "desc" },
+  })
+
+  if (lastRollback) {
+    const elapsed = Math.floor((now.getTime() - lastRollback.createdAt.getTime()) / 1000)
+    const remaining = ROLLBACK_COOLDOWN_SEC - elapsed
+    return ApiResponse.error(
+      `该提案刚刚执行过回滚，请等待 ${remaining} 秒后再试`,
       429,
     )
   }
 
   return null
-}
-
-/** 记录一次回滚操作 */
-function recordRollback(proposalId: string): void {
-  const now = Date.now()
-  const history = rollbackTimestamps.get(proposalId) ?? []
-  history.push(now)
-  // 仅保留最近 5 条，防内存泄漏
-  if (history.length > 5) history.shift()
-  rollbackTimestamps.set(proposalId, history)
-  globalTimestamps.push(now)
-  // 全局限流也仅保留最近记录
-  if (globalTimestamps.length > GLOBAL_MAX_ROLLBACKS * 2) {
-    globalTimestamps.splice(0, globalTimestamps.length - GLOBAL_MAX_ROLLBACKS * 2)
-  }
 }
 
 // ==============================
@@ -155,8 +155,8 @@ export const POST = withRBAC(
     try {
       const { id } = await routeCtx.params
 
-      // 1. 频率限制
-      const rateError = checkRateLimit(id)
+      // 1. 频率限制（基于 AuditLog DB 计数，支持多实例部署）
+      const rateError = await checkRateLimit(id, ctx.workspaceId)
       if (rateError) return rateError
 
       // 2. 解析并校验请求体
@@ -240,20 +240,19 @@ export const POST = withRBAC(
 
       // 6. L3 确认 Token 额外显式校验（双保险：gate 判断 confirmed 状态，此处校验 Token 匹配）
       //    确保 confirmed 状态与 Token 真实匹配，防止调用方绕过
-      const confirmationError = validateL3Confirmation(body.confirmationToken)
-      if (confirmationError) {
-        await updateAuditEntry({
-          auditId: preAuditId,
-          status: "failed",
-          detail: `${proposal.proposalId} · L3 确认 Token 校验失败`,
-        })
-        return confirmationError
+      if (automationLevelRaw === "L3") {
+        const confirmationError = validateL3Confirmation(body.confirmationToken)
+        if (confirmationError) {
+          await updateAuditEntry({
+            auditId: preAuditId,
+            status: "failed",
+            detail: `${proposal.proposalId} · L3 确认 Token 校验失败`,
+          })
+          return confirmationError
+        }
       }
 
-      // 7. 记录频率限制
-      recordRollback(id)
-
-      // 8. 执行回滚（全程 Prisma 事务，失败即整体回滚）
+      // 7. 执行回滚（全程 Prisma 事务，失败即整体回滚）
       //    审计日志的最终写入在 harness-rollback.ts 的事务内完成（强一致性），
       //    此处路由层仅更新预记录状态。
       const result = await rollbackHarnessProposal(id, body.operatorId)

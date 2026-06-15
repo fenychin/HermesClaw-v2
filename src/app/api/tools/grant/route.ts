@@ -11,7 +11,7 @@ import { issueToolGrant } from "@/lib/server/tool-registry"
 import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
-import { ToolGrantSchema, validateBody } from "@/lib/validators"
+import { ToolGrantSchema, validateBody } from "@/lib/server/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 export const runtime = "nodejs"

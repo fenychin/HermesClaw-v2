@@ -12,7 +12,7 @@ import {
   mockSkills,
   mockProjects,
   mockMemories,
-} from '../src/lib/mock-data'
+} from '../src/lib/server/__mocks__/mock-data'
 import { mockProposals as sharedProposals } from '../src/app/(workspace)/settings/harness/_data/mock-proposals'
 import { createSeedPrisma } from './seed-utils'
 import { foreignTradeSkillTemplates, toSkillDbRecord } from './seed-skills'

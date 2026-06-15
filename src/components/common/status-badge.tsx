@@ -17,7 +17,11 @@ export type StatusBadgeStatus =
   | "approved"
   | "rejected"
   | "upgrade"
-  | "pending_config";
+  | "pending_config"
+  | "draft"
+  | "canary"
+  | "active"
+  | "deprecated";
 
 interface StatusBadgeProps {
   status: StatusBadgeStatus;
@@ -37,6 +41,10 @@ const STATUS_LABEL: Record<StatusBadgeStatus, string> = {
   rejected: "已驳回",
   upgrade: "可升级",
   pending_config: "待配置",
+  draft: "待审批",
+  canary: "灰度观察",
+  active: "已激活",
+  deprecated: "已废弃",
 };
 
 /**
@@ -68,6 +76,14 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
         status === "rejected" && "bg-danger/10 text-danger",
         /* 可升级：紫色 + Zap 图标 */
         status === "upgrade" && "bg-brand/10 text-brand",
+        /* 待审批 (草稿)：黄色 */
+        status === "draft" && "bg-warning/10 text-warning",
+        /* 灰度观察：天蓝色 */
+        status === "canary" && "bg-sky-500/10 text-sky-600",
+        /* 已激活：绿色 */
+        status === "active" && "bg-success/10 text-success",
+        /* 已废弃：灰色 */
+        status === "deprecated" && "bg-muted text-hint",
         className,
       )}
     >

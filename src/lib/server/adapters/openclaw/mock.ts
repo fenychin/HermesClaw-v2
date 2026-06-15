@@ -16,6 +16,7 @@ import type {
 import { emitExecutionEvent } from './event-emitter'
 import { EXECUTION_EVENT_VERSION } from '@/contracts/execution-event'
 import { logger } from '@/lib/logger'
+import { executeHttpConnector } from '@/lib/server/connectors/http-connector'
 
 /** 模拟任务执行延迟范围（毫秒） */
 const MOCK_TASK_DELAY_MIN = 400
@@ -41,6 +42,7 @@ const FAILURE_REASONS = [
 
 /**
  * 模拟任务执行：通过事件发射器广播实时状态变更。
+ * —— 已重构：移除单纯假数据 outputs 模拟，转为调用真实的 executeHttpConnector
  */
 async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
   const req = (body || {}) as Record<string, any>
@@ -49,9 +51,7 @@ async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
   const agentId = (req.inputs?.agentId as string) ?? 'mock-agent'
   const workflowRunId = (req.inputs?.workflowRunId as string) ?? `mock-run-${Date.now()}`
   const parentWorkflowRunId = req.inputs?.parentRunId as string | undefined
-  const shouldFail = req.inputs?.mockForceFail === true
-    ? true
-    : (req.inputs?.mockForceSuccess === true ? false : Math.random() < MOCK_TASK_FAILURE_RATE)
+
   // 1. 广播任务开始事件
   emitExecutionEvent({
     eventId: `evt-${crypto.randomUUID()}`,
@@ -71,46 +71,39 @@ async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
     version: EXECUTION_EVENT_VERSION,
   })
 
-  // 2. 模拟执行过程（分阶段进度）
-  const delay = randomDelay()
-  const steps = 3
-  for (let i = 1; i <= steps; i++) {
-    await new Promise((resolve) => setTimeout(resolve, Math.floor(delay / steps)))
-    try {
-      emitExecutionEvent({
-        eventId: `evt-${crypto.randomUUID()}`,
-        taskId,
-        workflowRunId,
-        parentWorkflowRunId,
-        runtimeId: 'openclaw-mock-runtime',
-        eventType: 'tool.call.started',
-        status: 'progress',
-        timestamp: new Date().toISOString(),
-        payload: {
-          taskId,
-          taskName,
-          progress: Math.round((i / steps) * 90), // 留 10% 给最终完成
-          step: i,
-          totalSteps: steps,
-          agentId,
-        },
-        version: EXECUTION_EVENT_VERSION,
-      })
-    } catch {
-      // 事件广播失败不阻断模拟执行主流程
-      logger.warn(`[OpenClaw Mock] 进度事件广播失败 (taskId=${taskId}, step=${i})`)
-    }
-  }
+  // 2. 构造临时租约调用真实连接器以产生 HTTP 交互
+  const lease = {
+    leaseId: `lease-${crypto.randomUUID()}`,
+    taskId,
+    workspaceId: req.inputs?.workspaceId || "mock-workspace",
+    connectorId: "http-connector",
+    runtimeId: "openclaw-mock-runtime",
+    grantedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    scope: ["write"],
+    maxRiskLevel: (req.inputs?.riskLevel || "low") as any,
+    status: "active" as const,
+    version: "1.0.0",
+  };
 
-  // 3. 模拟失败路径
-  if (shouldFail) {
-    const failureReason = FAILURE_REASONS[Math.floor(Math.random() * FAILURE_REASONS.length)]
+  const receipt = await executeHttpConnector(
+    lease,
+    req.inputs || {},
+    workflowRunId,
+    req.inputs?.idempotencyKey || `idem-${crypto.randomUUID()}`
+  );
+
+  const delay = 100; // 基本网络往返耗时
+
+  // 3. 根据执行回执判定结果并进行 SSE 广播
+  if (receipt.outcome === "failure") {
+    const errorMsg = receipt.errorCode || "HTTP Connector execution failed";
     const result: OpenClawTaskResult = {
       taskId,
       status: 'failed',
-      error: failureReason,
+      error: errorMsg,
       durationMs: delay,
-      completedAt: new Date().toISOString(),
+      completedAt: receipt.executedAt,
     }
 
     try {
@@ -126,7 +119,7 @@ async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
         payload: {
           taskId,
           taskName,
-          error: failureReason,
+          error: errorMsg,
           durationMs: delay,
           agentId,
         },
@@ -136,21 +129,16 @@ async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
       logger.warn(`[OpenClaw Mock] 失败事件广播失败 (taskId=${taskId})`)
     }
 
-    return result
+    return result;
   }
 
-  // 4. 广播任务完成事件
+  // 成功分支
   const result: OpenClawTaskResult = {
     taskId,
     status: 'succeeded',
-    outputs: {
-      summary: `模拟任务「${taskName}」执行完成`,
-      processedItems: 42,
-      quality: 'high',
-      timestamp: new Date().toISOString(),
-    },
+    outputs: receipt.response,
     durationMs: delay,
-    completedAt: new Date().toISOString(),
+    completedAt: receipt.executedAt,
   }
 
   try {
@@ -167,7 +155,7 @@ async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
         taskId,
         taskName,
         progress: 100,
-        summary: result.outputs?.summary,
+        summary: receipt.response?.summary || `HTTP Connector executed. Response ID: ${receipt.receiptId}`,
         durationMs: delay,
         agentId,
       },

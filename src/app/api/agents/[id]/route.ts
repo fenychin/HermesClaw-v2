@@ -8,7 +8,7 @@ import {
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { writeAgentLog } from "@/lib/server/agent-log"
 import { checkConfirmQuery, checkConfirmValue, checkAutomationGate } from "@/lib/server/guardrail"
-import { AgentUpdateSchema, validateBody } from "@/lib/validators"
+import { AgentUpdateSchema, validateBody } from "@/lib/server/validators"
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
 import { serializeAgent } from "@/lib/server/agent-serializer"
 

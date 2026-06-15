@@ -127,7 +127,11 @@ export const TypedTaskInputSchema = z.any().transform((data, ctx) => {
 
   if (!result.success) {
     for (const issue of result.error.issues) {
-      ctx.addIssue(issue)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: issue.path as (string | number)[],
+        message: issue.message,
+      })
     }
     return z.NEVER
   }

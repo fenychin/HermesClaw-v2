@@ -65,7 +65,7 @@ function formatHarnessTime(iso: string | null | undefined, fallback = "—"): st
 /** 将 ProposalStatus 映射为 StatusBadgeStatus（'rolled-back' → 'error'，其余直接透传） */
 function toStatusBadgeStatus(status: ProposalStatus): StatusBadgeStatus {
   if (status === "rolled-back") return "error";
-  return status;
+  return status as StatusBadgeStatus;
 }
 
 // ============================================================

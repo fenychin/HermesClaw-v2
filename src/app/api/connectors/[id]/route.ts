@@ -7,7 +7,7 @@ import {
 } from "@/lib/api-utils"
 import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
 import { checkConfirmQuery } from "@/lib/server/guardrail"
-import { ConnectorUpdateSchema, validateBody } from "@/lib/validators"
+import { ConnectorUpdateSchema, validateBody } from "@/lib/server/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 /** GET /api/connectors/[id] —— 获取连接器详情 */

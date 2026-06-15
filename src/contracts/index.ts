@@ -102,6 +102,10 @@ export {
   ProposalStatusSchema,
   TargetComponentSchema,
   HARNESS_PROPOSAL_VERSION,
+  HarnessEvaluateSchema,
+  HarnessProposalCreateSchema,
+  HarnessProposalUpdateSchema,
+  HarnessSpecGenerateSchema,
 } from "./harness-proposal"
 export type {
   HarnessProposal,

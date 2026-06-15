@@ -145,7 +145,7 @@ export async function rollbackHarnessProposal(
     throw new RollbackException("提案不存在", 404)
   }
 
-  if (proposal.status !== "approved") {
+  if (proposal.status !== "approved" && proposal.status !== "canary") {
     throw new RollbackException(
       `仅已批准的提案可回滚，当前状态: ${proposal.status}`,
       409,

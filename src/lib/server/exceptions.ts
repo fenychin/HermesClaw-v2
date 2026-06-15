@@ -78,3 +78,20 @@ export class MissingIndustryIdError extends AppException {
     );
   }
 }
+
+/** 自动化等级/高危安全护栏异常 (403 Forbidden) */
+export class GuardrailError extends AppException {
+  constructor(message: string, details: Record<string, unknown> | null = null) {
+    super("GUARDRAIL_FORBIDDEN", message, 403, details);
+    this.name = "GuardrailError";
+  }
+}
+
+/** 自动化等级安全护栏违规异常 (403 Forbidden) */
+export class GuardrailViolationError extends AppException {
+  constructor(message: string, details: Record<string, unknown> | null = null) {
+    super("GUARDRAIL_VIOLATION", message, 403, details);
+    this.name = "GuardrailViolationError";
+  }
+}
+

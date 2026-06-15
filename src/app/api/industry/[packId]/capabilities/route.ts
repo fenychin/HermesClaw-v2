@@ -1,4 +1,13 @@
-import { getCachedManifest, listIndustryWorkflows, loadIndustryAgents } from "@/lib/industry-pack-sdk"
+import {
+  getCachedManifest,
+  listIndustryWorkflows,
+  loadIndustryAgents,
+  loadIndustrySkills,
+  loadIndustryConnectors,
+  loadIndustryDashboards,
+  loadIndustrySchemas,
+  loadIndustryEvalRules,
+} from "@/lib/industry-pack-sdk"
 import { withRBAC } from "@/lib/server/api-handler"
 import type { RouteContext } from "@/lib/server/api-handler"
 import { logger } from "@/lib/logger"
@@ -12,16 +21,20 @@ export const GET = withRBAC<RouteContext<{ packId: string }>>(
 
       const workflows = listIndustryWorkflows(packId)
       const agents = loadIndustryAgents(packId)
-      const manifest = getCachedManifest(packId)
-      
-      const directory = manifest.directory || {
-        skills: [],
-      }
+      const skills = loadIndustrySkills(packId)
+      const connectors = loadIndustryConnectors(packId)
+      const dashboards = loadIndustryDashboards(packId)
+      const schemas = loadIndustrySchemas(packId)
+      const evalRules = loadIndustryEvalRules(packId)
       
       return Response.json({
         workflows,
         agents,
-        skills: directory.skills || [],
+        skills,
+        connectors,
+        dashboards,
+        schemas,
+        evalRules,
       })
     } catch (error: any) {
       logger.error("[API] 获取行业包能力失败", {

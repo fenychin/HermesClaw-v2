@@ -117,7 +117,7 @@ describe("ProposalStatusSchema", () => {
 
   it("非法状态被拒", () => {
     expect(() => ProposalStatusSchema.parse("implemented")).toThrow()
-    expect(() => ProposalStatusSchema.parse("draft")).toThrow()
+    expect(() => ProposalStatusSchema.parse("unknown-status")).toThrow()
   })
 })
 

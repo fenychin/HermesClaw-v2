@@ -21,6 +21,11 @@ export {
   loadIndustryWorkflow,
   loadIndustryAgents,
   loadIndustryPrompt,
+  loadIndustryDashboards,
+  loadIndustryConnectors,
+  loadIndustrySkills,
+  loadIndustrySchemas,
+  loadIndustryEvalRules,
   clearCache,
   clearManifestCache,
 } from "./loader"
@@ -31,6 +36,7 @@ export {
   WorkflowStepsFileSchema,
   PackAgentAssetSchema,
   PackWorkflowAssetSchema,
+  PackSkillAssetSchema,
 } from "./schemas"
 
 export type {
@@ -39,6 +45,17 @@ export type {
   WorkflowStepsFile,
   PackAgentAsset,
   PackWorkflowAsset,
+  PackSkillAsset,
 } from "./schemas"
 
 export { mapLegacyManifest } from "./legacy-mapper"
+
+export {
+  extractWorkflowDevLetter,
+  extractWorkflowGradeInfo,
+} from "./output-extractors"
+
+export type {
+  WorkflowDevLetterDraft,
+  WorkflowGradeInfo,
+} from "./output-extractors"

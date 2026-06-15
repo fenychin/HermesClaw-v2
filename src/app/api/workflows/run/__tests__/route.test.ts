@@ -85,7 +85,7 @@ describe("POST /api/workflows/run API 路由集成拦截测试", () => {
       body: JSON.stringify(reqBody),
     })
 
-    const res = await POST(req)
+    const res = await POST(req, {})
     const body = await res.json()
 
     expect(res.status).toBe(200)
@@ -107,7 +107,7 @@ describe("POST /api/workflows/run API 路由集成拦截测试", () => {
       body: JSON.stringify(reqBody),
     })
 
-    const res = await POST(req)
+    const res = await POST(req, {})
     const body = await res.json()
 
     // 预期拦截
@@ -140,7 +140,7 @@ describe("POST /api/workflows/run API 路由集成拦截测试", () => {
       body: JSON.stringify(reqBody),
     })
 
-    const res = await POST(req)
+    const res = await POST(req, {})
     const body = await res.json()
 
     expect(res.status).toBe(200)

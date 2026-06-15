@@ -6,7 +6,7 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { ProjectCreateSchema, validateBody } from "@/lib/validators"
+import { ProjectCreateSchema, validateBody } from "@/lib/server/validators"
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
 import { auditedWrite } from "@/lib/server/audited-write"
 import { actorFromSession } from "@/lib/server/audit"

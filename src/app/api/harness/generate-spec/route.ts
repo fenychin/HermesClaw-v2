@@ -17,7 +17,8 @@ import { resolveLlmProvider } from "@/lib/server/llm-provider"
 import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { rateLimit } from "@/lib/rate-limit"
-import { HarnessSpecGenerateSchema, validateBody } from "@/lib/validators"
+import { validateBody } from "@/lib/server/validators"
+import { HarnessSpecGenerateSchema } from "@/contracts"
 
 export const runtime = "nodejs"
 // AI 调用可能稍慢

@@ -1,27 +1,6 @@
-/**
- * Industry Pack SDK — 装载器
- *
- * 落地 CLAUDE.md §6 行业包实现规则：
- * - 装载阶段经 Zod 强校验，不通过即拒绝（不允许运行期"宽容降级"）。
- * - 所有装载结果带进程级缓存，避免每次 API 请求重读磁盘。
- *
- * 来源：原 src/lib/server/industry-pack-loader.ts，按 SDK 边界拆分：
- * - schemas.ts — schema 定义
- * - legacy-mapper.ts — 兼容旧 manifest 格式
- * - loader.ts — 物理装载逻辑（本文件）
- *
- * SDK 公开 API（见 index.ts）：
- * - loadIndustryManifest / getCachedManifest
- * - listIndustryWorkflows（卡片元数据）
- * - loadIndustryWorkflowDag（DAG 定义）
- * - loadIndustryWorkflowSteps（UI 步骤）
- * - loadIndustryWorkflow（一次性返回 meta + dag + steps）
- * - loadIndustryAgents
- * - loadIndustryPrompt
- * - clearCache
- */
-import { readFileSync } from "fs"
+import { readFileSync, existsSync, readdirSync } from "fs"
 import { join } from "path"
+import yaml from "yaml"
 import { IndustryManifestSchema } from "@/contracts"
 import type { IndustryManifest } from "@/contracts"
 import {
@@ -29,10 +8,12 @@ import {
   WorkflowDagFileSchema,
   WorkflowStepsFileSchema,
   PackAgentAssetSchema,
+  PackSkillAssetSchema,
   type WorkflowMeta,
   type WorkflowDagFile,
   type WorkflowStepsFile,
   type PackAgentAsset,
+  type PackSkillAsset,
 } from "./schemas"
 import { mapLegacyManifest } from "./legacy-mapper"
 
@@ -45,6 +26,7 @@ const workflowMetasCache = new Map<string, WorkflowMeta[]>()
 const workflowDagCache = new Map<string, WorkflowDagFile>()
 const workflowStepsCache = new Map<string, WorkflowStepsFile>()
 const agentsCache = new Map<string, PackAgentAsset[]>()
+const skillsCache = new Map<string, PackSkillAsset[]>()
 const promptCache = new Map<string, string>()
 
 // ─── 工具：packId 合法性校验（防 path traversal） ────────────────
@@ -65,28 +47,57 @@ function assertSafeAssetId(assetId: string): void {
   }
 }
 
+/**
+ * 通用文件资源读取工具：优先尝试 .yaml 和 .yml，最后退化尝试 .json
+ */
+function readAssetFile(basePathWithoutExt: string): { parsed: any; ext: string } {
+  const exts = [".yaml", ".yml", ".json"];
+  for (const ext of exts) {
+    const filePath = basePathWithoutExt + ext;
+    if (existsSync(filePath)) {
+      const rawText = readFileSync(filePath, "utf-8");
+      if (ext === ".json") {
+        return { parsed: JSON.parse(rawText), ext };
+      } else {
+        return { parsed: yaml.parse(rawText), ext };
+      }
+    }
+  }
+  throw new Error(`File not found: ${basePathWithoutExt} (tried .yaml, .yml, .json)`);
+}
+
 // ─── Manifest ────────────────────────────────────────────────────
 
 export function loadIndustryManifest(packId: string): IndustryManifest {
   assertSafePackId(packId)
-  const filePath = join(PACKS_DIR, packId, "manifest.json")
-
-  let rawText: string
+  
   try {
-    rawText = readFileSync(filePath, "utf-8")
-  } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
-      throw new Error(`Industry pack manifest not found for packId: ${packId}`)
-    }
-    throw error
-  }
+    const basePath = join(PACKS_DIR, packId, "manifest")
+    const { parsed } = readAssetFile(basePath)
+    const mapped = mapLegacyManifest(parsed)
+    const manifest = IndustryManifestSchema.parse(mapped)
 
-  try {
-    const raw = JSON.parse(rawText)
-    const mapped = mapLegacyManifest(raw)
-    return IndustryManifestSchema.parse(mapped)
+    // 异步记录审计日志（不阻塞加载流程，防止 Next.js 客户端打包引入后端模块报错）
+    import("@/lib/server/audit")
+      .then(({ writeAuditLog }) => {
+        writeAuditLog({
+          actor: "system",
+          action: "industry.pack.activate",
+          targetType: "industry",
+          targetId: packId,
+          detail: `成功加载并激活行业包: ${manifest.name} (v${manifest.version})`,
+          riskLevel: "medium",
+          workspaceId: "default"
+        }).catch(() => {});
+      })
+      .catch(() => {});
+
+    return manifest
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    if (message.includes("File not found")) {
+      throw new Error(`Industry pack manifest not found for packId: ${packId}`)
+    }
     throw new Error(`Failed to parse industry pack manifest for packId: ${packId}: ${message}`)
   }
 }
@@ -100,17 +111,6 @@ export function getCachedManifest(packId: string): IndustryManifest {
 
 // ─── Workflow 元数据列表 ─────────────────────────────────────────
 
-/**
- * 列出指定行业包内全部 workflow 卡片元数据。
- *
- * 物理布局（v2，单文件 → 目录形式）：
- *   industry-packs/<packId>/workflows/<wfId>/meta.json
- *
- * 兼容旧布局（v1，扁平 .json）：
- *   industry-packs/<packId>/workflows/<wfId>.json
- *
- * 优先尝试 v2 目录，未命中再回退到 v1 文件，确保平滑迁移期可用。
- */
 export function listIndustryWorkflows(packId: string): WorkflowMeta[] {
   if (workflowMetasCache.has(packId)) {
     return workflowMetasCache.get(packId)!
@@ -130,18 +130,17 @@ export function listIndustryWorkflows(packId: string): WorkflowMeta[] {
 }
 
 function loadWorkflowMeta(packId: string, wfId: string): WorkflowMeta {
-  // 优先 v2 目录形式
-  const metaPathV2 = join(PACKS_DIR, packId, "workflows", wfId, "meta.json")
-  // 兼容 v1 扁平形式
-  const metaPathV1 = join(PACKS_DIR, packId, "workflows", `${wfId}.json`)
+  // 优先 v2 目录形式 (workflows/<wfId>/meta.*)
+  const basePathV2 = join(PACKS_DIR, packId, "workflows", wfId, "meta")
+  // 兼容 v1 扁平形式 (workflows/<wfId>.*)
+  const basePathV1 = join(PACKS_DIR, packId, "workflows", wfId)
 
-  for (const path of [metaPathV2, metaPathV1]) {
+  for (const basePath of [basePathV2, basePathV1]) {
     try {
-      const rawText = readFileSync(path, "utf-8")
-      const parsed = JSON.parse(rawText)
+      const { parsed } = readAssetFile(basePath)
       return WorkflowMetaSchema.parse(parsed)
     } catch (error) {
-      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      if (error instanceof Error && error.message.includes("File not found")) {
         continue
       }
       const message = error instanceof Error ? error.message : String(error)
@@ -149,7 +148,7 @@ function loadWorkflowMeta(packId: string, wfId: string): WorkflowMeta {
     }
   }
 
-  throw new Error(`Workflow meta not found: ${wfId} in pack: ${packId} (tried ${metaPathV2} and ${metaPathV1})`)
+  throw new Error(`Workflow meta not found: ${wfId} in pack: ${packId} (tried v2 and v1 formats)`)
 }
 
 /**
@@ -159,13 +158,6 @@ export const loadIndustryWorkflows = listIndustryWorkflows
 
 // ─── Workflow DAG ───────────────────────────────────────────────
 
-/**
- * 装载指定 workflow 的 DAG 定义。
- *
- * 路径：industry-packs/<packId>/workflows/<wfId>/dag.json
- *
- * 找不到文件时返回 null，调用方决定是否报错——MVP 期允许部分 workflow 暂无 DAG。
- */
 export function loadIndustryWorkflowDag(
   packId: string,
   wfId: string,
@@ -178,18 +170,17 @@ export function loadIndustryWorkflowDag(
     return workflowDagCache.get(cacheKey)!
   }
 
-  const dagPath = join(PACKS_DIR, packId, "workflows", wfId, "dag.json")
+  const dagPath = join(PACKS_DIR, packId, "workflows", wfId, "dag")
   try {
-    const rawText = readFileSync(dagPath, "utf-8")
-    const parsed = JSON.parse(rawText)
+    const { parsed } = readAssetFile(dagPath)
     const verified = WorkflowDagFileSchema.parse(parsed)
     if (verified.id !== wfId) {
-      throw new Error(`DAG id mismatch: file dag.json declares id="${verified.id}" but located under workflows/${wfId}/`)
+      throw new Error(`DAG id mismatch: file declares id="${verified.id}" but located under workflows/${wfId}/`)
     }
     workflowDagCache.set(cacheKey, verified)
     return verified
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+    if (error instanceof Error && error.message.includes("File not found")) {
       return null
     }
     const message = error instanceof Error ? error.message : String(error)
@@ -197,15 +188,8 @@ export function loadIndustryWorkflowDag(
   }
 }
 
-// ─── Workflow UI 步骤 ───────────────────────────────────────────
+// ─── Workflow UI 步骤定义 ───────────────────────────────────────────
 
-/**
- * 装载指定 workflow 的 UI 步骤定义。
- *
- * 路径：industry-packs/<packId>/workflows/<wfId>/steps.json
- *
- * 找不到文件时返回 null。
- */
 export function loadIndustryWorkflowSteps(
   packId: string,
   wfId: string,
@@ -218,18 +202,17 @@ export function loadIndustryWorkflowSteps(
     return workflowStepsCache.get(cacheKey)!
   }
 
-  const stepsPath = join(PACKS_DIR, packId, "workflows", wfId, "steps.json")
+  const stepsPath = join(PACKS_DIR, packId, "workflows", wfId, "steps")
   try {
-    const rawText = readFileSync(stepsPath, "utf-8")
-    const parsed = JSON.parse(rawText)
+    const { parsed } = readAssetFile(stepsPath)
     const verified = WorkflowStepsFileSchema.parse(parsed)
     if (verified.id !== wfId) {
-      throw new Error(`Steps id mismatch: file steps.json declares id="${verified.id}" but located under workflows/${wfId}/`)
+      throw new Error(`Steps id mismatch: file declares id="${verified.id}" but located under workflows/${wfId}/`)
     }
     workflowStepsCache.set(cacheKey, verified)
     return verified
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+    if (error instanceof Error && error.message.includes("File not found")) {
       return null
     }
     const message = error instanceof Error ? error.message : String(error)
@@ -237,11 +220,6 @@ export function loadIndustryWorkflowSteps(
   }
 }
 
-/**
- * 一次性装载 workflow 的全部内容（meta + dag + steps）。
- *
- * 用于 /api/industry/[packId]/workflows/[wfId] 端点。
- */
 export function loadIndustryWorkflow(
   packId: string,
   wfId: string,
@@ -270,10 +248,9 @@ export function loadIndustryAgents(packId: string): PackAgentAsset[] {
 
   for (const agentId of agentIds) {
     assertSafeAssetId(agentId)
-    const filePath = join(PACKS_DIR, packId, "agents", `${agentId}.json`)
+    const basePath = join(PACKS_DIR, packId, "agents", agentId)
     try {
-      const rawText = readFileSync(filePath, "utf-8")
-      const parsed = JSON.parse(rawText)
+      const { parsed } = readAssetFile(basePath)
       const verified = PackAgentAssetSchema.parse(parsed)
       agents.push(verified)
     } catch (error) {
@@ -288,15 +265,6 @@ export function loadIndustryAgents(packId: string): PackAgentAsset[] {
 
 // ─── Prompts ────────────────────────────────────────────────────
 
-/**
- * 装载行业 prompt 模板（Markdown）。
- *
- * 路径：industry-packs/<packId>/prompts/<key>.md
- *
- * 落地 CLAUDE.md §3.2：行业 prompt 必须随包发布，不得硬编码进核心。
- *
- * 找不到文件时返回 null，调用方决定是否报错或降级到通用模板。
- */
 export function loadIndustryPrompt(packId: string, key: string): string | null {
   assertSafePackId(packId)
   assertSafeAssetId(key)
@@ -319,6 +287,130 @@ export function loadIndustryPrompt(packId: string, key: string): string | null {
   }
 }
 
+// ─── Skills ─────────────────────────────────────────────────────
+
+export function loadIndustrySkills(packId: string): PackSkillAsset[] {
+  if (skillsCache.has(packId)) {
+    return skillsCache.get(packId)!
+  }
+
+  const manifest = getCachedManifest(packId)
+  const skillIds = manifest.directory?.skills || []
+  const skills: PackSkillAsset[] = []
+
+  for (const skillId of skillIds) {
+    assertSafeAssetId(skillId)
+    const basePath = join(PACKS_DIR, packId, "skills", skillId)
+    try {
+      const { parsed } = readAssetFile(basePath)
+      const verified = PackSkillAssetSchema.parse(parsed)
+      skills.push(verified)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to load skill asset: ${skillId} in pack: ${packId}. Error: ${message}`)
+    }
+  }
+
+  skillsCache.set(packId, skills)
+  return skills
+}
+
+// ─── Schemas ────────────────────────────────────────────────────
+
+export function loadIndustrySchemas(packId: string): any[] {
+  assertSafePackId(packId)
+  const dirPath = join(PACKS_DIR, packId, "schemas")
+  if (!existsSync(dirPath)) return []
+
+  const files = readdirSync(dirPath)
+  const schemas: any[] = []
+  for (const file of files) {
+    if (file.endsWith(".yaml") || file.endsWith(".yml") || file.endsWith(".json")) {
+      const ext = file.endsWith(".json") ? ".json" : (file.endsWith(".yml") ? ".yml" : ".yaml")
+      const nameWithoutExt = file.slice(0, -ext.length)
+      try {
+        const { parsed } = readAssetFile(join(dirPath, nameWithoutExt))
+        schemas.push(parsed)
+      } catch (err) {
+        console.error(`Failed to load schema ${file}:`, err)
+      }
+    }
+  }
+  return schemas
+}
+
+// ─── Eval Rules ─────────────────────────────────────────────────
+
+export function loadIndustryEvalRules(packId: string): any[] {
+  assertSafePackId(packId)
+  const dirPath = join(PACKS_DIR, packId, "eval-rules")
+  if (!existsSync(dirPath)) return []
+
+  const files = readdirSync(dirPath)
+  const evalRules: any[] = []
+  for (const file of files) {
+    if (file.endsWith(".yaml") || file.endsWith(".yml") || file.endsWith(".json")) {
+      const ext = file.endsWith(".json") ? ".json" : (file.endsWith(".yml") ? ".yml" : ".yaml")
+      const nameWithoutExt = file.slice(0, -ext.length)
+      try {
+        const { parsed } = readAssetFile(join(dirPath, nameWithoutExt))
+        evalRules.push(parsed)
+      } catch (err) {
+        console.error(`Failed to load eval rule ${file}:`, err)
+      }
+    }
+  }
+  return evalRules
+}
+
+// ─── 新增：加载行业 Dashboards 资产 ─────────────────────────────────
+
+export function loadIndustryDashboards(packId: string): any[] {
+  assertSafePackId(packId)
+  const dirPath = join(PACKS_DIR, packId, "dashboards")
+  if (!existsSync(dirPath)) return []
+
+  const files = readdirSync(dirPath)
+  const dashboards: any[] = []
+  for (const file of files) {
+    if (file.endsWith(".yaml") || file.endsWith(".yml") || file.endsWith(".json")) {
+      const ext = file.endsWith(".json") ? ".json" : (file.endsWith(".yml") ? ".yml" : ".yaml")
+      const nameWithoutExt = file.slice(0, -ext.length)
+      try {
+        const { parsed } = readAssetFile(join(dirPath, nameWithoutExt))
+        dashboards.push(parsed)
+      } catch (err) {
+        console.error(`Failed to load dashboard ${file}:`, err)
+      }
+    }
+  }
+  return dashboards
+}
+
+// ─── 新增：加载行业 Connectors Mapping 资产 ──────────────────────────
+
+export function loadIndustryConnectors(packId: string): any[] {
+  assertSafePackId(packId)
+  const dirPath = join(PACKS_DIR, packId, "connectors")
+  if (!existsSync(dirPath)) return []
+
+  const files = readdirSync(dirPath)
+  const connectors: any[] = []
+  for (const file of files) {
+    if (file.endsWith(".yaml") || file.endsWith(".yml") || file.endsWith(".json")) {
+      const ext = file.endsWith(".json") ? ".json" : (file.endsWith(".yml") ? ".yml" : ".yaml")
+      const nameWithoutExt = file.slice(0, -ext.length)
+      try {
+        const { parsed } = readAssetFile(join(dirPath, nameWithoutExt))
+        connectors.push(parsed)
+      } catch (err) {
+        console.error(`Failed to load connector ${file}:`, err)
+      }
+    }
+  }
+  return connectors
+}
+
 // ─── 缓存清理 ───────────────────────────────────────────────────
 
 export function clearCache(packId?: string): void {
@@ -326,7 +418,7 @@ export function clearCache(packId?: string): void {
     manifestCache.delete(packId)
     workflowMetasCache.delete(packId)
     agentsCache.delete(packId)
-    // 工作流 DAG / steps / prompt 用 packId::xxx 复合 key，遍历清理
+    skillsCache.delete(packId)
     for (const key of workflowDagCache.keys()) {
       if (key.startsWith(`${packId}::`)) workflowDagCache.delete(key)
     }
@@ -342,11 +434,9 @@ export function clearCache(packId?: string): void {
     workflowDagCache.clear()
     workflowStepsCache.clear()
     agentsCache.clear()
+    skillsCache.clear()
     promptCache.clear()
   }
 }
 
-/**
- * @deprecated 使用 clearCache 替代。仅为兼容旧调用保留。
- */
 export const clearManifestCache = clearCache
