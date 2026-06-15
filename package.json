@@ -1,6 +1,6 @@
 {
   "name": "hermesclaw-v2",
-  "version": "0.1.0",
+  "version": "0.13.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
@@ -20,7 +20,8 @@
     "smoke": "tsx scripts/e2e-smoke.ts",
     "smoke:ci": "tsx scripts/e2e-smoke.ts",
     "smoke:harness": "tsx scripts/harness-smoke.ts",
-    "smoke:all": "pnpm smoke && pnpm smoke:harness",
+    "smoke:ft": "tsx scripts/ft-pack-smoke.ts",
+    "smoke:all": "pnpm smoke && pnpm smoke:harness && pnpm smoke:ft",
     "check:middleware": "tsx scripts/check-middleware-sync.ts",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage"

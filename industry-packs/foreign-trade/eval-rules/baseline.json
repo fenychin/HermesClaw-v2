@@ -33,6 +33,16 @@
       "action": "raiseProposal",
       "severity": "low",
       "description": "近 14 天报价接受率过低提示报价策略需调优"
+    },
+    {
+      "id": "ft-avg-response-time",
+      "metric": "avgResponseTimeHours",
+      "scope": "workflow:dev-letter",
+      "threshold": 24,
+      "windowHours": 72,
+      "action": "raiseProposal",
+      "severity": "high",
+      "description": "近 72h 平均回复时间超过 24 小时触发开发信策略优化提案"
     }
   ]
 }

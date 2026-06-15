@@ -125,6 +125,7 @@ export function useOpenClawStream(
         await parseSSEStream(reader, {
           doneMarker: null, // OpenClaw 事件流无 [DONE] 标记，靠连接关闭自然结束
           onData: (data) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const raw = data as any
             const type = raw.eventType || raw.type || ''
             if (type === 'heartbeat') return

@@ -25,16 +25,12 @@ export const GET = withRBAC<RouteContext<{ packId: string; workflowId: string }>
 
       const result = loadIndustryWorkflow(packId, workflowId)
       return Response.json(result)
-    } catch (error: any) {
-      logger.error("[API] 获取行业 workflow 完整定义失败", {
-        packId,
-        workflowId,
-        error: error instanceof Error ? error.message : "未知错误",
-      })
-      const isNotFound =
-        error?.message && /not found/i.test(error.message)
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "未知错误";
+      const isNotFound = error instanceof Error && /not found/i.test(error.message);
+      logger.error("[API] 获取行业 workflow 完整定义失败", { packId, workflowId, error: msg });
       return Response.json(
-        { error: error?.message || "获取行业 workflow 失败" },
+        { error: msg || "获取行业 workflow 失败" },
         { status: isNotFound ? 404 : 500 },
       )
     }

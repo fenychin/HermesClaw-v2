@@ -27,7 +27,7 @@ import { useTradeStore } from "@/stores/trade-store";
 import { apiClient } from "@/lib/api-client";
 import type { EvolutionLogEntry } from "@/types";
 import { useBrainStats } from "@/hooks/use-brain-stats";
-import { Plus, Check, Play as PlayIcon, TrendingUp, X } from "lucide-react";
+import { Plus, Check, TrendingUp, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** 将 ISO 时间格式化为 "YYYY-MM-DD HH:mm"；空值回退占位 */

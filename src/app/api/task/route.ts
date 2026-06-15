@@ -167,6 +167,7 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
   }
 
   if (parsedInput && typeof parsedInput === "object") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const actionType = typeof (parsedInput as any)._type === "string" ? (parsedInput as any)._type : "";
     const typedInput = TypedTaskInputSchema.safeParse(parsedInput);
     if (!typedInput.success && isCriticalActionType(actionType)) {

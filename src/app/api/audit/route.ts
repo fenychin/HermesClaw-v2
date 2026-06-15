@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     const riskLevel = searchParams.get("riskLevel") || undefined
     const query = searchParams.get("query") || undefined
 
-    const where: Record<string, any> = {
+    const where: Record<string, unknown> = {
       workspaceId: ctx.workspaceId,
     }
 

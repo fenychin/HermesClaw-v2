@@ -15,7 +15,8 @@ import type { ModelProvider } from "@/types"
 /** LLM Provider 标识 */
 export type LlmProvider = "anthropic" | "deepseek"
 
-// 校验 LlmProvider 必须可被赋值给 ModelProvider (Assignable)
+// 编译时断言 LlmProvider 必须可被赋值给 ModelProvider (Assignable)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _assert: LlmProvider extends ModelProvider ? true : never = true
 
 /** Provider 选择结果 */

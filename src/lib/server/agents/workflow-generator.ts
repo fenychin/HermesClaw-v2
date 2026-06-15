@@ -20,7 +20,6 @@ import { prisma } from "@/lib/prisma"
 import { stringifyJsonField } from "@/lib/api-utils"
 import { parseJsonLoose } from "@/lib/server/hermes/harness-llm"
 import { logger } from "@/lib/logger"
-import { writeAuditLog } from "@/lib/server/shared/audit"
 import { guardOutput } from "@/lib/server/shared/output-guard"
 import {
   resolveLlmProvider,

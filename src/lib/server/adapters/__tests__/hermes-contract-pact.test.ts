@@ -117,7 +117,7 @@ describe("Hermes Adapter Contract Pact", () => {
       const response = hermesMock.handle(routePath, body)
       const result = schema.safeParse(response)
       if (!result.success) {
-        // eslint-disable-next-line no-console
+         
         console.error(
           `[hermes-contract-pact] schema 校验失败 → ${routePath}`,
           JSON.stringify(result.error.format(), null, 2),

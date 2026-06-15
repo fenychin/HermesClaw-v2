@@ -255,6 +255,7 @@ function buildEdgeTable(edges: WorkflowEdge[]): Map<string, Map<string | undefin
 }
 
 /** 根据上游节点的 branch 结果筛选应执行的下游节点 id 集合 */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function resolveDownstream(
   edgeTable: Map<string, Map<string | undefined, string[]>>,
   nodeId: string,

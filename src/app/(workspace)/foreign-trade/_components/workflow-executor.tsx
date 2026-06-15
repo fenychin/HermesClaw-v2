@@ -273,7 +273,7 @@ export function WorkflowExecutor({
       })
 
       // 安全解析 JSON：非 JSON 响应时取原始文本作为错误消息
-      let json: { success?: boolean; error?: string; code?: string; data?: RunResult; details?: any }
+      let json: { success?: boolean; error?: string; code?: string; data?: RunResult; details?: Record<string, unknown> }
       try {
         json = await res.json()
       } catch {
@@ -645,8 +645,8 @@ export function WorkflowExecutor({
                     setTimeout(() => {
                       handleExecute()
                     }, 400)
-                  } catch (err: any) {
-                    setGrantError(err.message || "服务器发生异常")
+                  } catch (err: unknown) {
+                    setGrantError(err instanceof Error ? err.message : "服务器发生异常")
                   } finally {
                     setGrantSubmitting(false)
                   }

@@ -21,11 +21,11 @@ import type { TaskEnvelope } from '@/contracts/task-envelope'
 import type { ActionReceipt } from '@/contracts/action-receipt'
 import { ACTION_RECEIPT_VERSION } from '@/contracts/action-receipt'
 
-import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 
 
-const FALLBACK_SKILL_CONSTRAINTS = [
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _FALLBACK_SKILL_CONSTRAINTS = [
   '不得删除任何持久化数据',
   '不得修改系统配置或其他 Agent 的任务边界',
   '不得发送外部邮件或执行资金操作',

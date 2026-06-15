@@ -43,6 +43,7 @@ const FAILURE_REASONS = [
  * 模拟任务执行：通过事件发射器广播实时状态变更。
  */
 async function mockExecuteTask(body: unknown): Promise<OpenClawTaskResult> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const req = (body || {}) as Record<string, any>
   const taskId = req.taskId ?? `mock-task-${Date.now()}`
   const taskName = (req.inputs?.taskName as string) ?? '未命名任务'
@@ -193,7 +194,8 @@ const mockHandlers: Record<string, (body: unknown) => unknown | Promise<unknown>
         logger.error('[OpenClaw Mock] mockExecuteTask 同步异常', {
           error: error instanceof Error ? error.message : String(error)
         })
-        const req = (body || {}) as Record<string, any>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const req = (body || {}) as Record<string, any>
         const taskId = req.taskId ?? `mock-task-${Date.now()}`
       return {
         taskId,
@@ -206,7 +208,8 @@ const mockHandlers: Record<string, (body: unknown) => unknown | Promise<unknown>
   },
 
   '/connectors/status': (body): OpenClawConnectorStatus => {
-    const req = (body || {}) as Record<string, any>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const req = (body || {}) as Record<string, any>
     return {
       connectorId: req.connectorId ?? 'mock-connector-001',
       name: '模拟数据连接器',

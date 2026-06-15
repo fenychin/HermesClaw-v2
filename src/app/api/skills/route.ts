@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
-import { parseJsonField, successResponse, errorResponse, serializeSkill } from "@/lib/api-utils"
+import { successResponse, errorResponse, serializeSkill } from "@/lib/api-utils"
 import { buildWorkspaceContext } from "@/lib/workspace"
 import { withRBAC } from "@/lib/server/shared/api-handler"
 import { validateBody, SkillCreateSchema } from "@/lib/validators"

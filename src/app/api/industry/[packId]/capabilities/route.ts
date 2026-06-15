@@ -23,14 +23,12 @@ export const GET = withRBAC<RouteContext<{ packId: string }>>(
         agents,
         skills: directory.skills || [],
       })
-    } catch (error: any) {
-      logger.error("[API] 获取行业包能力失败", {
-        packId,
-        error: error instanceof Error ? error.message : "未知错误",
-      })
-      const isNotFound = error.message && error.message.includes("not found")
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "未知错误";
+      const isNotFound = error instanceof Error && error.message.includes("not found");
+      logger.error("[API] 获取行业包能力失败", { packId, error: msg });
       return Response.json(
-        { error: error.message || "获取行业包能力失败" },
+        { error: msg || "获取行业包能力失败" },
         { status: isNotFound ? 404 : 500 }
       )
     }

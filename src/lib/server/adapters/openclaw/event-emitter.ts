@@ -162,6 +162,7 @@ export function emitOpenClawEvent(
   else if (event.type.endsWith(':cancelled')) status = 'cancelled'
 
   // 2. 映射事件族类型
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let eventType: any = 'run.progress'
   if (event.type.startsWith('task:')) {
     if (status === 'started') eventType = 'tool.call.started'

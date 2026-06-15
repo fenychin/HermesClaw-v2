@@ -91,7 +91,7 @@ describe("OpenClaw Adapter Contract Pact", () => {
       const response = await openclawMock.handle(routePath, body)
       const result = schema.safeParse(response)
       if (!result.success) {
-        // eslint-disable-next-line no-console
+         
         console.error(
           `[openclaw-contract-pact] schema 校验失败 → ${routePath}`,
           JSON.stringify(result.error.format(), null, 2),

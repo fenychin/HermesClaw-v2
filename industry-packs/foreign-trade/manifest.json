@@ -2,6 +2,11 @@
   "id": "foreign-trade",
   "name": "外贸行业包",
   "version": "1.0.0",
+  "description": "面向外贸企业的 AI 自动化行业包，覆盖询盘处理、报价生成、客户画像、订单跟进全流程",
+  "author": "HermesClaw Team",
+  "category": "trade",
+  "entryWorkflow": "inquiry-grade",
+  "primaryAgents": ["agent-001", "agent-002"],
   "compatibleHermesApi": { "min": "1.0.0", "max": "2.0.0" },
   "compatibleRuntimeApi": { "min": "1.0.0", "max": "2.0.0" },
   "directories": {

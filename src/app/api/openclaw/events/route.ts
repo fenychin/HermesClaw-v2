@@ -31,6 +31,8 @@ import { logger } from '@/lib/logger'
 import { ExecutionEventSchema } from '@hermesclaw/event-contracts'
 import { prisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/server/shared/audit'
+import { lookupWorkspaceByTaskIdOrFallback } from '@/lib/server/shared/task-lookup'
+import { buildInternalCallbackHeaders } from '@/lib/server/shared/internal-auth'
 
 /** SSE 心跳间隔（毫秒）—— 30 秒保活，避免代理/NAT 超时关闭连接 */
 const HEARTBEAT_INTERVAL_MS = 30_000
@@ -212,16 +214,24 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   // connector.* 事件写 AuditLog（CLAUDE.md §8.1：connector.execute 必须留痕）
   if (event.eventType.startsWith('tool.call.') && event.connectorId) {
+    // V1 修复：通过 taskId 反查 workspaceId；反查不到归到系统兜底 workspace（不再用 "default"）
+    const { workspaceId, isFallback } = await lookupWorkspaceByTaskIdOrFallback(event.taskId)
+    if (isFallback) {
+      logger.warn('[POST /api/openclaw/events] taskId 反查 workspace 失败，connector.execute 审计降级到系统兜底', {
+        taskId: event.taskId,
+        eventId: event.eventId,
+        connectorId: event.connectorId,
+      })
+    }
     await writeAuditLog({
       actor: event.runtimeId,
       action: 'connector.execute',
       targetType: 'connector',
       targetId: event.connectorId,
-      detail: `eventType=${event.eventType} status=${event.status} taskId=${event.taskId}`,
+      detail: `eventType=${event.eventType} status=${event.status} taskId=${event.taskId}` +
+        (isFallback ? ' workspaceLookup=fallback' : ''),
       riskLevel: event.status === 'failed' ? 'high' : 'low',
-      // workspaceId 此处缺失（OpenClaw runtime 仅持 taskId）；
-      // 临时降级使用 default workspace；生产应根据 taskId 反查
-      workspaceId: 'default',
+      workspaceId,
     })
   }
 
@@ -235,5 +245,104 @@ export async function POST(req: NextRequest): Promise<Response> {
     })
   }
 
-  return NextResponse.json({ received: true, duplicate: false }, { status: 200 })
+  // 终态事件 → 同步通知 Harness evaluate-event 端点（§3.4 主链路连接点）
+  // E5 修复：从 fire-and-forget 改为 await + 失败留痕审计；
+  //   - 网络/服务异常时仍返回 200（ingest 成功是事实，不能让上游误以为事件丢失），
+  //     但响应里增加 harnessCallbackOk:false 让调用方可观察；
+  //   - 失败时写一条 harness.callback.fail 审计，进入 §6.2 治理留痕。
+  let harnessCallbackOk: boolean | null = null
+  let harnessCallbackError: string | null = null
+  if (event.status === 'completed' || event.status === 'failed') {
+    try {
+      await notifyHarnessEvaluateEvent(event, req)
+      harnessCallbackOk = true
+    } catch (error) {
+      harnessCallbackOk = false
+      harnessCallbackError = error instanceof Error ? error.message : '未知错误'
+      logger.error('[POST /api/openclaw/events] 通知 harness/evaluate-event 失败', {
+        eventId: event.eventId,
+        taskId: event.taskId,
+        error: harnessCallbackError,
+      })
+      // 留痕：用 task 反查到的 workspace（反查不到归到系统兜底，仍能记录）
+      const { workspaceId: cbWs, isFallback: cbFallback } =
+        await lookupWorkspaceByTaskIdOrFallback(event.taskId)
+      await writeAuditLog({
+        actor: event.runtimeId,
+        action: 'harness.callback.fail',
+        targetType: 'task',
+        targetId: event.taskId,
+        detail:
+          `eventId=${event.eventId} status=${event.status} ` +
+          `error=${harnessCallbackError}` +
+          (cbFallback ? ' workspaceLookup=fallback' : ''),
+        riskLevel: 'high',
+        workspaceId: cbWs,
+      })
+    }
+  }
+
+  return NextResponse.json(
+    {
+      received: true,
+      duplicate: false,
+      ...(harnessCallbackOk !== null
+        ? { harnessCallbackOk, ...(harnessCallbackError ? { harnessCallbackError } : {}) }
+        : {}),
+    },
+    { status: 200 },
+  )
+}
+
+/**
+ * 终态事件回调 Harness evaluate-event 端点。
+ * —— 仅对 completed / failed 调用。失败由调用方用 `void ... .catch(...)` 兜底。
+ * —— 在测试环境（NODE_ENV=test）下默认跳过 fetch，避免单元测试触发外部副作用。
+ */
+async function notifyHarnessEvaluateEvent(
+  event: {
+    eventId: string
+    taskId: string
+    workflowRunId: string
+    runtimeId: string
+    status: string
+    payload?: unknown
+  },
+  req: NextRequest,
+): Promise<void> {
+  if (process.env.NODE_ENV === 'test' && process.env.HARNESS_EVALUATE_FORCE !== 'true') {
+    return
+  }
+
+  // 优先用 NEXTAUTH_URL，其次用本次请求的 origin（dev 联调最稳）
+  const origin =
+    process.env.NEXTAUTH_URL ??
+    req.nextUrl.origin ??
+    'http://localhost:3000'
+
+  const res = await fetch(`${origin}/api/harness/evaluate-event`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...buildInternalCallbackHeaders(),
+    },
+    body: JSON.stringify({
+      taskId: event.taskId,
+      workflowRunId: event.workflowRunId,
+      runtimeId: event.runtimeId,
+      finalStatus: event.status,
+      eventId: event.eventId,
+      payload: event.payload ?? {},
+    }),
+  })
+
+  // E5 修复：non-2xx 必须显式 throw，否则上游 await 无法识别失败
+  if (!res.ok) {
+    let bodyText = ''
+    try { bodyText = await res.text() } catch { /* ignore */ }
+    throw new Error(
+      `harness/evaluate-event responded ${res.status}` +
+      (bodyText ? ` body=${bodyText.slice(0, 200)}` : ''),
+    )
+  }
 }

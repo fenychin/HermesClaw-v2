@@ -16,7 +16,6 @@
 
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-import { writeAgentLog } from '@/lib/server/shared/agent-log'
 import {
   resolveAutomationLevel,
   mapAutomationToLogRisk,
@@ -334,7 +333,7 @@ export async function executeSkillNode(
 
   // 6. 提取 confidence 并校验置信度
   // P2-2.1：收窄为 LlmResponse 类型，消除裸 as Record<string, unknown> / as any 摸索
-  let confidence = response.confidence ?? response.result?.confidence as number | undefined
+  const confidence = response.confidence ?? (response.result as Record<string, unknown> | undefined)?.confidence as number | undefined
   let effectiveRiskLevel = riskLevel
   const warnings: string[] = []
 

@@ -80,6 +80,19 @@ const eslintConfig = defineConfig([
       }]
     }
   },
+  // 测试文件豁免 no-explicit-any 与 no-unused-vars（mock 对象与测试边界）
+  {
+    files: [
+      "**/__tests__/**/*.ts",
+      "**/__tests__/**/*.tsx",
+      "src/test/**/*.ts",
+      "src/test/**/*.tsx",
+    ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

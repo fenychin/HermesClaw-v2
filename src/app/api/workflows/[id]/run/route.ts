@@ -39,7 +39,7 @@ export const POST = withRBAC(
       if (text && text.trim().length > 0) {
         rawBody = JSON.parse(text)
       }
-    } catch (error) {
+    } catch {
       return ApiResponse.error('请求体 JSON 解析失败', 400)
     }
 

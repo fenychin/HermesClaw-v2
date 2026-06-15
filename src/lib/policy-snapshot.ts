@@ -14,6 +14,8 @@
  *    支持版本灰度、回滚到任意快照。
  */
 
+import { logger } from "@/lib/logger"
+
 /** 仓库默认 baseline，与 packages/event-contracts 当前 CONTRACT_VERSION 对齐 */
 const DEFAULT_POLICY_SNAPSHOT_VERSION = "1.0.0"
 
@@ -22,8 +24,21 @@ const DEFAULT_POLICY_SNAPSHOT_VERSION = "1.0.0"
  * —— 失败一律降级到默认 baseline，不阻断主流程。
  */
 export async function getCurrentPolicySnapshotVersion(
-  _workspaceId: string,
-  _agentId?: string,
+  workspaceId: string,
+  agentId?: string,
 ): Promise<string> {
-  return DEFAULT_POLICY_SNAPSHOT_VERSION
+  // E2 修复：防御性 try/catch 骨架，防止未来接入 HarnessBundle 表后首次查询异常冒泡
+  try {
+    // TODO（v0.13+）：接入 HarnessBundle / PolicySnapshot 表，读取实际版本
+    void workspaceId
+    void agentId
+    return DEFAULT_POLICY_SNAPSHOT_VERSION
+  } catch (error) {
+    logger.warn("[policy-snapshot] 读取快照版本失败，降级到默认 baseline", {
+      workspaceId,
+      agentId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return DEFAULT_POLICY_SNAPSHOT_VERSION
+  }
 }

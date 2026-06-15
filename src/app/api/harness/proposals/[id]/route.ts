@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import {
-  parseJsonField,
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
@@ -16,6 +15,7 @@ import { HarnessProposalSchema } from '@/contracts'
 import type { HarnessProposal } from '@/types'
 
 /** 序列化 HarnessProposal，对齐契约返回格式 */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function serializeProposal(proposal: any): HarnessProposal {
   const parsed = HarnessProposalSchema.parse({
     id: proposal.id,
@@ -94,6 +94,7 @@ export async function PATCH(
       return errorResponse("提案不存在", 404)
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const propChange = existing.proposedChange as any;
     const automationLevelRaw = propChange?.automationLevel;
     const riskLevelRaw = propChange?.riskLevel;
@@ -224,6 +225,7 @@ export async function DELETE(
     const guard = await checkConfirmQuery(request, "删除升级提案需二次确认")
     if (!guard.ok) return guard.response
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const propChange = existing.proposedChange as any;
 
     // AGENTS.md §5 #3 禁止静默执行：删除前写入预记录审计

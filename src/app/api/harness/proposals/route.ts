@@ -1,10 +1,11 @@
 import { ApiResponse } from '@/lib/server/shared/api-response'
 import { prisma } from '@/lib/prisma'
-import { withRBAC, type RouteContext } from '@/lib/server/shared/api-handler'
+import { withRBAC } from '@/lib/server/shared/api-handler'
 import type { WorkspaceContext } from '@/lib/workspace'
 import type { HarnessProposal } from '@/types'
 import { HarnessProposalSchema } from '@/contracts'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function serializeProposal(proposal: any): HarnessProposal {
   const parsed = HarnessProposalSchema.parse({
     id: proposal.id,
@@ -34,7 +35,7 @@ function serializeProposal(proposal: any): HarnessProposal {
 // 获取提案列表（RBAC: MEMBER 及以上可读；支持 ?status=pending 筛选）
 // —— AGENTS.md §4.11：workspaceId 过滤 + 角色门禁
 export const GET = withRBAC(
-  async (req: Request, ctx: WorkspaceContext, _routeCtx: RouteContext) => {
+  async (req: Request, ctx: WorkspaceContext) => {
     try {
       const { searchParams } = new URL(req.url)
       const status = searchParams.get('status')

@@ -13,13 +13,11 @@
  */
 import { prisma } from "@/lib/prisma"
 import { isErrorStatus } from "@/lib/server/hermes/harness-eval"
-import { parseJsonLoose } from "@/lib/server/hermes/harness-llm"
 import { selectModel } from "@/lib/server/shared/model-router"
 import {
   callAnthropicStructured,
   callDeepSeekJson,
   isProviderAvailable,
-  DEFAULT_ANTHROPIC_MODEL,
 } from "@/lib/server/shared/llm-provider"
 import type {
   HermesSuggestion,

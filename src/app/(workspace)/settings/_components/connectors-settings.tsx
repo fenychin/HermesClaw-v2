@@ -6,7 +6,6 @@ import {
   Database,
   LayoutGrid,
   FileSpreadsheet,
-  Building,
   ShoppingCart,
   Globe,
   RefreshCw,
@@ -18,7 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Connector } from "@/types";
 
 // 对应分类的 Lucide 图标
-const CATEGORY_ICONS: Record<string, any> = {
+const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   email: Mail,
   im: MessageSquare,
   crm: Database,
@@ -84,7 +83,7 @@ export function ConnectorsSettings() {
       await apiClient.updateConnector(id, { status: "connected" });
       refetch();
       toast.success("同步成功");
-    } catch (error) {
+    } catch {
       toast.error("同步失败");
     }
   };

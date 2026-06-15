@@ -27,7 +27,16 @@ const SYSTEM_ROUTES = [
 ];
 
 /** 开发环境免认证路由（仅本地测试使用） */
-const DEV_BYPASS_ROUTES = ["/api/chat", "/api/task", "/api/conversations"];
+const DEV_BYPASS_ROUTES = [
+  "/api/chat",
+  "/api/task",
+  "/api/conversations",
+  // Phase 2 主链路冒烟：dispatch / openclaw events / harness evaluate-event
+  // —— 仅 DEV_BYPASS_AUTH=true 时放行；route handler 内部仍有自己的 token / RBAC 兜底
+  "/api/openclaw/events",
+  "/api/openclaw/checkin",
+  "/api/harness/evaluate-event",
+];
 
 /** 写操作方法 */
 const WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
@@ -55,7 +64,12 @@ function getRoleFromSessionToken(token: string): string | null {
     const decoded = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
     const parsed = JSON.parse(decoded) as Record<string, unknown>;
     return (parsed.role as string) ?? null;
-  } catch {
+  } catch (err) {
+    // E6 修复：至少 log 一次，生产排查"角色未知→401"能定位到 JWT 层
+    console.warn("[middleware] JWT role 解码失败，降级为无角色", {
+      tokenPrefix: token.slice(0, 10) + "...",
+      error: err instanceof Error ? err.message : String(err),
+    })
     return null;
   }
 }

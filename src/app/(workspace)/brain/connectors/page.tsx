@@ -14,7 +14,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { PageTransition } from "@/components/common/PageTransition";
 import { ConnectorCard } from "@/components/common/connector-card";
-import { StatusBadge } from "@/components/common/status-badge";
+
 import { useAgentStore } from "@/stores/agent-store";
 import { useConnectorStore } from "@/stores/connector-store";
 import type { Connector, ConnectorCategory } from "@/types";

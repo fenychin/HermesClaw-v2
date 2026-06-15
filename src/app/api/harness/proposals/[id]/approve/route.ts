@@ -57,6 +57,7 @@ export const POST = withRBAC(
       })
       if (!proposal) return ApiResponse.error('提案不存在', 404)
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const propChange = proposal.proposedChange as any
       const riskLevelRaw = propChange?.riskLevel
       const automationLevelRaw = propChange?.automationLevel
