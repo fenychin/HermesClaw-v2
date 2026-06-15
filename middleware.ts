@@ -1,29 +1,122 @@
+/**
+ * ⚠️ 临时文件 —— 待删除。
+ *
+ * 项目的 middleware 规范实现位于 src/middleware.ts。历史上根目录与 src/ 各有一份，
+ * Next 仅加载其一且 webpack/Turbopack 选择不一致，导致行为漂移。原计划用「从 src 重导出」
+ * 收敛为单一可信源，但 Next 不允许重导出 `config`（必须可静态解析），故此处内联同一份逻辑，
+ * 保证无论 Next 选中根目录还是 src，行为完全一致、无构建错误。
+ *
+ * 环境恢复后应执行 `git rm middleware.ts`，仅保留 src/middleware.ts。
+ * 本文件逻辑必须与 src/middleware.ts 保持一字不差的同步。
+ */
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+
+/** 需跳过的路径前缀（静态资源 / 认证回调 / 健康检查） */
+const SKIP_PREFIXES = [
+  "/_next/",
+  "/static/",
+  "/favicon.ico",
+  "/api/auth/",
+  "/api/health",
+];
+
+/** 系统级路由（无需 session 的 cron / webhook） */
+const SYSTEM_ROUTES = ["/api/maintenance/", "/api/harness/cron"];
+
+/** 开发环境免认证路由（仅本地测试使用） */
+const DEV_BYPASS_ROUTES = ["/api/chat", "/api/task", "/api/conversations"];
+
+/** 写操作方法 */
+const WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
+
+/** 公开页面（无需登录即可访问） */
+const PUBLIC_PAGES = ["/login"];
+
+/** 从请求 cookie 中读取 session token（兼容开发 / 生产 cookie 名） */
+function getSessionToken(request: NextRequest): string | undefined {
+  return (
+    request.cookies.get("authjs.session-token")?.value ??
+    request.cookies.get("__Secure-authjs.session-token")?.value
+  );
+}
+
+/** 从 JWT session token 中提取 role 字段（Edge Runtime 纯 Base64URL 解码，无 Prisma 依赖） */
+function getRoleFromSessionToken(token: string): string | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = parts[1];
+    const decoded = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    const parsed = JSON.parse(decoded) as Record<string, unknown>;
+    return (parsed.role as string) ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/_next") ||
-    pathname === "/favicon.ico"
-  ) {
+  // 跳过静态资源、认证回调与健康检查
+  for (const prefix of SKIP_PREFIXES) {
+    if (pathname.startsWith(prefix)) return NextResponse.next();
+  }
+
+  // ============================================================
+  // API 路由：写操作认证 + 角色门禁（永不重定向到 /login）
+  // ============================================================
+  if (pathname.startsWith("/api/")) {
+    for (const prefix of SYSTEM_ROUTES) {
+      if (pathname.startsWith(prefix)) return NextResponse.next();
+    }
+
+    if (
+      process.env.DEV_BYPASS_AUTH === "true" &&
+      DEV_BYPASS_ROUTES.some((route) => pathname.startsWith(route))
+    ) {
+      return NextResponse.next();
+    }
+
+    if (WRITE_METHODS.includes(request.method)) {
+      const sessionToken = getSessionToken(request);
+      if (!sessionToken) {
+        return NextResponse.json(
+          { success: false, error: "未登录，写操作需要认证" },
+          { status: 401 },
+        );
+      }
+      const role = getRoleFromSessionToken(sessionToken);
+      if (role === "VIEWER") {
+        return NextResponse.json(
+          { success: false, error: "VIEWER 角色不可执行写操作" },
+          { status: 403 },
+        );
+      }
+    }
+
     return NextResponse.next();
   }
 
-  const sessionToken = request.cookies.get("authjs.session-token")?.value;
+  // ============================================================
+  // 页面路由：未登录重定向 /login
+  // ============================================================
+  const isPublic = PUBLIC_PAGES.some(
+    (page) => pathname === page || pathname.startsWith(`${page}/`),
+  );
+  if (isPublic) return NextResponse.next();
 
-  const response = sessionToken
-    ? NextResponse.next()
-    : NextResponse.redirect(new URL("/login", request.url));
+  if (!getSessionToken(request)) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.search = "";
+    return NextResponse.redirect(loginUrl);
+  }
 
-  // 添加调试头
-  response.headers.set("X-Middleware-Debug", `path=${pathname}, hasSession=${!!sessionToken}`);
-  return response;
+  return NextResponse.next();
 }
 
+/** 匹配所有非静态路径 */
 export const config = {
-  matcher: "/((?!_next/static|_next/image|favicon.ico).*)",
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

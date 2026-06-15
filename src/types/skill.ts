@@ -18,5 +18,11 @@ export interface Skill {
   outputSchema: string
   usedByAgents: string[]
   scenarios: string[]
+  /** 自动化授权等级（AGENTS.md §4.7）：L1 全自动 / L2 建议执行 / L3 需确认 / L4 禁止自动 */
+  automationLevel: string
   updatedAt: string
+  stats?: {
+    callCount: number
+    successRate: number
+  }
 }

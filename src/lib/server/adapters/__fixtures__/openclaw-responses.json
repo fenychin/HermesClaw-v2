@@ -1,0 +1,34 @@
+{
+  "contractVersion": 1,
+  "responses": {
+    "/tasks/execute": {
+      "taskId": "task-pact",
+      "status": "succeeded",
+      "outputs": {
+        "success": true,
+        "mock": true,
+        "url": "https://httpbin.org/post"
+      },
+      "durationMs": "<NUMBER>",
+      "completedAt": "<ISO_TIMESTAMP>"
+    },
+    "/connectors/status": {
+      "connectorId": "connector-pact",
+      "name": "模拟数据连接器",
+      "health": "healthy",
+      "lastHeartbeat": "<ISO_TIMESTAMP>",
+      "connectedSources": 3,
+      "version": "0.2.1",
+      "latencyMs": "<NUMBER>"
+    },
+    "/data/sync": {
+      "syncId": "<SYNC_ID>",
+      "status": "completed",
+      "totalRecords": 1500,
+      "syncedRecords": 1500,
+      "failedRecords": 0,
+      "startedAt": "<ISO_TIMESTAMP>",
+      "completedAt": "<ISO_TIMESTAMP>"
+    }
+  }
+}

@@ -1,53 +1,58 @@
 import type { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
+import Link from "next/link";
 
 interface PageHeaderProps {
   title: string;
-  /** 副标题（原 description，保留别名兼容） */
-  subtitle?: string;
-  /** @deprecated 使用 subtitle */
   description?: string;
-  /** 左侧图标 */
-  icon?: LucideIcon;
-  /** 右侧操作区（按钮等） */
   actions?: ReactNode;
+  breadcrumb?: { label: string; href?: string }[];
 }
 
 /**
  * 通用页头组件
- * —— 左侧：图标 + 大标题 + 副标题；右侧：操作区；底部 1px 分隔线
+ * —— 左侧：面包屑（可选）+ 大标题 + 可选描述；右侧：操作区；无底部边线，采用 mb-6 空白
  */
 export function PageHeader({
   title,
-  subtitle,
   description,
-  icon: Icon,
   actions,
+  breadcrumb,
 }: PageHeaderProps) {
-  const subtitleText = subtitle ?? description;
-
   return (
-    <div className="border-border mb-6 border-b pb-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          {Icon ? (
-            <div className="bg-accent text-brand flex size-9 shrink-0 items-center justify-center rounded-lg">
-              <Icon className="size-5" />
-            </div>
-          ) : null}
-          <div className="space-y-1">
-            <h1 className="text-foreground text-xl font-semibold tracking-tight">
-              {title}
-            </h1>
-            {subtitleText ? (
-              <p className="text-muted-foreground text-sm">{subtitleText}</p>
-            ) : null}
+    <div className="flex items-center justify-between mb-6">
+      {/* 左侧 */}
+      <div className="flex flex-col">
+        {/* 面包屑 */}
+        {breadcrumb && breadcrumb.length > 0 && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1 select-none">
+            {breadcrumb.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-1.5">
+                {idx > 0 && <span className="text-muted-foreground/50">/</span>}
+                {item.href ? (
+                  <Link href={item.href} className="hover:text-foreground transition-colors">
+                    {item.label}
+                  </Link>
+                ) : (
+                  <span>{item.label}</span>
+                )}
+              </div>
+            ))}
           </div>
-        </div>
-        {actions ? (
-          <div className="flex items-center gap-2">{actions}</div>
-        ) : null}
+        )}
+        {/* 标题与描述 */}
+        <h1 className="text-foreground text-xl font-semibold tracking-tight">
+          {title}
+        </h1>
+        {description && (
+          <p className="text-muted-foreground text-sm mt-0.5">{description}</p>
+        )}
       </div>
+
+      {/* 右侧 */}
+      {actions && (
+        <div className="flex items-center gap-2">{actions}</div>
+      )}
     </div>
   );
 }
+

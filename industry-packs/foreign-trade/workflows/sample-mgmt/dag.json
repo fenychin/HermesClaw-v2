@@ -1,0 +1,36 @@
+{
+  "id": "sample-mgmt",
+  "name": "sample-mgmt",
+  "description": "样品管理：跟踪样品寄送状态，记录客户反馈，推进样品到订单转化",
+  "templateId": "ft-sample-mgmt",
+  "requiredSkills": [],
+  "automationLevel": "L2",
+  "riskLevel": "low",
+  "nodes": [
+    {
+      "id": "n1-dispatch",
+      "kind": "task",
+      "name": "登记样品寄送",
+      "handler": "log-sample-dispatch",
+      "config": { "automationLevel": "L2" }
+    },
+    {
+      "id": "n2-track",
+      "kind": "task",
+      "name": "追踪物流状态",
+      "handler": "log-tracking-status",
+      "config": { "automationLevel": "L1" }
+    },
+    {
+      "id": "n3-feedback",
+      "kind": "task",
+      "name": "记录客户反馈",
+      "handler": "log-customer-feedback",
+      "config": { "automationLevel": "L2" }
+    }
+  ],
+  "edges": [
+    { "from": "n1-dispatch", "to": "n2-track" },
+    { "from": "n2-track", "to": "n3-feedback" }
+  ]
+}

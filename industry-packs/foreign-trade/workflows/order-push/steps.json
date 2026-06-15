@@ -1,0 +1,34 @@
+{
+  "id": "order-push",
+  "title": "订单推进",
+  "description": "监控订单进度并自动提醒关键节点",
+  "steps": [
+    {
+      "id": "step-n1-status",
+      "title": "订单状态快照",
+      "description": "记录当前订单进度",
+      "status": "pending",
+      "inputs": [
+        { "key": "order_id", "label": "订单编号", "type": "text", "required": true },
+        { "key": "current_stage", "label": "当前阶段", "type": "select", "required": true, "options": [
+          { "label": "备料中", "value": "material-prep" },
+          { "label": "排产中", "value": "production" },
+          { "label": "待验货", "value": "inspection" },
+          { "label": "待出运", "value": "shipping" }
+        ]}
+      ]
+    },
+    {
+      "id": "step-n2-check",
+      "title": "关键节点检查",
+      "description": "检查各节点完成情况",
+      "status": "pending"
+    },
+    {
+      "id": "step-n3-remind",
+      "title": "生成提醒任务",
+      "description": "自动生成关键节点提醒",
+      "status": "pending"
+    }
+  ]
+}

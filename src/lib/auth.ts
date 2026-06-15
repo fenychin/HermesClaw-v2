@@ -26,6 +26,7 @@ declare module "next-auth" {
 export const { handlers, auth, signIn, signOut } = NextAuth({
   /** 信任请求中的 Host 头（本地开发/反向代理环境必需） */
   trustHost: true,
+  secret: process.env.AUTH_SECRET || "hermesclaw-default-development-secret-key-32chars",
   providers: [
     Credentials({
       name: "credentials",
