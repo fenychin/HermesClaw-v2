@@ -282,3 +282,39 @@ OpenClaw 不得：
 - Hermes ↔ OpenClaw 之间的关键路径必须有 e2e 测试（模拟真实事件与回执）。  
 - 所有与高危动作相关的改动，必须在测试中覆盖：拒绝路径、审批路径、回滚路径。  
 - CI 流水线必须执行：类型检查 + 单元测试 + e2e 测试 + lint + schema 断言。
+- CI 必须断言生产环境下不存在 dev 旁路开关：
+  - `NODE_ENV === "production"` 时 `DEV_BYPASS_AUTH` 与 `E2E_BYPASS_RBAC` 均不得为 `"true"`；任一为真则构建失败。
+- CI 必须运行 `check:middleware` 脚本，断言 `middleware.ts` 与 `src/middleware.ts` 去除注释后完全一致。
+
+---
+
+# 11. 开发环境旁路开关
+
+## 11.1 DEV_BYPASS_AUTH 与 E2E_BYPASS_RBAC
+
+以下两个环境变量 **仅** 用于本地开发与 CI 冒烟测试，**生产部署必须不配（或显式置空）**：
+
+- `DEV_BYPASS_AUTH=true` —— 在 middleware 层放行无 cookie 调用特定 API 路由（`/api/openclaw/events`、`/api/openclaw/checkin`、`/api/harness/evaluate-event`、`/api/task` 系列）。
+  该变量**无** production 守卫（历史既有），运维须在部署配置中确保不设。
+- `E2E_BYPASS_RBAC=true` —— 在 `/api/task/dispatch` route handler 内跳过 `withRBAC("MEMBER")`，但仍走 `buildWorkspaceContext` 保留 workspace 隔离与审计。
+  该变量**有** `NODE_ENV !== "production"` 守卫，生产即使误配也会被忽略。
+
+## 11.2 INTERNAL_TASK_CALLBACK_TOKEN
+
+M2M 端点（dispatch、evaluate-event）的内部 token 校验：
+- 生产：必须配 `INTERNAL_TASK_CALLBACK_TOKEN`，请求必须带 `x-internal-token` 头且值相等。
+- dev/CI：可不配，由 `NODE_ENV !== "production"` 守卫默认放行。
+- 校验逻辑统一使用 `src/lib/server/shared/internal-auth.ts` 中的 `checkInternalToken` / `buildInternalCallbackHeaders`。
+
+## 11.3 middleware 双文件同步
+
+当前项目保留 `middleware.ts` 与 `src/middleware.ts` 两份文件（Next.js 16 turbopack/Webpack 加载顺序未文档化）。两份文件必须保持**运行时行为完全一致**（允许文件头注释不同）。改其中一份必须改另一份。CI 通过 `pnpm check:middleware` 脚本去注释比对。
+
+---
+
+# 12. OpenClaw → Hermes 终态回调
+
+- 当 `ExecutionEvent.status ∈ {completed, failed}` 时，`/api/openclaw/events` 的 POST handler **必须** 同步回调 `/api/harness/evaluate-event`。
+- `workspaceId` 由 Hermes 侧通过 `taskId` 反查 `IdempotencyKey` 表得到（`src/lib/server/shared/task-lookup.ts`），OpenClaw 不持有 workspace 上下文。
+- 反查不到 workspaceId 时，`/api/harness/evaluate-event` **必须** 返回 422（`TASK_WORKSPACE_NOT_FOUND`），不得降级到默认 workspace（防止跨租户指标污染）。
+- 任务派发时若 `clampAutomationLevel` 实际降低客户端请求的等级，**必须** 写一条 `automation.level.change` 审计（`targetType=task`）。
