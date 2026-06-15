@@ -36,8 +36,8 @@ interface MemoryState {
   freezeMemory: (id: string, frozen: boolean) => Promise<void>;
   /** 新增记忆（调 API） */
   addMemory: (memory: Partial<Memory>) => Promise<void>;
-  /** 升级记忆类型（调 API） */
-  upgradeMemory: (id: string) => Promise<void>;
+  /** 升级记忆类型（调 API，可直接指定目标类型） */
+  upgradeMemory: (id: string, targetType?: MemoryType) => Promise<void>;
 }
 
 export const useMemoryStore = create<MemoryState>((set, get) => ({
@@ -111,12 +111,12 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     }
   },
 
-  upgradeMemory: async (id) => {
+  upgradeMemory: async (id, targetType) => {
     const memory = get().memories.find((m) => m.id === id);
     if (!memory) return;
 
-    const nextType: MemoryType =
-      memory.type === "short" ? "mid" : memory.type === "mid" ? "long" : "long";
+    const nextType: MemoryType = targetType ||
+      (memory.type === "short" ? "mid" : memory.type === "mid" ? "long" : "long");
 
     // 乐观更新
     set((state) => ({

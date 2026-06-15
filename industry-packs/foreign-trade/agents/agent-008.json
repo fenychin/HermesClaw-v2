@@ -1,0 +1,21 @@
+{
+  "id": "agent-008",
+  "name": "Victor",
+  "role": "风险审查员",
+  "description": "审查客户信用、合同条款、支付风险与贸易合规性，为每一笔交易出具风险评估报告",
+  "status": "idle",
+  "source": "builtin",
+  "category": ["合规风控", "外贸法务"],
+  "bindSkills": ["skill-007"],
+  "bindConnectors": ["conn-016"],
+  "memoryPermission": "read",
+  "harnessVersion": "1.9.2",
+  "automationLevel": "L3",
+  "canDo": ["审查合同风险条款", "评估客户信用风险", "检查贸易合规性", "出具风险报告供审批"],
+  "cannotDo": ["自行决定通过/驳回交易", "修改合同条款", "绕过法务审批流程"],
+  "stats": { "todayTasks": 3, "successRate": 0.97, "avgDuration": "18m 20s" },
+  "lastActive": "2026-06-05T16:00:00Z",
+  "createdAt": "2026-02-15T08:00:00Z",
+  "industryId": "foreign-trade",
+  "templateId": "ft-risk-auditor"
+}

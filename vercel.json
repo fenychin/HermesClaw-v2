@@ -7,6 +7,18 @@
     {
       "path": "/api/maintenance/cleanup",
       "schedule": "0 3 * * 0"
+    },
+    {
+      "path": "/api/cron/canary-eval",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/capability-health",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/workflow-timeout",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

@@ -8,8 +8,8 @@
  */
 import { prisma } from "@/lib/prisma"
 
-/** 执行来源：agent（绑定智能体）| hermes-chat（控制面对话）| quick-task（快捷任务）| hermes-suggestions（今日建议） */
-export type AgentLogSource = "agent" | "hermes-chat" | "quick-task" | "hermes-suggestions"
+/** 执行来源：agent（绑定智能体）| hermes-chat（控制面对话）| quick-task（快捷任务）| hermes-suggestions（今日建议）| workflow（DAG 工作流节点）| conversation（对话创建写库） */
+export type AgentLogSource = "agent" | "hermes-chat" | "quick-task" | "hermes-suggestions" | "workflow" | "conversation" | "morning-brief" | "evening-brief" | "weekly-brief" | "connector" | "knowledge-gap" | "human-correction"
 
 export interface WriteAgentLogInput {
   /** 绑定的智能体 ID；控制面 / 快捷任务无绑定时为空 */
@@ -21,6 +21,8 @@ export interface WriteAgentLogInput {
   /** 耗时文本，如 "1.2s" */
   duration: string
   detail?: string
+  /** 风险等级（AGENTS.md §4.4 闭环反馈 / §4.7 自动化授权）：low | medium | high */
+  riskLevel?: string
 }
 
 /**
@@ -37,6 +39,7 @@ export async function writeAgentLog(input: WriteAgentLogInput): Promise<void> {
         status: input.status,
         duration: input.duration,
         detail: input.detail ?? null,
+        riskLevel: input.riskLevel ?? null,
       },
     })
   } catch (error) {

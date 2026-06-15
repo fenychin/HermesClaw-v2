@@ -1,31 +1,25 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import {
-  parseJsonField,
-  stringifyJsonField,
+  serializeMemory,
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
-import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
-import { MemoryCreateSchema, validateBody } from "@/lib/validators"
-
-/** 序列化 Memory，将 JSON 字符串字段反序列化 */
-function serializeMemory(memory: Record<string, unknown>) {
-  return {
-    ...memory,
-    tags: parseJsonField(memory.tags as string, []),
-  }
-}
+import { actorFromSession } from "@/lib/server/audit"
+import { MemoryCreateSchema, validateBody } from "@/lib/server/validators"
+import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
+import { guardOutput } from "@/lib/server/output-guard"
+import { MemoryService } from "@/lib/server/memory-service"
 
 /** GET /api/memory?type=short|mid|long —— 获取记忆列表，支持类型过滤 */
 export async function GET(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
     const { searchParams } = new URL(request.url)
     const type = searchParams.get("type")
 
-    const where = type
-      ? { type }
-      : {}
+    const where: Record<string, unknown> = { workspaceId: ctx.workspaceId }
+    if (type) where.type = type
 
     const memories = await prisma.memory.findMany({
       where,
@@ -44,14 +38,23 @@ export async function GET(request: Request) {
 /** POST /api/memory —— 创建新记忆 */
 export async function POST(request: Request) {
   try {
+    const ctx = await buildWorkspaceContext(request)
+    requireWritable(ctx.role)
     const rawBody = await request.json()
     const parsed = validateBody(rawBody, MemoryCreateSchema)
     if (parsed instanceof Response) return parsed
     const body = parsed
 
-    const memory = await prisma.memory.create({
-      data: {
-        id: crypto.randomUUID(),
+    // 引入安全护栏扫描（AGENTS.md 第五章：防注入与安全边界）
+    const guard = guardOutput(body.content, { minLength: 3, maxLength: 8000 })
+    if (!guard.ok) {
+      return errorResponse(`知识库文本不合规：${guard.reason}`, 400)
+    }
+
+    const actor = await actorFromSession()
+    const memory = await MemoryService.createMemory(
+      ctx.workspaceId,
+      {
         type: body.type,
         content: body.content,
         summary: body.summary,
@@ -60,19 +63,12 @@ export async function POST(request: Request) {
         relatedAgent: body.relatedAgent,
         confidence: body.confidence,
         frozen: body.frozen,
-        tags: stringifyJsonField(body.tags),
+        tags: body.tags,
         projectId: body.projectId,
       },
-    })
+      actor
+    )
 
-    await writeAuditLog({
-      actor: await actorFromSession(),
-      action: "create.memory",
-      targetType: "memory",
-      targetId: memory.id,
-      detail: `${memory.type} · ${memory.summary}`,
-      riskLevel: "low",
-    })
 
     return successResponse(
       { memory: serializeMemory(memory as unknown as Record<string, unknown>) },

@@ -1,0 +1,6 @@
+{
+  "id": "quote-gen",
+  "title": "报价生成",
+  "description": "根据产品与客户条件快速生成报价单",
+  "icon": "FileText"
+}
