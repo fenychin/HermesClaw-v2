@@ -34,6 +34,13 @@
   --ring: #7c5cff;                 /* 焦点环 = 品牌主色 */
   --radius: 0.875rem;              /* PRD 大圆角基准 */
 
+  /* 新增/补充 */
+  --radius-card: 1.25rem;     /* 卡片标准圆角 20px */
+  --radius-input: 0.875rem;   /* 输入框圆角 */
+  --radius-badge: 0.5rem;     /* badge 圆角 */
+  --spacing-card-padding: 1.25rem; /* 卡片内边距 */
+  --panel-shadow: 0 0 0 1px hsl(0 0% 100% / 0.05); /* 卡片微光边 */
+
   /* —— 图表色（Recharts，对应 chart-1..5）—— */
   --chart-1: #7c5cff;              /* 主色 */
   --chart-2: #4da3ff;              /* 辅助蓝 */
@@ -96,6 +103,12 @@
   --radius-xl: calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);
 
+  --radius-card: var(--radius-card);
+  --radius-input: var(--radius-input);
+  --radius-badge: var(--radius-badge);
+  --spacing-card-padding: var(--spacing-card-padding);
+  --shadow-panel: var(--panel-shadow);
+
   /* 图表 */
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -135,4 +148,18 @@
   html {
     @apply font-sans;
   }
+}
+
+/* ============================================================
+   全局隐藏滚动条 —— 保留滚动能力，移除白色滚动条视觉
+   Firefox → scrollbar-width:none
+   Webkit → ::-webkit-scrollbar display:none
+   ============================================================ */
+* {
+  scrollbar-width: none;           /* Firefox */
+  -ms-overflow-style: none;        /* IE/Edge Legacy */
+}
+
+*::-webkit-scrollbar {
+  display: none;                   /* Chrome / Safari / Edge */
 }

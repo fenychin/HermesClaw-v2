@@ -1,28 +1,23 @@
-import { prisma } from "@/lib/prisma"
-import { logger } from '@/lib/logger';
-import { successResponse, errorResponse } from "@/lib/api-utils"
+/**
+ * @deprecated 自 v0.12.12 起，外贸专属 API 收敛到 /api/packs/foreign-trade/* 命名空间。
+ * 本文件保留 308 永久重定向作为兼容层；计划在 v0.13 删除。
+ */
+import { NextResponse } from "next/server"
 
-/** 序列化 MarketIntelligence，将 DateTime 转为 ISO 字符串 */
-function serializeIntelligence(intel: {
-  publishedAt: Date
-  createdAt: Date
-} & Record<string, unknown>) {
-  return {
-    ...intel,
-    publishedAt: intel.publishedAt.toISOString(),
-    createdAt: intel.createdAt.toISOString(),
-  }
+const NEW_PREFIX = "/api/packs/foreign-trade/intelligence"
+const OLD_PREFIX = "/api/intelligence"
+
+function redirect(req: Request) {
+  const url = new URL(req.url)
+  url.pathname = url.pathname.replace(OLD_PREFIX, NEW_PREFIX)
+  return NextResponse.redirect(url, {
+    status: 308,
+    headers: {
+      Deprecation: "true",
+      Sunset: "v0.13",
+      Link: `<${url.pathname}>; rel="successor-version"`,
+    },
+  })
 }
 
-/** GET /api/intelligence —— 获取市场情报列表（按发布时间倒序） */
-export async function GET() {
-  try {
-    const intelligence = await prisma.marketIntelligence.findMany({
-      orderBy: { publishedAt: "desc" },
-    })
-    return successResponse({ intelligence: intelligence.map(serializeIntelligence) })
-  } catch (error) {
-    logger.error('GET /api/intelligence: 失败', { error: error instanceof Error ? error.message : '未知错误' })
-    return errorResponse("服务器内部错误")
-  }
-}
+export const GET = redirect

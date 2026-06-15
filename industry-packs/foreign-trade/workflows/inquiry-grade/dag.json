@@ -1,0 +1,53 @@
+{
+  "id": "inquiry-grade",
+  "name": "inquiry-grading",
+  "description": "询盘智能分级：自动评估询盘质量（A/B/C），A 级自动生成开发信草稿",
+  "templateId": "ft-inquiry-grading",
+  "requiredSkills": ["ft-inquiry-grading", "ft-outreach-email"],
+  "automationLevel": "L2",
+  "riskLevel": "low",
+  "nodes": [
+    {
+      "id": "n1-grading",
+      "kind": "skill",
+      "name": "询盘智能分级",
+      "config": { "skillId": "skill-ft-inquiry-grading", "automationLevel": "L2" }
+    },
+    {
+      "id": "n2-write",
+      "kind": "data-write",
+      "name": "写入分级结果",
+      "config": {
+        "target": "Inquiry",
+        "field": "priority",
+        "sourceNode": "n1-grading",
+        "sourcePath": "result.grade",
+        "valueMap": { "A": "high", "B": "mid", "C": "low" },
+        "automationLevel": "L1"
+      }
+    },
+    {
+      "id": "n3-condition",
+      "kind": "condition",
+      "name": "高意向判定",
+      "config": {
+        "variable": "grade",
+        "expected": "A",
+        "trueBranch": "A",
+        "falseBranch": "not-A",
+        "automationLevel": "L1"
+      }
+    },
+    {
+      "id": "n4-email",
+      "kind": "skill",
+      "name": "自动生成开发信",
+      "config": { "skillId": "skill-ft-outreach-email", "automationLevel": "L3" }
+    }
+  ],
+  "edges": [
+    { "from": "n1-grading", "to": "n2-write" },
+    { "from": "n2-write", "to": "n3-condition" },
+    { "from": "n3-condition", "to": "n4-email", "when": "A" }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "id": "agent-003",
+  "name": "Marcus",
+  "role": "客户跟进员",
+  "description": "管理客户跟进节奏，根据阶段自动生成跟进内容，预警客户流失并推荐挽回策略",
+  "status": "idle",
+  "source": "builtin",
+  "category": ["客户管理", "销售跟进"],
+  "bindSkills": ["skill-004", "skill-011"],
+  "bindConnectors": ["conn-001", "conn-005", "conn-007", "conn-008"],
+  "memoryPermission": "read-write",
+  "harnessVersion": "2.0.5",
+  "automationLevel": "L2",
+  "canDo": ["管理客户跟进周期", "生成个性化跟进内容", "客户流失预警", "同步跟进记录至 CRM"],
+  "cannotDo": ["修改合同条款", "自行决定报价折扣", "删除客户记录"],
+  "stats": { "todayTasks": 18, "successRate": 0.88, "avgDuration": "3m 05s" },
+  "lastActive": "2026-06-06T09:58:00Z",
+  "createdAt": "2026-01-10T08:00:00Z",
+  "industryId": "foreign-trade",
+  "templateId": "ft-followup-manager"
+}

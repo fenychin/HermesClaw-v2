@@ -1,28 +1,26 @@
-import { prisma } from "@/lib/prisma"
-import { logger } from '@/lib/logger';
-import { successResponse, errorResponse } from "@/lib/api-utils"
+/**
+ * @deprecated 自 v0.12.12 起，外贸专属 API 收敛到 /api/packs/foreign-trade/* 命名空间。
+ * 本文件保留 308 永久重定向作为兼容层；计划在 v0.13 删除。
+ *
+ * 迁移依据：CLAUDE.md §6.1（行业包是插件，不是业务分支）+ 全局架构审查 P0-#1。
+ */
+import { NextResponse } from "next/server"
 
-/** 序列化 Inquiry，将 DateTime 转为 ISO 字符串（匹配 types/trade.ts） */
-function serializeInquiry(inquiry: {
-  receivedAt: Date
-  createdAt: Date
-} & Record<string, unknown>) {
-  return {
-    ...inquiry,
-    receivedAt: inquiry.receivedAt.toISOString(),
-    createdAt: inquiry.createdAt.toISOString(),
-  }
+const NEW_PREFIX = "/api/packs/foreign-trade/inquiries"
+const OLD_PREFIX = "/api/inquiries"
+
+function redirect(req: Request) {
+  const url = new URL(req.url)
+  url.pathname = url.pathname.replace(OLD_PREFIX, NEW_PREFIX)
+  return NextResponse.redirect(url, {
+    status: 308,
+    headers: {
+      Deprecation: "true",
+      Sunset: "v0.13",
+      Link: `<${url.pathname}>; rel="successor-version"`,
+    },
+  })
 }
 
-/** GET /api/inquiries —— 获取询盘列表（按接收时间倒序） */
-export async function GET() {
-  try {
-    const inquiries = await prisma.inquiry.findMany({
-      orderBy: { receivedAt: "desc" },
-    })
-    return successResponse({ inquiries: inquiries.map(serializeInquiry) })
-  } catch (error) {
-    logger.error('GET /api/inquiries: 失败', { error: error instanceof Error ? error.message : '未知错误' })
-    return errorResponse("服务器内部错误")
-  }
-}
+export const GET = redirect
+export const POST = redirect

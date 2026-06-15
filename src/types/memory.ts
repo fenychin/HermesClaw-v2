@@ -21,4 +21,5 @@ export interface Memory {
   /** active | archived */
   status?: string
   createdAt: string
+  updatedAt?: string
 }

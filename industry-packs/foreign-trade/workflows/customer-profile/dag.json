@@ -1,0 +1,18 @@
+{
+  "id": "customer-profile",
+  "name": "customer-profile",
+  "description": "客户画像构建：整合多渠道信息生成完整客户档案，辅助开发信与报价策略",
+  "templateId": "ft-customer-profile",
+  "requiredSkills": ["ft-customer-profiling"],
+  "automationLevel": "L2",
+  "riskLevel": "low",
+  "nodes": [
+    {
+      "id": "n1-profile",
+      "kind": "skill",
+      "name": "客户画像构建",
+      "config": { "skillId": "skill-ft-customer-profiling", "automationLevel": "L2" }
+    }
+  ],
+  "edges": []
+}

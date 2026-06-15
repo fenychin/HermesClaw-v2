@@ -1,0 +1,6 @@
+{
+  "id": "order-push",
+  "title": "订单推进",
+  "description": "监控订单进度并自动提醒关键节点",
+  "icon": "TrendingUp"
+}

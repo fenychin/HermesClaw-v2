@@ -5,7 +5,7 @@
  * —— 切换 PostgreSQL 时：移除 adapter，PrismaClient 会自动读取
  *    DATABASE_URL 中的 ?connection_limit=10&pool_timeout=20 连接池参数
  */
-import { PrismaClient } from "@/generated/prisma/client";
+import { PrismaClient } from "@/generated/prisma-v2/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 
 const globalForPrisma = globalThis as unknown as {

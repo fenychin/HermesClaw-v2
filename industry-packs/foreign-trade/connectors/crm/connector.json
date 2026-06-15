@@ -1,0 +1,19 @@
+{
+  "name": "crm",
+  "kind": "outbound",
+  "industryPack": "foreign-trade",
+  "description": "外贸 CRM 连接器：客户档案、跟进记录、阶段同步",
+  "capabilities": [
+    "customer.upsert",
+    "followup.write",
+    "stage.update"
+  ],
+  "implementation": {
+    "type": "placeholder",
+    "note": "占位声明。当前未对接真实 CRM；OpenClaw 执行运行时遇到 crm.* 动作走 mock receipt。"
+  },
+  "config": {
+    "endpoint": "string",
+    "apiKey": "secret"
+  }
+}

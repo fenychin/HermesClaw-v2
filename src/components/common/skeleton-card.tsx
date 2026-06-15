@@ -27,7 +27,7 @@ export function SkeletonCard({ variant, className }: SkeletonCardProps) {
     return (
       <div
         className={cn(
-          "bg-card border-border rounded-2xl border p-5",
+          "bg-card border-border rounded-card border p-5",
           className,
         )}
       >
@@ -70,7 +70,7 @@ export function SkeletonCard({ variant, className }: SkeletonCardProps) {
   return (
     <div
       className={cn(
-        "bg-card border-border rounded-2xl border p-5",
+        "bg-card border-border rounded-card border p-5",
         className,
       )}
     >
