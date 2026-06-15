@@ -12,6 +12,8 @@
  * 响应：{ spec: HarnessSpec（JSON）, markdown: string }
  */
 import anthropic from "@/lib/anthropic"
+import { parseJsonLoose } from "@/lib/server/harness-llm"
+import { resolveLlmProvider } from "@/lib/server/llm-provider"
 import { logger } from '@/lib/logger';
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { rateLimit } from "@/lib/rate-limit"
@@ -170,23 +172,6 @@ function renderSpecMarkdown(
       `符合 AGENTS.md P6 Spec-First 原则。创建智能体时将以此 Spec 作为初始 Harness 配置基线。*`,
   ]
   return lines.join("\n")
-}
-
-/** 从 AI 原始输出中解析 JSON（兼容 ```json / 裸 JSON） */
-function parseJsonLoose(text: string): unknown {
-  const trimmed = text.trim()
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  const candidate = fenced ? fenced[1] : trimmed
-  try {
-    return JSON.parse(candidate)
-  } catch {
-    const start = candidate.indexOf("{")
-    const end = candidate.lastIndexOf("}")
-    if (start >= 0 && end > start) {
-      return JSON.parse(candidate.slice(start, end + 1))
-    }
-    throw new Error("无法从模型输出中解析 JSON")
-  }
 }
 
 /** 校验 AI 返回，收窄为 HarnessSpec */
@@ -350,30 +335,21 @@ export async function POST(request: Request) {
     if (parsed instanceof Response) return parsed
     const body = parsed
 
-    // 2. Provider 选择（与 harness-llm.ts 一致的策略）
-    const override = process.env.HARNESS_LLM_PROVIDER?.toLowerCase().trim()
-    const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY?.trim())
-    const hasDeepSeek = Boolean(process.env.DEEPSEEK_API_KEY?.trim())
-
+    // 2. Provider 选择（复用共享工具 llm-provider.ts）
     const userPrompt = buildUserPrompt(body)
 
     let result: { spec: unknown; provider: string; model: string }
 
-    if (override === "deepseek") {
-      if (!hasDeepSeek)
-        return errorResponse("HARNESS_LLM_PROVIDER=deepseek 但未配置 DEEPSEEK_API_KEY", 502)
-      result = await generateWithDeepSeek(userPrompt)
-    } else if (override === "anthropic") {
-      if (!hasAnthropic)
-        return errorResponse("HARNESS_LLM_PROVIDER=anthropic 但未配置 ANTHROPIC_API_KEY", 502)
-      result = await generateWithAnthropic(userPrompt)
-    } else if (hasAnthropic) {
-      result = await generateWithAnthropic(userPrompt)
-    } else if (hasDeepSeek) {
-      result = await generateWithDeepSeek(userPrompt)
-    } else {
+    try {
+      const selection = resolveLlmProvider(ANTHROPIC_MODEL)
+      if (selection.provider === "anthropic") {
+        result = await generateWithAnthropic(userPrompt)
+      } else {
+        result = await generateWithDeepSeek(userPrompt)
+      }
+    } catch (error) {
       return errorResponse(
-        "未配置 ANTHROPIC_API_KEY 或 DEEPSEEK_API_KEY，无法生成 Harness Spec",
+        error instanceof Error ? error.message : "无法生成 Harness Spec",
         502,
       )
     }

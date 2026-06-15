@@ -1,0 +1,15 @@
+{
+  "taskId": "task_fixture_1",
+  "workflowRunId": "run_fixture_1",
+  "workspaceId": "ws_1",
+  "industryId": "foreign-trade",
+  "agentId": "agent_sales",
+  "actionType": "email.send",
+  "input": { "to": "buyer@example.com", "subject": "报价单" },
+  "automationLevel": "L2",
+  "riskLevel": "low",
+  "idempotencyKey": "idem_fixture_1",
+  "callbackTarget": "topic:task.result",
+  "policySnapshotVersion": "1.0.0",
+  "version": "1.0.0"
+}

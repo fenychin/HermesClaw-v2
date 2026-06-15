@@ -3,11 +3,73 @@
 
 generator client {
   provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  output   = "../src/generated/prisma-v2"
 }
 
 datasource db {
   provider = "sqlite"
+}
+
+// ============================================================
+// 多租户 Workspace（工作空间）
+// —— WorkspaceRole 枚举以 TEXT 列存（SQLite 无原生 enum）
+// ============================================================
+model Workspace {
+  id        String            @id @default(cuid())
+  name      String
+  plan      String            @default("free") // free | pro | enterprise
+  createdAt DateTime          @default(now())
+  members   WorkspaceMember[]
+
+  // 反向关系
+  agents              Agent[]
+  agentLogs           AgentLog[]
+  projects            Project[]
+  memories            Memory[]
+  memoryRevisions     MemoryRevision[]
+  connectors          Connector[]
+  skills              Skill[]
+  harnessProposals    HarnessProposal[]
+  conversations       Conversation[]
+  conversationMessages ConversationMessage[]
+  auditLogs           AuditLog[]
+  inquiries           Inquiry[]
+  marketIntelligences MarketIntelligence[]
+  quotations          Quotation[]
+  exchangeRates       ExchangeRate[]
+  evolutionLogs       EvolutionLog[]
+  toolRegistries      ToolRegistry[]
+  toolGrants          ToolGrant[]
+  workflows           Workflow[]
+  workflowRuns        WorkflowRun[]
+  workflowNodeRuns    WorkflowNodeRun[]
+  tasks               Task[]
+  reports             Report[]
+  settings            WorkspaceSettings?
+}
+
+// ============================================================
+// 工作空间设置（策略路由 / 模型路由配置）
+// —— 承载每个 Workspace 的默认模型与各 taskType 的 Provider 偏好
+// —— 由 OWNER/ADMIN 在 /settings 模型路由页配置，selectModel() 读取
+// ============================================================
+model WorkspaceSettings {
+  workspaceId     String    @id
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  defaultModel    String    @default("deepseek-chat") // 默认模型（可配置，路由 fallback）
+  taskProviderMap String    @default("{}")            // JSON：{chat|workflow|analysis|generation} -> 'anthropic'|'deepseek'
+  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime  @default(now())
+}
+
+model WorkspaceMember {
+  workspaceId String
+  userId      String
+  role        String    @default("MEMBER") // OWNER | ADMIN | MEMBER | VIEWER
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, userId])
 }
 
 // ============================================================
@@ -24,6 +86,7 @@ model User {
   createdAt     DateTime  @default(now())
   accounts      Account[]
   sessions      Session[]
+  workspaceMemberships WorkspaceMember[]
 }
 
 model Account {
@@ -53,9 +116,15 @@ model Session {
 
 // ============================================================
 // 智能体
+//
+// [未来外贸 Industry Pack 扩展建议]：
+//   1. 增加 templateId 字段 (String, 可空)，关联行业通用岗位智能体模板 (如 'agent-sales-rep')。
+//   2. 规范化 category 存储，以便快速区分外贸专属岗位 ('foreign-trade' / 'trade') 和通用智能体。
 // ============================================================
 model Agent {
   id              String   @id
+  workspaceId     String   @default("default")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
   name            String
   role            String
   description     String
@@ -66,6 +135,7 @@ model Agent {
   bindConnectors  String   // JSON 数组
   memoryPermission String  @default("read")
   harnessVersion  String   @default("v1.0.0")
+  automationLevel String   @default("L2")  // 自动化授权等级（AGENTS.md §4.7）：L1/L2/L3/L4
   canDo           String   // JSON 数组
   cannotDo        String   // JSON 数组
   statsJson       String   // JSON 对象
@@ -73,6 +143,8 @@ model Agent {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   runLogs         AgentLog[]
+
+  @@index([workspaceId])
 }
 
 // 智能体运行日志
@@ -80,6 +152,8 @@ model Agent {
 //    source 标识来源：agent（绑定智能体）| hermes-chat（控制面对话）| quick-task（快捷任务）
 model AgentLog {
   id        String   @id
+  workspaceId     String   @default("default")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
   agentId   String?
   agent     Agent?   @relation(fields: [agentId], references: [id])
   source    String   @default("agent")
@@ -87,8 +161,12 @@ model AgentLog {
   status    String
   duration  String
   detail    String?
+  // 风险等级（AGENTS.md §4.4 闭环反馈 / §4.7 自动化授权）：low | medium | high
+  // Skill 节点执行时由 automationLevel 映射填充
+  riskLevel String?
   createdAt DateTime @default(now())
 
+  @@index([workspaceId])
   @@index([agentId])
   @@index([status])
   @@index([createdAt])
@@ -99,6 +177,8 @@ model AgentLog {
 // ============================================================
 model Project {
   id            String   @id
+  workspaceId   String   @default("default")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id])
   name          String
   type          String
   status        String   @default("active")
@@ -113,7 +193,9 @@ model Project {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   memories      Memory[]
+  tasks         Task[]
 
+  @@index([workspaceId])
   @@index([status])
   @@index([type])
 }
@@ -125,6 +207,8 @@ model Project {
 // ============================================================
 model Memory {
   id             String   @id
+  workspaceId    String   @default("default")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id])
   type           String   // short | mid | long
   content        String
   summary        String
@@ -142,6 +226,7 @@ model Memory {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  @@index([workspaceId])
   @@index([type])
   @@index([frozen])
   @@index([projectId])
@@ -150,6 +235,8 @@ model Memory {
 // 记忆修订历史（知识变更日志 KCL 的载体）
 model MemoryRevision {
   id         String   @id @default(cuid())
+  workspaceId    String   @default("default")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id])
   memoryId   String
   memory     Memory   @relation(fields: [memoryId], references: [id], onDelete: Cascade)
   version    Int
@@ -159,6 +246,8 @@ model MemoryRevision {
   editedBy   String   // 操作者：用户邮箱/名，或 "system"
   reason     String?  // 变更原因（KCL）
   createdAt  DateTime @default(now())
+
+  @@index([workspaceId])
 }
 
 // ============================================================
@@ -166,6 +255,8 @@ model MemoryRevision {
 // ============================================================
 model Connector {
   id           String    @id
+  workspaceId  String    @default("default")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id])
   name         String
   iconEmoji    String
   description  String
@@ -176,25 +267,33 @@ model Connector {
   usedByAgents String    // JSON 数组
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  @@index([workspaceId])
 }
 
 // ============================================================
 // 技能
 // ============================================================
 model Skill {
-  id           String   @id
-  name         String
-  description  String
-  version      String   @default("v1.0.0")
-  category     String
-  source       String   @default("custom")
-  status       String   @default("active")
-  inputSchema  String
-  outputSchema String
-  usedByAgents String   // JSON 数组
-  scenarios    String   // JSON 数组
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String   @id
+  workspaceId     String   @default("default")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
+  name            String
+  description     String
+  version         String   @default("v1.0.0")
+  category        String
+  source          String   @default("custom")
+  status          String   @default("active")
+  inputSchema     String
+  outputSchema    String
+  usedByAgents    String   // JSON 数组
+  scenarios       String   // JSON 数组
+  // 自动化授权等级（AGENTS.md §4.7）：L1 全自动 / L2 建议执行留痕 / L3 需人工确认 / L4 绝对禁止自动
+  automationLevel String   @default("L2")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([workspaceId])
 }
 
 // ============================================================
@@ -202,6 +301,8 @@ model Skill {
 // ============================================================
 model HarnessProposal {
   id               String    @id
+  workspaceId      String    @default("default")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id])
   proposalId       String    @unique
   triggeredBy      String    @default("auto")
   problemStatement String
@@ -215,9 +316,11 @@ model HarnessProposal {
   estimatedImpact  String
   reviewedBy       String?
   reviewedAt       String?
+  previousSnapshot String?   // JSON：变更前关联 Agent 的任务边界与工具访问快照，用于一键回滚
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
+  @@index([workspaceId])
   @@index([status])
   @@index([createdAt])
 }
@@ -227,23 +330,29 @@ model HarnessProposal {
 // ============================================================
 model Conversation {
   id        String               @id
+  workspaceId   String            @default("default")
+  workspace     Workspace         @relation(fields: [workspaceId], references: [id])
   title     String
   projectId String?
   messages  ConversationMessage[]
   createdAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
 
+  @@index([workspaceId])
   @@index([createdAt])
 }
 
 model ConversationMessage {
   id             String       @id
+  workspaceId    String       @default("default")
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id])
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   role           String       // user | assistant
   content        String
   createdAt      DateTime     @default(now())
 
+  @@index([workspaceId])
   @@index([conversationId])
   @@index([createdAt])
 }
@@ -251,16 +360,28 @@ model ConversationMessage {
 // ============================================================
 // 审计日志（AGENTS.md 第四章 4.3 / 第五章：任何关键操作须可溯源）
 // —— 记录审批、删除、连接器授权、边界变更等高危/治理动作
+// —— workspaceId 用于多租户数据隔离
 // ============================================================
 model AuditLog {
-  id         String   @id @default(cuid())
-  actor      String   // 操作者：用户邮箱/名，或 "system"
-  action     String   // 动作标识：approve.proposal | delete.agent | connector.connect ...
-  targetType String   // agent | connector | memory | project | proposal | inquiry ...
-  targetId   String
-  detail     String?
-  riskLevel  String?  // low | mid | high
-  createdAt  DateTime @default(now())
+  id              String   @id @default(cuid())
+  workspaceId     String   @default("default")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
+  actor           String   // 操作者：用户邮箱/名，或 "system"
+  action          String   // 动作标识：approve.proposal | delete.agent | connector.connect ...
+  targetType      String   // agent | connector | memory | project | proposal | inquiry ...
+  targetId        String
+  detail          String?
+  riskLevel       String?  // low | medium | high
+  // --- AGENTS.md §1.2 数据主权 / §4.4 Level 2 评估 新增字段 ---
+  contextSnapshot Json?    // 执行时的关键上下文快照（供 §4.4 Level 2 评估使用）
+  automationLevel String?  // L1 | L2 | L3 | L4（§4.7 自动化授权等级）
+  triggeredBy     String   @default("user") // user | system | cron
+  status          String   @default("pending") // pending | success | failed（预记录模式）
+  createdAt       DateTime @default(now())
+
+  @@index([workspaceId])
+  @@index([status])
+  @@index([automationLevel])
 }
 
 // ============================================================
@@ -268,6 +389,8 @@ model AuditLog {
 // ============================================================
 model Inquiry {
   id          String   @id
+  workspaceId String   @default("default")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
   fromCountry String
   countryFlag String
   companyName String
@@ -277,6 +400,8 @@ model Inquiry {
   receivedAt  DateTime
   replied     Boolean  @default(false)
   createdAt   DateTime @default(now())
+
+  @@index([workspaceId])
 }
 
 // ============================================================
@@ -284,6 +409,8 @@ model Inquiry {
 // ============================================================
 model MarketIntelligence {
   id              String   @id
+  workspaceId     String   @default("default")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
   type            String   // currency | tariff | competitor | market | logistics
   title           String
   summary         String
@@ -293,6 +420,25 @@ model MarketIntelligence {
   suggestedAction String
   publishedAt     DateTime
   createdAt       DateTime @default(now())
+
+  @@index([workspaceId])
+}
+
+// ============================================================
+// 汇率监测（外贸首页汇率卡片数据源；由连接器/定时任务同步刷新）
+// ============================================================
+model ExchangeRate {
+  id          String   @id
+  workspaceId String   @default("default")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  pair        String   // 货币对，如 USD/CNY
+  value       Float    // 当前汇率
+  change24h   Float    @default(0) // 24h 变化百分比
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@unique([workspaceId, pair])
+  @@index([workspaceId])
 }
 
 // ============================================================
@@ -300,12 +446,16 @@ model MarketIntelligence {
 // ============================================================
 model Quotation {
   id          String   @id
+  workspaceId String   @default("default")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
   projectId   String
   version     Int      @default(1)
   totalAmount String   // 保留千分位字符串，与 types/trade.ts 一致
   currency    String
   status      String   @default("draft") // draft | sent | accepted | rejected
   createdAt   DateTime @default(now())
+
+  @@index([workspaceId])
 }
 
 // ============================================================
@@ -313,6 +463,8 @@ model Quotation {
 // ============================================================
 model EvolutionLog {
   id            String   @id @default(cuid())
+  workspaceId   String   @default("default")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id])
   triggeredBy   String   // auto | manual
   evaluatedAt   DateTime @default(now())
   triggered     Boolean  @default(false)
@@ -324,7 +476,12 @@ model EvolutionLog {
   proposalId    String?  // 触发时生成的提案 proposalId
   reason        String?  // 未触发时的说明
   reportMd      String?  // AI 生成的 Markdown 评估报告
+  reportId      String?  // 关联的 EvaluationReport.reportId
+  logSample     String?  // JSON 数组：本次评估的日志样本摘要
+  analysisDurationSeconds Float? // AI 分析耗时（秒）
   createdAt     DateTime @default(now())
+
+  @@index([workspaceId])
 }
 
 // ============================================================
@@ -332,20 +489,26 @@ model EvolutionLog {
 // ============================================================
 model ToolRegistry {
   id          String   @id @default(cuid())
+  workspaceId String   @default("default")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
   name        String   @unique
   description String
   category    String   // connector | skill | system ...
   scopes      String   // JSON 数组：权限范围
-  riskLevel   String   @default("low") // low | mid | high（high 须双审批）
+  riskLevel   String   @default("low") // low | medium | high（high 须双审批）
   enabled     Boolean  @default(true)
   grants      ToolGrant[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
 }
 
 // 工具授权（短期 Token，≤ 1 小时有效期）
 model ToolGrant {
   id          String       @id @default(cuid())
+  workspaceId String       @default("default")
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id])
   toolId      String
   tool        ToolRegistry @relation(fields: [toolId], references: [id], onDelete: Cascade)
   agentId     String       // 被授权的智能体
@@ -358,4 +521,116 @@ model ToolGrant {
   approvedBy1 String?
   approvedBy2 String?
   createdAt   DateTime     @default(now())
+
+  @@index([workspaceId])
+}
+
+// ============================================================
+// 工作流（DAG 编排）—— nodes/edges 以 JSON 字符串列存图（沿用 Agent.canDo 惯例）
+//
+// [未来外贸 Industry Pack 扩展建议]：
+//   1. 增加 category 字段 (String, 默认为 'custom')，用于标明是否为外贸专属 ('foreign-trade') 或其它行业包，替换模糊名称检索。
+//   2. 增加 templateId 字段 (String, 可空)，用以关联特定的行业模版 (如 'trade-inquiry-followup')，追踪衍生的工作流运行指标。
+// ============================================================
+model Workflow {
+  id          String        @id
+  workspaceId String        @default("default")
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id])
+  name        String
+  description String        @default("")
+  status      String        @default("active")   // active | archived
+  nodes       String                              // JSON: WorkflowNode[]
+  edges       String                              // JSON: WorkflowEdge[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  runs        WorkflowRun[]
+
+  @@index([workspaceId])
+  @@index([status])
+}
+
+// 一次工作流运行（整体状态机：pending → running → completed | failed）
+model WorkflowRun {
+  id          String            @id
+  workspaceId String            @default("default")
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id])
+  workflowId  String
+  workflow    Workflow          @relation(fields: [workflowId], references: [id])
+  status      String            @default("pending")   // pending | running | completed | failed
+  trigger     String            @default("manual")    // manual | auto | subworkflow
+  input       String            @default("{}")         // JSON: 运行入参
+  output      String?                                 // JSON: 终态输出汇总
+  error       String?                                 // 失败原因
+  parentRunId String?                                 // 子工作流回溯父运行
+  startedAt   DateTime          @default(now())
+  finishedAt  DateTime?
+  nodeRuns    WorkflowNodeRun[]
+
+  @@index([workspaceId])
+  @@index([workflowId])
+  @@index([status])
+}
+
+// 单节点运行记录（与 AuditLog/AgentLog 互补，承载结构化 IO）
+model WorkflowNodeRun {
+  id         String       @id
+  workspaceId String      @default("default")
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id])
+  runId      String
+  run        WorkflowRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  nodeId     String                                 // 对应 WorkflowNode.id
+  kind       String                                 // task | condition | subworkflow | noop
+  status     String       @default("pending")       // pending | running | completed | skipped | failed
+  output     String?                                // JSON: 节点输出
+  error      String?
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  @@index([workspaceId])
+  @@index([runId])
+  @@index([status])
+}
+
+// ============================================================
+// 任务（任务域实体：智能体待办 / 人工创建 / 询盘衍生）
+// —— 状态流：OPEN → IN_PROGRESS → DONE；任意状态可设为 CANCELLED（软删除）
+// —— source 标识创建来源：intelligence | manual | inquiry
+// ============================================================
+model Task {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id])
+  title         String
+  description   String?
+  status        String    @default("OPEN")              // OPEN | IN_PROGRESS | DONE | CANCELLED
+  priority      String    @default("MEDIUM")            // LOW | MEDIUM | HIGH | URGENT
+  source        String?                                 // intelligence | manual | inquiry
+  relatedType   String?                                 // source entity type
+  relatedId     String?                                 // source entity id
+  projectId     String?                                 // 关联项目空间
+  project       Project?  @relation(fields: [projectId], references: [id])
+  dueAt         DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, createdAt])
+  @@index([projectId])
+}
+
+// ============================================================
+// AI 报告（晨报 / 晚报 / 周报）
+// —— LLM 生成的内容快照，含生成时使用的数据快照 dataSnapshot
+// ============================================================
+model Report {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace @relation(fields: [workspaceId], references: [id])
+  type         String    @default("MORNING")  // MORNING | EVENING | WEEKLY
+  content      String                         // LLM 生成的 markdown 摘要
+  generatedAt  DateTime  @default(now())
+  dataSnapshot String                         // JSON：生成时使用的数据快照
+  createdAt    DateTime  @default(now())
+
+  @@index([workspaceId, generatedAt])
 }

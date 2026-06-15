@@ -1,22 +1,15 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from '@/lib/logger';
 import {
-  parseJsonField,
+  serializeMemory,
   successResponse,
   errorResponse,
 } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
-import { checkConfirmQuery, checkConfirmValue } from "@/lib/server/guardrail"
+import { checkConfirmValue, checkAutomationGate } from "@/lib/server/guardrail"
 import { shouldVersion, snapshotRevision } from "@/lib/server/memory-version"
 import { MemoryUpdateSchema, validateBody } from "@/lib/validators"
-
-/** 序列化 Memory，将 JSON 字符串字段反序列化 */
-function serializeMemory(memory: Record<string, unknown>) {
-  return {
-    ...memory,
-    tags: parseJsonField(memory.tags as string, []),
-  }
-}
+import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 /** GET /api/memory/[id] —— 获取单条记忆详情 */
 export async function GET(
@@ -128,24 +121,34 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+    const ctx = await buildWorkspaceContext(request)
+    requireWritable(ctx.role)
 
     const existing = await prisma.memory.findUnique({ where: { id } })
     if (!existing) {
       return errorResponse("记忆不存在", 404)
     }
 
-    const guard = await checkConfirmQuery(request, "删除记忆需二次确认")
-    if (!guard.ok) return guard.response
+    // 删除持久化数据 = 高危操作，永远需要人工审批（AGENTS.md §4.5）
+    // L3 门禁：需 ?confirm=true 二次确认；L4 硬拒绝
+    const gate = await checkAutomationGate({
+      automationLevel: "L3",
+      riskLevel: "high",
+      confirmed: new URL(request.url).searchParams.get("confirm") === "true",
+      actionName: `删除记忆：${existing.summary}`,
+    })
+    if (!gate.ok) return gate.response
 
     await prisma.memory.delete({ where: { id } })
 
     await writeAuditLog({
-      actor: guard.actor,
+      actor: gate.actor,
       action: "delete.memory",
       targetType: "memory",
       targetId: id,
       detail: `${existing.type} · ${existing.summary}`,
-      riskLevel: "mid",
+      riskLevel: "medium",
+      workspaceId: ctx.workspaceId,
     })
 
     return successResponse({ message: "记忆已删除" })

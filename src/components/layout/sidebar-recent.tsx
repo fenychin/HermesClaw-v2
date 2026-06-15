@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { memo, useState, useMemo, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -15,20 +15,10 @@ import {
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useTradeStore } from "@/stores/trade-store";
-import type { Inquiry } from "@/types";
-
-// ============================================================
-// 数据层（复刻 recent-panel 逻辑，保持一致性）
-// ============================================================
-
-type RecentType = "conversation" | "task" | "project";
-
-interface RecentRecord {
-  id: string;
-  type: RecentType;
-  title: string;
-  timestamp: string;
-}
+import { RelativeTime } from "@/components/common/relative-time";
+import { buildRecentRecords } from "@/lib/recent-utils";
+import { useRecentConversations } from "@/hooks/use-recent-conversations";
+import type { RecentType } from "@/hooks/use-recent-conversations";
 
 const TYPE_ICON: Record<RecentType, typeof MessageSquare> = {
   conversation: MessageSquare,
@@ -42,63 +32,6 @@ const TYPE_COLOR: Record<RecentType, string> = {
   project: "text-success",
 };
 
-function relativeTime(isoStr: string): string {
-  const now = Date.now();
-  const diffMs = now - new Date(isoStr).getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "刚刚";
-  if (diffMin < 60) return `${diffMin}分钟前`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}小时前`;
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay === 1) return "昨天";
-  if (diffDay < 7) return `${diffDay}天前`;
-  return new Date(isoStr).toLocaleDateString("zh-CN", {
-    month: "numeric",
-    day: "numeric",
-  });
-}
-
-/** 构建最近记录（在组件内 useMemo，使用 store 数据） */
-function buildRecentRecords(
-  storeProjects: { id: string; name: string; updatedAt: string }[],
-  inquiries: Inquiry[],
-): RecentRecord[] {
-  const conversations: RecentRecord[] = inquiries.slice(0, 4).map((inq) => ({
-    id: inq.id,
-    type: "conversation" as RecentType,
-    title: inq.companyName,
-    timestamp: inq.receivedAt,
-  }));
-
-  const projects: RecentRecord[] = storeProjects.slice(0, 2).map((proj) => ({
-    id: proj.id,
-    type: "project" as RecentType,
-    title: proj.name,
-    timestamp: proj.updatedAt,
-  }));
-
-  const now = new Date();
-  const tasks: RecentRecord[] = [
-    {
-      id: "task-recent-001",
-      type: "task",
-      title: "Sakura 样品质量整改",
-      timestamp: new Date(now.getTime() - 45 * 60000).toISOString(),
-    },
-    {
-      id: "task-recent-002",
-      type: "task",
-      title: "BrightPath 报价单修订",
-      timestamp: new Date(now.getTime() - 120 * 60000).toISOString(),
-    },
-  ];
-
-  return [...conversations, ...projects, ...tasks].sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-  );
-}
-
 // ============================================================
 // 组件
 // ============================================================
@@ -109,7 +42,7 @@ function buildRecentRecords(
  *    当前路由为 /recent 时自动展开
  *    侧边栏收起时自动折叠二级展开
  */
-export function SidebarRecent({
+export const SidebarRecent = memo(function SidebarRecent({
   collapsed = false,
 }: {
   collapsed?: boolean;
@@ -121,13 +54,32 @@ export function SidebarRecent({
   const storeProjects = useProjectStore((s) => s.projects);
   const inquiries = useTradeStore((s) => s.inquiries);
   const loadInquiries = useTradeStore((s) => s.loadInquiries);
+
+  // 从 API 获取真实对话列表（共享 hook：含自动刷新）
+  const { apiConversations } = useRecentConversations();
+
+  // 延迟加载询盘数据——避免阻塞首屏渲染与导航切换
+  const loadedRef = useRef(false);
   useEffect(() => {
-    loadInquiries();
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    const id = requestIdleCallback(
+      () => loadInquiries(),
+      { timeout: 2000 },
+    );
+    return () => cancelIdleCallback(id);
   }, [loadInquiries]);
-  const recentRecords = useMemo(
-    () => buildRecentRecords(storeProjects, inquiries),
-    [storeProjects, inquiries],
-  );
+
+  // 合并：API 真实对话 + 询盘派生 + 项目 + mock 任务
+  const recentRecords = useMemo(() => {
+    const baseRecords = buildRecentRecords(storeProjects, inquiries);
+    // API 真实对话优先于询盘伪对话（按标题去重）
+    const seen = new Set(apiConversations.map((c) => c.title));
+    const filtered = baseRecords.filter((r) => r.type !== "conversation" || !seen.has(r.title));
+    return [...apiConversations, ...filtered]
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 8);
+  }, [storeProjects, inquiries, apiConversations]);
 
   /** 收起态时强制折叠（派生状态，避免在 effect 中 setState） */
   const effectiveExpanded = collapsed ? false : expanded;
@@ -141,26 +93,33 @@ export function SidebarRecent({
           setExpanded(!effectiveExpanded);
         }}
         className={cn(
-          "w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-          "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground",
-          isActive && "bg-sidebar-accent text-sidebar-foreground",
-          collapsed && "justify-center px-2",
+          "w-full flex items-center gap-3 rounded-xl px-3 h-10 text-sm font-medium transition-all duration-150",
+          "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+          isActive && "bg-accent text-foreground",
+          collapsed && "justify-center px-0",
         )}
         title={collapsed ? "最近" : undefined}
       >
-        <Clock className="size-4 shrink-0" />
-        {!collapsed && (
-          <>
-            <span className="truncate flex-1 text-left">最近</span>
-            <motion.span
-              animate={{ rotate: effectiveExpanded ? 180 : 0 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="shrink-0"
-            >
-              <ChevronDown className="size-3.5" />
-            </motion.span>
-          </>
-        )}
+        <Clock className="size-[18px] shrink-0" />
+        <span
+          className={cn(
+            "truncate flex-1 text-left transition-all duration-150 ease-in-out inline-block",
+            collapsed ? "opacity-0 w-0" : "opacity-100 w-auto"
+          )}
+        >
+          最近
+        </span>
+        <motion.span
+          animate={{
+            rotate: effectiveExpanded ? 180 : 0,
+            opacity: collapsed ? 0 : 1,
+            width: collapsed ? 0 : "auto",
+          }}
+          transition={{ duration: 0.15, ease: "easeOut" }}
+          className="shrink-0 overflow-hidden"
+        >
+          <ChevronDown className="size-3.5" />
+        </motion.span>
       </button>
 
       {/* 展开区域（仅非折叠态可展开） */}
@@ -176,10 +135,16 @@ export function SidebarRecent({
             <div className="mt-1 ml-9 space-y-0.5 pr-2">
               {recentRecords.map((record) => {
                 const Icon = TYPE_ICON[record.type];
+                // 真实 API 对话 → 直接打开会话；询盘/其他 → /recent
+                const linkHref =
+                  record.type === "conversation" &&
+                  apiConversations.some((c) => c.id === record.id)
+                    ? `/new?load=${record.id}`
+                    : "/recent";
                 return (
                   <Link
                     key={record.id}
-                    href="/recent"
+                    href={linkHref}
                     className={cn(
                       "flex items-center gap-2 px-2 py-1.5 rounded-md",
                       "hover:bg-sidebar-accent transition-colors",
@@ -191,9 +156,10 @@ export function SidebarRecent({
                     <span className="text-sidebar-foreground text-xs truncate flex-1">
                       {record.title}
                     </span>
-                    <span className="text-hint text-[10px] shrink-0">
-                      {relativeTime(record.timestamp)}
-                    </span>
+                    <RelativeTime
+                      value={record.timestamp}
+                      className="text-hint text-[10px] shrink-0"
+                    />
                   </Link>
                 );
               })}
@@ -216,4 +182,4 @@ export function SidebarRecent({
       </AnimatePresence>
     </div>
   );
-}
+});

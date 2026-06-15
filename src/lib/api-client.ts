@@ -188,10 +188,27 @@ export const apiClient = {
   getConversation: (id: string) =>
     apiFetch<{ conversation: unknown }>(`/api/conversations/${id}`),
 
+  /** 更新对话：关联项目空间或重命名 */
+  updateConversation: (id: string, data: { projectId?: string | null; title?: string }) =>
+    apiFetch<{ conversation: unknown }>(`/api/conversations/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
   createConversation: (title: string, initialMessage?: string) =>
     apiFetch<{ conversation: { id: string } }>("/api/conversations", {
       method: "POST",
       body: JSON.stringify({ title, initialMessage }),
+    }),
+
+  /** 原子导入：对话 + 完整消息一次事务落库（用于本地 pending 队列回放） */
+  importConversation: (
+    title: string,
+    messages: Array<{ role: "user" | "assistant"; content: string }>,
+  ) =>
+    apiFetch<{ conversation: { id: string } }>("/api/conversations", {
+      method: "POST",
+      body: JSON.stringify({ title, messages }),
     }),
 
   addMessage: (
@@ -210,6 +227,24 @@ export const apiClient = {
   // ---- 技能 ----
   getSkills: () =>
     apiFetch<{ skills: unknown[] }>("/api/skills"),
+
+  createSkill: (data: {
+    name: string
+    description: string
+    category?: string
+    inputSchema?: string
+    outputSchema?: string
+    scenarios?: string
+  }) =>
+    apiFetch<{ skill: unknown }>("/api/skills", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  testSkill: (id: string, confirm = false) =>
+    apiFetch<{ success?: boolean; message?: string }>(`/api/skills/${id}/test${confirm ? '?confirm=true' : ''}`, {
+      method: "POST",
+    }),
 
   // ---- 连接器 ----
   getConnectors: () =>
@@ -232,8 +267,36 @@ export const apiClient = {
     apiFetch<{ quotations: unknown[] }>("/api/quotations"),
 
   // ---- 审计日志 ----
-  getAuditLogs: (limit = 100) =>
-    apiFetch<{ logs: unknown[] }>(`/api/audit?limit=${limit}`),
+  getAuditLogs: (
+    limitOrParams?:
+      | number
+      | {
+          page?: number
+          limit?: number
+          actor?: string
+          action?: string
+          status?: string
+          targetType?: string
+          riskLevel?: string
+          query?: string
+        },
+  ) => {
+    let queryStr = ""
+    if (typeof limitOrParams === "number") {
+      queryStr = `?limit=${limitOrParams}`
+    } else if (limitOrParams) {
+      const urlParams = new URLSearchParams()
+      Object.entries(limitOrParams).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) {
+          urlParams.set(k, String(v))
+        }
+      })
+      queryStr = `?${urlParams.toString()}`
+    }
+    return apiFetch<{ logs: unknown[]; total?: number; page?: number; limit?: number }>(
+      `/api/audit${queryStr}`,
+    )
+  },
 
   // ---- 工具注册表 ----
   getTools: () =>
@@ -248,6 +311,22 @@ export const apiClient = {
   // ---- Hermes 今日建议 ----
   getHermesSuggestions: () =>
     apiFetch<HermesSuggestionsResult>("/api/hermes/suggestions"),
+
+  // ---- 智慧大脑指标 ----
+  getBrainStats: () =>
+    apiFetch<{
+      hitRate: number;
+      hitRateTrend: number[];
+      tokensSaved: number;
+      knowledgeGaps: Array<{
+        id: string;
+        description: string;
+        missingType: "mid" | "long";
+        suggestedAction: string;
+        detectedAt: string;
+        resolved: boolean;
+      }>;
+    }>("/api/brain/stats"),
 
   // ---- Harness Spec 生成（P6 Spec-First）----
   generateHarnessSpec: (data: {
@@ -265,7 +344,26 @@ export const apiClient = {
       body: JSON.stringify(data),
     }),
 
+  // ---- 最近记录 ----
+  getRecent: (type = "all", industry?: string) => {
+    const params = new URLSearchParams({ type })
+    if (industry) params.set("industry", industry)
+    return apiFetch<{ records: RecentRecordItem[] }>(
+      `/api/recent?${params.toString()}`,
+    )
+  },
+
   // ---- AGENTS.md 规则文档 ----
   getAgentsMd: () =>
     apiFetch<{ content: string }>("/api/agents-md"),
+}
+
+/** 最近记录统合类型（与 /api/recent 返回一致） */
+export interface RecentRecordItem {
+  id: string
+  type: "conversation" | "task" | "project" | "file" | "upgrade"
+  title: string
+  timestamp: string
+  href: string
+  meta?: Record<string, unknown>
 }
