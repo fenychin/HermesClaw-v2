@@ -1,3 +1,5 @@
+⚠️ Security: Rotating credentials, do not use old tokens
+
 # HermesClaw-v2
 
 > 面向中小企业的 AI 数字员工基础平台 — Web 工作台
