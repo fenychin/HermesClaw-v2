@@ -12,7 +12,7 @@ import {
   errorResponse,
 } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
-import { ToolCreateSchema, validateBody } from "@/lib/validators"
+import { ToolCreateSchema, validateBody } from "@/lib/server/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 export const runtime = "nodejs"

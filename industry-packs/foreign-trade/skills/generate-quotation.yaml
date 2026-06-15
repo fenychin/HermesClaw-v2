@@ -1,0 +1,6 @@
+id: generate-quotation
+name: 自动生成报价单
+description: 根据采买意向与报价术语（FOB/CIF等），自动算数生成合规的贸易报价单。
+version: 1.0.0
+category: foreign-trade
+status: active

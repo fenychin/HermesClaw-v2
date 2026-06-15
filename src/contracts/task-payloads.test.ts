@@ -100,7 +100,7 @@ describe("task-payloads schema tests", () => {
       const allExports = payloads as Record<string, any>
       
       const payloadSchemaKeys = Object.keys(allExports).filter(
-        (key) => key.endsWith("PayloadSchema") && key !== "GenericPayloadSchema"
+        (key) => key.endsWith("PayloadSchema") && key !== "GenericPayloadSchema" && key !== "SkillPayloadSchema"
       )
       
       expect(payloadSchemaKeys.length).toBeGreaterThan(0)

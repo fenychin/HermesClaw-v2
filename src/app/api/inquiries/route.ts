@@ -3,15 +3,13 @@ import { logger } from '@/lib/logger'
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { buildWorkspaceContext, type WorkspaceContext } from "@/lib/workspace"
 import { withRBAC } from "@/lib/server/api-handler"
-import { validateBody, InquiryCreateSchema } from "@/lib/validators"
+import { validateBody, InquiryCreateSchema } from "@/lib/server/validators"
 import { actorFromSession } from "@/lib/server/audit"
 import { auditedWrite } from "@/lib/server/audited-write"
 import { ApiResponse } from "@/lib/server/api-response"
 import { countryCodeToFlag } from "@/lib/country-utils"
-import {
-  runWorkflow,
-  WorkflowNotFoundError,
-} from '@/lib/server/workflow/dag-runner'
+import { runWorkflow } from '@/lib/server/workflow/dag-runner'
+import { WorkflowNotFoundError } from '@/lib/server/exceptions'
 
 /** 序列化 Inquiry，将 DateTime 转为 ISO 字符串（匹配 types/trade.ts） */
 function serializeInquiry(inquiry: {
@@ -151,7 +149,7 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
               workspaceId: ctx.workspaceId,
             })
           }
-        } catch (wfError) {
+        } catch (wfError: unknown) {
           // 分类处理：WorkflowNotFoundError 为配置缺失，其余为运行时异常
           if (wfError instanceof WorkflowNotFoundError) {
             logger.warn("POST /api/inquiries: inquiry-grading 工作流未配置", {

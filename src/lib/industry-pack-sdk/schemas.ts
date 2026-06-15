@@ -151,6 +151,18 @@ export const PackAgentAssetSchema = z.object({
 })
 export type PackAgentAsset = z.infer<typeof PackAgentAssetSchema>
 
+// ─── Skill 岗位/动作定义 ──────────────────────────────────────────
+
+export const PackSkillAssetSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  version: z.string().default("1.0.0"),
+  category: z.string().default("foreign-trade"),
+  status: z.string().default("active"),
+})
+export type PackSkillAsset = z.infer<typeof PackSkillAssetSchema>
+
 // ─── 兼容旧 PackWorkflowAssetSchema 名称 ────────────────────────
 
 /**
@@ -158,3 +170,4 @@ export type PackAgentAsset = z.infer<typeof PackAgentAssetSchema>
  */
 export const PackWorkflowAssetSchema = WorkflowMetaSchema
 export type PackWorkflowAsset = WorkflowMeta
+

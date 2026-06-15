@@ -4,7 +4,8 @@ import { HERMES_SYSTEM_PROMPT } from "@/lib/system-prompts";
 import { writeAgentLog } from "@/lib/server/agent-log";
 import { getGovernanceClause } from "@/lib/server/agents-md";
 import { rateLimit } from "@/lib/rate-limit";
-import { ChatMessageSchema, validateBody } from "@/lib/validators";
+import { ChatMessageSchema, validateBody } from "@/lib/server/validators";
+import { loadIndustryPrompt } from "@/lib/industry-pack-sdk";
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace";
 import { selectModel } from "@/lib/server/model-router";
 import { openChatStream } from "@/lib/server/llm-provider";
@@ -49,7 +50,17 @@ export async function POST(req: NextRequest) {
 
     // 注入 AGENTS.md 治理条款（运行时加载，最高优先级）
     const governance = await getGovernanceClause();
-    const baseSystem = systemPrompt || HERMES_SYSTEM_PROMPT;
+    
+    // 从行业包动态加载提示词
+    const promptKey = (systemPrompt === "hermes" || !systemPrompt) ? "hermes" : systemPrompt;
+    const loadedPrompt = loadIndustryPrompt("foreign-trade", promptKey);
+    let baseSystem = "";
+    if (loadedPrompt) {
+      baseSystem = loadedPrompt;
+    } else {
+      // 降级：若读取失败且 systemPrompt 存在，则使用 systemPrompt；否则为空
+      baseSystem = systemPrompt || "";
+    }
     const fullSystem = baseSystem + governance;
 
     // 预估 token 数（粗略：约 4 字符 / token），供路由预算策略使用

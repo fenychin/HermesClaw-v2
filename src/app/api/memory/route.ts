@@ -6,7 +6,7 @@ import {
   errorResponse,
 } from "@/lib/api-utils"
 import { actorFromSession } from "@/lib/server/audit"
-import { MemoryCreateSchema, validateBody } from "@/lib/validators"
+import { MemoryCreateSchema, validateBody } from "@/lib/server/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 import { guardOutput } from "@/lib/server/output-guard"
 import { MemoryService } from "@/lib/server/memory-service"

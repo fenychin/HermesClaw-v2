@@ -6,7 +6,7 @@ import {
   errorResponse,
 } from "@/lib/api-utils"
 import { actorFromSession } from "@/lib/server/audit"
-import { AgentCreateSchema, validateBody } from "@/lib/validators"
+import { AgentCreateSchema, validateBody } from "@/lib/server/validators"
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
 import { serializeAgent } from "@/lib/server/agent-serializer"
 

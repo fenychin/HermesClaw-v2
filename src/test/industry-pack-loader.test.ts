@@ -5,14 +5,25 @@ import { loadIndustryManifest, getCachedManifest, mapLegacyManifest, loadIndustr
 vi.mock("fs", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>
   const mockFiles: Record<string, string> = {
+    "/mock-root/industry-packs/foreign-trade/manifest.yaml": `
+packId: foreign-trade
+id: foreign-trade
+name: 外贸行业包
+version: 1.0.0
+compatibleHermesApi: ">=0.12.0"
+compatibleRuntimeApi: ">=0.12.0"
+directory:
+  workflows: ["inquiry-followup", "inquiry-grade", "dev-letter", "customer-profile", "quote-gen", "sample-mgmt", "order-push", "exhibition-leads", "followup-remind"]
+  agents: ["agent-001", "agent-002"]
+`,
     "/mock-root/industry-packs/foreign-trade/manifest.json": JSON.stringify({
       packId: "foreign-trade",
       id: "foreign-trade",
       name: "外贸行业包",
       version: "1.0.0",
-      compatibleHermesApi: { min: "1.0.0", max: "2.0.0" },
+      compatibleHermesApi: { min: "0.12.0", max: "2.0.0" },
       directory: {
-        workflows: ["inquiry-grade", "dev-letter", "customer-profile", "quote-gen", "sample-mgmt", "order-push", "exhibition-leads", "followup-remind"],
+        workflows: ["inquiry-followup", "inquiry-grade", "dev-letter", "customer-profile", "quote-gen", "sample-mgmt", "order-push", "exhibition-leads", "followup-remind"],
         agents: ["agent-001", "agent-002"],
       },
     }),
@@ -145,7 +156,7 @@ describe("Industry Pack Loader", () => {
     expect(manifest.id).toBe("foreign-trade")
     expect(manifest.name).toBe("外贸行业包")
     expect(manifest.version).toBe("1.0.0")
-    expect(manifest.compatibleHermesApi).toEqual({ min: "1.0.0", max: "2.0.0" })
+    expect(manifest.compatibleHermesApi).toEqual({ min: "0.12.0", max: "2.0.0" })
   })
 
   it("当加载不存在的 pack 时抛出明确的未找到错误（而非 JSON.parse 错误）", () => {

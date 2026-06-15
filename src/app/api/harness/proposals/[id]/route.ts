@@ -9,8 +9,11 @@ import { createAuditEntry, updateAuditEntry } from "@/lib/server/audit"
 import { writeAgentLog } from "@/lib/server/agent-log"
 import { checkConfirmQuery, checkAutomationGate } from "@/lib/server/guardrail"
 import { resolveAutomationLevel } from "@/types"
-import { HarnessProposalUpdateSchema, validateBody } from "@/lib/validators"
+import { validateBody } from "@/lib/server/validators"
+import { HarnessProposalUpdateSchema } from "@/contracts"
 import { buildWorkspaceContext, requireHarnessAdmin } from "@/lib/workspace"
+import { withRBAC, type RouteContext } from "@/lib/server/api-handler"
+import type { WorkspaceContext } from "@/lib/workspace"
 
 import { HarnessProposalSchema } from '@/contracts'
 import type { HarnessProposal } from '@/types'
@@ -41,35 +44,34 @@ function serializeProposal(proposal: any): HarnessProposal {
   return parsed as HarnessProposal
 }
 
-/** GET /api/harness/proposals/[id] —— 获取提案详情 */
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const { id } = await params
-    const ctx = await buildWorkspaceContext(request)
+/** GET /api/harness/proposals/[id] —— 获取提案详情（RBAC: MEMBER 以上） */
+export const GET = withRBAC<RouteContext<{ id: string }>>(
+  async (request: Request, ctx: WorkspaceContext, routeCtx: RouteContext<{ id: string }>) => {
+    try {
+      const { id } = await routeCtx.params
 
-    const queryWhere = id.startsWith("HEP-")
-      ? { proposalId: id, workspaceId: ctx.workspaceId }
-      : { id, workspaceId: ctx.workspaceId }
+      const queryWhere = id.startsWith("HEP-")
+        ? { proposalId: id, workspaceId: ctx.workspaceId }
+        : { id, workspaceId: ctx.workspaceId }
 
-    const proposal = await prisma.harnessProposal.findFirst({
-      where: queryWhere,
-    })
+      const proposal = await prisma.harnessProposal.findFirst({
+        where: queryWhere,
+      })
 
-    if (!proposal) {
-      return errorResponse("提案不存在", 404)
+      if (!proposal) {
+        return errorResponse("提案不存在", 404)
+      }
+
+      return successResponse({
+        proposal: serializeProposal(proposal),
+      })
+    } catch (error) {
+      logger.error('GET /api/harness/proposals/[id]: 失败', { error: error instanceof Error ? error.message : '未知错误' })
+      return errorResponse("服务器内部错误")
     }
-
-    return successResponse({
-      proposal: serializeProposal(proposal),
-    })
-  } catch (error) {
-    logger.error('GET /api/harness/proposals/[id]: 失败', { error: error instanceof Error ? error.message : '未知错误' })
-    return errorResponse("服务器内部错误")
-  }
-}
+  },
+  'MEMBER'
+)
 
 /** PATCH /api/harness/proposals/[id] —— 审批操作（approve / reject） */
 export async function PATCH(

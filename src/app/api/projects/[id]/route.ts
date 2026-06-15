@@ -10,7 +10,7 @@ import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import { checkConfirmQuery } from "@/lib/server/guardrail"
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace"
 import { z } from "zod"
-import { validateBody } from "@/lib/validators"
+import { validateBody } from "@/lib/server/validators"
 
 /** PATCH /api/projects/[id] 请求体 schema（全部字段可选） */
 const ProjectPatchSchema = z.object({

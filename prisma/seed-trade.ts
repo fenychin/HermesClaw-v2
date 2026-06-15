@@ -13,7 +13,7 @@ import {
   mockIntelligence,
   mockQuotations,
   mockExchangeRates,
-} from '../src/lib/mock-data'
+} from '../src/lib/server/__mocks__/mock-data'
 
 const adapter = new PrismaBetterSqlite3({
   url: process.env['DATABASE_URL'] ?? 'file:./dev.db',

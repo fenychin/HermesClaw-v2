@@ -15,7 +15,7 @@ import { ApiResponse } from '@/lib/server/api-response'
 import { logger } from '@/lib/logger'
 import { rateLimit } from '@/lib/rate-limit'
 import { withRBAC, type RouteContext } from '@/lib/server/api-handler'
-import { validateBody, WorkflowRunSchema } from '@/lib/validators'
+import { validateBody, WorkflowRunSchema } from '@/lib/server/validators'
 import type { WorkspaceContext } from '@/lib/workspace'
 import { WorkflowSchedulerService } from '@/lib/server/workflow/scheduler'
 

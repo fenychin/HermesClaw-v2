@@ -11,6 +11,7 @@
 import { actorFromSession } from "@/lib/server/audit"
 import { resolveAutomationLevel } from "@/types"
 import type { RiskLevel, AutomationLevel } from "@/types"
+import type { TaskEnvelope } from "@/contracts/task-envelope"
 
 export interface GuardrailPass {
   ok: true
@@ -131,4 +132,85 @@ export async function checkAutomationGate(
   }
 
   return { ok: true, actor: await actorFromSession(), level }
+}
+
+const AUTOMATION_LEVEL_WEIGHT = {
+  L1: 1,
+  L2: 2,
+  L3: 3,
+  L4: 4,
+}
+
+/**
+ * 校验 TaskEnvelope 的自动化授权等级是否超出了 Workspace 允许的最高等级。
+ * 若超出，则写入审计日志并抛出 GuardrailViolationError。
+ */
+export async function validateTaskAutomationLevel(
+  envelope: TaskEnvelope,
+  actor = "system"
+): Promise<void> {
+  const { prisma } = await import("@/lib/prisma")
+  const { writeAuditLog } = await import("@/lib/server/audit")
+  const { GuardrailViolationError } = await import("./exceptions")
+  const crypto = await import("crypto")
+
+  const workspaceId = envelope.workspaceId || "default"
+  
+  const workspace = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    select: { automationLevel: true }
+  })
+
+  const maxAllowedLevel = (workspace?.automationLevel || "L2") as keyof typeof AUTOMATION_LEVEL_WEIGHT
+  const taskLevel = (envelope.automationLevel || "L2") as keyof typeof AUTOMATION_LEVEL_WEIGHT
+
+  const taskWeight = AUTOMATION_LEVEL_WEIGHT[taskLevel] || 2
+  const allowedWeight = AUTOMATION_LEVEL_WEIGHT[maxAllowedLevel] || 2
+
+  if (taskWeight > allowedWeight) {
+    const errorMsg = `安全护栏拦截：任务要求的自动化等级为 ${taskLevel}，已超出 Workspace 允许的最高等级 ${maxAllowedLevel}`
+    
+    // 写入 AuditLog
+    await writeAuditLog({
+      actor,
+      action: "guardrail.violation",
+      targetType: "task",
+      targetId: envelope.taskId,
+      detail: errorMsg,
+      riskLevel: "high",
+      workspaceId
+    })
+
+    // 写入增强字段的审计记录 (AGENTS.md)
+    try {
+      await prisma.auditLog.create({
+        data: {
+          id: crypto.randomUUID(),
+          actor,
+          action: "guardrail.violation",
+          targetType: "task",
+          targetId: envelope.taskId,
+          detail: errorMsg,
+          riskLevel: "high",
+          workspaceId,
+          contextSnapshot: {
+            taskAutomationLevel: taskLevel,
+            workspaceAutomationLevel: maxAllowedLevel,
+            taskId: envelope.taskId,
+            actionType: envelope.actionType,
+          },
+          automationLevel: taskLevel as any,
+          triggeredBy: "system",
+          status: "failed",
+        }
+      })
+    } catch {
+      // 吞错
+    }
+
+    throw new GuardrailViolationError(errorMsg, {
+      taskAutomationLevel: taskLevel,
+      workspaceAutomationLevel: maxAllowedLevel,
+    })
+  }
 }

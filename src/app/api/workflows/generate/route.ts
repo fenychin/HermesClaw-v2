@@ -12,7 +12,7 @@
 import { z } from "zod"
 import { generateWorkflow } from "@/lib/server/agents/workflow-generator"
 import { successResponse, errorResponse } from "@/lib/api-utils"
-import { validateBody } from "@/lib/validators"
+import { validateBody } from "@/lib/server/validators"
 import { rateLimit } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
 import { withRBAC } from "@/lib/server/api-handler"

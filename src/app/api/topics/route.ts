@@ -6,7 +6,7 @@ import { actorFromSession } from "@/lib/server/audit"
 import { auditedWrite } from "@/lib/server/audited-write"
 import { writeAgentLog } from "@/lib/server/agent-log"
 import { withRBAC } from "@/lib/server/api-handler"
-import { validateBody } from "@/lib/validators"
+import { validateBody } from "@/lib/server/validators"
 import { truncateTitle } from "@/lib/utils"
 import { z } from "zod"
 

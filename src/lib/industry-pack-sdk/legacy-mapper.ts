@@ -37,6 +37,24 @@ interface LegacyManifest {
   [key: string]: unknown
 }
 
+function parseVersionRange(val: unknown): unknown {
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    // 匹配 ">=0.12.0"
+    const matchGtEq = trimmed.match(/^>=([\d\.]+)$/);
+    if (matchGtEq) {
+      return { min: matchGtEq[1], max: "2.0.0" };
+    }
+    // 匹配 "^0.12.0" 或 "~0.12.0"
+    const matchHat = trimmed.match(/^[\^\~]([\d\.]+)$/);
+    if (matchHat) {
+      return { min: matchHat[1], max: "2.0.0" };
+    }
+    return { min: trimmed, max: "2.0.0" };
+  }
+  return val;
+}
+
 /**
  * 把旧版（或本仓库当前的简化版）manifest data 映射为符合
  * IndustryManifestSchema 的对象，供后续 zod 强校验。
@@ -67,12 +85,17 @@ export function mapLegacyManifest(val: unknown): Record<string, unknown> | unkno
     const updatedAt = obj.updatedAt || new Date().toISOString()
     const version_field = obj.version_field || obj.version || "1.0.0"
 
+    const compatibleHermesApi = parseVersionRange(obj.compatibleHermesApi)
+    const compatibleRuntimeApi = parseVersionRange(obj.compatibleRuntimeApi)
+
     return {
       ...obj,
       packId,
       id,
       industry,
       directories,
+      compatibleHermesApi,
+      compatibleRuntimeApi,
       createdAt,
       updatedAt,
       version_field,

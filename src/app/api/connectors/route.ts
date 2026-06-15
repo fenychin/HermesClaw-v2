@@ -7,7 +7,7 @@ import {
   errorResponse,
 } from "@/lib/api-utils"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
-import { ConnectorCreateSchema, validateBody } from "@/lib/validators"
+import { ConnectorCreateSchema, validateBody } from "@/lib/server/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 import type { Connector } from "@/types"
 

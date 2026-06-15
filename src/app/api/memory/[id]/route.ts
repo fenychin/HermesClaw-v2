@@ -8,7 +8,7 @@ import {
 import { actorFromSession } from "@/lib/server/audit"
 import { checkConfirmValue, checkAutomationGate } from "@/lib/server/guardrail"
 import { MemoryService } from "@/lib/server/memory-service"
-import { MemoryUpdateSchema, validateBody } from "@/lib/validators"
+import { MemoryUpdateSchema, validateBody } from "@/lib/server/validators"
 import { buildWorkspaceContext, requireWritable } from "@/lib/workspace"
 
 /** GET /api/memory/[id] —— 获取单条记忆详情 */

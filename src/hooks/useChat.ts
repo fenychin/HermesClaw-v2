@@ -10,7 +10,7 @@ import {
   getPendingCount,
   flushPendingConversations,
   getFlushFailures,
-} from "@/lib/pending-conversations";
+} from "@/lib/server/pending-conversations";
 
 /** 单条对话消息 */
 export interface Message {

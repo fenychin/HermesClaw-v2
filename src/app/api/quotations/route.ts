@@ -3,7 +3,7 @@ import { logger } from '@/lib/logger'
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { buildWorkspaceContext, type WorkspaceContext } from "@/lib/workspace"
 import { withRBAC } from "@/lib/server/api-handler"
-import { validateBody, QuotationCreateSchema } from "@/lib/validators"
+import { validateBody, QuotationCreateSchema } from "@/lib/server/validators"
 import { actorFromSession } from "@/lib/server/audit"
 import { auditedWrite } from "@/lib/server/audited-write"
 import { ApiResponse } from "@/lib/server/api-response"

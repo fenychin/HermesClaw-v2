@@ -84,7 +84,7 @@ export function mapAutomationToAuditRisk(level: AutomationLevel): AuditRiskLevel
 /**
  * 将 AutomationLevel 映射为 AgentLog riskLevel 字符串。
  */
-export function mapAutomationToLogRisk(level: AutomationLevel): string {
+export function mapAutomationToLogRisk(level: AutomationLevel): 'low' | 'medium' | 'high' {
   switch (level) {
     case 'L1':
     case 'L2':

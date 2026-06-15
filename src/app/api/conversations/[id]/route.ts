@@ -9,7 +9,7 @@ import { actorFromSession } from "@/lib/server/audit"
 import { auditedWrite } from "@/lib/server/audited-write"
 import { writeAgentLog } from "@/lib/server/agent-log"
 import { z } from "zod"
-import { validateBody } from "@/lib/validators"
+import { validateBody } from "@/lib/server/validators"
 
 /** PATCH /api/conversations/[id] 请求体 schema */
 const ConversationPatchSchema = z.object({
