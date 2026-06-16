@@ -1,0 +1,21 @@
+name: inquiry-grade
+version: "1.0.0"
+displayName: "询盘深度分析"
+description: 对外贸询盘进行多维度评分、客户画像与跟进策略生成
+agentRole: 询盘分拣员
+systemPromptRef: inquiry-analysis
+workflowRef: inquiry-grade
+inputSchema:
+  required: [inquiryText]
+  optional: [productCategory, clientCompany]
+outputContract:
+  - scoreCard       # 4维度加权评分表
+  - customerProfile # 客户画像速写
+  - replyDraft      # 第一封回复邮件框架（email-en 代码块）
+  - riskWarnings    # 风险提示
+evolution:
+  autoUpgrade: true
+  upgradeThreshold: 3  # 20次调用中3次评分<7时提交HEP
+  memoryLayer: mid     # 结果沉淀到中期记忆
+  citationRequired: true
+harnessTags: [上下文供给, 反馈闭环]

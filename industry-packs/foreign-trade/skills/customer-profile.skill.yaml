@@ -1,0 +1,21 @@
+name: customer-profile
+version: "1.0.0"
+displayName: "客户画像分析"
+description: 企业背景穿透分析、决策链识别、采购行为特征与合作风险评估
+agentRole: 客户画像分析师
+systemPromptRef: customer-profile
+workflowRef: customer-profile
+inputSchema:
+  required: [companyName]
+  optional: [knownInfo, region]
+outputContract:
+  - companyProfile    # 企业基本画像
+  - decisionChain     # 决策链分析
+  - purchaseBehavior  # 采购行为特征
+  - communicationStrategy # 推荐沟通策略
+  - riskAssessment    # 合作风险评估
+evolution:
+  autoUpgrade: true
+  upgradeThreshold: 3
+  memoryLayer: long   # 客户画像沉淀到长期记忆
+harnessTags: [上下文供给, 进化调度器]

@@ -48,6 +48,8 @@ export interface HarnessAnalysisInput {
   provider: LlmProvider
   /** 调用方经 selectModel() 决策后的 Model */
   model: string
+  /** 企业知识库快照（可选） */
+  memoryContext?: string
 }
 
 /** 六大核心组件枚举（AGENTS.md 第四章），约束 AI 的 targetComponent */
@@ -97,28 +99,48 @@ const PROPOSAL_SCHEMA = {
 
 const SYSTEM_PROMPT = `你是 HermesClaw-v2 的 Harness 自演化引擎，正在执行 AGENTS.md 第三章定义的 Level 2 全系统评估。
 
-你的任务：分析智能体最近的运行日志与指标，识别 Harness（驾驭层）的性能瓶颈，产出一份可供人工审批的升级提案（HEP）。
+## 🧠 知识库优先级规则（新增 - P0 必须遵守）
+1. 推理时必须**优先引用企业知识库（Memory）中的数据**，包括：
+   - 项目空间历史记录（ProjectLog）
+   - 智能体运行日志（AgentLog）
+   - 企业自定义记忆条目（Memory: short/mid/long-term）
+2. 知识库数据与 LLM 通用知识冲突时，以知识库数据为准，标注「已覆盖通用结论」
+3. 每条 evidence 必须标注数据来源：
+   - 【来源：AgentLog-{id}】
+   - 【来源：Memory-{id}】
+   - 【来源：通用推理】（仅无知识库数据时使用）
+
+## 你的任务
+分析智能体最近的运行日志与指标，识别 Harness（驾驭层）的性能瓶颈，产出一份可供人工审批的升级提案（HEP）。
 
 判断与措辞要求：
 - targetComponent 必须落在六大核心组件之一：任务边界 / 上下文供给 / 工具接入 / 反馈闭环 / 安全护栏 / 进化调度器。
-- evidence 必须引用具体日志或指标，禁止空泛套话。
+- evidence 必须引用具体日志或指标（含来源标注），禁止空泛套话。
 - 若日志为空（最近窗口无任何运行记录），按 AGENTS.md 第五章「无日志的执行属严重违规」给出反馈闭环 / 进化调度器方向的提案。
 - riskLevel 仅取 low / medium / high；涉及边界或安全护栏变更倾向 medium 或 high。
 - 所有文本字段用中文。
 - 这是一份升级建议，最终须经人工审批，不要假设会自动生效。`
 
 /** 构造用户提示词 */
-function buildUserPrompt({ logSummary, metrics }: Omit<HarnessAnalysisInput, "provider" | "model">): string {
+function buildUserPrompt({ 
+  logSummary, 
+  metrics,
+  memoryContext 
+}: Omit<HarnessAnalysisInput, "provider" | "model">): string {
+  const memorySection = memoryContext 
+    ? `\n企业知识库上下文（优先参考）：\n${memoryContext}\n`
+    : "\n企业知识库：本次评估未提供知识库上下文，请标注「通用推理」。\n"
+
   return `运行日志（最近 ${metrics.windowHours} 小时，最多前 20 条）：
 ${logSummary}
-
+${memorySection}
 指标快照：
 - 总任务数：${metrics.total}
 - 失败任务数：${metrics.errors}
 - 失败率：${(metrics.errorRate * 100).toFixed(1)}%
 - 成功率：${(metrics.successRate * 100).toFixed(1)}%
 
-请基于以上数据生成一份 Harness 升级提案。`
+请基于以上数据（优先使用知识库上下文）生成一份 Harness 升级提案。`
 }
 
 /** 归一化风险等级：兼容模型可能返回的 mid / 中 等旧写法 */

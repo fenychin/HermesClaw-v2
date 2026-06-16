@@ -15,6 +15,7 @@ import { prisma } from "@/lib/prisma"
 import { isErrorStatus } from "@/lib/server/harness-eval"
 import { parseJsonLoose } from "@/lib/server/harness-llm"
 import { selectModel } from "@/lib/server/model-router"
+import { getBrainStats } from "@/lib/server/brain"
 import {
   callAnthropicStructured,
   callDeepSeekJson,
@@ -64,33 +65,44 @@ const SUGGESTIONS_SCHEMA = {
 } as const
 
 const SYSTEM_PROMPT = `你是 HermesClaw-v2 的 Hermes 智能控制面，面向中小企业外贸行业的 AI 数字员工系统核心规划引擎。
-你的职责是在用户打开工作台时，主动基于系统实时状态给出今日最该做的工作建议（AI-First：你是第一工程主体，主动规划而非被动等待）。
+` + `你的职责是在用户打开工作台时，主动基于系统实时状态给出今日最该做的工作建议（AI-First：你是第一工程主体，主动规划而非被动等待）。
 
 要求：
-- 恰好输出 ${TARGET_COUNT} 条建议，按优先级从高到低排列。
+- 恰好输出 \${TARGET_COUNT} 条建议，按优先级从高到低排列。
 - 每条建议聚焦一个可立即推进的具体动作，避免空泛套话。
 - priority 取 high / mid / low；relatedTo 取 agents / projects / harness 之一，须与建议内容匹配。
-- title 一句话点题；action 是用户可直接执行的指令（会被填入输入框发给数字员工）。
+- title 一句话点题；action 必须包含用户可直接执行的具体指令（会被填入输入框发给数字员工）。
 - 当待审批提案 > 0 时，至少 1 条关联 harness；错误率偏高时优先关注 agents；有风险项目时关注 projects。
+- 当系统存在知识库缺口（待解决知识库缺口数量 > 0）时，至少 1 条建议指向「补充知识库」，其 action 指向运行补充该缺失知识的指令。
 - 全部用中文。`
 
 /** 读取系统实时状态快照 */
 async function collectSnapshot(): Promise<HermesSystemSnapshot> {
   const since = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000)
-  const [pendingProposals, logs, atRiskCount] = await Promise.all([
+  const [pendingProposals, logs, atRiskCount, brainStats] = await Promise.all([
     prisma.harnessProposal.count({ where: { status: "pending" } }),
     prisma.agentLog.findMany({
       where: { createdAt: { gte: since } },
       select: { status: true },
     }),
     prisma.project.count({ where: { status: "at-risk" } }),
+    getBrainStats("default").catch(() => null),
   ])
 
   const total = logs.length
   const errors = logs.filter((l) => isErrorStatus(l.status)).length
   const errorRate = total > 0 ? Math.round((errors / total) * 100) : 0
+  const knowledgeGapsCount = brainStats
+    ? brainStats.knowledgeGaps.filter((g) => !g.resolved).length
+    : 0
 
-  return { pendingProposals, errorRate, atRiskCount, logCount24h: total }
+  return {
+    pendingProposals,
+    errorRate,
+    atRiskCount,
+    logCount24h: total,
+    knowledgeGapsCount,
+  }
 }
 
 /** 构造用户提示词（含当前时间与系统状态） */
@@ -102,7 +114,8 @@ function buildUserPrompt(snapshot: HermesSystemSnapshot): string {
 系统状态：
 - 待审批 Harness 提案：${snapshot.pendingProposals} 条
 - 24 小时内智能体错误率：${snapshot.errorRate}%（共 ${snapshot.logCount24h} 条运行日志）
-- 风险中项目数量：${snapshot.atRiskCount} 个`
+- 风险中项目数量：${snapshot.atRiskCount} 个
+- 待解决知识库缺口（盲区）数量：${snapshot.knowledgeGapsCount ?? 0} 个`
 }
 
 /** 归一化优先级 */
@@ -184,6 +197,14 @@ function fallbackSuggestions(snapshot: HermesSystemSnapshot): HermesSuggestion[]
       title: "关注风险项目",
       action: `当前有 ${snapshot.atRiskCount} 个项目处于风险状态，建议立即评估`,
       relatedTo: "projects",
+    };
+  }
+  if (snapshot.knowledgeGapsCount && snapshot.knowledgeGapsCount > 0) {
+    suggestions[2] = {
+      priority: "mid",
+      title: "补充企业知识库盲区",
+      action: "帮我列出当前未解决的知识库盲区，并建议具体的知识导入指令",
+      relatedTo: "harness",
     };
   }
 

@@ -42,6 +42,12 @@ directory:
   skills:
     - write-development-letter
     - generate-quotation
+    - inquiry-grade
+    - dev-letter
+    - quote-gen
+    - customer-profile
+    - project-space
+    - agent-dispatch
   connectors:
     - email
     - crm

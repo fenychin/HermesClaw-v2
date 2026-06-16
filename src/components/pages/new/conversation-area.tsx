@@ -12,12 +12,43 @@ import {
   Loader2,
   CheckCircle2,
   ArrowUpRight,
+  Pencil,
+  Copy,
+  Check,
 } from "lucide-react";
 import type { Message } from "@/hooks/useChat";
 import { MarkdownRenderer } from "@/components/common/markdown-renderer";
 import { ReasoningTracePanel } from "@/components/reasoning-trace-panel";
 import { apiClient } from "@/lib/api-client";
 import { toast } from "sonner";
+
+function CopyButton({ content }: { content: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("复制失败");
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer transition-colors"
+      title="复制消息"
+    >
+      {copied ? (
+        <Check className="size-3 text-green-500" />
+      ) : (
+        <Copy className="size-3" />
+      )}
+    </button>
+  );
+}
 
 interface ConversationAreaProps {
   /** 完整对话消息列表 */
@@ -32,6 +63,8 @@ interface ConversationAreaProps {
   conversationId: string | null;
   /** 清空对话回调 */
   onClearMessages: () => void;
+  /** 编辑消息回调（可选） */
+  onEditMessage?: (content: string) => void;
 }
 
 /**
@@ -46,6 +79,7 @@ export function ConversationArea({
   currentTrace,
   conversationId,
   onClearMessages,
+  onEditMessage,
 }: ConversationAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -205,9 +239,23 @@ export function ConversationArea({
                 className={cn("flex", isUser ? "justify-end" : "justify-start")}
               >
                 {isUser ? (
-                  // 用户消息：右对齐灰色气泡
-                  <div className="max-w-[85%] rounded-2xl bg-accent px-4 py-2.5 text-sm leading-relaxed text-foreground break-words whitespace-pre-wrap">
-                    {msg.content || "…"}
+                  // 用户消息：右对齐灰色气泡 + 左侧 hover 操作键
+                  <div className="flex items-start gap-2 max-w-[85%] group">
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity mt-1 shrink-0">
+                      {onEditMessage && (
+                        <button
+                          onClick={() => onEditMessage(msg.content)}
+                          className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer transition-colors"
+                          title="编辑消息"
+                        >
+                          <Pencil className="size-3" />
+                        </button>
+                      )}
+                      <CopyButton content={msg.content} />
+                    </div>
+                    <div className="rounded-2xl bg-accent px-4 py-2.5 text-sm leading-relaxed text-foreground break-words whitespace-pre-wrap">
+                      {msg.content || "…"}
+                    </div>
                   </div>
                 ) : (
                   // AI 消息：全宽、无边框、纯 Markdown

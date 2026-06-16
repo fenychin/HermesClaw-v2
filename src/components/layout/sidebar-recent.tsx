@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useMemo, useEffect, useRef } from "react";
+import { memo, useState, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,10 +13,7 @@ import {
   FolderKanban,
   ArrowRight,
 } from "lucide-react";
-import { useProjectStore } from "@/stores/project-store";
-import { useTradeStore } from "@/stores/trade-store";
 import { RelativeTime } from "@/components/common/relative-time";
-import { buildRecentRecords } from "@/lib/recent-utils";
 import { useRecentConversations } from "@/hooks/use-recent-conversations";
 import type { RecentType } from "@/hooks/use-recent-conversations";
 
@@ -51,35 +48,15 @@ export const SidebarRecent = memo(function SidebarRecent({
   const isActive = pathname === "/recent" || pathname.startsWith("/recent/");
   const [expanded, setExpanded] = useState(isActive);
 
-  const storeProjects = useProjectStore((s) => s.projects);
-  const inquiries = useTradeStore((s) => s.inquiries);
-  const loadInquiries = useTradeStore((s) => s.loadInquiries);
-
   // 从 API 获取真实对话列表（共享 hook：含自动刷新）
   const { apiConversations } = useRecentConversations();
 
-  // 延迟加载询盘数据——避免阻塞首屏渲染与导航切换
-  const loadedRef = useRef(false);
-  useEffect(() => {
-    if (loadedRef.current) return;
-    loadedRef.current = true;
-    const id = requestIdleCallback(
-      () => loadInquiries(),
-      { timeout: 2000 },
-    );
-    return () => cancelIdleCallback(id);
-  }, [loadInquiries]);
-
-  // 合并：API 真实对话 + 询盘派生 + 项目 + mock 任务
+  // 仅取 API 真实最近对话并按更新时间排序展示（与右下角最近对话保持一致）
   const recentRecords = useMemo(() => {
-    const baseRecords = buildRecentRecords(storeProjects, inquiries);
-    // API 真实对话优先于询盘伪对话（按标题去重）
-    const seen = new Set(apiConversations.map((c) => c.title));
-    const filtered = baseRecords.filter((r) => r.type !== "conversation" || !seen.has(r.title));
-    return [...apiConversations, ...filtered]
+    return [...apiConversations]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 8);
-  }, [storeProjects, inquiries, apiConversations]);
+  }, [apiConversations]);
 
   /** 收起态时强制折叠（派生状态，避免在 effect 中 setState） */
   const effectiveExpanded = collapsed ? false : expanded;
@@ -135,12 +112,7 @@ export const SidebarRecent = memo(function SidebarRecent({
             <div className="mt-1 ml-9 space-y-0.5 pr-2">
               {recentRecords.map((record) => {
                 const Icon = TYPE_ICON[record.type];
-                // 真实 API 对话 → 直接打开会话；询盘/其他 → /recent
-                const linkHref =
-                  record.type === "conversation" &&
-                  apiConversations.some((c) => c.id === record.id)
-                    ? `/new?load=${record.id}`
-                    : "/recent";
+                const linkHref = `/new?load=${record.id}`;
                 return (
                   <Link
                     key={record.id}

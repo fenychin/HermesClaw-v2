@@ -2,6 +2,8 @@
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useState } from "react";
+import { Check, Copy } from "lucide-react";
 
 /**
  * AI 消息 Markdown 渲染实现（react-markdown + remark-gfm）
@@ -73,12 +75,12 @@ export default function MarkdownRendererImpl({ content }: { content: string }) {
 
         // ===== 列表 =====
         ul: ({ children }) => (
-          <ul className="list-disc pl-5 my-1.5 space-y-0.5 text-sm">
+          <ul className="list-disc list-inside pl-2 my-1.5 space-y-0.5 text-sm">
             {children}
           </ul>
         ),
         ol: ({ children }) => (
-          <ol className="list-decimal pl-5 my-1.5 space-y-0.5 text-sm">
+          <ol className="list-decimal list-inside pl-2 my-1.5 space-y-0.5 text-sm">
             {children}
           </ol>
         ),
@@ -96,13 +98,15 @@ export default function MarkdownRendererImpl({ content }: { content: string }) {
         // ===== 分隔线 =====
         hr: () => <hr className="my-3 border-border" />,
 
-        // ===== 代码块（带语言标签栏）=====
+        // ===== 代码块（带语言标签栏与复制功能）=====
         code: ({
           className,
           children,
           ...props
         }: React.ComponentPropsWithoutRef<"code">) => {
           const isInline = !className;
+          const [copied, setCopied] = useState(false);
+
           if (isInline) {
             return (
               <code
@@ -114,18 +118,47 @@ export default function MarkdownRendererImpl({ content }: { content: string }) {
             );
           }
           const lang = extractLang(className);
+          const rawCode = String(children ?? "").trim();
+
+          const handleCopy = async () => {
+            try {
+              await navigator.clipboard.writeText(rawCode);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            } catch (err) {
+              console.error("Failed to copy code: ", err);
+            }
+          };
+
           return (
             <div className="my-2 rounded-lg border border-border overflow-hidden">
-              {/* 顶部栏：语言标签 */}
+              {/* 顶部栏：语言标签与复制按钮 */}
               <div className="flex items-center justify-between bg-sidebar px-3 py-1.5 border-b border-border">
                 <span className="text-[11px] text-hint font-mono">
                   {lang || "code"}
                 </span>
+                <button
+                  onClick={handleCopy}
+                  className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  title="Copy to clipboard"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-green-500" />
+                      <span className="text-green-500">已复制</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      <span>复制</span>
+                    </>
+                  )}
+                </button>
               </div>
-              {/* 代码内容 */}
-              <pre className="bg-background overflow-x-auto">
+              {/* 代码内容：添加自动换行 */}
+              <pre className="bg-background overflow-x-auto whitespace-pre-wrap break-words">
                 <code
-                  className="block text-xs leading-relaxed px-3 py-2.5 font-mono text-foreground/85"
+                  className="block text-xs leading-relaxed px-3 py-2.5 font-mono text-foreground/85 whitespace-pre-wrap break-words"
                   {...props}
                 >
                   {children}

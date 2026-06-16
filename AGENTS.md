@@ -160,6 +160,7 @@ Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私
 - **健康度统计**：基于 Capability Registry 的各能力 24h 调用监控，对包整体状态执行聚合计数。
 - **数据模型**：`IndustryPackInstallation`（Prisma Schema）。
 - **审计动作**：支持 `pack.install.started` / `pack.installed` / `pack.install.failed` / `pack.uninstalled` 等审计留痕。
+- **技能 YAML 契约（2026-06-16 v3.16.00-dev）**：配套定义了 `inquiry-grade`、`dev-letter`、`quote-gen`、`customer-profile`、`project-space` 和 `agent-dispatch` 6 套标准的技能定义资产，通过外贸行业包 `manifest.yaml` 进行静态绑定，用于后端的自演化升级与记忆沉淀。
 
 ### 3.3 必备字段（最小集）
 

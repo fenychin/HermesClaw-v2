@@ -1,0 +1,35 @@
+# 结果优先交付技能 v1.0 — 高复用核心技能
+
+name: result-first-delivery
+version: "1.0.0"
+description: |
+  强制所有 Agent 遵循「先给结果，后给理由」的交付协议。
+  自动注入双语邮件格式规范和知识库优先级规则。
+  可被任意 Agent 继承，实现跨 Agent 标准化输出。
+
+triggers:
+  - type: message_contains
+    keywords: ["邮件", "开发信", "报价", "回复", "草稿", "模板", "letter", "email", "quote"]
+  - type: task_type
+    values: ["compose", "draft", "generate", "reply"]
+
+pre_inject_system_rules: |
+  ## 🔴 结果优先强制规则（由 result-first-delivery.skill 注入）
+  1. 必须先输出可直接使用的内容，后给分析
+  2. 所有邮件/书信必须以双语代码块输出（必须包裹在 \`\`\`email-cn 与 \`\`\`email-en 代码块内，严禁直接展示纯文本）
+  3. 每条结论标注知识库来源：【来源：知识库】或【来源：通用推理】
+  4. 末尾输出【Harness 进化日志】：触发规则 + 知识库命中 + 沉淀建议
+
+evolution:
+  auto_upgrade: true
+  upgrade_trigger: |
+    当本技能在 20 次调用中出现 3 次以上用户反馈「内容不够具体」或评分 < 7 时，
+    自动提交 Harness 升级提案（HEP），建议强化对应 Agent 的提示词。
+  version_bump: patch  # 自动升级时递增 patch 版本
+  audit_required: true  # 任何版本升级须经人工审批
+
+memory_integration:
+  priority: knowledge_base_first
+  fallback: llm_general
+  conflict_resolution: knowledge_base_wins
+  citation_required: true

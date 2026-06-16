@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma"
 import { analyzeHarnessLogs } from "@/lib/server/harness-llm"
 import type { HarnessAnalysis } from "@/lib/server/harness-llm"
 import { selectModel } from "@/lib/server/model-router"
+import { getBrainStats } from "@/lib/server/brain"
 import { automationLevelFromRisk } from "@/types"
 import type {
   HarnessEvaluateResult,
@@ -194,6 +195,18 @@ export async function runHarnessEvaluation(
   })
 
   // --- 6. 调用 AI 分析 ---
+  let memoryContext: string | undefined = undefined
+  try {
+    const stats = await getBrainStats(workspaceId)
+    memoryContext = `智慧大脑记忆状态快照：
+- 记忆检索命中率：${(stats.hitRate * 100).toFixed(1)}%
+- 节省 Token 数：${stats.tokensSaved}
+- 发现的知识缺口（盲区）：
+${stats.knowledgeGaps.map(g => `  * [${g.resolved ? "已解决" : "待补充"}] ${g.description} (建议: ${g.suggestedAction})`).join("\n")}`
+  } catch (err) {
+    memoryContext = "获取知识库快照失败，请基于通用推理执行。"
+  }
+
   let analysis: HarnessAnalysis
   try {
     analysis = await analyze({
@@ -201,6 +214,7 @@ export async function runHarnessEvaluation(
       metrics,
       provider: routing.provider,
       model: routing.model,
+      memoryContext,
     })
   } catch (error) {
     const reason = `AI 分析失败：${error instanceof Error ? error.message : "未知错误"}`

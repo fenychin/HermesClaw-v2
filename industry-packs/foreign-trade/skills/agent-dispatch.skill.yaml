@@ -1,0 +1,14 @@
+name: agent-dispatch
+version: "1.0.0"
+displayName: "调用智能体"
+description: 多智能体协同编排任务，支持 @mention 路由
+agentRole: null  # 由 targetAgent 字段动态决定
+systemPromptRef: hermes
+workflowRef: call-agent
+inputSchema:
+  required: [targetAgent, taskPrompt]
+  optional: [outputFormat]
+outputContract:
+  - taskResult        # 任务执行结果（结果优先输出）
+  - executionRationale # 执行依据
+harnessTags: [工具接入, 反馈闭环]

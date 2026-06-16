@@ -25,6 +25,7 @@ const QUICK_CARDS: ReadonlyArray<{
   color: string;
   prompt: string;
   systemPrompt?: string;
+  workflowEnabled: boolean;
 }> = [
   {
     key: "analyze-inquiry",
@@ -33,6 +34,7 @@ const QUICK_CARDS: ReadonlyArray<{
     color: "text-brand-blue",
     prompt: "请帮我分析以下询盘，判断客户意向和优先级：\n",
     systemPrompt: TRADE_AGENT_PROMPTS.inquiryAnalysis,
+    workflowEnabled: true,
   },
   {
     key: "cold-email",
@@ -41,6 +43,7 @@ const QUICK_CARDS: ReadonlyArray<{
     color: "text-primary",
     prompt: "请帮我为以下客户生成一封专业的英文开发信，客户信息：\n",
     systemPrompt: TRADE_AGENT_PROMPTS.developmentLetter,
+    workflowEnabled: true,
   },
   {
     key: "quotation",
@@ -49,6 +52,7 @@ const QUICK_CARDS: ReadonlyArray<{
     color: "text-success",
     prompt: "请帮我制定以下产品的报价策略：\n",
     systemPrompt: TRADE_AGENT_PROMPTS.quotation,
+    workflowEnabled: true,
   },
   {
     key: "client-profile",
@@ -57,6 +61,7 @@ const QUICK_CARDS: ReadonlyArray<{
     color: "text-warning",
     prompt: "请帮我分析以下客户的背景、采购习惯和决策链：\n",
     systemPrompt: TRADE_AGENT_PROMPTS.customerProfile,
+    workflowEnabled: true,
   },
   {
     key: "create-project",
@@ -64,6 +69,7 @@ const QUICK_CARDS: ReadonlyArray<{
     label: "创建项目空间",
     color: "text-primary",
     prompt: "请帮我为新客户或订单建立一个独立工作空间：",
+    workflowEnabled: true,
   },
   {
     key: "call-agent",
@@ -71,6 +77,7 @@ const QUICK_CARDS: ReadonlyArray<{
     label: "调用智能体",
     color: "text-brand-blue",
     prompt: "我想调用数字员工执行以下任务：",
+    workflowEnabled: true,
   },
 ];
 
@@ -83,6 +90,7 @@ interface QuickCardsProps {
    * 由父组件填入 CommandBox 并在发送时一并提交。
    */
   onSelect?: (prompt: string, systemPrompt?: string) => void;
+  onWorkflowSelect?: (cardKey: string) => void;  // 新增
 }
 
 /**
@@ -90,9 +98,13 @@ interface QuickCardsProps {
  * —— 双排 3×2 紧凑网格布局，hover 微提亮。
  *    点击后将预设 prompt 填入输入框并聚焦；外贸专项卡片附带专属角色 prompt。
  */
-export function QuickCards({ onSelect }: QuickCardsProps) {
-  const handleClick = (prompt: string, systemPrompt?: string) => {
-    onSelect?.(prompt, systemPrompt);
+export function QuickCards({ onSelect, onWorkflowSelect }: QuickCardsProps) {
+  const handleClick = (key: string, prompt: string, systemPrompt?: string) => {
+    if (onWorkflowSelect) {
+      onWorkflowSelect(key);
+    } else {
+      onSelect?.(prompt, systemPrompt);
+    }
   };
 
   return (
@@ -108,7 +120,7 @@ export function QuickCards({ onSelect }: QuickCardsProps) {
             delay: 0.1 + i * STAGGER_DELAY,
             ease: "easeOut",
           }}
-          onClick={() => handleClick(card.prompt, card.systemPrompt)}
+          onClick={() => handleClick(card.key, card.prompt, card.systemPrompt)}
           className={cn(
             "flex flex-row items-center gap-2 px-3 py-2.5 rounded-xl",
             "bg-card border border-border",

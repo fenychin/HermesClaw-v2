@@ -1,0 +1,19 @@
+name: project-space
+version: "1.0.0"
+displayName: "创建项目空间"
+description: 为客户订单建立独立工作空间，生成任务清单与里程碑节点
+agentRole: Hermes 规划助手
+systemPromptRef: hermes
+workflowRef: create-project
+inputSchema:
+  required: [projectName]
+  optional: [associatedClient, projectType, keyFocus]
+outputContract:
+  - spaceStructure    # 项目空间结构建议
+  - taskList          # 初始任务清单（5-8个）
+  - milestones        # 关键时间节点
+  - agentConfig       # 推荐数字员工配置
+evolution:
+  autoUpgrade: false  # 项目空间类不自动升级，需人工审批
+  memoryLayer: short
+harnessTags: [任务边界, 工具接入]

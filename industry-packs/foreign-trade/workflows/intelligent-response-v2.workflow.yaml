@@ -1,0 +1,80 @@
+# 智能响应自进化工作流 v2.0
+
+name: intelligent-response-v2
+version: "2.0.0"
+description: |
+  整合知识库检索 + Agent 团队协作 + 结果优先交付的核心工作流。
+  支持自我进化：根据用户反馈自动调整 Agent 提示词权重。
+
+nodes:
+  - id: knowledge-retrieval
+    kind: task
+    name: "知识库优先检索"
+    config:
+      automationLevel: L1
+      handler: "knowledge-retrieval-handler"
+      description: |
+        从企业知识库（Memory + ProjectLog + AgentLog）检索与当前任务相关的上下文。
+        输出：relevantMemories（数组）+ knowledgeGaps（缺口列表）
+      output: ctx.variables.knowledgeContext
+
+  - id: intent-parse
+    kind: task
+    name: "意图解析"
+    config:
+      automationLevel: L1
+      handler: "intent-parser"
+      input: ctx.variables.knowledgeContext
+      description: "解析用户意图，判断任务类型：email/analysis/quote/plan/other"
+      output: ctx.variables.intentType
+
+  - id: agent-dispatch
+    kind: condition
+    name: "Agent 团队分发"
+    config:
+      expression: "ctx.variables.intentType"
+      branches:
+        email: [compose-agent]
+        analysis: [analysis-agent]
+        quote: [quote-agent]
+        plan: [plan-agent]
+        other: [hermes-general]
+
+  - id: compose-agent
+    kind: task
+    name: "开发信/邮件写作"
+    config:
+      automationLevel: L2
+      promptFile: "industry-packs/foreign-trade/prompts/development-letter.md"
+      injectSkills: ["result-first-delivery"]
+      input:
+        knowledgeContext: ctx.variables.knowledgeContext
+        userRequest: ctx.variables.userMessage
+
+  - id: result-delivery
+    kind: task
+    name: "结果交付（双语代码块）"
+    config:
+      automationLevel: L2
+      enforceFormat: bilingual-codeblock
+      validateOutput:
+        required: ["email-cn block", "email-en block", "Harness 进化日志"]
+
+  - id: harness-evolution-log
+    kind: task
+    name: "Harness 自进化记录"
+    config:
+      automationLevel: L1
+      handler: "harness-snapshot-writer"
+      description: |
+        将本次执行的规则命中情况、知识库命中情况、用户满意度（如有）
+        写入 HarnessProposal 评估池，供下次 Level 2 评估使用。
+
+  - id: memory-consolidation
+    kind: task
+    name: "记忆沉淀"
+    config:
+      automationLevel: L2
+      handler: "memory-consolidation-handler"
+      description: "将本次新增的外贸业务知识按短/中/长期分层写入记忆库"
+      needsApproval: false  # L2 自动执行，无需审批

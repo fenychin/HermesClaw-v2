@@ -30,6 +30,7 @@ export async function generateProposal(evaluationReport: EvaluationReport): Prom
   try {
     const { selectModel } = await import("./model-router")
     const { analyzeHarnessLogs } = await import("./harness-llm")
+    const { getBrainStats } = await import("./brain")
 
     const routing = await selectModel({
       workspaceId,
@@ -37,6 +38,18 @@ export async function generateProposal(evaluationReport: EvaluationReport): Prom
       taskType: "workflow",
       estimatedTokens: 1000,
     })
+
+    let memoryContext: string | undefined = undefined
+    try {
+      const stats = await getBrainStats(workspaceId)
+      memoryContext = `智慧大脑记忆状态快照：
+- 记忆检索命中率：${(stats.hitRate * 100).toFixed(1)}%
+- 节省 Token 数：${stats.tokensSaved}
+- 发现的知识缺口（盲区）：
+${stats.knowledgeGaps.map(g => `  * [${g.resolved ? "已解决" : "待补充"}] ${g.description} (建议: ${g.suggestedAction})`).join("\n")}`
+    } catch (err) {
+      memoryContext = "获取知识库快照失败，请基于通用推理执行。"
+    }
 
     const analysis = await analyzeHarnessLogs({
       logSummary,
@@ -50,6 +63,7 @@ export async function generateProposal(evaluationReport: EvaluationReport): Prom
       },
       provider: routing.provider,
       model: routing.model,
+      memoryContext,
     })
 
     if (analysis && analysis.draft) {

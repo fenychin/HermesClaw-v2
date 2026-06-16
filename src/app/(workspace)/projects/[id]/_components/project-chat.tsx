@@ -105,6 +105,7 @@ function ProjectChatInner() {
               currentTrace={currentTrace}
               conversationId={conversationId}
               onClearMessages={clearMessages}
+              onEditMessage={setInput}
             />
           </div>
         </div>

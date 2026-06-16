@@ -1,0 +1,21 @@
+name: dev-letter
+version: "1.0.0"
+displayName: "开发信生成"
+description: 生成高转化率的个性化外贸开发信，强制双语代码块输出
+agentRole: 开发信写作专家
+systemPromptRef: development-letter
+workflowRef: dev-letter
+inputSchema:
+  required: [clientBackground, sellingPoints, language, tone]
+outputContract:
+  - subjectOptions  # 3个主题行选项（标注推荐度）
+  - emailCn         # 中文版（email-cn 代码块）
+  - emailEn         # 英文版（email-en 代码块）
+  - writingRationale # 写作依据与知识库来源
+  - followUpFrame   # 跟进邮件框架
+evolution:
+  autoUpgrade: true
+  upgradeThreshold: 3
+  memoryLayer: long  # 成功开发信模板沉淀到长期记忆
+  citationRequired: true
+harnessTags: [上下文供给, 工具接入]

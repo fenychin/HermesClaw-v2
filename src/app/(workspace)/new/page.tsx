@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { PageTransition } from "@/components/common/PageTransition";
 import { CommandBox } from "@/components/pages/new/command-box";
 import { QuickCards } from "@/components/pages/new/quick-cards";
+import { QuickWorkflowForm } from "@/components/pages/new/quick-workflow-form";
 import { QuickTaskPanel } from "@/components/pages/new/quick-task-panel";
 import { ConversationArea } from "@/components/pages/new/conversation-area";
 import { SuggestionPanel } from "@/components/pages/new/suggestion-panel";
@@ -70,6 +71,27 @@ function NewTopicPageInner() {
 
   // 快捷任务面板折叠态（仅空态展示）
   const [showQuickTask, setShowQuickTask] = useState(false);
+  const [activeWorkflowKey, setActiveWorkflowKey] = useState<string | null>(null);
+
+  // 点击卡片时触发工作流表单
+  const handleWorkflowSelect = useCallback((cardKey: string) => {
+    setActiveWorkflowKey(cardKey);
+  }, []);
+
+  // 工作流表单提交：直接调用 sendMessage
+  const handleWorkflowSubmit = useCallback(
+    (prompt: string, systemPrompt?: string) => {
+      const apiModelId = getApiModelId();
+      setActiveWorkflowKey(null);
+      sendMessage(prompt, systemPrompt, apiModelId);
+    },
+    [sendMessage, getApiModelId],
+  );
+
+  // 返回卡片列表
+  const handleWorkflowBack = useCallback(() => {
+    setActiveWorkflowKey(null);
+  }, []);
 
   const handleSend = useCallback(() => {
     if (!input.trim() || isStreaming) return;
@@ -154,6 +176,7 @@ function NewTopicPageInner() {
                   currentTrace={currentTrace}
                   conversationId={conversationId}
                   onClearMessages={clearMessages}
+                  onEditMessage={setInput}
                 />
               </div>
             </div>
@@ -184,7 +207,36 @@ function NewTopicPageInner() {
             {/* 快捷入口：仅空状态展示，置于输入框下方 */}
             {!hasMessages && (
               <div className="w-full max-w-2xl mx-auto mt-5 space-y-4">
-                <QuickCards onSelect={handleQuickActionSelect} />
+                <AnimatePresence mode="wait">
+                  {activeWorkflowKey ? (
+                    <motion.div
+                      key="workflow-form"
+                      initial={{ opacity: 0, y: 16, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                    >
+                      <QuickWorkflowForm
+                        cardKey={activeWorkflowKey}
+                        onSubmit={handleWorkflowSubmit}
+                        onBack={handleWorkflowBack}
+                      />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="quick-cards"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -12, scale: 0.96 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <QuickCards
+                        onSelect={handleQuickActionSelect}
+                        onWorkflowSelect={handleWorkflowSelect}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             )}
           </div>

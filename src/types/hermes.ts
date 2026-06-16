@@ -29,6 +29,8 @@ export interface HermesSystemSnapshot {
   atRiskCount: number
   /** 24 小时内运行日志总数 */
   logCount24h: number
+  /** 待解决的知识库缺口（盲区）数量 */
+  knowledgeGapsCount?: number
 }
 
 /** GET /api/hermes/suggestions 响应数据 */
