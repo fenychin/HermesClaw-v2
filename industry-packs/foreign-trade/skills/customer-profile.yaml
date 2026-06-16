@@ -1,4 +1,5 @@
-name: customer-profile
+id: customer-profile
+name: "客户画像分析"
 version: "1.0.0"
 displayName: "客户画像分析"
 description: 企业背景穿透分析、决策链识别、采购行为特征与合作风险评估

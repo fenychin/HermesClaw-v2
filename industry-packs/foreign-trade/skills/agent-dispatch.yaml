@@ -1,4 +1,5 @@
-name: agent-dispatch
+id: agent-dispatch
+name: "调用智能体"
 version: "1.0.0"
 displayName: "调用智能体"
 description: 多智能体协同编排任务，支持 @mention 路由

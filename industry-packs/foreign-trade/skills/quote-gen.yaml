@@ -1,4 +1,5 @@
-name: quote-gen
+id: quote-gen
+name: "报价策略生成"
 version: "1.0.0"
 displayName: "报价策略生成"
 description: 多策略定价分析 + 正式报价单草稿 + 谈判预案

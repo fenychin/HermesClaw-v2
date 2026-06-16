@@ -1,4 +1,5 @@
-name: inquiry-grade
+id: inquiry-grade
+name: "询盘深度分析"
 version: "1.0.0"
 displayName: "询盘深度分析"
 description: 对外贸询盘进行多维度评分、客户画像与跟进策略生成

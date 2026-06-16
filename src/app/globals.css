@@ -14,19 +14,19 @@
 .dark {
   /* —— 基础语义色 —— */
   --background: #0b0b0c;            /* 页面主背景 */
-  --foreground: #d4d4d8;           /* 一级文字 */
+  --foreground: #c4c4c6;           /* 一级文字 */
   --card: #18181b;                 /* 卡片背景 */
-  --card-foreground: #d4d4d8;
+  --card-foreground: #c4c4c6;
   --popover: #202024;              /* 浮层背景 */
-  --popover-foreground: #d4d4d8;
+  --popover-foreground: #c4c4c6;
   --primary: #7c5cff;              /* 品牌主色 */
   --primary-foreground: #f5f5f7;
   --secondary: #202024;            /* 次级按钮 */
-  --secondary-foreground: #d4d4d8;
+  --secondary-foreground: #c4c4c6;
   --muted: #18181b;
   --muted-foreground: #a1a1aa;     /* 二级文字 */
   --accent: #24242a;               /* hover 背景 */
-  --accent-foreground: #d4d4d8;
+  --accent-foreground: #c4c4c6;
   --destructive: #ff6b6b;          /* 风险色 */
   --destructive-foreground: #f5f5f7;
   --border: #2a2a31;               /* 分隔线 */
@@ -50,11 +50,11 @@
 
   /* —— 侧边栏 —— */
   --sidebar: #111112;              /* 侧边栏背景 */
-  --sidebar-foreground: #d4d4d8;
+  --sidebar-foreground: #c4c4c6;
   --sidebar-primary: #7c5cff;
   --sidebar-primary-foreground: #f5f5f7;
   --sidebar-accent: #24242a;       /* 侧栏 hover */
-  --sidebar-accent-foreground: #d4d4d8;
+  --sidebar-accent-foreground: #c4c4c6;
   --sidebar-border: #2a2a31;
   --sidebar-ring: #7c5cff;
 
@@ -136,6 +136,17 @@
   --color-danger: var(--danger);
   --color-overlay: var(--overlay);
   --color-hover: var(--hover);
+
+  /* 从底层重映射纯白和极亮色，防止 text-white, text-zinc-100 等编译为纯白 */
+  --color-white: #d4d4d8;
+  --color-zinc-50: #d4d4d8;
+  --color-zinc-100: #d4d4d8;
+  --color-slate-50: #d4d4d8;
+  --color-slate-100: #d4d4d8;
+  --color-neutral-50: #d4d4d8;
+  --color-neutral-100: #d4d4d8;
+  --color-gray-50: #d4d4d8;
+  --color-gray-100: #d4d4d8;
 }
 
 @layer base {
@@ -163,3 +174,21 @@
 *::-webkit-scrollbar {
   display: none;                   /* Chrome / Safari / Edge */
 }
+
+/* ============================================================
+   防刺眼视觉控制 (Anti-Glare / Eye-Care Styles)
+   深色背景下纯白色 (#fff) 的高对比度会导致眼睛疲劳。
+   通过降低高亮、粗体和标题的纯白明度来提供更温和的深色模式体验。
+   ============================================================ */
+strong, b, h1, h2, h3, h4, h5, h6 {
+  color: #d4d4d8 !important;       /* 粗体与标题：降噪至 84% 明度，避免高光眩光 */
+}
+
+.text-white,
+.text-zinc-50,
+.text-slate-50,
+.text-neutral-50,
+.text-sidebar-foreground {
+  color: #d4d4d8 !important;       /* 常用纯白文字类：降噪为一级标准文字色 (84% 明度) */
+}
+

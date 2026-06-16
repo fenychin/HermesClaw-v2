@@ -1,4 +1,5 @@
-name: dev-letter
+id: dev-letter
+name: "开发信生成"
 version: "1.0.0"
 displayName: "开发信生成"
 description: 生成高转化率的个性化外贸开发信，强制双语代码块输出
