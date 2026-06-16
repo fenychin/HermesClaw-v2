@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma"
 import { runHarnessEvaluation, EVAL_WINDOW_HOURS } from "@/lib/server/harness-eval"
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { rollbackHarnessProposal } from "@/lib/server/harness/harness-rollback"
+import { writeAuditLog } from "@/lib/server/audit"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -87,19 +88,14 @@ export async function GET(request: NextRequest) {
             await rollbackHarnessProposal(proposal.id, "system")
 
             // 写入 proposal.rollback 审计日志，以完全对齐 AGENTS.md
-            await prisma.auditLog.create({
-              data: {
-                actor: "system",
-                action: "proposal.rollback",
-                targetType: "proposal",
-                targetId: proposal.id,
-                detail: `${proposal.proposalId} · 灰度运行数 ${totalLogs}，失败率 ${(errorRate * 100).toFixed(1)}%，超标自动回滚`,
-                riskLevel: "high",
-                workspaceId: wsId,
-                automationLevel: "L3",
-                triggeredBy: "system",
-                status: "success",
-              }
+            await writeAuditLog({
+              actor: "system",
+              action: "proposal.rollback",
+              targetType: "proposal",
+              targetId: proposal.id,
+              detail: `${proposal.proposalId} · 灰度运行数 ${totalLogs}，失败率 ${(errorRate * 100).toFixed(1)}%，超标自动回滚`,
+              riskLevel: "high",
+              workspaceId: wsId,
             })
 
             logger.info(`[cron] 提案 ${proposal.proposalId} 灰度失败率 ${(errorRate * 100).toFixed(1)}% 超标，触发自动回滚`)

@@ -62,6 +62,16 @@ export async function generateProposal(evaluationReport: EvaluationReport): Prom
       automationLevel = "L2" // 智能提案默认以 L2 安全等级进行灰度
     }
   } catch (err: any) {
+    // 【必须】写入 AuditLog，降级事件不能静默
+    await writeAuditLog({
+      actor: "system",
+      action: "proposal.generation.fallback",
+      targetType: "proposal",
+      targetId: `eval:${evaluationReport.workspaceId}`,
+      detail: `AI 提案生成失败，降级至硬编码规则。错误: ${err.message}`,
+      riskLevel: "medium",
+      workspaceId: evaluationReport.workspaceId,
+    })
     // 柔性降级（保底）：若大模型调用异常或无密钥，安全降级至硬编码规则分流引擎
     console.warn("[generateProposal] AI 提案生成失败，降级至硬编码规则分流:", err.message)
     if (errorRate > 0.3) {

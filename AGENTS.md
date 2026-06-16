@@ -229,7 +229,10 @@ Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私
 - **执行引擎补充约定（v3.11）**：
   - **Serverless 超时机制**：明确声明 Serverless 环境下的超时控制不得使用应用内本地 `Promise.race`，必须统一委托给后台 `Cron` 巡检补偿器（如 `/api/cron/workflow-timeout`）驱动。
   - **快速失败 (Fast-fail) 契约**：所有 `Execution Runtime`（执行引擎）在接收到属于“权限阻断（如 Grant Missing 等策略异常）”或“人工拒绝（Approval Rejected）”等明确的安全拦截与硬错误时，必须立刻跳过常规容错重试机制（Fast-fail），立即终止执行并抛出错误。
-
+- **维护清理约定（v3.12）**：
+  - 审计日志（AuditLog）及执行轨迹（AgentLog）禁止物理删除，过期数据只允许归档（软标记）。
+  - 短期记忆（Memory type=short, frozen=false）允许物理清理，但清理前后必须写入 AuditLog，记录清理数量与时间窗口，保证清理动作本身可追溯。
+  - 所有 Cron 维护脚本的执行结果（含 archived/cleaned 计数）必须写入 AuditLog，action 命名规范：`maintenance.<task>.completed` / `maintenance.<task>.failed`。
 
 ---
 
@@ -329,6 +332,16 @@ Harness Runtime 至少由以下对象组成：
 - **API 路由**：`POST /api/workflow-runs`（启动）/ `POST /api/workflow-runs/[id]/execute`（执行）/ `POST /api/workflow-runs/[id]/cancel`（取消）/ `GET /api/workflow-runs/[id]/status`（状态查询）
 - **审计动作**：`workflow.run.started` / `workflow.run.completed` / `workflow.run.failed` / `workflow.run.cancelled` / `workflow.run.resumed` / `orchestration.session.started` / `orchestration.session.completed` / `orchestration.session.failed` / `orchestration.subagent.completed` / `orchestration.session.resumed`
 - **单元测试**：[runtime-engine.test.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/workflow/__tests__/runtime-engine.test.ts)（28 个测试用例） / [orchestrator.test.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/__tests__/orchestrator.test.ts)（14 个测试用例）
+- **Workflow 节点执行器（v3.12.00-dev）**：
+  - `skill-executor.ts`：Skill 节点 LLM 编排执行器，通过 `selectModel()` 路由，
+    L3 强制人工确认，使用 `ctx.industryId` 消除 N+1 查询。
+  - `data-write-executor.ts`：Data-Write 节点 Prisma 写入执行器，
+    从上游节点输出取值，写入目标模型。
+  - `subworkflow-executor.ts`：子工作流节点执行器，通过依赖注入
+    `createSubworkflowHandler(runWorkflow)` 规避循环导入，
+    最大嵌套深度由 `maxDepth`（默认 5）控制。
+  - `utils/topo-sort.ts`：统一拓扑排序工具，同时导出 `topoSortFlat`（runtime-engine 用）
+    和 `topoSortLayers`（dag-engine 用），消除原各文件内联实现。
 - **Legacy 引擎**：`dag-engine.ts` + `dag-runner.ts` 为历史遗留并行实现，
   已标记 `@deprecated`，操作 `WorkflowNodeRun` 表，不接受新功能对接。
   所有新工作流逻辑必须使用 `runtime-engine.ts`。
@@ -382,6 +395,11 @@ Harness Runtime 至少由以下对象组成：
 
 所有提案都必须通过 Hermes 的审批与灰度机制才能生效。
 
+**提案生成降级规则（v3.12）**：
+- 当大模型调用不可用（网络异常 / 无 API 密钥 / 响应超时）时，proposal-engine 启用硬编码规则分流引擎作为保底降级策略（Fallback Rule Engine）。
+- 降级路径必须向 AuditLog 写入 `proposal.generation.fallback` 事件，记录降级原因，避免系统在无感知状态下运行备用逻辑。
+- 降级提案的 automationLevel 上限为 L2（不允许降级路径产生 L3/L4 自动化提案）。
+- 此降级机制为系统自愈能力的核心组成部分，禁止删除或绕过。
 ---
 
 ## 第六章：治理、安全与审计

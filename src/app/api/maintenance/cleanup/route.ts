@@ -9,6 +9,7 @@
  */
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
+import { writeAuditLog } from "@/lib/server/audit"
 
 export const runtime = "nodejs"
 
@@ -18,11 +19,14 @@ export async function POST() {
 
     // 清理 30 天前的成功 AgentLog（保留重要的 error 日志）
     const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000)
-    const deletedLogs = await prisma.agentLog.deleteMany({
+    // 根据 AGENTS.md 规定，只做软归档
+    const archivedLogs = await prisma.agentLog.updateMany({
       where: {
         status: "success",
         createdAt: { lt: thirtyDaysAgo },
+        archivedAt: null,
       },
+      data: { archivedAt: new Date() },
     })
 
     // 清理 7 天前的短期记忆（若未冻结）
@@ -37,11 +41,22 @@ export async function POST() {
 
     const result = {
       cleaned: {
-        agentLogs: deletedLogs.count,
+        agentLogs: archivedLogs.count,
         shortMemories: deletedShortMemory.count,
       },
       timestamp: new Date().toISOString(),
     }
+
+    // 按 AGENTS.md 规定，维护操作必须写入 AuditLog
+    await writeAuditLog({
+      actor: "system",
+      action: "maintenance.cleanup.completed",
+      targetType: "system",
+      targetId: "cleanup",
+      detail: `Archived ${archivedLogs.count} logs, Cleaned ${deletedShortMemory.count} memories`,
+      riskLevel: "medium",
+      workspaceId: "default",
+    })
 
     logger.info("POST /api/maintenance/cleanup: 完成", result)
 

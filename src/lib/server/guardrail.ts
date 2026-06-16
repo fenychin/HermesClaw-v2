@@ -191,42 +191,24 @@ export async function validateTaskAutomationLevel(
       }
     }
 
-    
-    // 写入 AuditLog
-    await writeAuditLog({
-      actor,
-      action: "guardrail.violation",
-      targetType: "task",
-      targetId: envelope.taskId,
-      detail: errorMsg,
-      riskLevel: "high",
-      workspaceId
-    })
-
     // 写入增强字段的审计记录 (AGENTS.md)
     try {
-      await prisma.auditLog.create({
-        data: {
-          id: crypto.randomUUID(),
-          actor,
-          action: "guardrail.violation",
-          targetType: "task",
-          targetId: envelope.taskId,
-          detail: errorMsg,
-          riskLevel: "high",
-          workspaceId,
-          contextSnapshot: {
-            taskAutomationLevel: taskLevel,
-            workspaceAutomationLevel: maxAllowedLevel,
-            taskId: envelope.taskId,
-            actionType: envelope.actionType,
-          },
-          automationLevel: taskLevel as string,
-          triggeredBy: "system",
-          status: "failed",
+      await writeAuditLog({
+        actor,
+        action: "guardrail.violation",
+        targetType: "task",
+        targetId: envelope.taskId,
+        detail: errorMsg,
+        riskLevel: "high",
+        workspaceId,
+        contextSnapshot: {
+          taskAutomationLevel: taskLevel,
+          workspaceAutomationLevel: maxAllowedLevel,
+          actionType: envelope.actionType,
+          input: envelope.input
         }
       })
-    } catch {
+    } catch (err) {
       // 吞错
     }
 

@@ -76,35 +76,21 @@ export function withRBAC<C = unknown>(
     if (!hasMinRole(ctx.role, requiredRole)) {
       // 拒绝也必须可溯源（§4.3 无日志禁止静默执行）
       // —— 附带 contextSnapshot 记录拒绝上下文
-      await writeAuditLog({
-        actor: await actorFromSession(),
-        action: "RBAC_DENIED",
-        targetType: "rbac",
-        targetId: new URL(request.url).pathname,
-        detail: `角色 ${ctx.role} 不满足最低要求 ${requiredRole}（${request.method}）`,
-        riskLevel: "medium",
-        workspaceId: ctx.workspaceId,
-      })
-      // 同时写入带增强字段的审计（AGENTS.md §1.2 数据主权）
+
       try {
-        await prisma.auditLog.create({
-          data: {
-            actor: await actorFromSession(),
-            action: "RBAC_DENIED",
-            targetType: "rbac",
-            targetId: new URL(request.url).pathname,
-            detail: `角色 ${ctx.role} 不满足最低要求 ${requiredRole}（${request.method}）`,
-            riskLevel: "medium",
-            workspaceId: ctx.workspaceId,
-            contextSnapshot: {
-              currentRole: ctx.role,
-              requiredRole,
-              method: request.method,
-              path: new URL(request.url).pathname,
-            },
-            automationLevel: "L1",
-            triggeredBy: "user",
-            status: "success",
+        await writeAuditLog({
+          actor: await actorFromSession(),
+          action: "RBAC_DENIED",
+          targetType: "rbac",
+          targetId: new URL(request.url).pathname,
+          detail: `角色 ${ctx.role} 不满足最低要求 ${requiredRole}（${request.method}）`,
+          riskLevel: "medium",
+          workspaceId: ctx.workspaceId,
+          contextSnapshot: {
+            currentRole: ctx.role,
+            requiredRole,
+            method: request.method,
+            path: new URL(request.url).pathname,
           },
         })
       } catch {

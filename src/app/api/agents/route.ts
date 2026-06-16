@@ -6,6 +6,7 @@ import { ApiResponse } from '@/lib/server/api-response'
 import { AgentCreateSchema, validateBody } from "@/lib/server/validators"
 import { ForbiddenError, requireWritable } from "@/lib/workspace"
 import { serializeAgent } from "@/lib/server/agent-serializer"
+import { writeAuditLog } from "@/lib/server/audit"
 
 /** GET /api/agents —— 获取智能体列表，支持分页与状态筛选 */
 export const GET = withRBAC(
@@ -118,19 +119,17 @@ export const POST = withRBAC(
             lastActive: body.lastActive,
           },
         }),
-        prisma.auditLog.create({
-          data: {
-            id: crypto.randomUUID(),
-            actor,
-            action: "agent.create",
-            targetType: "agent",
-            targetId: agentId,
-            detail: `${body.name} · ${body.role}`,
-            riskLevel: "low",
-            workspaceId: ctx.workspaceId,
-          },
-        }),
       ])
+
+      await writeAuditLog({
+        actor: "user",
+        action: "create.agent",
+        targetType: "agent",
+        targetId: agentId,
+        detail: `创建智能体: ${body.name}`,
+        riskLevel: "medium",
+        workspaceId: ctx.workspaceId,
+      })
 
       return ApiResponse.ok({ agent: serializeAgent(agent as unknown as Record<string, unknown>) })
     } catch (error) {

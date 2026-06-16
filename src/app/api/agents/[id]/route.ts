@@ -161,8 +161,8 @@ export async function DELETE(
     const guard = await checkConfirmQuery(request, "删除智能体需二次确认")
     if (!guard.ok) return guard.response
 
-    // 先删除关联的运行日志，再删除智能体（workspaceId 隔离）
-    await prisma.agentLog.deleteMany({ where: { agentId: id, workspaceId: ctx.workspaceId } })
+    // 先将关联的运行日志软归档，再删除智能体（workspaceId 隔离）
+    await prisma.agentLog.updateMany({ where: { agentId: id, workspaceId: ctx.workspaceId }, data: { archivedAt: new Date() } })
     await prisma.agent.delete({ where: { id, workspaceId: ctx.workspaceId } })
 
     await writeAuditLog({
