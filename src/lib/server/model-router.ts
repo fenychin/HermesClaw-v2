@@ -21,6 +21,8 @@ import {
   type AuditRiskLevel,
 } from "@/lib/server/audit"
 import { parseJsonField } from "@/lib/api-utils"
+import { withTraceStep } from "./reasoning-trace"
+import type { ReasoningTrace } from "./contracts/reasoning-trace"
 import {
   type LlmProvider,
   DEFAULT_ANTHROPIC_MODEL,
@@ -150,6 +152,7 @@ function reconcileAvailability(
   }
   
   // 遍历降级链中除当前 provider 外第一个可用的 Provider
+  const ALL_PROVIDERS: LlmProvider[] = ["anthropic", "deepseek"]
   for (const p of ALL_PROVIDERS) {
     if (p !== provider && isProviderAvailable(p)) {
       const fallbackModel = p === "anthropic" ? HIGH_CAPABILITY_MODEL : COST_OPTIMIZED_MODEL
@@ -175,85 +178,111 @@ function reconcileAvailability(
  *
  * 决策后执行 Provider 可用性降级（§2.3），并将最终决策写入 AuditLog（§1.2）。
  */
-export async function selectModel(ctx: ModelRouteContext): Promise<RoutingDecision> {
-  let provider: LlmProvider
-  let model: string
-  let reason: string
-
-  if (ctx.riskLevel === "high") {
-    // 1. 高风险 → 高能力模型
-    provider = "anthropic"
-    model = HIGH_CAPABILITY_MODEL
-    reason = "高风险任务路由至高能力模型"
-  } else if (ctx.taskType === "workflow") {
-    // 2. 工作流（非高风险）→ 成本优化模型
-    provider = "deepseek"
-    model = COST_OPTIMIZED_MODEL
-    reason = "工作流任务路由至成本优化模型"
-  } else {
-    // 3. 其余 → 工作空间默认模型 + taskType Provider 偏好
-    const settings = await getWorkspaceModelSettings(ctx.workspaceId)
-    model = settings.defaultModel || FALLBACK_MODEL
-    // Provider 优先取 taskType 偏好，否则由默认模型推断
-    provider = settings.taskProviderMap[ctx.taskType] ?? providerOf(model)
-    // 偏好 Provider 与模型不一致时，切换为该 Provider 的默认模型，保持语义连贯
-    if (provider !== providerOf(model)) {
-      model = provider === "anthropic" ? HIGH_CAPABILITY_MODEL : COST_OPTIMIZED_MODEL
-    }
-    reason = "默认策略路由（工作空间配置）"
-  }
-
-  // Provider 可用性降级
-  const resolved = reconcileAvailability(provider, model)
-  const detail = resolved.degraded
-    ? `${reason}；${provider} 不可用，已降级至 ${resolved.provider}/${resolved.model}`
-    : `${reason}；taskType=${ctx.taskType}, est=${ctx.estimatedTokens} tokens`
-
-  const decision: RoutingDecision = {
-    provider: resolved.provider,
-    model: resolved.model,
-    reason: detail,
-  }
-
-  // §1.2 数据主权：路由决策必须留痕（无日志的静默执行属违规）
-  // —— 附带 contextSnapshot 供 §4.4 Level 2 评估使用
-  // —— automationLevel 根据 riskLevel 推断：high→L3, medium→L2, low→L1
-  // —— triggeredBy 根据调用来源推断（chat/agent 触发 → user，workflow 触发 → system）
-  // —— 使用统一预记录模式（createAuditEntry + updateAuditEntry），与其他高风险动作审计路径一致
-  const automationLevel: "L1" | "L2" | "L3" | "L4" =
-    ctx.riskLevel === "high" ? "L3" : ctx.riskLevel === "medium" ? "L2" : "L1"
-  const triggeredBy: "user" | "system" | "cron" =
-    ctx.taskType === "workflow" ? "system" : "user"
-
-  const auditEntry = await createAuditEntry({
-    actor: await actorFromSession(),
-    action: "model.route",
-    targetType: "model",
-    targetId: decision.model,
-    detail: decision.reason,
-    riskLevel: toAuditRiskLevel(ctx.riskLevel),
-    workspaceId: ctx.workspaceId,
-    contextSnapshot: {
-      taskType: ctx.taskType,
-      estimatedTokens: ctx.estimatedTokens,
-      selectedProvider: resolved.provider,
-      selectedModel: resolved.model,
-      degraded: resolved.degraded,
-      originalProvider: provider,
-      originalModel: model,
+export async function selectModel(
+  ctx: ModelRouteContext,
+  trace?: ReasoningTrace
+): Promise<RoutingDecision> {
+  return withTraceStep(
+    trace,
+    {
+      type: 'model.route',
+      label: '选择推理模型',
+      inputs: {
+        taskType: ctx.taskType,
+        riskLevel: ctx.riskLevel,
+        estimatedTokens: ctx.estimatedTokens,
+      },
     },
-    automationLevel,
-    triggeredBy,
-  })
+    async (step) => {
+      let provider: LlmProvider
+      let model: string
+      let reason: string
 
-  if (auditEntry.ok) {
-    await updateAuditEntry({
-      auditId: auditEntry.auditId,
-      status: "success",
-      detail: decision.reason,
-    })
-  }
-  // 审计失败不阻断路由决策（createAuditEntry 内部已 console.error）
+      if (ctx.riskLevel === "high") {
+        // 1. 高风险 → 高能力模型
+        provider = "anthropic"
+        model = HIGH_CAPABILITY_MODEL
+        reason = "高风险任务路由至高能力模型"
+      } else if (ctx.taskType === "workflow") {
+        // 2. 工作流（非高风险）→ 成本优化模型
+        provider = "deepseek"
+        model = COST_OPTIMIZED_MODEL
+        reason = "工作流任务路由至成本优化模型"
+      } else {
+        // 3. 其余 → 工作空间默认模型 + taskType Provider 偏好
+        const settings = await getWorkspaceModelSettings(ctx.workspaceId)
+        model = settings.defaultModel || FALLBACK_MODEL
+        // Provider 优先取 taskType 偏好，否则由默认模型推断
+        provider = settings.taskProviderMap[ctx.taskType] ?? providerOf(model)
+        // 偏好 Provider 与模型不一致时，切换为该 Provider 的默认模型，保持语义连贯
+        if (provider !== providerOf(model)) {
+          model = provider === "anthropic" ? HIGH_CAPABILITY_MODEL : COST_OPTIMIZED_MODEL
+        }
+        reason = "默认策略路由（工作空间配置）"
+      }
 
-  return decision
+      // Provider 可用性降级
+      const resolved = reconcileAvailability(provider, model)
+      const detail = resolved.degraded
+        ? `${reason}；${provider} 不可用，已降级至 ${resolved.provider}/${resolved.model}`
+        : `${reason}；taskType=${ctx.taskType}, est=${ctx.estimatedTokens} tokens`
+
+      const decision: RoutingDecision = {
+        provider: resolved.provider,
+        model: resolved.model,
+        reason: detail,
+      }
+
+      // §1.2 数据主权：路由决策必须留痕（无日志的静默执行属违规）
+      // —— 附带 contextSnapshot 供 §4.4 Level 2 评估使用
+      // —— automationLevel 根据 riskLevel 推断：high→L3, medium→L2, low→L1
+      // —— triggeredBy 根据调用来源推断（chat/agent 触发 → user，workflow 触发 → system）
+      // —— 使用统一预记录模式（createAuditEntry + updateAuditEntry），与其他高风险动作审计路径一致
+      const automationLevel: "L1" | "L2" | "L3" | "L4" =
+        ctx.riskLevel === "high" ? "L3" : ctx.riskLevel === "medium" ? "L2" : "L1"
+      const triggeredBy: "user" | "system" | "cron" =
+        ctx.taskType === "workflow" ? "system" : "user"
+
+      const auditEntry = await createAuditEntry({
+        actor: await actorFromSession(),
+        action: "model.route",
+        targetType: "model",
+        targetId: decision.model,
+        detail: decision.reason,
+        riskLevel: toAuditRiskLevel(ctx.riskLevel),
+        workspaceId: ctx.workspaceId,
+        contextSnapshot: {
+          taskType: ctx.taskType,
+          estimatedTokens: ctx.estimatedTokens,
+          selectedProvider: resolved.provider,
+          selectedModel: resolved.model,
+          degraded: resolved.degraded,
+          originalProvider: provider,
+          originalModel: model,
+        },
+        automationLevel,
+        triggeredBy,
+      })
+
+      if (auditEntry.ok) {
+        await updateAuditEntry({
+          auditId: auditEntry.auditId,
+          status: "success",
+          detail: decision.reason,
+        })
+      }
+      // 审计失败不阻断路由决策（createAuditEntry 内部已 console.error）
+
+      step._pendingUpdate = {
+        outputs: {
+          selectedModel: decision.model,
+          provider: decision.provider,
+          routingReason: decision.reason,
+        },
+      }
+
+      return decision
+    }
+  )
 }
+

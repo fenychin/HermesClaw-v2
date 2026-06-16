@@ -12,12 +12,12 @@ import {
   getFlushFailures,
 } from "@/lib/server/pending-conversations";
 
-/** 单条对话消息 */
 export interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  trace?: any; // To store the reasoning trace object directly for display
 }
 
 /**
@@ -41,6 +41,7 @@ export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [currentTrace, setCurrentTrace] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   /** 当前持久化对话 ID（ref 供回调闭包，state 供组件消费） */
@@ -147,6 +148,7 @@ export function useChat() {
       abortControllerRef.current = new AbortController();
 
       let fullContent = "";
+      let traceObj: any = undefined;
 
       try {
         const response = await fetch("/api/chat", {
@@ -171,10 +173,13 @@ export function useChat() {
         // 复用共享 SSE 解析器（替换手写 ReadableStream 读取）
         await parseSSEStream(reader, {
           onData: (json) => {
-            const parsed = json as { text?: string };
+            const parsed = json as { text?: string; type?: string; trace?: any };
             if (parsed.text) {
               fullContent += parsed.text;
               setStreamingContent(fullContent);
+            } else if (parsed.type === "trace" && parsed.trace) {
+              traceObj = parsed.trace;
+              setCurrentTrace(traceObj);
             }
           },
         });
@@ -184,9 +189,11 @@ export function useChat() {
           role: "assistant",
           content: fullContent,
           timestamp: new Date(),
+          trace: traceObj,
         };
         setMessages((prev) => [...prev, assistantMessage]);
         setStreamingContent("");
+        setCurrentTrace(null);
 
         // 对话完成后持久化到数据库
         persistConversation(content.trim(), fullContent);
@@ -201,9 +208,11 @@ export function useChat() {
             role: "assistant",
             content: fullContent,
             timestamp: new Date(),
+            trace: traceObj,
           };
           setMessages((prev) => [...prev, partialMessage]);
           setStreamingContent("");
+          setCurrentTrace(null);
           persistConversation(content.trim(), fullContent);
         }
       } finally {
@@ -221,6 +230,7 @@ export function useChat() {
   const clearMessages = useCallback(() => {
     setMessages([]);
     setStreamingContent("");
+    setCurrentTrace(null);
     setError(null);
     conversationIdRef.current = null;
   }, []);
@@ -280,5 +290,6 @@ export function useChat() {
     pendingCount,
     /** 手动触发回放（通常无需调用——挂载/网络恢复/每次保存成功自动触发） */
     flushPending: flush,
+    currentTrace,
   };
 }

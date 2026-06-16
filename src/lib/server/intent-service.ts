@@ -6,6 +6,8 @@ import { callAnthropicStructured, callDeepSeekJson } from "@/lib/server/llm-prov
 import { writeAuditLog, type AuditRiskLevel } from "@/lib/server/audit"
 import { actorFromSession } from "@/lib/server/audit"
 import { GuardrailError } from "@/lib/server/exceptions"
+import { withTraceStep } from "./reasoning-trace"
+import type { ReasoningTrace } from "./contracts/reasoning-trace"
 
 const INTENT_EXTRACT_SCHEMA = {
   type: "object",
@@ -46,93 +48,111 @@ export async function parseIntentToTaskEnvelope(
     industryId: string;
     automationLevel: AutomationLevel;
     riskLevel: RiskLevel;
-  }
+  },
+  trace?: ReasoningTrace
 ): Promise<TaskEnvelope> {
-  // 1. 安全护栏：L4 自动化等级绝对禁止自动执行，审批通道亦不得放行
-  if (context.automationLevel === "L4") {
-    throw new GuardrailError("L4 动作绝对禁止系统自动审批与执行");
-  }
+  return withTraceStep(
+    trace,
+    {
+      type: 'intent.parse',
+      label: '理解您的指令',
+      inputs: { userInput: input, agentId: context.agentId },
+    },
+    async (step) => {
+      // 1. 安全护栏：L4 自动化等级绝对禁止自动执行，审批通道亦不得放行
+      if (context.automationLevel === "L4") {
+        throw new GuardrailError("L4 动作绝对禁止系统自动审批与执行");
+      }
 
-  // 2. 模型路由决策
-  // 将 RiskLevel ("low" | "medium" | "high" | "critical") 转换为 RouteRiskLevel ("low" | "medium" | "high")
-  const routeRiskLevel: RouteRiskLevel =
-    context.riskLevel === "critical" ? "high" : (context.riskLevel as RouteRiskLevel);
+      // 2. 模型路由决策
+      // 将 RiskLevel ("low" | "medium" | "high" | "critical") 转换为 RouteRiskLevel ("low" | "medium" | "high")
+      const routeRiskLevel: RouteRiskLevel =
+        context.riskLevel === "critical" ? "high" : (context.riskLevel as RouteRiskLevel);
 
-  const decision = await selectModel({
-    taskType: "workflow",
-    riskLevel: routeRiskLevel,
-    estimatedTokens: 1000,
-    workspaceId: context.workspaceId,
-  });
+      const decision = await selectModel({
+        taskType: "workflow",
+        riskLevel: routeRiskLevel,
+        estimatedTokens: 1000,
+        workspaceId: context.workspaceId,
+      });
 
-  // 3. 调用 LLM 获取结构化输出
-  let parsedResult: { actionType: string; input: Record<string, unknown>; callbackTarget?: string };
+      // 3. 调用 LLM 获取结构化输出
+      let parsedResult: { actionType: string; input: Record<string, unknown>; callbackTarget?: string };
 
-  if (decision.provider === "anthropic") {
-    const raw = await callAnthropicStructured({
-      systemPrompt: SYSTEM_PROMPT,
-      userPrompt: input,
-      schema: INTENT_EXTRACT_SCHEMA as Record<string, unknown>,
-      model: decision.model,
-      thinking: false,
-    });
-    parsedResult = raw as typeof parsedResult;
-  } else {
-    const raw = await callDeepSeekJson({
-      systemPrompt: `${SYSTEM_PROMPT}
+      if (decision.provider === "anthropic") {
+        const raw = await callAnthropicStructured({
+          systemPrompt: SYSTEM_PROMPT,
+          userPrompt: input,
+          schema: INTENT_EXTRACT_SCHEMA as Record<string, unknown>,
+          model: decision.model,
+          thinking: false,
+        });
+        parsedResult = raw as typeof parsedResult;
+      } else {
+        const raw = await callDeepSeekJson({
+          systemPrompt: `${SYSTEM_PROMPT}
 只输出一个符合以下 JSON 结构的 JSON 对象，不要包含任何额外文字或 Markdown 标记包裹：
 {
   "actionType": "动作类型",
   "input": {},
   "callbackTarget": "回调目标"
 }`,
-      userPrompt: input,
-      model: decision.model,
-    });
-    parsedResult = raw as typeof parsedResult;
-  }
+          userPrompt: input,
+          model: decision.model,
+        });
+        parsedResult = raw as typeof parsedResult;
+      }
 
-  // 校验模型解析结果的基本完整性
-  if (!parsedResult || !parsedResult.actionType || !parsedResult.input) {
-    throw new Error("模型意图解析失败，无法解析出 actionType 或 input。");
-  }
+      // 校验模型解析结果的基本完整性
+      if (!parsedResult || !parsedResult.actionType || !parsedResult.input) {
+        throw new Error("模型意图解析失败，无法解析出 actionType 或 input。");
+      }
 
-  // 4. 组装并生成唯一 Key
-  const taskId = crypto.randomUUID();
-  const workflowRunId = crypto.randomUUID();
-  const idempotencyKey = crypto.randomUUID();
+      // 4. 组装并生成唯一 Key
+      const taskId = crypto.randomUUID();
+      const workflowRunId = crypto.randomUUID();
+      const idempotencyKey = crypto.randomUUID();
 
-  const taskEnvelopeData = {
-    taskId,
-    workflowRunId,
-    workspaceId: context.workspaceId,
-    industryId: context.industryId,
-    agentId: context.agentId,
-    actionType: parsedResult.actionType,
-    input: parsedResult.input,
-    automationLevel: context.automationLevel,
-    riskLevel: context.riskLevel,
-    idempotencyKey,
-    callbackTarget: parsedResult.callbackTarget || "workflow-callback",
-    policySnapshotVersion: "1.0.0",
-    version: "1.0.0",
-  };
+      const taskEnvelopeData = {
+        taskId,
+        workflowRunId,
+        workspaceId: context.workspaceId,
+        industryId: context.industryId,
+        agentId: context.agentId,
+        actionType: parsedResult.actionType,
+        input: parsedResult.input,
+        automationLevel: context.automationLevel,
+        riskLevel: context.riskLevel,
+        idempotencyKey,
+        callbackTarget: parsedResult.callbackTarget || "workflow-callback",
+        policySnapshotVersion: "1.0.0",
+        version: "1.0.0",
+      };
 
-  // 5. 写入 AuditLog
-  const actor = await actorFromSession();
-  const auditRiskLevel: AuditRiskLevel =
-    context.riskLevel === "critical" ? "high" : (context.riskLevel as AuditRiskLevel);
+      // 5. 写入 AuditLog
+      const actor = await actorFromSession();
+      const auditRiskLevel: AuditRiskLevel =
+        context.riskLevel === "critical" ? "high" : (context.riskLevel as AuditRiskLevel);
 
-  await writeAuditLog({
-    actor,
-    action: "workflow.generate",
-    targetType: "task",
-    targetId: taskId,
-    detail: `用户意图解析成功: "${input}" -> 动作: "${taskEnvelopeData.actionType}"`,
-    riskLevel: auditRiskLevel,
-    workspaceId: context.workspaceId,
-  });
+      await writeAuditLog({
+        actor,
+        action: "workflow.generate",
+        targetType: "task",
+        targetId: taskId,
+        detail: `用户意图解析成功: "${input}" -> 动作: "${taskEnvelopeData.actionType}"`,
+        riskLevel: auditRiskLevel,
+        workspaceId: context.workspaceId,
+      });
 
-  // 6. Zod 强校验确保绝对合规，校验失败将抛出 ZodError，杜绝绕过
-  return TaskEnvelopeSchema.parse(taskEnvelopeData);
+      step._pendingUpdate = {
+        outputs: {
+          actionType: parsedResult.actionType,
+          input: parsedResult.input,
+        },
+      }
+
+      // 6. Zod 强校验确保绝对合规，校验失败将抛出 ZodError，杜绝绕过
+      return TaskEnvelopeSchema.parse(taskEnvelopeData);
+    }
+  );
 }

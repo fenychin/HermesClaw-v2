@@ -40,6 +40,7 @@ function NewTopicPageInner() {
     stopStreaming,
     clearMessages,
     loadConversation,
+    currentTrace,
   } = useChat();
 
   // 从 Zustand ui-store 读取/写入输入态（PRD §10.2 要求）
@@ -138,6 +139,7 @@ function NewTopicPageInner() {
                   messages={messages}
                   isStreaming={isStreaming}
                   streamingContent={streamingContent}
+                  currentTrace={currentTrace}
                   conversationId={conversationId}
                   onClearMessages={clearMessages}
                 />

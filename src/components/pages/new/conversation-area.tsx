@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { Message } from "@/hooks/useChat";
 import { MarkdownRenderer } from "@/components/common/markdown-renderer";
+import { ReasoningTracePanel } from "@/components/reasoning-trace-panel";
 import { apiClient } from "@/lib/api-client";
 import { toast } from "sonner";
 
@@ -25,6 +26,8 @@ interface ConversationAreaProps {
   isStreaming: boolean;
   /** 当前流式输出文本（未沉淀到 messages） */
   streamingContent: string;
+  /** 当前的推理追踪（如果正在流式输出中） */
+  currentTrace?: any;
   /** 当前持久化对话 ID（用于创建项目时关联对话） */
   conversationId: string | null;
   /** 清空对话回调 */
@@ -40,6 +43,7 @@ export function ConversationArea({
   messages,
   isStreaming,
   streamingContent,
+  currentTrace,
   conversationId,
   onClearMessages,
 }: ConversationAreaProps) {
@@ -207,8 +211,9 @@ export function ConversationArea({
                   </div>
                 ) : (
                   // AI 消息：全宽、无边框、纯 Markdown
-                  <div className="w-full min-w-0 text-sm leading-relaxed text-foreground break-words">
-                    <MarkdownRenderer content={msg.content || "…"} />
+                  <div className="w-full min-w-0 flex flex-col gap-2 text-sm leading-relaxed text-foreground break-words">
+                    {msg.trace && <ReasoningTracePanel trace={msg.trace} />}
+                    {msg.content ? <MarkdownRenderer content={msg.content} /> : <div className="text-slate-400 animate-pulse">…</div>}
                   </div>
                 )}
               </motion.div>
@@ -216,16 +221,23 @@ export function ConversationArea({
           })}
 
           {/* 流式输出中的 AI 消息（全宽 + 光标） */}
-          {isStreaming && streamingContent && (
+          {isStreaming && (streamingContent || currentTrace) && (
             <motion.div
               key="streaming-bubble"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               className="flex justify-start"
             >
-              <div className="w-full min-w-0 text-sm leading-relaxed text-foreground break-words">
-                <MarkdownRenderer content={streamingContent} />
-                <span className="inline-block w-0.5 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom" />
+              <div className="w-full min-w-0 flex flex-col gap-2 text-sm leading-relaxed text-foreground break-words">
+                {currentTrace && <ReasoningTracePanel trace={currentTrace} />}
+                {streamingContent ? (
+                  <>
+                    <MarkdownRenderer content={streamingContent} />
+                    <span className="inline-block w-0.5 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom" />
+                  </>
+                ) : (
+                  <div className="text-slate-400 animate-pulse">思考中…</div>
+                )}
               </div>
             </motion.div>
           )}

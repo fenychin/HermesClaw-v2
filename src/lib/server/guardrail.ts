@@ -12,6 +12,8 @@ import { actorFromSession } from "@/lib/server/audit"
 import { resolveAutomationLevel } from "@/types"
 import type { RiskLevel, AutomationLevel } from "@/types"
 import type { TaskEnvelope } from "@/contracts/task-envelope"
+import { withTraceStep } from "./reasoning-trace"
+import type { ReasoningTrace } from "./contracts/reasoning-trace"
 
 export interface GuardrailPass {
   ok: true
@@ -98,40 +100,70 @@ export interface AutomationGateInput {
  */
 export async function checkAutomationGate(
   input: AutomationGateInput,
+  trace?: ReasoningTrace
 ): Promise<GuardrailResult> {
-  const level = resolveAutomationLevel(
-    input.automationLevel,
-    input.riskLevel as RiskLevel,
+  return withTraceStep(
+    trace,
+    {
+      type: 'guardrail.check',
+      label: '安全策略检查',
+      inputs: {
+        actionName: input.actionName,
+        riskLevel: input.riskLevel,
+        automationLevel: input.automationLevel,
+      },
+    },
+    async (step) => {
+      const level = resolveAutomationLevel(
+        input.automationLevel,
+        input.riskLevel as RiskLevel,
+      )
+
+      // L4：绝对禁止自动，审批通道亦不得放行 —— 统一规范化拒绝体（AGENTS.md §4.7）
+      if (level === "L4") {
+        step._pendingUpdate = {
+          status: 'blocked',
+          blockedReason: "L4 动作禁止系统自动审批，须在源业务系统人工发起",
+          outputs: { level },
+        }
+        return {
+          ok: false as const,
+          level,
+          response: Response.json(
+            {
+              success: false,
+              error: "L4_FORBIDDEN",
+              message: "L4 动作禁止系统自动审批，须在源业务系统人工发起",
+            },
+            { status: 403 },
+          ),
+        }
+      }
+
+      // L3：高风险，须显式二次确认
+      if (level === "L3" && !input.confirmed) {
+        step._pendingUpdate = {
+          status: 'blocked',
+          blockedReason: "L3 高风险操作，需二次确认",
+          outputs: { level },
+        }
+        return {
+          ...blocked(
+            `L3 高风险操作，确认${input.actionName}后将立即生效且无法撤销，请二次确认`,
+            409,
+          ),
+          level,
+        }
+      }
+
+      step._pendingUpdate = {
+        status: 'passed',
+        outputs: { level },
+      }
+
+      return { ok: true as const, actor: await actorFromSession(), level }
+    }
   )
-
-  // L4：绝对禁止自动，审批通道亦不得放行 —— 统一规范化拒绝体（AGENTS.md §4.7）
-  if (level === "L4") {
-    return {
-      ok: false,
-      level,
-      response: Response.json(
-        {
-          success: false,
-          error: "L4_FORBIDDEN",
-          message: "L4 动作禁止系统自动审批，须在源业务系统人工发起",
-        },
-        { status: 403 },
-      ),
-    }
-  }
-
-  // L3：高风险，须显式二次确认
-  if (level === "L3" && !input.confirmed) {
-    return {
-      ...blocked(
-        `L3 高风险操作，确认${input.actionName}后将立即生效且无法撤销，请二次确认`,
-        409,
-      ),
-      level,
-    }
-  }
-
-  return { ok: true, actor: await actorFromSession(), level }
 }
 
 const AUTOMATION_LEVEL_WEIGHT = {

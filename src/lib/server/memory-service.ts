@@ -6,6 +6,8 @@
 import { prisma } from "@/lib/prisma"
 import crypto from "crypto"
 import { writeAuditLog } from "./audit"
+import { withTraceStep } from "./reasoning-trace"
+import type { ReasoningTrace } from "./contracts/reasoning-trace"
 
 export interface CreateMemoryInput {
   type: string
@@ -227,6 +229,50 @@ export class MemoryService {
     }).catch((err: unknown) => {
       console.error("[MemoryService] Failed to write audit log for deleteMemory:", err)
     })
+  }
+
+  /**
+   * 搜索记忆
+   */
+  static async searchMemory(
+    workspaceId: string,
+    query: string,
+    trace?: ReasoningTrace
+  ) {
+    return withTraceStep(
+      trace,
+      {
+        type: 'memory.recall',
+        label: '调取相关记忆',
+        inputs: { query },
+      },
+      async (step) => {
+        // 简单实现基于内容的搜索
+        const memories = await prisma.memory.findMany({
+          where: {
+            workspaceId,
+            status: "active",
+            OR: [
+              { content: { contains: query } },
+              { summary: { contains: query } },
+            ],
+          },
+          take: 20,
+        })
+
+        step._pendingUpdate = {
+          outputs: { recalledCount: memories.length },
+          dataSources: memories.slice(0, 5).map(m => ({
+            type: 'memory' as const,
+            id: m.id,
+            label: m.summary ?? m.type,
+            excerpt: m.content?.slice(0, 100),
+          })),
+        }
+
+        return memories
+      }
+    )
   }
 
   /**

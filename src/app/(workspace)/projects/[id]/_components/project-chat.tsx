@@ -33,6 +33,7 @@ function ProjectChatInner() {
     stopStreaming,
     clearMessages,
     loadConversation,
+    currentTrace,
   } = useChat();
 
   const input = useUiStore((s) => s.newTopicInput);
@@ -101,6 +102,7 @@ function ProjectChatInner() {
               messages={messages}
               isStreaming={isStreaming}
               streamingContent={streamingContent}
+              currentTrace={currentTrace}
               conversationId={conversationId}
               onClearMessages={clearMessages}
             />

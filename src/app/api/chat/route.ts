@@ -9,6 +9,7 @@ import { loadIndustryPrompt } from "@/lib/industry-pack-sdk";
 import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace";
 import { selectModel } from "@/lib/server/model-router";
 import { openChatStream } from "@/lib/server/llm-provider";
+import { createTrace } from "@/lib/server/reasoning-trace";
 
 export const runtime = "nodejs";
 
@@ -68,13 +69,19 @@ export async function POST(req: NextRequest) {
       (fullSystem.length + messages.reduce((sum, m) => sum + m.content.length, 0)) / 4,
     );
 
+    // 初始化推理轨迹（供页面展示）
+    const trace = createTrace({
+      workspaceId,
+      conversationId: "ephemeral-chat",
+    });
+
     // 策略路由：对话为低风险 chat 任务，由 selectModel 决策 Provider/模型并留痕
     const routing = await selectModel({
       taskType: "chat",
       riskLevel: "low",
       estimatedTokens,
       workspaceId,
-    });
+    }, trace);
 
     // 客户端模型偏好覆写（modelId 非空时映射到 Provider + Model）
     if (modelId) {
@@ -93,6 +100,7 @@ export async function POST(req: NextRequest) {
       system: fullSystem,
       messages,
       elapsed,
+      trace,
     });
   } catch (error) {
     // 权限不足（VIEWER）：返回 403
@@ -182,18 +190,26 @@ interface SseChatArgs {
   system: string;
   messages: { role: string; content: string }[];
   elapsed: () => string;
+  trace?: any;
 }
 
 /**
  * SSE 流式封装：将 openChatStream 的文本增量封帧为 data: {text} 格式，
  * 统一处理完成 / 错误审计与上游错误友好降级（DeepSeek + Anthropic 对齐）。
  */
-function sseChatStream({ provider, model, system, messages, elapsed }: SseChatArgs) {
+function sseChatStream({ provider, model, system, messages, elapsed, trace }: SseChatArgs) {
   const encoder = new TextEncoder();
 
   const readableStream = new ReadableStream({
     async start(controller) {
       try {
+        if (trace) {
+          // 先将当前的 Trace 信息推送给前端
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: 'trace', trace })}\n\n`),
+          );
+        }
+
         await openChatStream(
           { provider, model, system, messages, maxTokens: 2048 },
           (text) => {

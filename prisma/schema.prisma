@@ -181,6 +181,24 @@ model AgentLog {
 }
 
 // ============================================================
+// 推理轨迹（ReasoningTrace）
+// ============================================================
+model ReasoningTrace {
+  id             String   @id @default(cuid())
+  traceId        String   @unique
+  conversationId String
+  messageId      String?
+  workspaceId    String
+  agentId        String?
+  steps          Json     // TraceStep[]
+  totalDurationMs Int?
+  createdAt      DateTime @default(now())
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@index([workspaceId, createdAt(sort: Desc)])
+}
+
+// ============================================================
 // 项目空间
 // ============================================================
 model Project {

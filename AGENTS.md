@@ -233,6 +233,16 @@ Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私
   - 审计日志（AuditLog）及执行轨迹（AgentLog）禁止物理删除，过期数据只允许归档（软标记）。
   - 短期记忆（Memory type=short, frozen=false）允许物理清理，但清理前后必须写入 AuditLog，记录清理数量与时间窗口，保证清理动作本身可追溯。
   - 所有 Cron 维护脚本的执行结果（含 archived/cleaned 计数）必须写入 AuditLog，action 命名规范：`maintenance.<task>.completed` / `maintenance.<task>.failed`。
+- **推理透明化约定（v3.12）**：
+  - 推理轨迹（ReasoningTrace）专供向企业用户展示 AI 的思考过程和数据溯源，消除“黑箱感”。
+  - 推理轨迹仅属于 Hermes 观察性数据，严禁影响或阻断执行域的核心链路与安全护栏。
+  - 推理轨迹内任何输出与展示，必须在入库前和展示前进行脱敏，过滤掉密码、凭据等高危敏感字段。
+  - 推理轨迹（ReasoningTrace）不能替代用于合规追责的 AuditLog，二者并行存在各司其职。
+  - **Fail-safe 强制约定**：所有 Trace 埋点操作必须通过 `withTraceStep(trace, config, fn)` 高阶函数调用，禁止在业务代码中直接调用 `addTraceStep` / `completeTraceStep`。`withTraceStep` 内部保证：
+    (a) trace 代码异常只写 console.warn，绝不向外抛出（不阻断主链路）；
+    (b) 业务 fn 抛出异常时，步骤状态自动置为 `error`（不卡 running）；
+    (c) 业务 fn 正常返回时，步骤状态自动置为 `passed` 或回调中声明的状态。
+    违反此约定（直接调用底层函数）的 PR 不允许合并。
 
 ---
 
