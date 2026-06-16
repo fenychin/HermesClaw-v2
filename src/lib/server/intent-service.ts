@@ -149,6 +149,8 @@ export async function parseIntentToTaskEnvelope(
           actionType: parsedResult.actionType,
           input: parsedResult.input,
         },
+        reasoning: `使用 ${decision.model}（${decision.provider}）将用户指令解析为动作「${parsedResult.actionType}」`,
+        modelUsed: decision.model,
       }
 
       // 6. Zod 强校验确保绝对合规，校验失败将抛出 ZodError，杜绝绕过

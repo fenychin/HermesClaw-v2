@@ -14,6 +14,7 @@ import type { RiskLevel, AutomationLevel } from "@/types"
 import type { TaskEnvelope } from "@/contracts/task-envelope"
 import { withTraceStep } from "./reasoning-trace"
 import type { ReasoningTrace } from "./contracts/reasoning-trace"
+import { HIGH_RISK_ACTION_APPROVAL_EXPIRY_MS } from "./approval"
 
 export interface GuardrailPass {
   ok: true
@@ -215,7 +216,7 @@ export async function validateTaskAutomationLevel(
           actionSummary: `高危动作被护栏拦截，等待人工审批：${envelope.actionType}`,
           inputSnapshot: envelope.input ?? {},
           policySnapshotVersion: envelope.policySnapshotVersion ?? 'unknown',
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),  // 24 小时有效期
+          expiresAt: new Date(Date.now() + HIGH_RISK_ACTION_APPROVAL_EXPIRY_MS),  // 24 小时有效期
           creator: actor,
         })
       } catch (err) {

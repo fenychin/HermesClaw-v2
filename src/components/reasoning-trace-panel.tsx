@@ -1,164 +1,141 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronRight, Clock, ShieldAlert, Sparkles, AlertCircle } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import React, { useState, useEffect } from 'react'
+import { ChevronDown, ChevronRight, CheckCircle2, XCircle, PauseCircle, Loader2, CircleDashed } from 'lucide-react'
 
-// Make sure to import or define the types locally if they are not exposed to the client
-import type { ReasoningTrace, TraceStep, TraceStepStatus } from "@/lib/server/contracts/reasoning-trace";
-
-interface ReasoningTracePanelProps {
-  trace: ReasoningTrace;
+export interface ReasoningTracePanelProps {
+  traceId: string
+  defaultOpen?: boolean
 }
 
-export function ReasoningTracePanel({ trace }: ReasoningTracePanelProps) {
-  const [expanded, setExpanded] = useState(false);
-
-  if (!trace || !trace.steps || trace.steps.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="my-4 max-w-2xl text-sm">
-      <Card className="overflow-hidden border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50">
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors"
-        >
-          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-            <Sparkles className="h-4 w-4 text-indigo-500" />
-            <span className="font-medium">AI 思考过程</span>
-            <span className="text-xs text-slate-400">
-              ({trace.steps.length} 步)
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            {trace.totalDurationMs && (
-              <span className="text-xs text-slate-400">
-                {(trace.totalDurationMs / 1000).toFixed(1)}s
-              </span>
-            )}
-            {expanded ? (
-              <ChevronDown className="h-4 w-4 text-slate-400" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-slate-400" />
-            )}
-          </div>
-        </button>
-
-        {expanded && (
-          <div className="border-t border-slate-200 p-4 dark:border-slate-800">
-            <div className="flex flex-col gap-4">
-              {trace.steps.map((step, idx) => (
-                <TraceStepItem key={step.id || idx} step={step} />
-              ))}
-            </div>
-          </div>
-        )}
-      </Card>
-    </div>
-  );
+// 简化的接口定义，用于组件内部渲染
+interface TraceStep {
+  id: string
+  type: string
+  status: 'running' | 'passed' | 'completed' | 'blocked' | 'fallback' | 'error' | 'pending'
+  label: string
+  reasoning?: string
+  modelUsed?: string
+  durationMs?: number
 }
 
-function TraceStepItem({ step }: { step: TraceStep }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="flex flex-col gap-2 relative">
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5">
-          <StatusIcon status={step.status} />
-        </div>
-        <div className="flex-1">
-          <button
-            className="flex items-center justify-between w-full text-left font-medium text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
-            onClick={() => setOpen(!open)}
-          >
-            <div className="flex items-center gap-2">
-              <span>{step.label}</span>
-              {step.modelUsed && (
-                <span className="text-[10px] rounded bg-indigo-100 text-indigo-700 px-1.5 py-0.5 dark:bg-indigo-900/50 dark:text-indigo-300">
-                  {step.modelUsed}
-                </span>
-              )}
-            </div>
-            {step.durationMs && (
-              <span className="text-xs text-slate-400 font-normal">
-                {step.durationMs}ms
-              </span>
-            )}
-          </button>
-          
-          {(step.reasoning || step.outputs) && (
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 line-clamp-1 cursor-pointer" onClick={() => setOpen(!open)}>
-              {step.reasoning ? step.reasoning : step.outputs ? "查看详细数据" : ""}
-            </p>
-          )}
-
-          {open && (
-            <div className="mt-3 flex flex-col gap-3 rounded-md bg-white p-3 text-xs shadow-sm ring-1 ring-slate-200 dark:bg-slate-950 dark:ring-slate-800">
-              {step.reasoning && (
-                <div className="whitespace-pre-wrap text-slate-600 dark:text-slate-300">
-                  {step.reasoning}
-                </div>
-              )}
-              
-              {step.dataSources && step.dataSources.length > 0 && (
-                <div>
-                  <div className="font-medium text-slate-700 dark:text-slate-300 mb-1">数据来源:</div>
-                  <ul className="list-disc pl-4 text-slate-600 dark:text-slate-400">
-                    {step.dataSources.map((ds, i) => (
-                      <li key={i}>{ds.label}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {step.inputs && Object.keys(step.inputs).length > 0 && (
-                <div>
-                  <div className="font-medium text-slate-700 dark:text-slate-300 mb-1">Inputs:</div>
-                  <pre className="overflow-x-auto rounded bg-slate-50 p-2 text-[10px] text-slate-600 dark:bg-slate-900 dark:text-slate-400">
-                    {JSON.stringify(step.inputs, null, 2)}
-                  </pre>
-                </div>
-              )}
-
-              {step.outputs && Object.keys(step.outputs).length > 0 && (
-                <div>
-                  <div className="font-medium text-slate-700 dark:text-slate-300 mb-1">Outputs:</div>
-                  <pre className="overflow-x-auto rounded bg-slate-50 p-2 text-[10px] text-slate-600 dark:bg-slate-900 dark:text-slate-400">
-                    {JSON.stringify(step.outputs, null, 2)}
-                  </pre>
-                </div>
-              )}
-
-              {(step.blockedReason || step.fallbackReason) && (
-                <div className="text-amber-600 dark:text-amber-500 font-medium">
-                  {step.blockedReason || step.fallbackReason}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+interface ReasoningTrace {
+  traceId: string
+  steps: TraceStep[]
 }
 
-function StatusIcon({ status }: { status: TraceStepStatus }) {
+function StatusIcon({ status }: { status: TraceStep['status'] }) {
   switch (status) {
-    case "passed":
-      return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
-    case "running":
-      return <Clock className="h-4 w-4 animate-spin text-blue-500" />;
-    case "blocked":
-      return <ShieldAlert className="h-4 w-4 text-rose-500" />;
-    case "fallback":
-      return <AlertCircle className="h-4 w-4 text-amber-500" />;
-    case "error":
-      return <AlertCircle className="h-4 w-4 text-red-500" />;
+    case 'running':
+      return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+    case 'passed':
+    case 'completed':
+      return <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+    case 'error':
+      return <XCircle className="h-4 w-4 text-destructive" />
+    case 'blocked':
+    case 'fallback':
+      return <PauseCircle className="h-4 w-4 text-amber-500" />
+    case 'pending':
     default:
-      return <Clock className="h-4 w-4 text-slate-400" />;
+      return <CircleDashed className="h-4 w-4 text-muted-foreground" />
   }
+}
+
+export function ReasoningTracePanel({ traceId, defaultOpen = false }: ReasoningTracePanelProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen)
+  const [trace, setTrace] = useState<ReasoningTrace | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (isOpen && !trace && !loading && !error) {
+      let isMounted = true
+      setLoading(true)
+      
+      fetch(`/api/reasoning-traces/${traceId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (!isMounted) return
+          if (data.success) {
+            setTrace(data.data)
+          } else {
+            setError(data.error || 'Failed to load trace')
+          }
+        })
+        .catch(err => {
+          if (isMounted) setError(err.message)
+        })
+        .finally(() => {
+          if (isMounted) setLoading(false)
+        })
+        
+      return () => { isMounted = false }
+    }
+  }, [isOpen, traceId, trace, loading, error])
+
+  return (
+    <div className="border border-border rounded-md bg-background text-sm text-foreground overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center w-full px-3 py-2 text-left font-medium text-muted-foreground hover:bg-muted/50 focus:outline-none transition-colors"
+      >
+        {isOpen ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+        查看 AI 推理过程
+      </button>
+
+      {isOpen && (
+        <div className="p-3 border-t border-border bg-muted/20">
+          {loading && (
+            <div className="space-y-3">
+              <div className="h-3 bg-muted rounded animate-pulse w-3/4"></div>
+              <div className="h-3 bg-muted rounded animate-pulse w-1/2"></div>
+              <div className="h-3 bg-muted rounded animate-pulse w-5/6"></div>
+            </div>
+          )}
+          
+          {error && <div className="text-destructive text-xs">加载失败：{error}</div>}
+
+          {trace && trace.steps && (
+            <div className="space-y-4">
+              {trace.steps.map((step) => (
+                <div key={step.id} className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <StatusIcon status={step.status} />
+                    <span className="font-medium">{step.label}</span>
+                    {step.durationMs !== undefined && (
+                      <span className="text-xs text-muted-foreground">
+                        {(step.durationMs / 1000).toFixed(1)}s
+                      </span>
+                    )}
+                  </div>
+                  
+                  {(step.reasoning || step.modelUsed) && (
+                    <div className="ml-6 pl-3 border-l-2 border-border flex flex-col gap-2 mt-0.5">
+                      {step.reasoning && (
+                        <p className="text-muted-foreground leading-relaxed text-xs">
+                          {step.reasoning}
+                        </p>
+                      )}
+                      {step.modelUsed && (
+                        <div className="inline-flex">
+                          <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[10px] font-medium tracking-wider">
+                            {step.modelUsed}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+              
+              {trace.steps.length === 0 && (
+                <div className="text-muted-foreground italic text-xs">暂无推理步骤记录。</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }

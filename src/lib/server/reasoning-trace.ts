@@ -189,3 +189,69 @@ export async function withTraceStep<T>(
 
   return result!
 }
+
+/**
+ * 获取单条推理轨迹
+ */
+export async function getReasoningTrace(traceId: string, workspaceId: string): Promise<ReasoningTrace | null> {
+  const { prisma } = await import('@/lib/prisma')
+  const record = await prisma.reasoningTrace.findUnique({
+    where: { traceId }
+  })
+  
+  if (!record || record.workspaceId !== workspaceId) {
+    return null
+  }
+
+  return {
+    traceId: record.traceId,
+    conversationId: record.conversationId,
+    messageId: record.messageId ?? undefined,
+    workspaceId: record.workspaceId,
+    agentId: record.agentId ?? undefined,
+    steps: typeof record.steps === 'string' ? JSON.parse(record.steps) : record.steps,
+    totalDurationMs: record.totalDurationMs ?? undefined,
+    createdAt: record.createdAt.toISOString(),
+  } as ReasoningTrace
+}
+
+/**
+ * 获取推理轨迹列表
+ */
+export async function listReasoningTraces(
+  workspaceId: string, 
+  options: { workflowRunId: string, page: number, pageSize: number }
+): Promise<{ traces: ReasoningTrace[], total: number, page: number, pageSize: number }> {
+  const { prisma } = await import('@/lib/prisma')
+  const { workflowRunId, page, pageSize } = options
+  const skip = (page - 1) * pageSize
+
+  // 注意：Schema 中对应的是 conversationId，对于 workflow run 其上下文通常存放在这里
+  const where = {
+    workspaceId,
+    conversationId: workflowRunId,
+  }
+
+  const [records, total] = await Promise.all([
+    prisma.reasoningTrace.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: pageSize,
+    }),
+    prisma.reasoningTrace.count({ where }),
+  ])
+
+  const traces = records.map(record => ({
+    traceId: record.traceId,
+    conversationId: record.conversationId,
+    messageId: record.messageId ?? undefined,
+    workspaceId: record.workspaceId,
+    agentId: record.agentId ?? undefined,
+    steps: typeof record.steps === 'string' ? JSON.parse(record.steps) : record.steps,
+    totalDurationMs: record.totalDurationMs ?? undefined,
+    createdAt: record.createdAt.toISOString(),
+  })) as ReasoningTrace[]
+
+  return { traces, total, page, pageSize }
+}
