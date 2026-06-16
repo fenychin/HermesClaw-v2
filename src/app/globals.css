@@ -14,19 +14,19 @@
 .dark {
   /* —— 基础语义色 —— */
   --background: #0b0b0c;            /* 页面主背景 */
-  --foreground: #f5f5f7;           /* 一级文字 */
+  --foreground: #d4d4d8;           /* 一级文字 */
   --card: #18181b;                 /* 卡片背景 */
-  --card-foreground: #f5f5f7;
+  --card-foreground: #d4d4d8;
   --popover: #202024;              /* 浮层背景 */
-  --popover-foreground: #f5f5f7;
+  --popover-foreground: #d4d4d8;
   --primary: #7c5cff;              /* 品牌主色 */
   --primary-foreground: #f5f5f7;
   --secondary: #202024;            /* 次级按钮 */
-  --secondary-foreground: #f5f5f7;
+  --secondary-foreground: #d4d4d8;
   --muted: #18181b;
   --muted-foreground: #a1a1aa;     /* 二级文字 */
   --accent: #24242a;               /* hover 背景 */
-  --accent-foreground: #f5f5f7;
+  --accent-foreground: #d4d4d8;
   --destructive: #ff6b6b;          /* 风险色 */
   --destructive-foreground: #f5f5f7;
   --border: #2a2a31;               /* 分隔线 */
@@ -50,11 +50,11 @@
 
   /* —— 侧边栏 —— */
   --sidebar: #111112;              /* 侧边栏背景 */
-  --sidebar-foreground: #f5f5f7;
+  --sidebar-foreground: #d4d4d8;
   --sidebar-primary: #7c5cff;
   --sidebar-primary-foreground: #f5f5f7;
   --sidebar-accent: #24242a;       /* 侧栏 hover */
-  --sidebar-accent-foreground: #f5f5f7;
+  --sidebar-accent-foreground: #d4d4d8;
   --sidebar-border: #2a2a31;
   --sidebar-ring: #7c5cff;
 

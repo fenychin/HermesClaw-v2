@@ -260,6 +260,15 @@ async function generateWithDeepSeek(
   }
 }
 
+interface SuggestionsCache {
+  snapshotHash: string
+  timestamp: number
+  result: HermesSuggestionsResult
+}
+
+let suggestionsCache: SuggestionsCache | null = null
+const CACHE_TTL_MS = 15 * 60 * 1000 // 15分钟缓存过期
+
 /**
  * 生成 Hermes 今日建议。
  *
@@ -267,12 +276,39 @@ async function generateWithDeepSeek(
  * 决策自动写入 AuditLog(action='model.route')。
  *
  * LLM 不可用时返回基于系统快照的预设建议。
+ *
+ * 🔄 已优化：支持 process.env.ENABLE_LLM_SUGGESTIONS === 'false' 降级与 15min 内存缓存。
  */
 export async function generateHermesSuggestions(): Promise<HermesSuggestionsResult> {
   const snapshot = await collectSnapshot()
   const prompt = buildUserPrompt(snapshot)
 
-  // LLM 不可用时返回基于系统快照的预设建议
+  // 1. 检查环境变量降级控制：若明确关闭 LLM 建议，则直接走 fallback 降级
+  const enableLlm = process.env.ENABLE_LLM_SUGGESTIONS !== "false"
+
+  if (!enableLlm) {
+    return {
+      suggestions: fallbackSuggestions(snapshot),
+      snapshot,
+      provider: "deepseek",
+      model: "fallback",
+    }
+  }
+
+  // 2. 检查内存缓存是否命中（基于核心指标哈希与 TTL 校验）
+  const snapshotHash = `${snapshot.pendingProposals}-${snapshot.errorRate}-${snapshot.atRiskCount}-${snapshot.knowledgeGapsCount}`
+  if (
+    suggestionsCache &&
+    Date.now() - suggestionsCache.timestamp < CACHE_TTL_MS &&
+    suggestionsCache.snapshotHash === snapshotHash
+  ) {
+    return {
+      ...suggestionsCache.result,
+      snapshot, // 始终返回最新收集的快照指标，确保前端面板数值实时准确
+    }
+  }
+
+  // 3. LLM 不可用时返回基于系统快照的预设建议
   if (!isProviderAvailable("anthropic") && !isProviderAvailable("deepseek")) {
     return {
       suggestions: fallbackSuggestions(snapshot),
@@ -298,10 +334,19 @@ export async function generateHermesSuggestions(): Promise<HermesSuggestionsResu
     generated = await generateWithDeepSeek(prompt, routing.model)
   }
 
-  return {
+  const result: HermesSuggestionsResult = {
     suggestions: generated.suggestions,
     snapshot,
     provider: routing.provider,
     model: generated.model,
   }
+
+  // 4. 写入内存缓存
+  suggestionsCache = {
+    snapshotHash,
+    timestamp: Date.now(),
+    result,
+  }
+
+  return result
 }

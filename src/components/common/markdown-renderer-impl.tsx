@@ -54,7 +54,7 @@ export default function MarkdownRendererImpl({ content }: { content: string }) {
 
         // ===== 行内样式 =====
         strong: ({ children }) => (
-          <strong className="font-semibold text-foreground">{children}</strong>
+          <strong className="font-semibold text-foreground/90">{children}</strong>
         ),
         em: ({ children }) => (
           <em className="italic text-muted-foreground/90">{children}</em>

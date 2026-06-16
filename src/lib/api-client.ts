@@ -94,7 +94,11 @@ export const apiClient = {
     apiFetch<{ projects: unknown[] }>("/api/projects"),
 
   getProject: (id: string) =>
-    apiFetch<{ project: unknown }>(`/api/projects/${id}`),
+    apiFetch<{
+      project: any
+      memories?: any[]
+      workflowRuns?: any[]
+    }>(`/api/projects/${id}`),
 
   createProject: (data: Record<string, unknown>) =>
     apiFetch<{ project: unknown }>("/api/projects", {

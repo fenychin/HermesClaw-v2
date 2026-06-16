@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -99,6 +100,7 @@ export function SuggestionPanel({
   });
 
   const suggestions = suggestionsResult?.suggestions ?? [];
+  const snapshot = suggestionsResult?.snapshot;
   // 错误降级（API 不可用时保持页面可用）
   // 无需单独 error toast — Skeleton→error 过渡已足够明显
 
@@ -176,7 +178,35 @@ export function SuggestionPanel({
 
         {/* ---- 成功：真实 AI 建议 ---- */}
         {!suggestionsLoading && !suggestionsError && suggestions.length > 0 && (
-          <div className="space-y-2.5">
+          <div className="space-y-3">
+            {/* 实时快照微型看板 */}
+            {snapshot && (
+              <div className="flex items-center justify-between bg-muted/30 border border-border/50 rounded-xl p-2.5 text-[10px] text-muted-foreground">
+                <div className="flex flex-col items-center flex-1 border-r border-border/30 last:border-0 gap-0.5">
+                  <span className="font-semibold text-foreground text-xs">{snapshot.pendingProposals}</span>
+                  <span>待审批提案</span>
+                </div>
+                <div className="flex flex-col items-center flex-1 border-r border-border/30 last:border-0 gap-0.5">
+                  <span className={cn("font-semibold text-xs", snapshot.errorRate > 10 ? "text-destructive" : "text-foreground")}>
+                    {snapshot.errorRate}%
+                  </span>
+                  <span>24h错误率</span>
+                </div>
+                <div className="flex flex-col items-center flex-1 border-r border-border/30 last:border-0 gap-0.5">
+                  <span className={cn("font-semibold text-xs", snapshot.atRiskCount > 0 ? "text-destructive" : "text-foreground")}>
+                    {snapshot.atRiskCount}
+                  </span>
+                  <span>风险项目</span>
+                </div>
+                <div className="flex flex-col items-center flex-1 last:border-0 gap-0.5">
+                  <span className={cn("font-semibold text-xs", snapshot.knowledgeGapsCount && snapshot.knowledgeGapsCount > 0 ? "text-primary" : "text-foreground")}>
+                    {snapshot.knowledgeGapsCount ?? 0}
+                  </span>
+                  <span>知识盲区</span>
+                </div>
+              </div>
+            )}
+
             {suggestions.map((s, i) => {
               const relatedMeta = RELATED_META[s.relatedTo];
               const RelatedIcon = relatedMeta.icon;

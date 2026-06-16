@@ -109,9 +109,8 @@ export const SidebarRecent = memo(function SidebarRecent({
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="overflow-hidden"
           >
-            <div className="mt-1 ml-9 space-y-0.5 pr-2">
+            <div className="mt-1 ml-1 space-y-0.5 pr-2">
               {recentRecords.map((record) => {
-                const Icon = TYPE_ICON[record.type];
                 const linkHref = `/new?load=${record.id}`;
                 return (
                   <Link
@@ -122,9 +121,6 @@ export const SidebarRecent = memo(function SidebarRecent({
                       "hover:bg-sidebar-accent transition-colors",
                     )}
                   >
-                    <Icon
-                      className={cn("size-3 shrink-0", TYPE_COLOR[record.type])}
-                    />
                     <span className="text-sidebar-foreground text-xs truncate flex-1">
                       {record.title}
                     </span>

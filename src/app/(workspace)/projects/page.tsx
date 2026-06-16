@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/common/empty-state";
 import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { apiClient } from "@/lib/api-client";
 
 import { ProjectCard } from "./_components/project-card";
 import { NewProjectDialog } from "./_components/new-project-dialog";
@@ -33,12 +34,7 @@ export default function ProjectsPage() {
   // 1. 获取真实项目列表 (包括 active 和 archived)
   const { data: projectData, isLoading, refetch } = useQuery({
     queryKey: ["projects-list"],
-    queryFn: async () => {
-      // 默认拉取活跃的项目
-      const res = await fetch("/api/projects?status=active&limit=100");
-      if (!res.ok) throw new Error("获取项目列表失败");
-      return res.json();
-    },
+    queryFn: () => apiClient.getProjects(),
   });
 
   const projects = projectData?.projects || [];
@@ -52,15 +48,7 @@ export default function ProjectsPage() {
 
   // 2. 新建项目空间 Mutation
   const createMutation = useMutation({
-    mutationFn: async (body: any) => {
-      const res = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error("创建项目空间失败");
-      return res.json();
-    },
+    mutationFn: (body: any) => apiClient.createProject(body),
     onSuccess: () => {
       toast.success("项目空间创建成功，已初始化专属中期记忆");
       queryClient.invalidateQueries({ queryKey: ["projects-list"] });
@@ -73,15 +61,8 @@ export default function ProjectsPage() {
 
   // 3. 更新项目 Mutation
   const updateMutation = useMutation({
-    mutationFn: async ({ id, fields }: { id: string; fields: any }) => {
-      const res = await fetch(`/api/projects/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(fields),
-      });
-      if (!res.ok) throw new Error("更新项目失败");
-      return res.json();
-    },
+    mutationFn: ({ id, fields }: { id: string; fields: any }) =>
+      apiClient.updateProject(id, fields),
     onSuccess: () => {
       toast.success("项目更新成功");
       queryClient.invalidateQueries({ queryKey: ["projects-list"] });
@@ -93,14 +74,7 @@ export default function ProjectsPage() {
 
   // 4. 删除项目 Mutation (物理删除或软归档)
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      // DELETE 会触发二次确认
-      const res = await fetch(`/api/projects/${id}?confirm=true`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("删除项目失败");
-      return res.json();
-    },
+    mutationFn: (id: string) => apiClient.deleteProject(id, true),
     onSuccess: () => {
       toast.success("项目已成功删除，关联记忆已自动解绑");
       queryClient.invalidateQueries({ queryKey: ["projects-list"] });

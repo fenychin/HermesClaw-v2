@@ -23,6 +23,7 @@ import { ProjectTabs } from "./_components/project-tabs";
 import { ProjectRiskPanel } from "./_components/project-risk-panel";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { apiClient } from "@/lib/api-client";
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -34,9 +35,7 @@ export default function ProjectDetailPage() {
     queryKey: ["project-detail", id],
     queryFn: async () => {
       if (!id) return null;
-      const res = await fetch(`/api/projects/${id}`);
-      if (!res.ok) throw new Error("获取项目详情失败");
-      return res.json();
+      return apiClient.getProject(id);
     },
     enabled: !!id,
   });

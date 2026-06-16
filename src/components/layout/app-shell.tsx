@@ -5,6 +5,7 @@ import { Sidebar } from "./sidebar";
 import { TopBar } from "./TopBar";
 import { useAgentStore } from "@/stores/agent-store";
 import { useProjectStore } from "@/stores/project-store";
+import { useTradeStore } from "@/stores/trade-store";
 import { useOpenClawStream } from "@/hooks/use-openclaw-stream";
 
 /** 工作台外壳：左侧侧边栏 + 右侧（TopBar + 主内容滚动区） */
@@ -27,6 +28,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         const projectState = useProjectStore.getState();
         if (projectState.projects.length === 0 && !projectState.loading) {
           projectState.loadProjects();
+        }
+        const tradeState = useTradeStore.getState();
+        if (tradeState.intelligence.length === 0 && !tradeState.loading) {
+          tradeState.loadIntelligence();
         }
       },
       { timeout: 3000 },

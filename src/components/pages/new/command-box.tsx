@@ -334,95 +334,10 @@ export function CommandBox({
   // 记录最后一次 final 结果在输入框中的起始位置，用于仅更新 interim 区域
   const lastFinalLengthRef = useRef(0);
 
-  const toggleRecording = async () => {
-    if (isRecording) {
-      recognitionRef.current?.stop();
-      setIsRecording(false);
-      return;
-    }
-
-    // 检测浏览器 SpeechRecognition API 支持
-    const SpeechRecognitionAPI =
-      (window as unknown as { SpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition ||
-      (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
-
-    if (!SpeechRecognitionAPI) {
-      toast.error("当前浏览器不支持语音识别", {
-        description: "请使用 Chrome 或 Edge 浏览器",
-      });
-      return;
-    }
-
-    try {
-      const recognition = new SpeechRecognitionAPI();
-      recognitionRef.current = recognition;
-
-      // 配置：中文识别
-      recognition.lang = "zh-CN";
-      recognition.interimResults = true;
-      recognition.continuous = false; // 单段识别更稳定，避免 isFinal 管理复杂度
-      recognition.maxAlternatives = 1;
-
-      // 记录识别开始前的基础文本（不含之前可能残留的语音文本）
-      const baseText = value;
-      lastFinalLengthRef.current = baseText.length;
-
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        let finalText = "";
-        let interimText = "";
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            finalText += result[0].transcript;
-          } else {
-            interimText += result[0].transcript;
-          }
-        }
-
-        // 用原生 isFinal 状态管理：基础文本 + 已确认文本 + (中间文本)
-        const base = value.slice(0, lastFinalLengthRef.current);
-        if (finalText) {
-          // final 结果：追加到基础文本末尾
-          const newBase = `${base} ${finalText}`.trim();
-          onChange(newBase);
-          lastFinalLengthRef.current = newBase.length;
-        } else if (interimText) {
-          // interim 结果：在基础文本后临时展示
-          onChange(`${base} ${interimText}`.trim());
-        }
-      };
-
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        if (event.error === "no-speech") {
-          toast.info("未检测到语音", { description: "请靠近麦克风再试一次" });
-        } else if (event.error === "not-allowed") {
-          setVoicePermissionDenied(true);
-          toast.error("麦克风权限被拒绝", {
-            description: "请在浏览器设置中允许麦克风访问后重试",
-          });
-        } else if (event.error === "aborted") {
-          // 用户手动停止，无提示
-        } else {
-          toast.error("语音识别出错", { description: event.error || "未知错误" });
-        }
-        setIsRecording(false);
-      };
-
-      recognition.onend = () => {
-        setIsRecording(false);
-      };
-
-      recognition.start();
-      setIsRecording(true);
-      toast.success("正在聆听…", { description: "说话内容将自动转为文字" });
-    } catch (err) {
-      const msg = err instanceof DOMException && err.name === "NotAllowedError"
-        ? "麦克风权限被拒绝，请在浏览器设置中允许后重试"
-        : "请检查浏览器麦克风权限设置";
-      toast.error("无法启动语音识别", { description: msg });
-      setVoicePermissionDenied(true);
-    }
+  const toggleRecording = () => {
+    toast.info("语音输入功能正在开发中，敬请期待…", {
+      description: "下一版本将接入专业级 AI 语音大模型，提供精准的高速语音解析。",
+    });
   };
 
   // ---- URL 粘贴（元数据 + 全文内容抓取，供 AI 分析） ----
@@ -600,78 +515,7 @@ export function CommandBox({
             aria-hidden="true"
           />
 
-          {/* 语音输入 */}
-          <button
-            type="button"
-            onClick={toggleRecording}
-            className={cn(
-              "rounded-lg p-1.5 transition-colors",
-              isRecording
-                ? "text-danger bg-danger/10 animate-pulse"
-                : "text-hint hover:text-foreground hover:bg-accent",
-            )}
-            title={isRecording ? "停止录音" : voicePermissionDenied ? "语音输入（需麦克风权限）" : "语音输入"}
-          >
-            {isRecording ? <MicOff className="size-4" /> : <Mic className="size-4" />}
-          </button>
 
-          {/* 粘贴 URL */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => {
-                setShowUrlInput(!showUrlInput);
-                setShowSlashMenu(false);
-                setActiveDropdown(null);
-              }}
-              className={cn(
-                "rounded-lg p-1.5 transition-colors",
-                showUrlInput
-                  ? "text-primary bg-primary/10"
-                  : "text-hint hover:text-foreground hover:bg-accent",
-              )}
-              title="粘贴链接"
-            >
-              <Link className="size-4" />
-            </button>
-
-            {/* URL 输入弹窗 */}
-            <AnimatePresence>
-              {showUrlInput && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                  transition={{ duration: 0.15, ease: "easeOut" }}
-                  className="absolute bottom-full left-0 mb-2 w-72 bg-popover border border-border rounded-xl shadow-2xl z-50 overflow-hidden"
-                >
-                  <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
-                    <Globe className="size-3.5 text-hint shrink-0" />
-                    <input
-                      ref={urlInputRef}
-                      autoFocus
-                      value={urlValue}
-                      onChange={(e) => setUrlValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleUrlPaste();
-                        if (e.key === "Escape") setShowUrlInput(false);
-                      }}
-                      placeholder="粘贴或输入 URL…"
-                      className="flex-1 bg-transparent text-sm text-foreground placeholder:text-hint outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleUrlPaste}
-                      disabled={!urlValue.trim() || urlFetching}
-                      className="text-primary hover:text-primary/80 text-xs font-medium disabled:opacity-40 shrink-0"
-                    >
-                      {urlFetching ? "获取中…" : "插入"}
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
 
           {/* @ 智能体 */}
           <div className="relative">
@@ -854,66 +698,10 @@ export function CommandBox({
             </AnimatePresence>
           </div>
 
-          {/* / 命令 */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => {
-                setShowSlashMenu(!showSlashMenu);
-                setShowUrlInput(false);
-                setActiveDropdown(null);
-              }}
-              className={cn(
-                "rounded-lg p-1.5 transition-colors",
-                showSlashMenu
-                  ? "text-primary bg-primary/10"
-                  : "text-hint hover:text-foreground hover:bg-accent",
-              )}
-              title="/ 命令"
-            >
-              <Slash className="size-4" />
-            </button>
 
-            {/* 技能命令下拉 */}
-            <AnimatePresence>
-              {showSlashMenu && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                  transition={{ duration: 0.15, ease: "easeOut" }}
-                  className="absolute bottom-full right-0 mb-2 w-64 bg-popover border border-border rounded-xl shadow-2xl z-50 overflow-hidden"
-                >
-                  <div className="max-h-72 overflow-y-auto py-1">
-                    <p className="text-hint text-[10px] font-bold px-3 py-1.5 uppercase tracking-wider">
-                      技能命令
-                    </p>
-                    {slashCommands.map((cmd) => (
-                      <button
-                        key={cmd.name}
-                        type="button"
-                        onClick={() => handleSlashCommand(cmd.name)}
-                        className="w-full flex items-start gap-2.5 px-3 py-2.5 hover:bg-accent transition-colors text-left"
-                      >
-                        <Zap className="size-3.5 text-primary mt-0.5 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-foreground text-sm font-medium truncate">
-                            {cmd.name}
-                          </p>
-                          <p className="text-hint text-xs truncate leading-tight mt-0.5">
-                            {cmd.desc}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
         </div>
 
-        {/* 右侧：模型选择器 + 发送 / 停止按钮 */}
+        {/* 右侧：模型选择器 + 语音输入 + 发送 / 停止按钮 */}
         <div className="flex items-center gap-2">
           {/* 模型选择器（紧凑行内下拉） */}
           {onModelChange && selectedModelId && (
@@ -923,6 +711,21 @@ export function CommandBox({
               disabled={isStreaming}
             />
           )}
+
+          {/* 语音输入按钮（置于中间，突出重要性） */}
+          <button
+            type="button"
+            onClick={toggleRecording}
+            className={cn(
+              "size-8 flex items-center justify-center rounded-lg transition-colors shrink-0",
+              isRecording
+                ? "text-danger bg-danger/10 animate-pulse"
+                : "text-hint hover:text-foreground hover:bg-accent",
+            )}
+            title={isRecording ? "停止录音" : voicePermissionDenied ? "语音输入（需麦克风权限）" : "语音输入"}
+          >
+            {isRecording ? <MicOff className="size-4" /> : <Mic className="size-4" />}
+          </button>
 
           {isStreaming ? (
             <Button
