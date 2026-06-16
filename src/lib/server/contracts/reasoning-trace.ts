@@ -14,6 +14,7 @@ export type TraceStepType =
   | 'connector.call'      // 连接器调用
   | 'proposal.generate'   // 提案生成
   | 'fallback.triggered'  // 降级触发
+  | 'llm.generate'        // 模型推理与生成
 
 export type TraceStepStatus = 'running' | 'passed' | 'blocked' | 'fallback' | 'error'
 

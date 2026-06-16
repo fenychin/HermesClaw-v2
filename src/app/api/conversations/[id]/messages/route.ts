@@ -57,6 +57,26 @@ export async function POST(
             content: body.content,
           },
         })
+
+        // 检查并写入推理轨迹 (ReasoningTrace)
+        if (body.trace) {
+          try {
+            await prisma.reasoningTrace.create({
+              data: {
+                traceId: body.trace.traceId,
+                conversationId,
+                messageId: messageId,
+                workspaceId: ctx.workspaceId,
+                steps: body.trace.steps,
+                totalDurationMs: body.trace.totalDurationMs || null,
+              }
+            })
+          } catch (traceErr) {
+            // Fail-safe: 异常不阻断主链路消息保存
+            logger.warn('写入推理轨迹失败 (已忽略)', { error: traceErr instanceof Error ? traceErr.message : '未知错误' })
+          }
+        }
+
         // 自动更新对话的 updatedAt
         await prisma.conversation.update({
           where: { id: conversationId },

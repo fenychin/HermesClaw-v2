@@ -121,6 +121,14 @@ export const ConversationCreateSchema = z.object({
       z.object({
         role: z.enum(["user", "assistant"]),
         content: z.string().min(1).max(100000),
+        trace: z
+          .object({
+            traceId: z.string(),
+            steps: z.array(z.any()),
+            totalDurationMs: z.number().optional().nullable(),
+          })
+          .optional()
+          .nullable(),
       }),
     )
     .max(100)
@@ -130,6 +138,14 @@ export const ConversationCreateSchema = z.object({
 export const ConversationMessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string().min(1).max(100000),
+  trace: z
+    .object({
+      traceId: z.string(),
+      steps: z.array(z.any()),
+      totalDurationMs: z.number().optional().nullable(),
+    })
+    .optional()
+    .nullable(),
 });
 
 // ==============================

@@ -3,8 +3,9 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { PageTransition } from "@/components/common/PageTransition";
 import { CommandBox } from "@/components/pages/new/command-box";
 import { QuickCards } from "@/components/pages/new/quick-cards";
@@ -129,12 +130,23 @@ function NewTopicPageInner() {
   return (
     <PageTransition>
       <div className="h-full flex bg-background">
-        {/* 左栏：对话区撑满上方，输入框 + 快捷入口由 layout 动画在居中/底部之间切换 */}
-        <div className="flex-1 flex flex-col min-w-0 min-h-0">
-          {/* 对话历史 — 仅在有消息时占据上方空间，内部滚动 */}
+        {/* 左栏：整个中栏设为可滚动 */}
+        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col relative">
+          {/* 顶部操作栏：有对话时显示新对话按钮 */}
           {hasMessages && (
-            <div className="flex-1 min-h-0 overflow-hidden px-4 md:px-8 pt-6">
-              <div className="h-full max-w-2xl mx-auto">
+            <div className="sticky top-0 flex justify-between items-center px-4 md:px-8 py-3 border-b border-border/50 bg-background/95 backdrop-blur z-20 shrink-0">
+              <div className="text-sm font-medium text-muted-foreground">当前对话</div>
+              <Button onClick={clearMessages} variant="outline" size="sm" className="gap-1.5 rounded-full">
+                <Plus className="size-3.5" />
+                新对话
+              </Button>
+            </div>
+          )}
+
+          {/* 对话历史 — 移除内部滚动，改为由外层容器滚动 */}
+          {hasMessages && (
+            <div className="flex-1 px-4 md:px-8 pt-6 pb-2">
+              <div className="max-w-2xl mx-auto">
                 <ConversationArea
                   messages={messages}
                   isStreaming={isStreaming}
@@ -147,15 +159,13 @@ function NewTopicPageInner() {
             </div>
           )}
 
-          {/* 输入框 + 快捷入口 — layout 动画：空态居中 ↔ 有消息沉底 */}
-          <motion.div
-            layout
-            transition={{ type: "spring", stiffness: 350, damping: 30 }}
+          {/* 输入框 + 快捷入口 — 使用 sticky 悬浮在底部 */}
+          <div
             className={cn(
-              "px-4 md:px-8",
+              "px-4 md:px-8 w-full",
               hasMessages
-                ? "shrink-0 pb-4 pt-2"
-                : "flex-1 flex flex-col items-center justify-center",
+                ? "sticky bottom-0 shrink-0 pb-6 pt-2 bg-background/95 backdrop-blur z-10"
+                : "flex-1 flex flex-col items-center justify-center min-h-full",
             )}
           >
             <div className="w-full max-w-2xl mx-auto">
@@ -175,42 +185,9 @@ function NewTopicPageInner() {
             {!hasMessages && (
               <div className="w-full max-w-2xl mx-auto mt-5 space-y-4">
                 <QuickCards onSelect={handleQuickActionSelect} />
-
-                {/* 结构化快捷任务（置信度护栏）— 可折叠 */}
-                <div className="border-t border-border pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowQuickTask((v) => !v)}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <ChevronDown
-                      className={cn(
-                        "size-3.5 transition-transform duration-200",
-                        showQuickTask && "rotate-180",
-                      )}
-                    />
-                    结构化任务
-                    <span className="text-hint font-normal">（带置信度护栏，低置信度自动提示人工复核）</span>
-                  </button>
-                  <AnimatePresence>
-                    {showQuickTask && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="pt-3">
-                          <QuickTaskPanel />
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
               </div>
             )}
-          </motion.div>
+          </div>
         </div>
 
         <aside className="w-64 xl:w-72 shrink-0 border-l border-border overflow-y-auto hidden xl:flex flex-col p-3">

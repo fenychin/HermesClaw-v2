@@ -215,12 +215,13 @@ export const apiClient = {
     convId: string,
     role: "user" | "assistant",
     content: string,
+    trace?: any,
   ) =>
     apiFetch<{ message: unknown }>(
       `/api/conversations/${convId}/messages`,
       {
         method: "POST",
-        body: JSON.stringify({ role, content }),
+        body: JSON.stringify({ role, content, trace }),
       },
     ),
 

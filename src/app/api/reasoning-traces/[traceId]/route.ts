@@ -5,9 +5,10 @@ import { getReasoningTrace } from "@/lib/server/reasoning-trace";
  * GET /api/reasoning-traces/[traceId]
  * 获取单条推理轨迹（含所有 steps）
  */
-export const GET = withRBAC(async (request, ctx, { params }) => {
+export const GET = withRBAC<{ params: Promise<{ traceId: string }> }>(async (request, ctx, { params }) => {
   try {
-    const traceId = params.traceId;
+    const resolvedParams = await params;
+    const traceId = resolvedParams.traceId;
     if (!traceId) {
       return Response.json({ success: false, error: "Trace ID is required" }, { status: 400 });
     }

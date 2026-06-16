@@ -46,6 +46,13 @@ export async function POST(request: Request) {
     const conversationId = crypto.randomUUID()
     const actor = await actorFromSession()
 
+    const messagesWithId = body.messages?.map((m) => ({
+      id: crypto.randomUUID(),
+      role: m.role,
+      content: m.content,
+      trace: m.trace,
+    }))
+
     // 预记录审计 + 写库 + 成功/失败回填，统一经 auditedWrite（§4.3 / §5 #3）
     const conversation = await auditedWrite(
       {
@@ -59,8 +66,8 @@ export async function POST(request: Request) {
         workspaceId: ctx.workspaceId,
         detail: `创建对话: ${body.title}`,
       },
-      () =>
-        prisma.conversation.create({
+      async () => {
+        const created = await prisma.conversation.create({
           data: {
             id: conversationId,
             workspaceId: ctx.workspaceId,
@@ -68,10 +75,10 @@ export async function POST(request: Request) {
             projectId: body.projectId,
             // 优先批量 messages[]（原子回放），其次单条 initialMessage（向后兼容）
             messages:
-              body.messages && body.messages.length > 0
+              messagesWithId && messagesWithId.length > 0
                 ? {
-                    create: body.messages.map((m) => ({
-                      id: crypto.randomUUID(),
+                    create: messagesWithId.map((m) => ({
+                      id: m.id,
                       workspaceId: ctx.workspaceId,
                       role: m.role,
                       content: m.content,
@@ -91,7 +98,32 @@ export async function POST(request: Request) {
           include: {
             _count: { select: { messages: true } },
           },
-        }),
+        })
+
+        // 保存成功后，如果有些 messagesWithId 带有 trace，也一并写入数据库
+        if (messagesWithId) {
+          for (const m of messagesWithId) {
+            if (m.trace) {
+              try {
+                await prisma.reasoningTrace.create({
+                  data: {
+                    traceId: m.trace.traceId,
+                    conversationId,
+                    messageId: m.id,
+                    workspaceId: ctx.workspaceId,
+                    steps: m.trace.steps,
+                    totalDurationMs: m.trace.totalDurationMs || null,
+                  }
+                })
+              } catch (traceErr) {
+                logger.warn('批量导入写入推理轨迹失败 (已忽略)', { error: traceErr instanceof Error ? traceErr.message : '未知错误' })
+              }
+            }
+          }
+        }
+
+        return created
+      },
       { onSuccess: (c) => ({ detail: `对话已创建: ${c.id}` }) },
     )
 

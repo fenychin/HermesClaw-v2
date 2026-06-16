@@ -36,7 +36,34 @@ export async function GET(
       return errorResponse("对话不存在", 404)
     }
 
-    return successResponse({ conversation })
+    // 查询消息关联的 ReasoningTrace 列表
+    const messageIds = conversation.messages.map((m) => m.id)
+    const traces = await prisma.reasoningTrace.findMany({
+      where: { messageId: { in: messageIds } },
+    })
+
+    const traceMap = new Map<string, any>()
+    for (const t of traces) {
+      if (t.messageId) {
+        traceMap.set(t.messageId, {
+          traceId: t.traceId,
+          steps: typeof t.steps === 'string' ? JSON.parse(t.steps) : t.steps,
+          totalDurationMs: t.totalDurationMs,
+        })
+      }
+    }
+
+    const messagesWithTrace = conversation.messages.map((m) => ({
+      ...m,
+      trace: traceMap.get(m.id) || null,
+    }))
+
+    return successResponse({
+      conversation: {
+        ...conversation,
+        messages: messagesWithTrace,
+      },
+    })
   } catch (error) {
     logger.error('GET /api/conversations/[id]: 失败', { error: error instanceof Error ? error.message : '未知错误' })
     return errorResponse("服务器内部错误")

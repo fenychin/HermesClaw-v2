@@ -297,7 +297,7 @@ export interface OpenChatStreamOptions {
 }
 
 /** 文本增量回调：每收到一个 text delta 即调用 */
-export type TextDeltaCallback = (text: string) => void | Promise<void>
+export type TextDeltaCallback = (text: string, isReasoning?: boolean) => void | Promise<void>
 
 interface MockStreamArgs {
   provider: string
@@ -438,8 +438,15 @@ async function streamDeepSeekShared({
 
         try {
           const parsed = JSON.parse(data)
-          const content = parsed.choices?.[0]?.delta?.content
-          if (content) await onDelta(content)
+          const delta = parsed.choices?.[0]?.delta
+          if (delta) {
+            if (delta.reasoning_content) {
+              await onDelta(delta.reasoning_content, true)
+            }
+            if (delta.content) {
+              await onDelta(delta.content, false)
+            }
+          }
         } catch {
           // 跳过解析失败的中间帧
         }
@@ -484,15 +491,17 @@ async function streamAnthropicShared({
     max_tokens: maxTokens,
     system,
     messages: anthropicMessages,
+    // Note: To enable thinking block in streaming for Anthropic, we would need to pass thinking options here.
+    // Assuming standard stream for now, but listening for thinking blocks if enabled.
   })
 
   for await (const event of stream) {
-    if (
-      event.type === "content_block_delta" &&
-      event.delta.type === "text_delta" &&
-      event.delta.text
-    ) {
-      await onDelta(event.delta.text)
+    if (event.type === "content_block_delta" && event.delta) {
+      if (event.delta.type === "text_delta" && event.delta.text) {
+        await onDelta(event.delta.text, false)
+      } else if (event.delta.type === "thinking_delta" && (event.delta as any).thinking) {
+        await onDelta((event.delta as any).thinking, true)
+      }
     }
   }
 }

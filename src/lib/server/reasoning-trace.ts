@@ -70,7 +70,7 @@ export function addTraceStep(
  */
 export function completeTraceStep(
   step: TraceStep,
-  update: Partial<Pick<TraceStep, 'status' | 'outputs' | 'reasoning' | 'dataSources' | 'blockedReason' | 'fallbackReason'>>
+  update: Partial<Pick<TraceStep, 'status' | 'outputs' | 'reasoning' | 'dataSources' | 'blockedReason' | 'fallbackReason' | 'modelUsed'>>
 ): void {
   const now = new Date()
   step.completedAt = now.toISOString()
@@ -89,6 +89,7 @@ export function completeTraceStep(
   if (update.dataSources) step.dataSources = update.dataSources
   if (update.blockedReason) step.blockedReason = update.blockedReason
   if (update.fallbackReason) step.fallbackReason = update.fallbackReason
+  if (update.modelUsed) step.modelUsed = update.modelUsed
 }
 
 /**

@@ -54,7 +54,10 @@ export async function POST(req: NextRequest) {
     
     // 从行业包动态加载提示词
     const promptKey = (systemPrompt === "hermes" || !systemPrompt) ? "hermes" : systemPrompt;
-    const loadedPrompt = loadIndustryPrompt("foreign-trade", promptKey);
+    let loadedPrompt: string | null = null;
+    if (/^[a-zA-Z0-9_-]+$/.test(promptKey)) {
+      loadedPrompt = loadIndustryPrompt("foreign-trade", promptKey);
+    }
     let baseSystem = "";
     if (loadedPrompt) {
       baseSystem = loadedPrompt;
@@ -193,10 +196,6 @@ interface SseChatArgs {
   trace?: any;
 }
 
-/**
- * SSE 流式封装：将 openChatStream 的文本增量封帧为 data: {text} 格式，
- * 统一处理完成 / 错误审计与上游错误友好降级（DeepSeek + Anthropic 对齐）。
- */
 function sseChatStream({ provider, model, system, messages, elapsed, trace }: SseChatArgs) {
   const encoder = new TextEncoder();
 
@@ -204,6 +203,15 @@ function sseChatStream({ provider, model, system, messages, elapsed, trace }: Ss
     async start(controller) {
       try {
         if (trace) {
+          // 在开始流式输出前，追加一个“模型推理与生成”步骤，用于承载后续的流式思考过程
+          const { addTraceStep } = await import("@/lib/server/reasoning-trace");
+          addTraceStep(trace, {
+            type: "llm.generate",
+            label: "模型推理与生成",
+            status: "running",
+            modelUsed: model,
+          });
+
           // 先将当前的 Trace 信息推送给前端
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ type: 'trace', trace })}\n\n`),
@@ -211,13 +219,31 @@ function sseChatStream({ provider, model, system, messages, elapsed, trace }: Ss
         }
 
         await openChatStream(
-          { provider, model, system, messages, maxTokens: 2048 },
-          (text) => {
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ text })}\n\n`),
-            );
+          { provider, model, system, messages, maxTokens: 8192 },
+          (text, isReasoning) => {
+            if (isReasoning) {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ reasoning: text })}\n\n`),
+              );
+            } else {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ text })}\n\n`),
+              );
+            }
           },
         );
+
+        if (trace) {
+           // 结束“模型推理与生成”步骤
+           const { completeTraceStep } = await import("@/lib/server/reasoning-trace");
+           const genStep = trace.steps.find((s: any) => s.type === "llm.generate");
+           if (genStep) {
+             completeTraceStep(genStep, { status: "passed" });
+             controller.enqueue(
+               encoder.encode(`data: ${JSON.stringify({ type: 'trace', trace })}\n\n`),
+             );
+           }
+        }
 
         // 流正常结束，发送终止标记
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));

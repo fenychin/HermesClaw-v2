@@ -88,7 +88,7 @@ export default function MarkdownRendererImpl({ content }: { content: string }) {
 
         // ===== 引用块 =====
         blockquote: ({ children }) => (
-          <blockquote className="border-l-2 border-primary/50 pl-3 my-2 text-muted-foreground text-sm italic">
+          <blockquote className="border-l-2 border-primary/50 pl-3 my-2 text-muted-foreground text-sm italic break-words">
             {children}
           </blockquote>
         ),
@@ -106,7 +106,7 @@ export default function MarkdownRendererImpl({ content }: { content: string }) {
           if (isInline) {
             return (
               <code
-                className="bg-accent text-primary/90 text-xs px-1.5 py-0.5 rounded font-mono"
+                className="bg-accent text-primary/90 text-xs px-1.5 py-0.5 rounded font-mono break-words whitespace-pre-wrap"
                 {...props}
               >
                 {children}

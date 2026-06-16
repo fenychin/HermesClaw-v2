@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react'
 import { ChevronDown, ChevronRight, CheckCircle2, XCircle, PauseCircle, Loader2, CircleDashed } from 'lucide-react'
 
 export interface ReasoningTracePanelProps {
-  traceId: string
+  traceId?: string
+  trace?: any // or ReasoningTrace
   defaultOpen?: boolean
 }
 
@@ -42,14 +43,20 @@ function StatusIcon({ status }: { status: TraceStep['status'] }) {
   }
 }
 
-export function ReasoningTracePanel({ traceId, defaultOpen = false }: ReasoningTracePanelProps) {
+export function ReasoningTracePanel({ traceId, trace: initialTrace, defaultOpen = false }: ReasoningTracePanelProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
-  const [trace, setTrace] = useState<ReasoningTrace | null>(null)
+  const [trace, setTrace] = useState<ReasoningTrace | null>(initialTrace || null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (isOpen && !trace && !loading && !error) {
+    if (initialTrace) {
+      setTrace(initialTrace)
+    }
+  }, [initialTrace])
+
+  useEffect(() => {
+    if (isOpen && !trace && traceId && !loading && !error) {
       let isMounted = true
       setLoading(true)
       

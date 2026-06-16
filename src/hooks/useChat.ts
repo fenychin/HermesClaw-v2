@@ -88,7 +88,7 @@ export function useChat() {
    * —— 首次调用时创建 conversation，后续调用追加消息
    */
   const persistConversation = useCallback(
-    async (userContent: string, assistantContent: string) => {
+    async (userContent: string, assistantContent: string, traceObj?: any) => {
       try {
         if (!conversationIdRef.current) {
           const title = truncateTitle(userContent);
@@ -106,6 +106,7 @@ export function useChat() {
           conversationIdRef.current,
           "assistant",
           assistantContent,
+          traceObj,
         );
         // 本次保存成功 → 尝试回放之前积压的失败对话 + 通知侧边栏/面板刷新
         flush().catch(() => {});
@@ -173,12 +174,33 @@ export function useChat() {
         // 复用共享 SSE 解析器（替换手写 ReadableStream 读取）
         await parseSSEStream(reader, {
           onData: (json) => {
-            const parsed = json as { text?: string; type?: string; trace?: any };
+            const parsed = json as { text?: string; type?: string; trace?: any; reasoning?: string };
             if (parsed.text) {
               fullContent += parsed.text;
               setStreamingContent(fullContent);
+            } else if (parsed.reasoning) {
+              if (traceObj && traceObj.steps && traceObj.steps.length > 0) {
+                // 深拷贝确保触发 React 渲染
+                const newTrace = JSON.parse(JSON.stringify(traceObj));
+                // 将推理过程追加到最后一个步骤（模型推理与生成步骤）
+                const lastStep = newTrace.steps[newTrace.steps.length - 1];
+                lastStep.reasoning = (lastStep.reasoning || "") + parsed.reasoning;
+                traceObj = newTrace;
+                setCurrentTrace(newTrace);
+              }
             } else if (parsed.type === "trace" && parsed.trace) {
-              traceObj = parsed.trace;
+              const newTrace = parsed.trace;
+              if (traceObj && traceObj.steps && newTrace.steps) {
+                newTrace.steps.forEach((newStep: any) => {
+                  const oldStep = traceObj.steps.find(
+                    (s: any) => s.id === newStep.id || s.type === newStep.type,
+                  );
+                  if (oldStep && oldStep.reasoning && !newStep.reasoning) {
+                    newStep.reasoning = oldStep.reasoning;
+                  }
+                });
+              }
+              traceObj = newTrace;
               setCurrentTrace(traceObj);
             }
           },
@@ -196,7 +218,7 @@ export function useChat() {
         setCurrentTrace(null);
 
         // 对话完成后持久化到数据库
-        persistConversation(content.trim(), fullContent);
+        persistConversation(content.trim(), fullContent, traceObj);
       } catch (err: unknown) {
         if (err instanceof Error && err.name !== "AbortError") {
           setError(err.message || "对话失败，请重试");
@@ -213,7 +235,7 @@ export function useChat() {
           setMessages((prev) => [...prev, partialMessage]);
           setStreamingContent("");
           setCurrentTrace(null);
-          persistConversation(content.trim(), fullContent);
+          persistConversation(content.trim(), fullContent, traceObj);
         }
       } finally {
         setIsStreaming(false);
@@ -255,6 +277,7 @@ export function useChat() {
           role: m.role as "user" | "assistant",
           content: m.content,
           timestamp: new Date(m.createdAt),
+          trace: (m as any).trace || undefined,
         }));
         setMessages(loaded);
         setStreamingContent("");

@@ -189,8 +189,8 @@ export function ConversationArea({
   const showActionBar = !isStreaming && messages.length >= 2;
 
   return (
-    // 跟随父容器高度（max-h-[30vh]），不主动撑开；内容溢出时内部滚动
-    <div className="h-full overflow-y-auto">
+    // 内容溢出时由外部容器滚动
+    <div className="pb-40">
       <div className="space-y-6 py-3">
         <AnimatePresence initial={false}>
           {messages.map((msg) => {
@@ -334,8 +334,8 @@ export function ConversationArea({
         )}
         </AnimatePresence>
 
-        {/* 自动滚底锚点 */}
-        <div ref={bottomRef} />
+        {/* 自动滚底锚点，增加 scroll-margin 避免被底部 sticky 的输入框遮挡 */}
+        <div ref={bottomRef} className="scroll-mt-32 scroll-mb-32 h-1" />
       </div>
     </div>
   );
