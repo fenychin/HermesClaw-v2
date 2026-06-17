@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "no-restricted-imports": ["error", {
+      "patterns": [
+        { "group": ["react", "react-dom", "next/*"], "message": "Hermes Kernel 是纯服务端包，禁止导入前端框架" },
+        { "group": ["@hermesclaw/openclaw-adapter/internal/*"], "message": "禁止直接访问 OpenClaw 内部实现，使用契约层通信" }
+      ]
+    }]
+  }
+}

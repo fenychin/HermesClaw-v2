@@ -1,0 +1,55 @@
+{
+  "name": "@hermesclaw/hermes-kernel",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./memory": {
+      "types": "./dist/memory.d.ts",
+      "import": "./dist/memory.mjs",
+      "require": "./dist/memory.js"
+    },
+    "./orchestration": {
+      "types": "./dist/orchestration.d.ts",
+      "import": "./dist/orchestration.mjs",
+      "require": "./dist/orchestration.js"
+    },
+    "./harness": {
+      "types": "./dist/harness.d.ts",
+      "import": "./dist/harness.mjs",
+      "require": "./dist/harness.js"
+    },
+    "./policy": {
+      "types": "./dist/policy.d.ts",
+      "import": "./dist/policy.mjs",
+      "require": "./dist/policy.js"
+    },
+    "./handlers": {
+      "types": "./dist/handlers.d.ts",
+      "import": "./dist/handlers.mjs",
+      "require": "./dist/handlers.js"
+    },
+    "./handlers/chat-handler": {
+      "types": "./dist/handlers/chat-handler.d.ts",
+      "import": "./dist/handlers/chat-handler.mjs",
+      "require": "./dist/handlers/chat-handler.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hermesclaw/event-contracts": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "^5",
+    "vitest": "^4.1.8"
+  }
+}

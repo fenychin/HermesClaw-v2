@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+**/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -16,6 +17,8 @@
 # next.js
 /.next/
 /out/
+**/.next/
+**/out/
 
 # production
 /build
@@ -52,6 +55,16 @@ next-env.d.ts
 
 # Prisma client 为生成代码，不入库；装包时由 postinstall (prisma generate) 自动重建
 /src/generated/
+**/src/generated/
+
+# monorepo 包构建产物（由 pnpm build 自动重建）
+packages/*/dist/
+apps/*/.next/
+apps/*/dist/
+
+# turborepo 缓存
+.turbo/
+**/.turbo/
 
 # 数据库文件（严禁提交）
 *.db

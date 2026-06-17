@@ -1,0 +1,17 @@
+{
+  "checkpointId": "chk_fixture_1",
+  "taskId": "task_fixture_1",
+  "workflowRunId": "run_fixture_1",
+  "workspaceId": "workspace_1",
+  "decision": "pending",
+  "status": "pending",
+  "triggerReason": "risk.level.high",
+  "requestedAt": "2026-06-13T10:00:00.000Z",
+  "expiresAt": "2026-06-14T10:00:00.000Z",
+  "riskLevel": "high",
+  "automationLevel": "L3",
+  "actionSummary": "高风险写操作需人工审批",
+  "inputSnapshot": { "recipient": "test@example.com", "amount": 100 },
+  "policySnapshotVersion": "1.0",
+  "version": "1.0.0"
+}

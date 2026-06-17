@@ -1,4 +1,11 @@
-onlyBuiltDependencies: better-sqlite3
-nodeLinker: hoisted
+packages:
+  - "apps/*"
+  - "packages/*"
 allowBuilds:
+  '@prisma/engines': true
   better-sqlite3: true
+  esbuild: true
+  msw: true
+  prisma: true
+  sharp: true
+  unrs-resolver: true

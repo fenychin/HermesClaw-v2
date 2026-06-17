@@ -1,0 +1,35 @@
+name: CI — 测试与边界检查
+on: [push, pull_request]
+
+jobs:
+  # ── 三域边界检查 ────────────────────────────────
+  domain-boundary:
+    name: 三域边界检查
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:boundaries
+      - name: 验证契约包零运行时依赖
+        run: |
+          cd packages/event-contracts
+          node -e "const pkg=require('./package.json'); const deps=Object.keys(pkg.dependencies||{}); if(deps.filter(d=>d!=='zod').length>0) { console.error('❌ event-contracts 有非 zod 依赖！'); process.exit(1); } console.log('✅ 契约包依赖检查通过')"
+
+  # ── 全局测试 ─────────────────────────────────────
+  test:
+    name: 全局测试 (vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test

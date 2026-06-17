@@ -1,0 +1,10 @@
+{
+  "capabilityId": "cap_fixture_1",
+  "runtimeId": "runtime_1",
+  "displayName": "Email Connector",
+  "version": "1.0.0",
+  "workspaceId": "workspace_1",
+  "type": "connector",
+  "capabilityType": "connector",
+  "name": "email-connector"
+}
