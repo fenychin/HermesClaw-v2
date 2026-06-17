@@ -6,10 +6,7 @@ const withBundleAnalyzer = bundleAnalyzer({
 });
 
 const nextConfig: NextConfig = {
-  // ★ Next.js Instrumentation Hook（进程级引导入口，用于 SDK DI 注入）
-  experimental: {
-    instrumentationHook: true,
-  },
+  // ★ Next.js 15.3+ 默认启用 Instrumentation Hook，无需 experimental.instrumentationHook
 
   // 显式锁定项目根目录，避免 Next 因上层目录残留的 package-lock.json 误判 workspace root
   turbopack: {

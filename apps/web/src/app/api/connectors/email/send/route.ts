@@ -11,7 +11,7 @@ export const POST = withRBAC(async (req: Request, ctx: WorkspaceContext) => {
   const gate = await checkAutomationGate({ automationLevel: "L2", riskLevel: "medium", confirmed: d.confirm === true, actionName: `发送邮件: ${d.subject}` })
   if (!gate.ok) return gate.response
   try {
-    const result = await sendEmail({ connectorId: d.connectorId, from: d.from, to: d.to, cc: d.cc, subject: d.subject, bodyHtml: d.bodyHtml, bodyText: d.bodyText, attachments: d.attachments, templateId: d.templateId, templateVariables: d.templateVariables, agentId: d.agentId, taskId: d.taskId, leaseToken: d.leaseToken, injectUnsubscribeLink: d.injectUnsubscribeLink, unsubscribeUrl: d.unsubscribeUrl })
+    const result = await sendEmail({ connectorId: d.connectorId, workspaceId: ctx.workspaceId, from: d.from, to: d.to, cc: d.cc, subject: d.subject, bodyHtml: d.bodyHtml, bodyText: d.bodyText, attachments: d.attachments, templateId: d.templateId, templateVariables: d.templateVariables, agentId: d.agentId, taskId: d.taskId, leaseToken: d.leaseToken, injectUnsubscribeLink: d.injectUnsubscribeLink, unsubscribeUrl: d.unsubscribeUrl })
     return ApiResponse.ok(result)
   } catch (error) { if (error instanceof LeaseTokenValidationError) return ApiResponse.error(error.message, 403); return ApiResponse.error(error instanceof Error ? error.message : '发送失败', 500) }
 }, 'MEMBER')

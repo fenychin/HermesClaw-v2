@@ -2,6 +2,9 @@
  * Workspace Member Service — 成员管理业务逻辑
  *
  * 从 apps/web/src/app/api/workspace/members/route.ts 下沉至此。
+ *
+ * 注：WorkspaceMember 使用复合主键 (workspaceId, userId)，无独立 id / createdAt 列；
+ * 对外暴露的稳定标识统一以 `${workspaceId}:${userId}` 拼接。
  */
 import { prisma } from "@/lib/prisma"
 import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
@@ -16,12 +19,14 @@ export class MemberServiceError extends Error {
   constructor(public readonly httpStatus: number, message: string) { super(message); this.name = "MemberServiceError" }
 }
 
+const memberKey = (workspaceId: string, userId: string) => `${workspaceId}:${userId}`
+
 export async function listMembers(workspaceId: string, page = 1, limit = 50) {
   const [members, total] = await Promise.all([
-    prisma.workspaceMember.findMany({ where: { workspaceId }, include: { user: { select: { id: true, name: true, email: true, image: true } } }, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: "asc" } }),
+    prisma.workspaceMember.findMany({ where: { workspaceId }, include: { user: { select: { id: true, name: true, email: true } } }, skip: (page - 1) * limit, take: limit, orderBy: { userId: "asc" } }),
     prisma.workspaceMember.count({ where: { workspaceId } }),
   ])
-  return { items: members.map((m: any) => ({ id: m.id, role: m.role, user: m.user ? { id: m.user.id, name: m.user.name, email: m.user.email, image: m.user.image } : null, createdAt: m.createdAt?.toISOString() })), total, page, limit }
+  return { items: members.map((m) => ({ id: memberKey(m.workspaceId, m.userId), role: m.role, user: m.user ? { id: m.user.id, name: m.user.name, email: m.user.email } : null, createdAt: null })), total, page, limit }
 }
 
 export async function inviteMember(workspaceId: string, email: string, role: WorkspaceRole) {
@@ -30,8 +35,9 @@ export async function inviteMember(workspaceId: string, email: string, role: Wor
   const existing = await prisma.workspaceMember.findUnique({ where: { workspaceId_userId: { workspaceId, userId: user.id } } })
   if (existing) throw new MemberServiceError(409, "该用户已是成员")
   const member = await prisma.workspaceMember.create({ data: { workspaceId, userId: user.id, role }, include: { user: { select: { id: true, name: true, email: true } } } })
-  void writeAuditLog({ actor: await actorFromSession(), action: "member.invite", targetType: "member", targetId: member.id, detail: `邀请成员: ${email} 角色 ${role}`, riskLevel: "medium", workspaceId }).catch(() => {})
-  return { id: member.id, role: member.role, user: member.user, createdAt: member.createdAt?.toISOString() }
+  const id = memberKey(member.workspaceId, member.userId)
+  void writeAuditLog({ actor: await actorFromSession(), action: "member.invite", targetType: "member", targetId: id, detail: `邀请成员: ${email} 角色 ${role}`, riskLevel: "medium", workspaceId }).catch(() => {})
+  return { id, role: member.role, user: member.user, createdAt: null }
 }
 
 export async function changeMemberRole(workspaceId: string, userId: string, role: WorkspaceRole) {
@@ -39,8 +45,9 @@ export async function changeMemberRole(workspaceId: string, userId: string, role
   const member = await prisma.workspaceMember.findUnique({ where })
   if (!member) throw new MemberServiceError(404, "成员不存在")
   const updated = await prisma.workspaceMember.update({ where, data: { role } })
-  void writeAuditLog({ actor: await actorFromSession(), action: "member.role.change", targetType: "member", targetId: updated.id, detail: `变更角色: ${member.role} → ${role}`, riskLevel: "high", workspaceId }).catch(() => {})
-  return { id: updated.id, role: updated.role }
+  const id = memberKey(updated.workspaceId, updated.userId)
+  void writeAuditLog({ actor: await actorFromSession(), action: "member.role.change", targetType: "member", targetId: id, detail: `变更角色: ${member.role} → ${role}`, riskLevel: "high", workspaceId }).catch(() => {})
+  return { id, role: updated.role }
 }
 
 export async function removeMember(workspaceId: string, userId: string) {
@@ -48,6 +55,7 @@ export async function removeMember(workspaceId: string, userId: string) {
   const member = await prisma.workspaceMember.findUnique({ where })
   if (!member) throw new MemberServiceError(404, "成员不存在")
   await prisma.workspaceMember.delete({ where })
-  void writeAuditLog({ actor: await actorFromSession(), action: "member.remove", targetType: "member", targetId: member.id, detail: `移除成员: ${userId}`, riskLevel: "high", workspaceId }).catch(() => {})
+  const id = memberKey(member.workspaceId, member.userId)
+  void writeAuditLog({ actor: await actorFromSession(), action: "member.remove", targetType: "member", targetId: id, detail: `移除成员: ${userId}`, riskLevel: "high", workspaceId }).catch(() => {})
   return { removed: true }
 }

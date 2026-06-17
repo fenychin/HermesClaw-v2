@@ -1,10 +1,13 @@
 /**
  * 技能域（Skills）服务端逻辑
- * 
+ *
  * 职责：
  * 1. 查询当前工作空间内的技能；
  * 2. 依据 AgentLog 对技能进行动态调用量与成功率的统计分析；
- * 3. 避免在 API Route 中直接承载重度计算与分析逻辑，保持接口单一职责。
+ * 3. 创建技能（注册到工作空间）；
+ * 4. 避免在 API Route 中直接承载重度计算与分析逻辑，保持接口单一职责。
+ *
+ * 注：技能"测试运行"的执行逻辑位于 packages/openclaw-adapter（Execution Runtime 域）。
  */
 import { prisma } from "@/lib/prisma";
 import { isErrorStatus } from "@/lib/server/harness-eval";
@@ -69,4 +72,60 @@ export async function getSkillsWithStats(
       },
     };
   });
+}
+
+/**
+ * 技能创建（注册）输入。
+ * 注：执行域（OpenClaw）由 executeSkillTest 处理，此处仅做工作空间内 CRUD。
+ */
+export interface CreateSkillInput {
+  workspaceId: string;
+  name: string;
+  description: string;
+  version?: string;
+  category?: string;
+  inputSchema?: string;
+  outputSchema?: string;
+  scenarios?: string;
+  automationLevel?: string;
+}
+
+/**
+ * 在工作空间内创建一条 Skill 记录。
+ * 由 apps/web/src/app/api/skills/route.ts 薄门卫调用。
+ */
+export async function createSkillRecord(
+  input: CreateSkillInput,
+  deps: SkillsDeps = defaultDeps,
+) {
+  const skillId = crypto.randomUUID();
+  const skill = await deps.prisma.skill.create({
+    data: {
+      id: skillId,
+      workspaceId: input.workspaceId,
+      name: input.name,
+      description: input.description,
+      version: input.version ?? "v1.0.0",
+      category: input.category ?? "custom:通用",
+      source: "custom",
+      status: "active",
+      inputSchema: input.inputSchema ?? JSON.stringify({ role: input.name }),
+      outputSchema: input.outputSchema ?? JSON.stringify({}),
+      usedByAgents: "[]",
+      scenarios: input.scenarios ?? "[]",
+      automationLevel: input.automationLevel ?? "L2",
+    },
+  });
+  return skill;
+}
+
+/**
+ * 为执行域加载技能（薄门卫读 DB → 调 executor）。
+ * 返回值已剔除 workspace 隔离校验由调用方完成。
+ */
+export async function loadSkillForExecution(
+  skillId: string,
+  deps: SkillsDeps = defaultDeps,
+) {
+  return deps.prisma.skill.findUnique({ where: { id: skillId } });
 }

@@ -25,7 +25,10 @@ export async function GET(request: Request) {
     const ctx = await buildWorkspaceContext(request)
 
     // 三域调用点：[控制域]
-    const status = await getHarnessStatus(prisma, ctx.workspaceId, EVAL_WINDOW_HOURS)
+    const status = await getHarnessStatus(
+      { workspaceId: ctx.workspaceId, evalWindowHours: EVAL_WINDOW_HOURS },
+      { prisma },
+    )
 
     return successResponse(status)
   } catch (error) {

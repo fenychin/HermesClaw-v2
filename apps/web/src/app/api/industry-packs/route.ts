@@ -1,6 +1,8 @@
 import { ApiResponse } from '@/lib/server/api-response'; import { withRBAC } from '@/lib/server/api-handler'
 import { checkAutomationGate } from '@/lib/server/guardrail'
 import { installPack, listInstalledPacks, PackAlreadyInstalledError, PackManifestInvalidError, PackDependencyNotMetError, PackCoreVersionIncompatibleError } from '@/lib/server/industry-pack-loader'
+import { loadIndustryManifest } from '@hermesclaw/industry-pack-sdk'
+import type { IndustryPackManifest } from '@hermesclaw/event-contracts'
 import type { WorkspaceContext } from '@/lib/workspace'
 
 export const GET = withRBAC(async (request: Request, ctx: WorkspaceContext) => {
@@ -17,7 +19,9 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
     if (!packId) return ApiResponse.error('缺少 packId', 400)
     const gate = await checkAutomationGate({ automationLevel: "L3", riskLevel: "medium", confirmed: body.confirm === true, actionName: `安装行业包: ${packId}` })
     if (!gate.ok) return gate.response
-    const result = await installPack({ packId, workspaceId: ctx.workspaceId, installedBy: ctx.userId || "system" })
+    // SDK 加载并校验 manifest，再交给 loader 写库
+    const manifest = loadIndustryManifest(packId) as unknown as IndustryPackManifest
+    const result = await installPack(manifest, ctx.workspaceId, ctx.userId || "system")
     return ApiResponse.ok(result)
   } catch (error) {
     if (error instanceof PackAlreadyInstalledError) return ApiResponse.error(error.message, 409)

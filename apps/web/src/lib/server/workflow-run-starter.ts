@@ -28,7 +28,8 @@ export async function startAgentWorkflowRun(opts: { agentId: string; input: any;
 
   const hasHighRisk = /发送|发信|邮件|email|删除|delete|修改|更新|update|高危|high/i.test(opts.input)
   let riskLevel: any = agent.automationLevel === 'L4' ? 'critical' : agent.automationLevel === 'L3' ? (hasHighRisk ? 'high' : 'medium') : (hasHighRisk ? 'high' : 'low')
-  const envelope = await parseIntentToTaskEnvelope(opts.input, { workspaceId: opts.workspaceId, agentId: opts.agentId, industryId: agent.industryId || 'default', automationLevel: agent.automationLevel || 'L2', riskLevel })
+  const automationLevel = (agent.automationLevel || 'L2') as 'L1' | 'L2' | 'L3' | 'L4'
+  const envelope = await parseIntentToTaskEnvelope(opts.input, { workspaceId: opts.workspaceId, agentId: opts.agentId, industryId: agent.industryId || 'default', automationLevel, riskLevel })
 
   try { await validateTaskAutomationLevel(envelope, opts.userId || 'system') }
   catch (err: any) {
@@ -47,7 +48,7 @@ export async function startAgentWorkflowRun(opts: { agentId: string; input: any;
   if (!workflow) workflow = await prisma.workflow.findFirst({ where: { workspaceId: opts.workspaceId } })
   if (!workflow) workflow = await prisma.workflow.create({ data: { id: `wf-auto-${crypto.randomUUID()}`, workspaceId: opts.workspaceId, name: agent.name || 'Auto', status: 'active', nodes: '[]', edges: '[]' } })
 
-  const run = await startWorkflowRun({ workflowId: workflow.id, workspaceId: opts.workspaceId, agentId: opts.agentId, input: envelope, userId: opts.userId })
+  const run = await startWorkflowRun({ workflowId: workflow.id, workspaceId: opts.workspaceId, agentId: opts.agentId, inputContext: { envelope, taskId: envelope.taskId } as any, triggeredBy: opts.userId })
   if (opts.idempotencyKey) idempotencyMap.set(opts.idempotencyKey, { workflowRunId: run.id, status: 'running', timestamp: Date.now() })
   return { workflowRunId: run.id, status: 'running' }
 }

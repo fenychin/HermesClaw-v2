@@ -16,14 +16,16 @@ export const POST = withRBAC(async (req: Request, ctx: WorkspaceContext, routeCt
   try {
     const { id } = await routeCtx.params
     const parsed = validateBody(await req.json().catch(() => ({})), RollbackRequestSchema); if (parsed instanceof Response) return parsed
-    const proposal = await prisma.harnessProposal.findUnique({ where: { id, workspaceId: ctx.workspaceId }, select: { id: true, proposalId: true, status: true, riskLevel: true, automationLevel: true } })
+    const proposal = await prisma.harnessProposal.findUnique({ where: { id, workspaceId: ctx.workspaceId }, select: { id: true, proposalId: true, status: true, proposedChange: true } })
     if (!proposal) return ApiResponse.error("提案不存在", 404)
-    if (proposal.automationLevel === "L4") return ApiResponse.error("L4 级别提案禁止自动执行", 403)
-    if (proposal.automationLevel === "L3" && parsed.confirmationToken !== L3_TOKEN) return Response.json({ success: false, error: "L3 高风险回滚需 confirmationToken", requiresConfirmation: true }, { status: 409 })
+    const changeMeta = (proposal.proposedChange ?? {}) as { riskLevel?: string; automationLevel?: string }
+    const automationLevel = (changeMeta.automationLevel ?? "L2") as "L1" | "L2" | "L3" | "L4"
+    if (automationLevel === "L4") return ApiResponse.error("L4 级别提案禁止自动执行", 403)
+    if (automationLevel === "L3" && parsed.confirmationToken !== L3_TOKEN) return Response.json({ success: false, error: "L3 高风险回滚需 confirmationToken", requiresConfirmation: true }, { status: 409 })
     const actor = await actorFromSession()
-    const entry = await createAuditEntry({ actor, action: "rollback.proposal", targetType: "proposal", targetId: id, detail: `回滚提案 ${proposal.proposalId}`, riskLevel: "high", workspaceId: ctx.workspaceId, automationLevel: proposal.automationLevel as any, triggeredBy: "user" })
+    const entry = await createAuditEntry({ actor, action: "rollback.proposal", targetType: "proposal", targetId: id, detail: `回滚提案 ${proposal.proposalId}`, riskLevel: "high", workspaceId: ctx.workspaceId, automationLevel, triggeredBy: "user" })
     preAuditId = entry.auditId
-    await rollbackHarnessProposal({ proposalId: id, operatorId: parsed.operatorId, confirmed: true })
+    await rollbackHarnessProposal(id, parsed.operatorId)
     await updateAuditEntry({ auditId: entry.auditId, status: "success", detail: `提案 ${proposal.proposalId} 回滚成功` })
     return ApiResponse.ok({ message: "回滚成功" })
   } catch (error) {

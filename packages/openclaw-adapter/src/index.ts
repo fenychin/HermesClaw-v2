@@ -21,6 +21,15 @@
 export { createOpenClawAdapter } from './executor'
 export type { ExecutionAdapter } from './executor'
 
+// Skill Executor — 技能测试执行
+export { executeSkillTest } from './executor/skill-executor'
+export type {
+  SkillRecord,
+  SkillTestInput,
+  SkillExecutorDeps,
+  SkillTestResult,
+} from './executor/skill-executor'
+
 // ExecutionEvent 统一构造工厂（唯一的事件构造点，禁止外部直接字面量构造）
 export { createExecutionEvent } from './executor/event-factory'
 export type { CreateExecutionEventParams } from './executor/event-factory'

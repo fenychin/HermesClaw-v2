@@ -17,12 +17,12 @@ export class AgentExecuteError extends Error {
 export async function executeAgentAction(opts: { agentId: string; workspaceId: string; industryId?: string; action: string }) {
   const agent = await prisma.agent.findUnique({ where: { id: opts.agentId, workspaceId: opts.workspaceId } })
   if (!agent) throw new AgentExecuteError(404, "智能体不存在")
-  const boundary = assertWithinBoundary(agent, opts.action)
-  if (!boundary.ok) {
+  const boundary = await assertWithinBoundary(opts.agentId, opts.action, opts.workspaceId)
+  if (!boundary.allowed) {
     const actor = await actorFromSession()
-    void writeAgentLog({ source: "agent", taskName: `${agent.name}: 执行被拒绝`, status: "error", duration: "0s", detail: `越界: ${opts.action} → ${boundary.reason}`, riskLevel: "high" })
-    void writeAuditLog({ actor, action: "agent.boundary_violation", targetType: "agent", targetId: opts.agentId, detail: `边界违规: ${boundary.reason}`, riskLevel: "high", workspaceId: opts.workspaceId }).catch(() => {})
-    return { status: "blocked" as const, violation: boundary.reason }
+    void writeAgentLog({ source: "agent", taskName: `${agent.name}: 执行被拒绝`, status: "error", duration: "0s", detail: `越界: ${opts.action} → ${boundary.violation}`, riskLevel: "high" })
+    void writeAuditLog({ actor, action: "agent.boundary_violation", targetType: "agent", targetId: opts.agentId, detail: `边界违规: ${boundary.violation}`, riskLevel: "high", workspaceId: opts.workspaceId }).catch(() => {})
+    return { status: "blocked" as const, violation: boundary.violation }
   }
   const systemPrompt = loadIndustryPrompt(opts.industryId ?? "foreign-trade", agent.role || "默认") ?? `你是 ${agent.name}，请用中文回复。`
   const decision = await selectModel({ taskType: "chat", riskLevel: "low", estimatedTokens: Math.ceil((systemPrompt.length + opts.action.length) / 4), workspaceId: opts.workspaceId })

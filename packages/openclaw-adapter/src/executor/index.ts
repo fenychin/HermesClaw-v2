@@ -300,3 +300,14 @@ export function createOpenClawAdapter(
     },
   }
 }
+
+
+// Skill Executor — 技能测试执行
+export { executeSkillTest } from "./skill-executor"
+export type {
+  SkillRecord,
+  SkillTestInput,
+  SkillExecutorDeps,
+  SkillTestResult,
+} from "./skill-executor"
+

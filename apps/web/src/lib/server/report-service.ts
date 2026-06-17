@@ -97,7 +97,7 @@ export async function generateAndStoreReport(input: GenerateReportInput): Promis
   const dataSnapshot = { intelTitles, inquiryCount, urgentCount, pendingTasks, workflowSummary, date: dateStr, reportType }
   await Promise.all([
     updateAuditEntry({ auditId: auditEntry.auditId, status: "success", detail: `已生成${typeLabel} (${duration})`, contextSnapshot: { reportId, type: reportType, duration } }),
-    prisma.report.create({ data: { id: reportId, workspaceId: input.workspaceId, type: reportType, content, title: `${dateStr} ${typeLabel}`, dataSnapshot: JSON.stringify(dataSnapshot), createdBy: input.actor || "system" } }),
+    prisma.report.create({ data: { id: reportId, workspaceId: input.workspaceId, type: reportType, content, dataSnapshot: JSON.stringify(dataSnapshot) } }),
     prisma.agentLog.create({ data: { id: crypto.randomUUID(), workspaceId: input.workspaceId, source: reportType === "WEEKLY" ? "weekly-brief" : reportType === "EVENING" ? "evening-brief" : "morning-brief", taskName: `生成${typeLabel} ${dateStr}`, status: "success", duration, detail: content.slice(0, 200), riskLevel: "low" } }),
   ]).catch(() => {})
 

@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getDashboardData } from "@/app/api/dashboard/route";
+import { getDashboardOverview } from "@hermesclaw/hermes-kernel";
 import DashboardClient from "./dashboard-client";
 
 interface PageProps {
@@ -28,7 +28,7 @@ export default async function DashboardPage(props: PageProps) {
   let initialData = null;
   try {
     const workspaceId = await getWorkspaceIdForServerComponent();
-    initialData = await getDashboardData(workspaceId, period);
+    initialData = await getDashboardOverview({ workspaceId, period }, { prisma } as any);
   } catch (err) {
     console.error("[DashboardPage] Server side fetch failed:", err);
   }
