@@ -1,9 +1,11 @@
 /**
  * POST /api/harness/proposals/[id]/rollback — 提案回滚
  *
- * Sprint 3 MVP：调用 hermes-kernel rollbackHarnessProposal()
- * AuditLog 由 kernel 内部写入。
- * 保留 L3/L4 门禁逻辑兼容旧流程。
+ * 增强逻辑（F-1）：
+ * 1. 验证 status 为 'canary' 或 'active'
+ * 2. 读取 previousSnapshot 将其内容还原（由 kernel 完成）
+ * 3. 更新 status → 'rolled_back'，写 rolledBackAt
+ * 4. 写 AuditLog: action='harness.rollback.executed', reason
  */
 import { prisma } from "@/lib/prisma";
 import { withRBAC, type RouteContext } from "@/lib/server/api-handler";
@@ -76,7 +78,7 @@ export const POST = withRBAC(
 
       const actor = await actorFromSession();
 
-      // 调用 kernel 回滚逻辑（含 AuditLog 写入）
+      // 调用 kernel 回滚逻辑（含 previousSnapshot 还原 + AuditLog 写入）
       const result = await rollbackHarnessProposal(
         {
           proposalId: proposal.id,
@@ -90,6 +92,26 @@ export const POST = withRBAC(
       if (!result.ok) {
         return ApiResponse.error(result.message, 400);
       }
+
+      // 写 harness.rollback.executed 审计（含 reason）
+      await prisma.auditLog.create({
+        data: {
+          workspaceId: ctx.workspaceId,
+          action: "harness.rollback.executed",
+          actor,
+          targetType: "proposal",
+          targetId: proposal.id,
+          detail: JSON.stringify({
+            reason: parsed.reason ?? parsed.operatorId,
+            status: "rolled_back",
+          }),
+          triggeredBy: "user",
+          status: "success",
+          createdAt: new Date(),
+        },
+      }).catch(() => {
+        /* 审计写失败不阻塞 */
+      });
 
       return ApiResponse.ok({
         message: "回滚成功",

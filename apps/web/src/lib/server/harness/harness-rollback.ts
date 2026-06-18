@@ -198,7 +198,7 @@ export async function rollbackHarnessProposal(
       await tx.harnessProposal.update({
         where: { id: proposalId },
         data: {
-          status: "rolled-back",
+          status: "rolled_back",
           reviewedBy: operatorId,
           reviewedAt: now,
         },

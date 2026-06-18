@@ -1,9 +1,21 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest"
 import { prisma } from "@/lib/prisma"
 import { captureSnapshot } from "@/lib/server/harness-snapshot"
 import { startCanary, evaluateCanaryHealth } from "@/lib/server/canary"
 import { executeRollback } from "@/lib/server/rollback"
 import { setupWorkspace, cleanWorkspace } from "./e2e-helper"
+
+// ---- Mock next-auth 避免模块解析失败（G-2） ----
+vi.mock('next-auth', () => ({
+  default: vi.fn(() => ({
+    auth: vi.fn().mockResolvedValue({ user: { id: 'test-user', workspaceId: 'ws-test' } }),
+    handlers: {},
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+  })),
+}))
+vi.mock('next-auth/providers/credentials', () => ({ default: vi.fn() }))
 
 describe("E2E Integration Link 5: Canary Rollback Complete Path", () => {
   const workspaceId = "ws-e2e-rollback"

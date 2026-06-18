@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         proposalId: true,
         workspaceId: true,
         canaryStartedAt: true,
-        canaryConfig: true,
+        canaryWindowHours: true,
       },
       orderBy: { canaryStartedAt: "asc" },
     })

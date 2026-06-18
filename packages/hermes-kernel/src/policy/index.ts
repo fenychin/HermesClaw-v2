@@ -1,4 +1,14 @@
 export * from "./roles";
+export {
+  enforceBoundary,
+  enforceAutomationGate,
+} from "./boundary-enforcer";
+export type {
+  EnforceBoundaryParams,
+  EnforceBoundaryResult,
+  EnforceAutomationGateParams,
+  EnforceAutomationGateResult,
+} from "./boundary-enforcer";
 
 /**
  * Policy 裁决 —— L1-L4 自动化授权矩阵（CLAUDE.md §2.3 / AGENTS.md §5.2）

@@ -1,7 +1,19 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest"
 import { prisma } from "@/lib/prisma"
 import { assertWithinBoundary } from "@/lib/server/boundary"
 import { setupWorkspace, cleanWorkspace } from "./e2e-helper"
+
+// ---- Mock next-auth 避免模块解析失败（G-2） ----
+vi.mock('next-auth', () => ({
+  default: vi.fn(() => ({
+    auth: vi.fn().mockResolvedValue({ user: { id: 'test-user', workspaceId: 'ws-test' } }),
+    handlers: {},
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+  })),
+}))
+vi.mock('next-auth/providers/credentials', () => ({ default: vi.fn() }))
 
 // ---- Mocks ----
 

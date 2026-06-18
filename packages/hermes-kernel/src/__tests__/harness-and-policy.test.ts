@@ -16,9 +16,11 @@ function makePrismaMock(overrides: Partial<Record<string, any>> = {}) {
   const base = {
     workspace: {
       findUnique: vi.fn(async () => ({ automationLevel: "L2" })),
+      update: vi.fn(async ({ data }: any) => ({ id: "ws-1", ...data })),
     },
     workspaceSettings: {
       findUnique: vi.fn(async () => null),
+      upsert: vi.fn(async ({ create }: any) => create),
     },
     agentLog: {
       groupBy: vi.fn(async () => []),
@@ -325,9 +327,8 @@ describe("generateHarnessProposals", () => {
     expect(created).toHaveLength(2);
 
     // 校验 previousSnapshot 已写入
-    expect(typeof created[0].previousSnapshot).toBe("string");
-    const snap = JSON.parse(created[0].previousSnapshot);
-    expect(snap.workspaceId).toBe("ws-1");
+    expect(typeof created[0].previousSnapshot).toBe("object");
+    expect(created[0].previousSnapshot?.workspaceId).toBe("ws-1");
 
     // high 提案：requiresHumanApproval = true
     const highRow = created.find(
@@ -400,10 +401,10 @@ describe("generateHarnessProposals", () => {
 });
 
 // ==============================
-// SPRINT 2 — PART A：approve 后 Canary 路径
+// SPRINT 2 — PART A：approve 后路径（F-1: pending → approved）
 // ==============================
-describe("approveHarnessProposal — Canary 路径", () => {
-  /** 构造一个 pending 提案（riskLevel 从 proposedChange.riskLevel 读取） */
+describe("approveHarnessProposal", () => {
+  /** 构造一个 pending 提案 */
   function makePendingProposal(riskLevel: string) {
     return {
       id: "prop-1",
@@ -413,11 +414,13 @@ describe("approveHarnessProposal — Canary 路径", () => {
       proposedChange: { riskLevel, description: "test", targetComponent: "X", automationLevel: "L2" },
       estimatedImpact: riskLevel,
       canaryConfig: null,
+      canaryWindowHours: null,
       canaryStartedAt: null,
+      previousSnapshot: null,
     };
   }
 
-  it("riskLevel=low → 直接 active，不进入 canary", async () => {
+  it("审批后 status → approved", async () => {
     const auditCreate = vi.fn(async () => ({}));
     const prisma = makePrismaMock({
       harnessProposal: {
@@ -431,66 +434,9 @@ describe("approveHarnessProposal — Canary 路径", () => {
       { prisma },
     );
     expect(result.ok).toBe(true);
-    expect(result.newStatus).toBe("active");
-    // canaryStartedAt 不应设置
+    expect(result.newStatus).toBe("approved");
     const updateCall = (prisma.harnessProposal.update.mock.calls as any)[0][0];
-    expect(updateCall.data.canaryStartedAt).toBeNull();
-  });
-
-  it("riskLevel=medium → 直接 active", async () => {
-    const prisma = makePrismaMock({
-      harnessProposal: {
-        findUnique: vi.fn(async () => makePendingProposal("medium")),
-        update: vi.fn(async ({ data }: any) => ({ id: "prop-1", ...data })),
-      },
-    });
-    const result = await approveHarnessProposal(
-      { proposalId: "prop-1", workspaceId: "ws-1", actor: "admin@x.com" },
-      { prisma },
-    );
-    expect(result.ok).toBe(true);
-    expect(result.newStatus).toBe("active");
-  });
-
-  it("riskLevel=high → 进入 canary，status='canary'", async () => {
-    const auditCreate = vi.fn(async () => ({}));
-    const prisma = makePrismaMock({
-      harnessProposal: {
-        findUnique: vi.fn(async () => makePendingProposal("high")),
-        update: vi.fn(async ({ data }: any) => ({ id: "prop-1", ...data })),
-      },
-      auditLog: { create: auditCreate },
-    });
-    const result = await approveHarnessProposal(
-      { proposalId: "prop-1", workspaceId: "ws-1", actor: "admin@x.com" },
-      { prisma },
-    );
-    expect(result.ok).toBe(true);
-    expect(result.newStatus).toBe("canary");
-    expect(result.message).toContain("Canary");
-    // canaryStartedAt 应被设置
-    const updateCall = (prisma.harnessProposal.update.mock.calls as any)[0][0];
-    expect(updateCall.data.canaryStartedAt).toBeInstanceOf(Date);
-    // canaryConfig 应被写入
-    expect(updateCall.data.canaryConfig).toEqual({
-      durationHours: 24,
-      successThreshold: 0.95,
-    });
-  });
-
-  it("riskLevel=critical → 也进入 canary", async () => {
-    const prisma = makePrismaMock({
-      harnessProposal: {
-        findUnique: vi.fn(async () => makePendingProposal("critical")),
-        update: vi.fn(async ({ data }: any) => ({ id: "prop-1", ...data })),
-      },
-    });
-    const result = await approveHarnessProposal(
-      { proposalId: "prop-1", workspaceId: "ws-1", actor: "admin@x.com" },
-      { prisma },
-    );
-    expect(result.ok).toBe(true);
-    expect(result.newStatus).toBe("canary");
+    expect(updateCall.data.status).toBe("approved");
   });
 
   it("提案不存在时返回错误", async () => {
@@ -550,10 +496,10 @@ describe("决策操作写入 AuditLog", () => {
     expect(auditData.actor).toBe("admin@x.com");
     expect(auditData.targetType).toBe("proposal");
     expect(auditData.targetId).toBe("prop-1");
-    const detail = JSON.parse(auditData.detail);
-    expect(detail.before).toBe("pending");
-    expect(detail.after).toBe("active");
-  });
+      const detail = JSON.parse(auditData.detail);
+      expect(detail.before).toBe("pending");
+      expect(detail.after).toBe("approved");
+    });
 
   it("reject 写入 auditLog.create", async () => {
     const auditCreate = vi.fn(async () => ({}));
@@ -608,7 +554,7 @@ describe("决策操作写入 AuditLog", () => {
     expect(auditData.action).toBe("proposal.rollback");
     const detail = JSON.parse(auditData.detail);
     expect(detail.before).toBe("active");
-    expect(detail.after).toBe("rolled-back");
+    expect(detail.after).toBe("rolled_back");
   });
 
   it("AuditLog 写入失败不阻塞业务", async () => {
@@ -906,7 +852,7 @@ describe("Sprint 3 E2E 场景验证", () => {
       expect(highProposal.triggeredBy).toBe("auto");
       expect(highProposal.proposalId).toMatch(/^HEP-/);
       // previousSnapshot 已写入
-      expect(typeof highProposal.previousSnapshot).toBe("string");
+      expect(typeof highProposal.previousSnapshot).toBe("object");
     });
   });
 
@@ -950,10 +896,9 @@ describe("Sprint 3 E2E 场景验证", () => {
         { prisma },
       );
 
-      // 状态应为 canary（非 active）
+      // 审批后状态为 approved（F-1 分离：approve→canary 由 canary 路由处理）
       expect(result.ok).toBe(true);
-      expect(result.newStatus).toBe("canary");
-      expect(result.message).toContain("Canary");
+      expect(result.newStatus).toBe("approved");
 
       // AuditLog 应写入 proposal.approve
       expect(auditCreate).toHaveBeenCalled();
@@ -961,10 +906,10 @@ describe("Sprint 3 E2E 场景验证", () => {
       expect(auditData.action).toBe("proposal.approve");
       const detail = JSON.parse(auditData.detail);
       expect(detail.before).toBe("pending");
-      expect(detail.after).toBe("canary");
+      expect(detail.after).toBe("approved");
     });
 
-    it("riskLevel=low 的提案审批后直接 active", async () => {
+    it("riskLevel=low 的提案审批后状态为 approved", async () => {
       const prisma = makePrismaMock({
         harnessProposal: {
           findUnique: vi.fn(async () => ({
@@ -975,7 +920,9 @@ describe("Sprint 3 E2E 场景验证", () => {
             proposedChange: { riskLevel: "low" },
             estimatedImpact: "low",
             canaryConfig: null,
+            canaryWindowHours: null,
             canaryStartedAt: null,
+            previousSnapshot: null,
           })),
           update: vi.fn(async ({ data }: any) => ({
             id: "prop-low",
@@ -993,7 +940,7 @@ describe("Sprint 3 E2E 场景验证", () => {
         },
         { prisma },
       );
-      expect(result.newStatus).toBe("active");
+      expect(result.newStatus).toBe("approved");
     });
   });
 
@@ -1101,7 +1048,7 @@ describe("Sprint 3 E2E 场景验证", () => {
       expect(auditData.action).toBe("proposal.rollback");
       const detail = JSON.parse(auditData.detail);
       expect(detail.before).toBe("canary");
-      expect(detail.after).toBe("rolled-back");
+      expect(detail.after).toBe("rolled_back");
     });
   });
 

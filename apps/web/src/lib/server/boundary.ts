@@ -11,6 +11,7 @@
 import { prisma } from "@/lib/prisma"
 import { parseJsonField } from "@/lib/api-utils"
 import { logger } from "@/lib/logger"
+import { enforceBoundary } from "@hermesclaw/hermes-kernel"
 import {
   resolveLlmProvider,
   callAnthropicStructured,
@@ -65,13 +66,23 @@ export async function assertWithinBoundary(
     }
   }
 
-  // 2. 读取该 agent 的 cannotDo（workspaceId 隔离）
+  // 2. 检查 Workspace 边界（下沉到 kernel）
+  const boundary = await enforceBoundary({
+    agentId,
+    workspaceId,
+    targetWorkspaceId: workspaceId,
+    prisma: client,
+  })
+  if (!boundary.allowed) {
+    return { allowed: false, violation: boundary.violation! }
+  }
+
+  // 3. 读取该 agent 的 cannotDo（workspaceId 隔离）
   const agent = await client.agent.findUnique({
     where: { id: agentId, workspaceId },
     select: { cannotDo: true },
   })
   if (!agent) {
-    // 找不到 agent 时保守拒绝（避免无主执行）
     return { allowed: false, violation: "智能体不存在，拒绝执行" }
   }
 
@@ -89,7 +100,7 @@ export async function assertWithinBoundary(
     }
   }
 
-  // 3. 第二级拦截：LLM 语义判定（解决同义词语义绕过及模糊表达的精准控制）
+  // 4. 第二级拦截：LLM 语义判定（解决同义词语义绕过及模糊表达的精准控制）
   // NOTE: 如果 cannotDo 列表为空，且未触发高危红线硬过滤，则可以直接放行（无需调用 LLM）。
   if (cannotDo.length === 0) {
     return { allowed: true }

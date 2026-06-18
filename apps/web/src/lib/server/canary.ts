@@ -449,7 +449,7 @@ export async function abortCanary(
 
     await tx.harnessProposal.update({
       where: { id: canary.proposalId },
-      data: { status: 'rolled-back' }
+      data: { status: 'rolled_back' }
     })
 
     return updated

@@ -311,7 +311,7 @@ describe("Harness Canary State Machine Tests", () => {
 
       expect(prisma.harnessProposal.update).toHaveBeenCalledWith({
         where: { id: "prop-1" },
-        data: { status: "rolled-back" },
+        data: { status: "rolled_back" },
       })
 
       expect(mockTriggerRollback).toHaveBeenCalledWith("hca-1", "metrics failed")

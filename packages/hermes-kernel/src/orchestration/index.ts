@@ -1,5 +1,24 @@
 import type { TaskEnvelope } from '@hermesclaw/event-contracts'
 
+// DAG Workflow 引擎 —— 见 ./dag-engine.ts
+export {
+  runDag,
+  buildDagFromWorkflowTemplate,
+} from './dag-engine'
+export type {
+  DagNode,
+  DagAction,
+  DagContext,
+  DagNodeResult,
+  DagRunResult,
+  DagPrismaClient,
+  WorkflowStep,
+} from './dag-engine'
+
+// Intent Parser —— 见 ./intent-parser.ts
+export { parseIntent } from './intent-parser'
+export type { IntentParseInput, IntentParseResult } from './intent-parser'
+
 export function createTaskEnvelope(params: Partial<TaskEnvelope>): Partial<TaskEnvelope> {
   return {
     taskId: params.taskId || `t-${Math.random().toString(36).substring(2, 9)}`,
