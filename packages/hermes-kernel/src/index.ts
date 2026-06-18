@@ -13,7 +13,14 @@ export { createTaskEnvelope, orchestrate } from './orchestration'
 export { memoryRead, memoryWrite } from './memory'
 // 注：runHarnessEvaluation / getHarnessStatus 改由 ./handlers/harness-handler 暴露（见下方），
 // 此处仅保留 policy 检查导出，避免与 handler 层重复导出。
-export { checkPolicy } from './policy'
+export { checkPolicy, checkPolicySync } from './policy'
+export type {
+  PolicyCheckInput,
+  PolicyCheckResult,
+  PolicyCheckDeps,
+  AutomationLevel,
+  RiskLevel,
+} from './policy'
 
 // Chat Handler
 export { executeChatStream, ChatHandlerError, createSseResponse } from './handlers/chat-handler'
@@ -32,8 +39,8 @@ export { getBrainStats, getBrainOverview } from './handlers/brain-handler'
 export type { BrainHandlerDeps, BrainStatsInput, BrainOverviewInput } from './handlers/brain-handler'
 
 // Harness Handler
-export { getHarnessStatus, listHarnessProposals, getHarnessProposal, approveHarnessProposal, rejectHarnessProposal, rollbackHarnessProposal, runHarnessEvaluation, getEvolutionLog } from './handlers/harness-handler'
-export type { HarnessHandlerDeps, HarnessStatusInput, HarnessProposalListInput, HarnessProposalGetInput, HarnessApproveInput, HarnessDecisionResult, HarnessEvaluateInput, HarnessEvolutionLogInput } from './handlers/harness-handler'
+export { getHarnessStatus, listHarnessProposals, getHarnessProposal, approveHarnessProposal, rejectHarnessProposal, rollbackHarnessProposal, runHarnessEvaluation, getEvolutionLog, generateHarnessProposals, promoteCanaryToActive } from './handlers/harness-handler'
+export type { HarnessHandlerDeps, HarnessStatusInput, HarnessProposalListInput, HarnessProposalGetInput, HarnessApproveInput, HarnessDecisionResult, HarnessEvaluateInput, HarnessEvolutionLogInput, EvaluationResult, EvaluationSignal, EvaluationSeverity, ProposalType, RunHarnessEvaluationDeps, GenerateHarnessProposalsInput, GenerateHarnessProposalsDeps, GenerateHarnessProposalsResult, HarnessProposalStatus, HarnessProposalRiskLevel, CanaryConfig, PromoteCanaryInput, PromoteCanaryResult } from './handlers/harness-handler'
 
 // Report Handler
 export { generateReport } from './handlers/report-handler'

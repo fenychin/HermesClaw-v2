@@ -6,9 +6,27 @@
  * 三域归属：Hermes Control Kernel
  */
 
+import {
+  runHarnessEvaluation as runHarnessEvaluationCore,
+  type EvaluationResult,
+  type EvaluationSeverity,
+  type ProposalType,
+} from "../harness";
+
 export interface HarnessHandlerDeps {
   prisma: any;
 }
+
+// 重新导出新版评估引擎，保持 root index.ts 的兼容性。
+export { runHarnessEvaluationCore as runHarnessEvaluation };
+export type {
+  EvaluationResult,
+  EvaluationSignal,
+  EvaluationSeverity,
+  ProposalType,
+  RunHarnessEvaluationInput as HarnessEvaluateInput,
+  RunHarnessEvaluationDeps,
+} from "../harness";
 
 // ==============================
 // Harness Status
@@ -97,7 +115,138 @@ export interface HarnessDecisionResult {
   ok: boolean;
   message: string;
   proposal?: any;
+  /** 决策后的状态：'active' | 'canary' | 'rejected' | 'rolled-back' */
+  newStatus?: HarnessProposalStatus;
 }
+
+// ==============================
+// Sprint 2：Canary 配置 + 风险等级判定
+// ==============================
+
+export type HarnessProposalStatus =
+  | "pending"
+  | "approved"
+  | "active"
+  | "canary"
+  | "rejected"
+  | "rolled-back";
+
+export type HarnessProposalRiskLevel = "low" | "medium" | "high" | "critical";
+
+export interface CanaryConfig {
+  /** 观察窗口（小时），到点后 cron 触发 promote/rollback 决策 */
+  durationHours: number;
+  /** 通过门槛：canary 期间 AgentLog 成功率必须 >= 此阈值 */
+  successThreshold: number;
+}
+
+const DEFAULT_CANARY_CONFIG: CanaryConfig = {
+  durationHours: 24,
+  successThreshold: 0.95,
+};
+
+const RISK_RANK: Record<HarnessProposalRiskLevel, number> = {
+  low: 0,
+  medium: 1,
+  high: 2,
+  critical: 3,
+};
+
+function readRiskLevel(proposal: any): HarnessProposalRiskLevel {
+  // proposedChange 可能是 Json 对象（Prisma JSON 列）或字符串
+  const pc =
+    typeof proposal?.proposedChange === "string"
+      ? safeJsonParse(proposal.proposedChange)
+      : proposal?.proposedChange;
+  const raw = pc?.riskLevel;
+  if (raw === "low" || raw === "medium" || raw === "high" || raw === "critical")
+    return raw;
+  // 兜底：用 estimatedImpact / evidence.severity 推断
+  const sev =
+    typeof proposal?.estimatedImpact === "string"
+      ? proposal.estimatedImpact
+      : null;
+  if (sev === "high" || sev === "critical") return "high";
+  if (sev === "medium") return "medium";
+  return "low";
+}
+
+function safeJsonParse(s: unknown): any {
+  if (typeof s !== "string") return null;
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
+
+function shouldEnterCanary(risk: HarnessProposalRiskLevel): boolean {
+  return RISK_RANK[risk] >= RISK_RANK.high;
+}
+
+function readCanaryConfig(proposal: any): CanaryConfig {
+  const cc =
+    typeof proposal?.canaryConfig === "string"
+      ? safeJsonParse(proposal.canaryConfig)
+      : proposal?.canaryConfig;
+  const dur = Number(cc?.durationHours);
+  const thr = Number(cc?.successThreshold);
+  return {
+    durationHours: Number.isFinite(dur) && dur > 0 ? dur : DEFAULT_CANARY_CONFIG.durationHours,
+    successThreshold:
+      Number.isFinite(thr) && thr > 0 && thr <= 1
+        ? thr
+        : DEFAULT_CANARY_CONFIG.successThreshold,
+  };
+}
+
+// ==============================
+// Audit 写入（Sprint 2 PART C）
+// ==============================
+
+interface AuditPayload {
+  workspaceId: string;
+  action: string;
+  actor: string;
+  targetId: string;
+  before: HarnessProposalStatus | string;
+  after: HarnessProposalStatus | string;
+  riskLevel?: HarnessProposalRiskLevel;
+  extra?: Record<string, unknown>;
+}
+
+async function writeProposalAudit(
+  prisma: any,
+  payload: AuditPayload,
+): Promise<void> {
+  if (!prisma?.auditLog?.create) return;
+  try {
+    await prisma.auditLog.create({
+      data: {
+        workspaceId: payload.workspaceId,
+        action: payload.action,
+        actor: payload.actor,
+        targetType: "proposal",
+        targetId: payload.targetId,
+        detail: JSON.stringify({
+          before: payload.before,
+          after: payload.after,
+          ...(payload.extra ?? {}),
+        }),
+        riskLevel: payload.riskLevel ?? null,
+        triggeredBy: payload.actor === "cron" || payload.actor === "system" ? "system" : "user",
+        status: "success",
+        createdAt: new Date(),
+      },
+    });
+  } catch {
+    // AuditLog 写失败不应反向阻塞业务，记录到 proposal 的 detail 字段已足够
+  }
+}
+
+// ==============================
+// approve / reject / rollback
+// ==============================
 
 export async function approveHarnessProposal(
   input: HarnessApproveInput,
@@ -111,8 +260,53 @@ export async function approveHarnessProposal(
   if (proposal.status !== "pending") {
     return { ok: false, message: `提案状态为 ${proposal.status}，不可审批` };
   }
-  await p.harnessProposal.update({ where: { id: input.proposalId }, data: { status: "active", approvedBy: input.actor, approvedAt: new Date() } });
-  return { ok: true, message: "提案已审批通过", proposal: { ...proposal, status: "active" } };
+
+  const risk = readRiskLevel(proposal);
+  const before = proposal.status as HarnessProposalStatus;
+  const now = new Date();
+
+  // Sprint 2：高风险（high / critical）→ 进入 canary；其他 → 直接 active
+  let newStatus: HarnessProposalStatus;
+  let canaryStartedAt: Date | null = null;
+  let canaryConfig: CanaryConfig | null = null;
+  if (shouldEnterCanary(risk)) {
+    newStatus = "canary";
+    canaryStartedAt = now;
+    canaryConfig = readCanaryConfig(proposal);
+  } else {
+    newStatus = "active";
+  }
+
+  const updated = await p.harnessProposal.update({
+    where: { id: input.proposalId },
+    data: {
+      status: newStatus,
+      approvedBy: input.actor,
+      approvedAt: now,
+      reviewedBy: input.actor,
+      reviewedAt: now,
+      canaryStartedAt: canaryStartedAt,
+      canaryConfig: canaryConfig,
+    },
+  });
+
+  await writeProposalAudit(p, {
+    workspaceId: input.workspaceId,
+    action: "proposal.approve",
+    actor: input.actor,
+    targetId: input.proposalId,
+    before,
+    after: newStatus,
+    riskLevel: risk,
+    extra: canaryConfig ? { canaryConfig } : undefined,
+  });
+
+  return {
+    ok: true,
+    message: newStatus === "canary" ? "提案已审批，进入 Canary 观察期" : "提案已审批通过",
+    proposal: { ...proposal, ...updated, status: newStatus },
+    newStatus,
+  };
 }
 
 export async function rejectHarnessProposal(
@@ -123,8 +317,34 @@ export async function rejectHarnessProposal(
   const proposal = await p.harnessProposal.findUnique({ where: { id: input.proposalId } });
   if (!proposal || proposal.workspaceId !== input.workspaceId) return { ok: false, message: "提案不存在" };
   if (proposal.status !== "pending") return { ok: false, message: `提案状态为 ${proposal.status}，不可驳回` };
-  await p.harnessProposal.update({ where: { id: input.proposalId }, data: { status: "rejected", rejectedBy: input.actor, rejectedAt: new Date() } });
-  return { ok: true, message: "提案已驳回" };
+
+  const before = proposal.status as HarnessProposalStatus;
+  const now = new Date();
+  const risk = readRiskLevel(proposal);
+
+  await p.harnessProposal.update({
+    where: { id: input.proposalId },
+    data: {
+      status: "rejected",
+      rejectedBy: input.actor,
+      rejectedAt: now,
+      reviewedBy: input.actor,
+      reviewedAt: now,
+    },
+  });
+
+  await writeProposalAudit(p, {
+    workspaceId: input.workspaceId,
+    action: "proposal.reject",
+    actor: input.actor,
+    targetId: input.proposalId,
+    before,
+    after: "rejected",
+    riskLevel: risk,
+    extra: input.reason ? { reason: input.reason } : undefined,
+  });
+
+  return { ok: true, message: "提案已驳回", newStatus: "rejected" };
 }
 
 export async function rollbackHarnessProposal(
@@ -135,25 +355,433 @@ export async function rollbackHarnessProposal(
   const proposal = await p.harnessProposal.findUnique({ where: { id: input.proposalId } });
   if (!proposal || proposal.workspaceId !== input.workspaceId) return { ok: false, message: "提案不存在" };
   if (proposal.status !== "active" && proposal.status !== "canary") return { ok: false, message: "只能回滚已激活或灰度中的提案" };
-  await p.harnessProposal.update({ where: { id: input.proposalId }, data: { status: "rolled-back", rolledBackBy: input.actor, rolledBackAt: new Date() } });
-  return { ok: true, message: "提案已回滚" };
+
+  const before = proposal.status as HarnessProposalStatus;
+  const now = new Date();
+  const risk = readRiskLevel(proposal);
+
+  await p.harnessProposal.update({
+    where: { id: input.proposalId },
+    data: {
+      status: "rolled-back",
+      rolledBackBy: input.actor,
+      rolledBackAt: now,
+      canaryCompletedAt: before === "canary" ? now : undefined,
+      canaryRollbackReason: before === "canary" ? input.reason ?? "manual rollback" : undefined,
+    },
+  });
+
+  await writeProposalAudit(p, {
+    workspaceId: input.workspaceId,
+    action: "proposal.rollback",
+    actor: input.actor,
+    targetId: input.proposalId,
+    before,
+    after: "rolled-back",
+    riskLevel: risk,
+    extra: input.reason ? { reason: input.reason } : undefined,
+  });
+
+  return { ok: true, message: "提案已回滚", newStatus: "rolled-back" };
+}
+
+// ==============================
+// Sprint 2 PART A：Canary → Active 自动晋级
+// ==============================
+
+export interface PromoteCanaryInput {
+  proposalId: string;
+  workspaceId: string;
+  /** 触发者，默认 'cron'。也支持手动触发时传入 actor。 */
+  actor?: string;
+  /** 强制覆盖窗口检查（用于手动晋级），默认 false */
+  force?: boolean;
+}
+
+export interface PromoteCanaryResult {
+  ok: boolean;
+  message: string;
+  /** 'promoted' | 'rolled-back' | 'pending' | 'skipped' */
+  outcome: "promoted" | "rolled-back" | "pending" | "skipped";
+  metrics?: {
+    sampleSize: number;
+    errorCount: number;
+    successRate: number;
+    successThreshold: number;
+    elapsedHours: number;
+    durationHours: number;
+  };
+}
+
+/**
+ * 计算 Canary 期间 Agent 错误率（基于 AgentLog）。
+ * 窗口为 [canaryStartedAt, now]。
+ *
+ * 错误率口径：status === 'error' 视为错误；
+ * 'success' / 'completed' / 'ok' 视为成功；其它状态忽略不计入分母。
+ */
+async function computeCanaryAgentMetrics(
+  prisma: any,
+  workspaceId: string,
+  windowStart: Date,
+): Promise<{ sampleSize: number; errorCount: number; successRate: number }> {
+  if (!prisma?.agentLog?.findMany) {
+    return { sampleSize: 0, errorCount: 0, successRate: 1 };
+  }
+  const logs: Array<{ status: string }> = await prisma.agentLog.findMany({
+    where: { workspaceId, createdAt: { gte: windowStart } },
+    select: { status: true },
+  });
+
+  let errors = 0;
+  let counted = 0;
+  for (const l of logs) {
+    if (l.status === "error" || l.status === "failed") {
+      errors += 1;
+      counted += 1;
+    } else if (
+      l.status === "success" ||
+      l.status === "completed" ||
+      l.status === "ok"
+    ) {
+      counted += 1;
+    }
+    // 其它中间态（pending/running/...) 不计入
+  }
+  const successRate = counted === 0 ? 1 : (counted - errors) / counted;
+  return { sampleSize: counted, errorCount: errors, successRate };
+}
+
+/**
+ * 评估并尝试将一个 canary 提案晋级为 active。
+ *
+ * 决策逻辑（按顺序）：
+ *  1. 提案不存在 / workspace 不匹配 → ok=false
+ *  2. proposal.status !== 'canary' → outcome='skipped'
+ *  3. 未到 durationHours：
+ *       - force=true 时按当前指标评估
+ *       - 否则 outcome='pending'
+ *  4. 到点（或 force）：
+ *       - 样本足够（>=5）且 successRate >= threshold → 晋级 active
+ *       - 否则触发 rollback
+ *
+ * 所有终结性状态变更都会写入 AuditLog。
+ */
+export async function promoteCanaryToActive(
+  input: PromoteCanaryInput,
+  deps: HarnessHandlerDeps,
+): Promise<PromoteCanaryResult> {
+  const p = deps.prisma;
+  const actor = input.actor ?? "cron";
+
+  const proposal = await p.harnessProposal.findUnique({
+    where: { id: input.proposalId },
+  });
+  if (!proposal || proposal.workspaceId !== input.workspaceId) {
+    return { ok: false, message: "提案不存在", outcome: "skipped" };
+  }
+  if (proposal.status !== "canary") {
+    return {
+      ok: false,
+      message: `提案状态为 ${proposal.status}，非 canary，跳过`,
+      outcome: "skipped",
+    };
+  }
+
+  const config = readCanaryConfig(proposal);
+  const startedAt: Date | null = proposal.canaryStartedAt
+    ? new Date(proposal.canaryStartedAt)
+    : null;
+  if (!startedAt) {
+    return {
+      ok: false,
+      message: "Canary 起始时间缺失，无法评估",
+      outcome: "skipped",
+    };
+  }
+
+  const now = new Date();
+  const elapsedMs = now.getTime() - startedAt.getTime();
+  const elapsedHours = elapsedMs / 3600_000;
+  const windowEnded = elapsedHours >= config.durationHours;
+
+  // 未到点且未强制 → 维持 canary，等待下一个 cron tick
+  if (!windowEnded && !input.force) {
+    return {
+      ok: true,
+      message: `Canary 仍在观察期内（${elapsedHours.toFixed(1)}/${config.durationHours}h）`,
+      outcome: "pending",
+      metrics: {
+        sampleSize: 0,
+        errorCount: 0,
+        successRate: 1,
+        successThreshold: config.successThreshold,
+        elapsedHours,
+        durationHours: config.durationHours,
+      },
+    };
+  }
+
+  // 计算指标
+  const metrics = await computeCanaryAgentMetrics(p, input.workspaceId, startedAt);
+  const risk = readRiskLevel(proposal);
+
+  // 样本量门槛：< 5 视为统计不足，等同未通过 → 触发 rollback 防止无依据放行
+  const SAMPLE_FLOOR = 5;
+  const passed =
+    metrics.sampleSize >= SAMPLE_FLOOR &&
+    metrics.successRate >= config.successThreshold;
+
+  if (passed) {
+    await p.harnessProposal.update({
+      where: { id: input.proposalId },
+      data: {
+        status: "active",
+        canaryCompletedAt: now,
+      },
+    });
+    await writeProposalAudit(p, {
+      workspaceId: input.workspaceId,
+      action: "proposal.promote",
+      actor,
+      targetId: input.proposalId,
+      before: "canary",
+      after: "active",
+      riskLevel: risk,
+      extra: {
+        successRate: metrics.successRate,
+        successThreshold: config.successThreshold,
+        sampleSize: metrics.sampleSize,
+        elapsedHours,
+      },
+    });
+    return {
+      ok: true,
+      message: `Canary 通过：成功率 ${(metrics.successRate * 100).toFixed(1)}% ≥ ${(config.successThreshold * 100).toFixed(0)}%，已晋级 active`,
+      outcome: "promoted",
+      metrics: { ...metrics, successThreshold: config.successThreshold, elapsedHours, durationHours: config.durationHours },
+    };
+  }
+
+  // 失败 → 回滚
+  const rollbackReason =
+    metrics.sampleSize < SAMPLE_FLOOR
+      ? `样本量不足（${metrics.sampleSize} < ${SAMPLE_FLOOR}），canary 期满未取得足够运行证据`
+      : `成功率 ${(metrics.successRate * 100).toFixed(1)}% < ${(config.successThreshold * 100).toFixed(0)}%`;
+
+  await p.harnessProposal.update({
+    where: { id: input.proposalId },
+    data: {
+      status: "rolled-back",
+      rolledBackBy: actor,
+      rolledBackAt: now,
+      canaryCompletedAt: now,
+      canaryRollbackReason: rollbackReason,
+    },
+  });
+  await writeProposalAudit(p, {
+    workspaceId: input.workspaceId,
+    action: "proposal.rollback",
+    actor,
+    targetId: input.proposalId,
+    before: "canary",
+    after: "rolled-back",
+    riskLevel: risk,
+    extra: {
+      reason: rollbackReason,
+      successRate: metrics.successRate,
+      successThreshold: config.successThreshold,
+      sampleSize: metrics.sampleSize,
+      elapsedHours,
+    },
+  });
+
+  return {
+    ok: true,
+    message: `Canary 未通过：${rollbackReason}，已自动回滚`,
+    outcome: "rolled-back",
+    metrics: { ...metrics, successThreshold: config.successThreshold, elapsedHours, durationHours: config.durationHours },
+  };
 }
 
 // ==============================
 // Harness Evaluation
+// —— 占位实现已迁移至 ../harness/index.ts。
+// —— 真实评估引擎通过本文件顶部的 `export { runHarnessEvaluation }` 暴露。
 // ==============================
 
-export interface HarnessEvaluateInput {
+// ==============================
+// Harness Proposal 生成
+// —— 把 EvaluationResult 写入 HarnessProposal 表
+// ==============================
+
+export interface GenerateHarnessProposalsInput {
   workspaceId: string;
+  windowHours?: number;
 }
 
-export async function runHarnessEvaluation(
-  input: HarnessEvaluateInput,
-  deps: HarnessHandlerDeps,
-): Promise<{ evaluations: number; anomalies: number }> {
+export interface GenerateHarnessProposalsDeps {
+  prisma: any;
+  callLlm: (systemPrompt: string, userPrompt: string) => Promise<string>;
+}
+
+export interface GenerateHarnessProposalsResult {
+  generated: number;
+  proposals: any[];
+}
+
+const SEVERITY_RANK: Record<EvaluationSeverity, number> = {
+  low: 0,
+  medium: 1,
+  high: 2,
+  critical: 3,
+};
+
+function severityToRiskLevel(s: EvaluationSeverity): "low" | "medium" | "high" {
+  if (s === "low") return "low";
+  if (s === "medium") return "medium";
+  return "high"; // high / critical → high
+}
+
+function proposalTypeToComponent(t: ProposalType): string {
+  switch (t) {
+    case "skill_binding":
+      return "SkillBinding";
+    case "workflow_template":
+      return "WorkflowTemplate";
+    case "memory_policy":
+      return "MemoryPolicy";
+    case "connector_policy":
+      return "ConnectorPolicy";
+    case "eval_rule":
+      return "EvalRuleSet";
+    default:
+      return "Unknown";
+  }
+}
+
+/** 采集 workspace 当前策略快照（用于 rollback / previousSnapshot 字段）。 */
+async function captureWorkspaceSnapshot(
+  prisma: any,
+  workspaceId: string,
+): Promise<Record<string, unknown>> {
+  const snapshot: Record<string, unknown> = {
+    workspaceId,
+    capturedAt: new Date().toISOString(),
+  };
+  try {
+    const ws = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { id: true, name: true, automationLevel: true, plan: true },
+    });
+    if (ws) snapshot.workspace = ws;
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (prisma.workspaceSettings?.findUnique) {
+      const settings = await prisma.workspaceSettings.findUnique({
+        where: { workspaceId },
+        select: {
+          defaultModel: true,
+          taskProviderMap: true,
+          workflowEngine: true,
+        },
+      });
+      if (settings) snapshot.settings = settings;
+    }
+  } catch {
+    /* ignore */
+  }
+  return snapshot;
+}
+
+export async function generateHarnessProposals(
+  input: GenerateHarnessProposalsInput,
+  deps: GenerateHarnessProposalsDeps,
+): Promise<GenerateHarnessProposalsResult> {
   const p = deps.prisma;
-  const anomalies = await p.harnessProposal.count({ where: { workspaceId: input.workspaceId, status: "pending" } });
-  return { evaluations: anomalies > 0 ? anomalies : 1, anomalies };
+
+  // 1. 调用真实评估引擎
+  const evalOut = await runHarnessEvaluationCore(
+    { workspaceId: input.workspaceId, windowHours: input.windowHours },
+    { prisma: p, callLlm: deps.callLlm },
+  );
+
+  // 2. 过滤 severity >= medium
+  const eligible = evalOut.results.filter(
+    (r) => SEVERITY_RANK[r.severity] >= SEVERITY_RANK.medium,
+  );
+
+  if (eligible.length === 0) {
+    return { generated: 0, proposals: [] };
+  }
+
+  // 3. 准备 workspace 策略快照（一次即可，所有提案共享）
+  const snapshot = await captureWorkspaceSnapshot(p, input.workspaceId);
+  const snapshotJson = JSON.stringify(snapshot);
+
+  // 4. 写入 HarnessProposal
+  const proposals: any[] = [];
+  let seq = 0;
+  for (const result of eligible) {
+    seq += 1;
+    const proposalId = `HEP-${Date.now()}-${seq}`;
+    const evidence = {
+      signal: result.signal,
+      proposalType: result.proposalType,
+      severity: result.severity,
+      generatedBy: "harness-evaluation-engine",
+    };
+    const proposedChange = {
+      targetComponent: proposalTypeToComponent(result.proposalType),
+      description: result.suggestion,
+      riskLevel: severityToRiskLevel(result.severity),
+      automationLevel: "L2",
+    };
+
+    try {
+      const created = await p.harnessProposal.create({
+        data: {
+          proposalId,
+          workspaceId: input.workspaceId,
+          triggeredBy: "auto",
+          triggerReason: `harness-evaluation-engine: ${result.signal.type}`,
+          problemStatement: `[AI生成] ${result.signal.type} 优化提案`,
+          evidence,
+          proposedChange,
+          targetSkillId: null,
+          requiresHumanApproval:
+            SEVERITY_RANK[result.severity] >= SEVERITY_RANK.high,
+          estimatedImpact: result.severity,
+          affectedAgents: result.signal.agentId
+            ? [result.signal.agentId]
+            : [],
+          rollbackPlan:
+            "回滚至 previousSnapshot 中存储的 Workspace 策略快照（automationLevel + WorkspaceSettings）",
+          previousSnapshot: snapshotJson,
+          status: "pending",
+        },
+      });
+      proposals.push({
+        ...created,
+        createdAt: created.createdAt?.toISOString?.() ?? created.createdAt,
+        updatedAt: created.updatedAt?.toISOString?.() ?? created.updatedAt,
+      });
+    } catch (err) {
+      // 单条失败不阻断整体，记录后继续
+      proposals.push({
+        proposalId,
+        status: "create-failed",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return {
+    generated: proposals.filter((p) => p.status !== "create-failed").length,
+    proposals,
+  };
 }
 
 // ==============================
