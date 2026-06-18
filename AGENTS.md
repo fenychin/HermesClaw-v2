@@ -1,9 +1,9 @@
 # AGENTS.md — HermesClaw-v3 项目最高规则文档
 
-> 版本: v3.0.0  
+> 版本: v3.16.00-dev  
 > 项目: HermesClaw  
 > 状态: 生效中  
-> 最后更新: 2026-06-12
+> 最后更新: 2026-06-18
 
 ---
 
@@ -139,9 +139,9 @@ Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私
 - `HumanApprovalCheckpoint`（人工审批检查点）
 
 #### 3.1.1 Capability Registry 实现（2026-06-15 v3.04.00-dev）
-- **Registry 服务**：[capability-registry.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/capability-registry.ts)
+- **Registry 服务**：[capability-registry.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/apps/web/src/lib/server/capability-registry.ts)
 - **版本管理**：使用 `CapabilityVersion`（prisma schema）实现，支持基于内联 semver 语义化排序的版本解析与运行时发现。
-- **健康度刷新**：通过 [/api/cron/capability-health](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/app/api/cron/capability-health/route.ts) 每小时自动调度刷新。
+- **健康度刷新**：通过 [/api/cron/capability-health](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/apps/web/src/app/api/cron/capability-health/route.ts) 每小时自动调度刷新。
 - **能力下线**：支持 `deprecate`（仍可用，写 WARNING 审计日志）和 `yank`（立即不可用，彻底阻断并写入 high 风险审计日志）。
 - **审计动作**：支持 `capability.registered` / `capability.yanked` / `capability.health.degraded` 审计留痕溯源。
 
@@ -152,8 +152,8 @@ Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私
 - 最终任务状态由 Hermes 汇总裁定，但不得篡改 OpenClaw 回传的原始执行回执与事件轨迹。
 
 3.2.1 Industry Pack Loader v2 实现（2026-06-15 v3.06.00-dev）
-- **Loader 核心**：[industry-pack-loader.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/industry-pack-loader.ts)
-- **Manifest 契约**：[industry-pack-manifest.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/contracts/industry-pack-manifest.ts)
+- **Loader 核心**：[industry-pack-loader.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/apps/web/src/lib/server/industry-pack-loader.ts)
+- **Manifest 契约**：[industry-pack-manifest.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/packages/event-contracts/src/industry-pack-manifest.ts)
 - **安装流程**：Manifest 校验（非空/SemVer/重复能力 ID/自循环依赖） → 依赖解析与深度检测（最大深度为 5，防无限循环） → 组件表实体创建/更新 → 敏感词前缀转换（如密码等转为 `'env:PLACEHOLDER'`） → 版本化注册至 Registry（已注册视为幂等跳过） → 更新为 `installed` 状态。
 - **异常回滚**：注册失败时，遍历已成功注册的能力列表逐一调用 `deprecateCapability` 进行软标记废弃（禁止 deleteMany 物理删除），更新安装状态为 `failed`。
 - **卸载策略**：Graceful Deprecation 策略，逐个废弃所安装能力，更新安装记录状态为 `uninstalled`，禁止物理删除任何 Skill / Workflow / Connector 记录。
@@ -196,7 +196,7 @@ Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私
 - `version`（事件版本）
 
 #### 3.3.1 Built-in Email Connector 实现（2026-06-15 v3.05.00-dev）
-- **核心服务**：[email-connector.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/connectors/email-connector.ts)
+- **核心服务**：[email-connector.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/apps/web/src/lib/server/connectors/email-connector.ts)
 - **核心能力**：
   - **SMTP 发送**：使用 Node.js 原生 `net`/`tls` 进行握手与内容组装，非测试/开发环境下使用真实 socket 发送。
   - **速率限制**：小时级额度校验，在 Prisma 事务中悲观锁定 Connector 记录并原子更新已使用额度；超限时抛出 `RateLimitExceededError`。
@@ -219,7 +219,7 @@ Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私
 - OpenClaw Gateway 如发现事件重放或序列缺口时，必须依靠幂等键保护下游系统。
 
 ### 3.5 实现状态与补充约定（2026-06-15 v3.02.00-dev）
-- 契约层已实现：[contracts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/contracts/)
+- 契约层已实现：[contracts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/packages/event-contracts/src/)
 - 合规版本：`CONTRACT_VERSION = '1.0'`
 - 已接入：`harness-eval.ts` / `connectors.ts` / `audit.ts`
 - **已接入（v3.07）**：`workflow/runtime-engine.ts` + `orchestrator.ts` 已实现 Workflow Runtime Engine 与 Multi-Agent Orchestration，完整替代原「待接入」状态
@@ -304,23 +304,23 @@ Harness Runtime 至少由以下对象组成：
 6. 全量激活或回滚
 
 ### 4.3.1 快照实现（2026-06-15 v3.02.01-dev）
-- **快照服务**：[harness-snapshot.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/harness-snapshot.ts)
-- **触发时机**：Approval 通过后、Canary 启动前（由 [approval.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/approval.ts) `recordProposalSnapshot` 钩子触发）
+- **快照服务**：[harness-snapshot.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/apps/web/src/lib/server/harness-snapshot.ts)
+- **触发时机**：Approval 通过后、Canary 启动前（由 [approval.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/apps/web/src/lib/server/approval.ts) `recordProposalSnapshot` 钩子触发）
 - **数据模型**：`HarnessSnapshot`（prisma schema）
 - **审计动作**：`harness.snapshot.created` / `harness.snapshot.restored`
 
 ### 4.4.1 Canary 实现（2026-06-15 v3.02.02-dev）
-- **Canary 服务**：[canary.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/canary.ts)
+- **Canary 服务**：[canary.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/apps/web/src/lib/server/canary.ts)
 - **晋级阈值**：`errorRate < 5%`，`successRate > 90%`
 - **自动回滚阈值**：`errorRate > 20%`（超出此阈值立即触发 Early Abort 紧急中止）
 - **观察窗口**：默认 24h，可在提案中自定义
-- **定时评估**：[/api/cron/canary-eval](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/app/api/cron/canary-eval/route.ts)（每 5 分钟由 Cron 调度）
+- **定时评估**：[/api/cron/canary-eval](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/apps/web/src/app/api/cron/canary-eval/route.ts)（每 5 分钟由 Cron 调度）
 - **审计动作**：`canary.started` / `canary.promoted` / `canary.aborted`
 
 ### 4.5.1 回滚实现（2026-06-15 v3.02.03-dev）
-- **回滚服务**：[rollback.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/rollback.ts)
+- **回滚服务**：[rollback.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/apps/web/src/lib/server/rollback.ts)
 - **触发入口**：
-  - **自动触发**：由巡检 Cron（[/api/cron/canary-eval](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/app/api/cron/canary-eval/route.ts)）检测到健康度恶化自动调用。
+  - **自动触发**：由巡检 Cron（[/api/cron/canary-eval](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/apps/web/src/app/api/cron/canary-eval/route.ts)）检测到健康度恶化自动调用。
   - **手动触发**：通过管理员接口 `POST /api/rollbacks` 与重试接口 `POST /api/rollbacks/[id]/retry`。
 - **机制与约束**：
   - **原子事务性**：使用单个 Prisma 事务原子恢复 Agent 状态，将灰度期间新建的关联 Workflow、Skill、Connector 置为 `'deprecated'`。
@@ -330,19 +330,19 @@ Harness Runtime 至少由以下对象组成：
 - **审计动作**：`harness.rollback.completed` / `harness.rollback.failed`。
 
 ### 4.6.1 Multi-Agent Orchestration + Workflow Runtime 实现（2026-06-15 v3.07.00-dev）
-- **Workflow Runtime Engine**：[runtime-engine.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/workflow/runtime-engine.ts)
-- **Multi-Agent Orchestrator**：[orchestrator.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/orchestrator.ts)
-- **Contracts**：[agent-message.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/contracts/agent-message.ts) / [orchestration-session.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/contracts/orchestration-session.ts)
+- **Workflow Runtime Engine**：[runtime-engine.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/apps/web/src/lib/server/workflow/runtime-engine.ts)
+- **Multi-Agent Orchestrator**：[orchestrator.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/apps/web/src/lib/server/orchestrator.ts)
+- **Contracts**：[agent-message.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/packages/event-contracts/src/agent-message.ts) / [orchestration-session.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/packages/event-contracts/src/orchestration-session.ts)
 - **Schema 新增模型**：`WorkflowRun`（扩展）/ `StepRun` / `OrchestrationSession` / `SubAgentTask` / `AgentMessage`
 - **执行模式**：支持串行（`sequential`）/ 并行（`parallel`）/ 条件分支（`conditional`）/ 人工介入（`human-in-loop`）四种工作流模式
 - **Orchestrator 权限门禁**：Orchestrator Agent 必须满足 `automationLevel >= L3`，否则拒绝创建编排会话
 - **Sub-Agent 限制**：单 Session 最多支持 `MAX_SUB_AGENTS = 8` 个 Sub-Agent 并发
 - **结果合并策略**：内置 `union` / `append` / `first-wins` / `majority` 四种合并模式
 - **超时管理**：WorkflowRun 整体 30 分钟、单 Step 60 秒、Session 默认 15 分钟，均提取为顶层可配置常量
-- **超时巡检**：[/api/cron/workflow-timeout](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/app/api/cron/workflow-timeout/route.ts)（每 5 分钟由 Cron 调度）
+- **超时巡检**：[/api/cron/workflow-timeout](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/apps/web/src/app/api/cron/workflow-timeout/route.ts)（每 5 分钟由 Cron 调度）
 - **API 路由**：`POST /api/workflow-runs`（启动）/ `POST /api/workflow-runs/[id]/execute`（执行）/ `POST /api/workflow-runs/[id]/cancel`（取消）/ `GET /api/workflow-runs/[id]/status`（状态查询）
 - **审计动作**：`workflow.run.started` / `workflow.run.completed` / `workflow.run.failed` / `workflow.run.cancelled` / `workflow.run.resumed` / `orchestration.session.started` / `orchestration.session.completed` / `orchestration.session.failed` / `orchestration.subagent.completed` / `orchestration.session.resumed`
-- **单元测试**：[runtime-engine.test.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/workflow/__tests__/runtime-engine.test.ts)（28 个测试用例） / [orchestrator.test.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/src/lib/server/__tests__/orchestrator.test.ts)（14 个测试用例）
+- **单元测试**：[runtime-engine.test.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/apps/web/src/lib/server/workflow/__tests__/runtime-engine.test.ts)（28 个测试用例） / [orchestrator.test.ts](file:///d:/Users/frankfeny/Desktop/HermesClaw-v3/apps/web/src/lib/server/__tests__/orchestrator.test.ts)（14 个测试用例）
 - **Workflow 节点执行器（v3.12.00-dev）**：
   - `skill-executor.ts`：Skill 节点 LLM 编排执行器，通过 `selectModel()` 路由，
     L3 强制人工确认，使用 `ctx.industryId` 消除 N+1 查询。

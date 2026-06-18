@@ -1,6 +1,6 @@
 # CLAUDE.md — HermesClaw 工程协作与实现约束
-## 版本：v1.3
-## 日期：2026-06-14
+## 版本：v2.0
+## 日期：2026-06-18
 
 ---
 
@@ -62,47 +62,50 @@
 
 # 3. 仓库结构约定
 
-## 3.1 当前阶段（v0.x）：单 Next.js 应用 + 内部分层
+## 3.1 当前阶段（v3.x）：pnpm monorepo
 
-为降低 MVP 阶段的工程复杂度，本仓库当前**不采用 pnpm monorepo**，而是用单 Next.js 应用配合明确的目录边界来近似 monorepo 各 package / service 的角色：
+本仓库采用 **pnpm monorepo** 架构，各 package 已从单 Next.js 应用拆分完毕：
 
 | 物理目录 | 等价角色 | 说明 |
 | --- | --- | --- |
-| `src/app` | apps/web | 视图层 + Route Handler，不得直接持有核心业务规则 |
-| `src/contracts` | packages/event-contracts + packages/harness-schema | 全部契约对象（TaskEnvelope / ExecutionEvent / HarnessBundle / IndustryManifest 等）的 zod 单源定义 |
-| `src/lib/server` | services/hermes-core + services/openclaw-runtime | 控制核与执行运行时的内部实现，只通过 `src/contracts` 与 `src/lib/server/adapters/*` 互通 |
-| `src/lib/server/adapters/hermes` | hermes adapter | Hermes API 客户端，版本锁定 + Mock 降级 |
-| `src/lib/server/adapters/openclaw` | openclaw adapter | OpenClaw API 客户端 + ExecutionEvent 总线 |
-| `src/lib/industry-pack-sdk` | packages/industry-pack-sdk | 行业包装载、校验、Schema、prompt/DAG/steps 加载 API |
+| `apps/web/` | apps/web + services/hermes-core + services/openclaw-runtime | 视图层 + Route Handler + 服务端集成层，不得直接持有纯逻辑 |
+| `apps/web/src/app/` | apps/web 视图层 | Next.js App Router 页面 & API Route Handler |
+| `apps/web/src/lib/server/` | services/hermes-core + services/openclaw-runtime 集成层 | 控制核与执行运行时的 Prisma/HTTP 集成实现 |
+| `apps/web/src/lib/server/adapters/hermes/` | hermes adapter | Hermes API 客户端，版本锁定 + Mock 降级 |
+| `apps/web/src/lib/server/adapters/openclaw/` | openclaw adapter (legacy) | 旧版 OpenClaw 适配器（已迁移至 `packages/openclaw-adapter`） |
+| `packages/hermes-kernel/` | services/hermes-core 纯逻辑 | 控制核纯逻辑层（意图解析 / DAG 引擎 / Harness 生命周期 / 策略 / 记忆） |
+| `packages/openclaw-adapter/` | services/openclaw-runtime 纯逻辑 | 执行运行时适配器（Gateway 客户端 / 事件总线 / SSE 发射器 / Mock） |
+| `packages/event-contracts/` | packages/event-contracts + packages/harness-schema | 全部契约对象的 Zod 单源定义（TaskEnvelope / ExecutionEvent / HarnessBundle 等） |
+| `packages/industry-pack-sdk/` | packages/industry-pack-sdk | 行业包装载、校验、Schema、prompt/DAG/steps 加载 API |
 | `industry-packs/<pack-id>/` | 行业包资产 | 每个 pack 自包含 manifest + agents + workflows + prompts + skills + connectors（按 §6.2） |
 | `prisma/` | infra/db | 数据库 schema 与 seed 脚本 |
 | `.claude/` | infra/skills | Claude Code skills（外贸技能模板） |
 
-## 3.2 目录边界（无论是否拆 monorepo 都必须遵守）
+## 3.2 目录边界（monorepo 模式）
 
-- `src/app/` 不得包含核心业务规则；从 `src/lib/server/*` 获取数据，从 `src/contracts/*` 获取类型。
-- `src/lib/server/` 内部模块只通过 `src/contracts` 与 `src/lib/server/adapters/*` 跨域通信，**禁止跨 service 直接 import 私有实现**（例：未来若 hermes/ 与 openclaw/ 拆分，二者只能通过契约对象互相访问）。
-- `src/contracts/` 只放协议 schema，**不得 import `src/lib/server/*`**（防止反向依赖）。
-- `src/lib/industry-pack-sdk/` 只放行业包装载与校验逻辑，**不写任何具体行业的业务实现**；具体行业逻辑必须落在 `industry-packs/<pack-id>/`。
+- `apps/web/src/app/` 不得包含核心业务规则；从 `apps/web/src/lib/server/*` 获取数据，从 `packages/event-contracts/src/*` 获取类型。
+- `packages/hermes-kernel/` 和 `packages/openclaw-adapter/` 为纯逻辑层，**零依赖 Prisma / Next.js**；所有外部依赖通过 DI 接口（`*Deps`）注入。
+- `apps/web/src/lib/server/` 内部模块通过 `packages/event-contracts` 与 `packages/hermes-kernel` / `packages/openclaw-adapter` 通信，**禁止跨域直接 import 私有实现**。
+- `packages/event-contracts/` 只放协议 schema，**不得 import 任何 server/kernel/adapter 代码**（防止反向依赖）。
+- `packages/industry-pack-sdk/` 只放行业包装载与校验逻辑，**不写任何具体行业的业务实现**；具体行业逻辑必须落在 `industry-packs/<pack-id>/`。
 - `industry-packs/<pack-id>/` 不得侵入 Hermes / OpenClaw 核心代码；与核心通信必须经由 SDK 公开的注入点（manifest + agents + workflows + prompts + skills）。
-- 任何在 `src/lib/server/` 中出现的特定 `industryId` 字面量（如 `"foreign-trade"`）都视为 anti-pattern；处理方式：通过参数传入或从 `WorkspaceContext` / `Workflow.industryId` 派生。
+- 任何在 `packages/hermes-kernel/` 或 `apps/web/src/lib/server/` 中出现的特定 `industryId` 字面量（如 `"foreign-trade"`）都视为 anti-pattern；处理方式：通过参数传入或从 `WorkspaceContext` / `Workflow.industryId` 派生。
 
-## 3.3 演进路线（v0.13+）
+## 3.3 拆分完成状态（v3.x）
 
-当 Hermes Core / OpenClaw Runtime 需要独立部署或被替换内核时，按以下顺序正式拆分为 pnpm workspace：
+Hermes Core / OpenClaw Runtime 已按以下顺序完成拆分：
 
-1. 抽 `packages/event-contracts`（来源：`src/contracts/`）
-2. 抽 `packages/harness-schema`（来源：`src/contracts/harness-*.ts`、`industry-manifest.ts`）
-3. 抽 `packages/industry-pack-sdk`（来源：`src/lib/industry-pack-sdk/`）
-4. 拆 `services/hermes-core` 与 `services/openclaw-runtime`（来源：`src/lib/server/` 中的对应模块）
-5. 把 `src/app/` 重命名为 `apps/web/`
+1. ✅ `packages/event-contracts`（来源：旧 `src/contracts/`）
+2. ✅ `packages/hermes-kernel`（来源：旧 `src/lib/server/` 纯逻辑层）
+3. ✅ `packages/openclaw-adapter`（来源：旧 `src/lib/server/adapters/openclaw/`）
+4. ✅ `packages/industry-pack-sdk`（来源：旧 `src/lib/industry-pack-sdk/`）
+5. ✅ `apps/web/`（来源：旧 `src/app/` + `src/lib/server/` 集成层）
 
-届时本节升级为：
+当前目录结构已稳定为 monorepo：
 
-> 采用 monorepo 目录结构：`apps/web`、`services/hermes-core`、`services/openclaw-runtime`、`packages/event-contracts`、`packages/harness-schema`、`packages/industry-pack-sdk`、`packages/shared-types`、`infra/docker`。
-> 目录边界与 §3.2 保持一致。
+> `apps/web`、`packages/hermes-kernel`、`packages/openclaw-adapter`、`packages/event-contracts`、`packages/industry-pack-sdk`、`industry-packs/<pack-id>`、`prisma/`
 
-在拆分完成前，**§3.2 的目录边界等价生效**，违反任何一条都视为破坏未来的可拆分性。
+**§3.2 的目录边界对所有代码变更等价生效**，违反任何一条都视为破坏架构完整性。
 
 ---
 
