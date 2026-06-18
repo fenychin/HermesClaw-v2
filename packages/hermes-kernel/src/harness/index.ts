@@ -554,3 +554,7 @@ export async function getHarnessStatus(
     intervalHours: evalWindowHours,
   };
 }
+
+// Proposal Writer
+export { writeProposalsFromEvaluation } from './proposal-writer'
+export type { WriteProposalsParams } from './proposal-writer'

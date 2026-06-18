@@ -121,3 +121,14 @@ OpenClaw Gateway 真实接入
   - 新建 `knowledge/index.yaml`（3 条知识条目：Incoterms 2020 / HS 编码 / 付款方式），填补空目录。
   - manifest.yaml `directory.skills` 增补 `result-first-delivery`、`directory.workflows` 增补 `intelligent-response-v2`，与磁盘实际计数对齐；顶部加入 sprint 验证注释。
 - **修复完成日期**：2026-06-18
+
+---
+
+## MVP Release Checklist
+
+- [ ] FC-1~FC-6 全部通过
+- [ ] harness canary 状态机 11 项转换测试通过
+- [ ] boundary 隔离 11 项测试通过（已通过 ✅）
+- [ ] next-auth E2E 环境 5 项修复通过
+- [ ] `pnpm build` 零 TS 错误
+- [ ] TECH_DEBT.md 无 HIGH 风险未修复项

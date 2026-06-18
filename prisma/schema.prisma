@@ -3,7 +3,7 @@
 
 generator client {
   provider = "prisma-client"
-  output   = "../src/generated/prisma-v2"
+  output   = "../apps/web/src/generated/prisma-v2"
 }
 
 datasource db {
@@ -19,6 +19,7 @@ model Workspace {
   name            String
   plan            String            @default("free") // free | pro | enterprise
   automationLevel String            @default("L2") // 自动化授权等级（AGENTS.md §5.2）：L1/L2/L3/L4
+  status          String            @default("active") // active | suspended | archived
   createdAt       DateTime          @default(now())
   members         WorkspaceMember[]
 
@@ -61,6 +62,8 @@ model WorkspaceSettings {
   defaultModel    String    @default("deepseek-chat") // 默认模型（可配置，路由 fallback）
   taskProviderMap String    @default("{}") // JSON：{chat|workflow|analysis|generation} -> 'anthropic'|'deepseek'
   workflowEngine  String    @default("local") // local | hermes
+  webhookUrl      String?   // 评估异常通知 webhook
+  evalWindowHours Int       @default(24) // 评估时间窗口（小时）
   updatedAt       DateTime  @updatedAt
   createdAt       DateTime  @default(now())
 }
@@ -336,26 +339,41 @@ model Skill {
 // ============================================================
 // Harness 升级提案
 // ============================================================
+
+enum HarnessProposalStatus {
+  draft
+  pending
+  approved
+  canary
+  active
+  rejected
+  rolled_back
+}
+
 model HarnessProposal {
-  id                    String    @id @default(cuid())
-  proposalId            String    @unique // HEP-{timestamp}
-  workspaceId           String    @default("default")
-  workspace             Workspace @relation(fields: [workspaceId], references: [id])
-  triggeredBy           String // "auto" | "manual"
+  id                    String                @id @default(cuid())
+  proposalId            String                @unique // HEP-{timestamp}
+  title                 String                @default("") // 提案摘要，如 "[workflow_failure] xxx"
+  severity              String                @default("medium") // low | medium | high | critical
+  proposalType          String                @default("eval_rule") // skill_binding | workflow_template | memory_policy | connector_policy | eval_rule
+  signalSnapshot        String                @default("") // JSON：EvaluationSignal 快照
+  workspaceId           String                @default("default")
+  workspace             Workspace             @relation(fields: [workspaceId], references: [id])
+  triggeredBy           String // "auto" | "manual" | "cron.evaluation"
   triggerReason         String
   problemStatement      String
-  evidence              Json      @default(dbgenerated("'[]'"))
+  evidence              Json                  @default(dbgenerated("'[]'"))
   proposedChange        Json // { targetComponent, description, riskLevel, automationLevel }
   targetSkillId         String? // 关联具体 Skill（L3 审批门禁据此匹配；null 表示非 skill 类提案）
-  requiresHumanApproval Boolean   @default(true)
+  requiresHumanApproval Boolean               @default(true)
   estimatedImpact       String
-  affectedAgents        Json      @default(dbgenerated("'[]'"))
+  affectedAgents        Json                  @default(dbgenerated("'[]'"))
   rollbackPlan          String
-  status                String    @default("pending") // ProposalStatus enum values
+  status                HarnessProposalStatus @default(pending)
   reviewedBy            String?
   reviewedAt            DateTime?
   // --- Sprint 2：Canary + 决策审计字段 ---
-  // 详见 §11 Harness Canary 演化路径，approve→canary→(promote|rollback)→active|rolled-back
+  // 详见 §11 Harness Canary 演化路径，approve→canary→(promote|rollback)→active|rolled_back
   approvedBy            String?
   approvedAt            DateTime?
   rejectedBy            String?
@@ -363,12 +381,14 @@ model HarnessProposal {
   rolledBackBy          String?
   rolledBackAt          DateTime?
   canaryStartedAt       DateTime?
-  canaryConfig          Json? // { durationHours, successThreshold }
+  canaryWindowHours     Int                   @default(24)
+  canaryMetrics         Json?
+  activatedAt           DateTime?
   canaryCompletedAt     DateTime?
   canaryRollbackReason  String?
-  previousSnapshot      String? // JSON: 变更前关联 Agent 的任务边界与工具访问快照，用于一键回滚
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  previousSnapshot      Json?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
 
   @@index([workspaceId])
   @@index([status])

@@ -11,7 +11,11 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
-    "test": "turbo test",
+    "test": "turbo run test",
+    "test:kernel": "vitest run --project '@hermesclaw/hermes-kernel'",
+    "test:e2e": "vitest run --project '@hermesclaw/web' --reporter=verbose",
+    "test:smoke": "vitest run apps/web/src/test/e2e/foreign-trade-smoke.test.ts",
+    "test:boundary": "vitest run --project '@hermesclaw/web' -t \"boundary|Boundary|Cross-Tenant\"",
     "lint:domains": "eslint packages",
     "check:boundaries": "pnpm -w lint:domains && echo '✅ 三域边界检查通过'"
   },
@@ -20,7 +24,8 @@
     "@typescript-eslint/parser": "^8.61.1",
     "eslint": "^9.39.4",
     "eslint-plugin-import": "^2.32.0",
-    "turbo": "latest"
+    "turbo": "latest",
+    "vitest": "^4.1.8"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

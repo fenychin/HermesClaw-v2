@@ -21,6 +21,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/evaluation",
+      "schedule": "0 */6 * * *"
+    },
+    {
       "path": "/api/cron/capability-health",
       "schedule": "0 * * * *"
     },
