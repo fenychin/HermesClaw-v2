@@ -900,3 +900,68 @@ export async function getWorkflowRunStatus(
     }
   }
 }
+
+// ─────────────────────────────────────────────────────────────────
+// dispatchEnvelope — TD-004: First-class TaskEnvelope dispatch API
+//
+// Replaces the `inputContext: { envelope } as any` hack in
+// workflow-run-starter.ts. The envelope is a typed top-level param
+// and is persisted to WorkflowRun.envelopeSnapshot for audit/policy.
+// ─────────────────────────────────────────────────────────────────
+
+export interface DispatchEnvelopeInput {
+  envelope: {
+    taskId: string
+    workspaceId: string
+    agentId?: string
+    actionType?: string
+    riskLevel?: string
+    automationLevel?: string
+    input?: Record<string, unknown>
+    policySnapshotVersion?: string
+    [key: string]: unknown   // allow extra fields from event-contracts evolution
+  }
+  workflowId: string
+  workspaceId: string
+  triggeredBy?: string
+  agentId?: string
+  mode?: 'sequential' | 'parallel' | 'conditional' | 'human-in-loop'
+}
+
+export async function dispatchEnvelope(
+  input: DispatchEnvelopeInput,
+  deps?: RuntimeEngineDeps,
+): Promise<{ run: any; envelopeTaskId: string }> {
+  const { envelope, ...runInput } = input
+
+  // 1. Start the workflow run — envelope.taskId is the idempotency key
+  const run = await startWorkflowRun(
+    {
+      workflowId: runInput.workflowId,
+      workspaceId: runInput.workspaceId,
+      agentId: runInput.agentId ?? envelope.agentId,
+      mode: runInput.mode,
+      triggeredBy: runInput.triggeredBy,
+      triggerType: 'agent-dispatch',
+      // Pass clean, typed inputContext — no more `as any`
+      inputContext: {
+        taskId: envelope.taskId,
+        actionType: envelope.actionType ?? 'unknown',
+        riskLevel: envelope.riskLevel ?? 'low',
+        automationLevel: envelope.automationLevel ?? 'L2',
+        ...(envelope.input ?? {}),
+      },
+    },
+    deps,
+  )
+
+  // 2. Persist the full envelope snapshot on the run record for audit/policy
+  await prisma.workflowRun.update({
+    where: { runId: run.runId },
+    data: {
+      envelopeSnapshot: envelope as any,  // Json field — safe cast, no business logic
+    },
+  })
+
+  return { run, envelopeTaskId: envelope.taskId }
+}

@@ -4,7 +4,7 @@
  * 从 apps/web/src/app/api/workflow-runs/route.ts 下沉。
  */
 import { prisma } from "@/lib/prisma"
-import { startWorkflowRun } from "@/lib/server/workflow/runtime-engine"
+import { dispatchEnvelope } from "@/lib/server/workflow/runtime-engine"
 import { parseIntentToTaskEnvelope } from "@/lib/server/intent-service"
 import { validateTaskAutomationLevel } from "@/lib/server/guardrail"
 import { createApprovalCheckpoint } from "@/lib/server/approval"
@@ -48,7 +48,15 @@ export async function startAgentWorkflowRun(opts: { agentId: string; input: any;
   if (!workflow) workflow = await prisma.workflow.findFirst({ where: { workspaceId: opts.workspaceId } })
   if (!workflow) workflow = await prisma.workflow.create({ data: { id: `wf-auto-${crypto.randomUUID()}`, workspaceId: opts.workspaceId, name: agent.name || 'Auto', status: 'active', nodes: '[]', edges: '[]' } })
 
-  const run = await startWorkflowRun({ workflowId: workflow.id, workspaceId: opts.workspaceId, agentId: opts.agentId, inputContext: { envelope, taskId: envelope.taskId } as any, triggeredBy: opts.userId })
+  const { run } = await dispatchEnvelope(
+    {
+      envelope,
+      workflowId: workflow.id,
+      workspaceId: opts.workspaceId,
+      agentId: opts.agentId,
+      triggeredBy: opts.userId,
+    },
+  )
   if (opts.idempotencyKey) idempotencyMap.set(opts.idempotencyKey, { workflowRunId: run.id, status: 'running', timestamp: Date.now() })
   return { workflowRunId: run.id, status: 'running' }
 }

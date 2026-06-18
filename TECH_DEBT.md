@@ -52,7 +52,7 @@
   本仓库 v3.20 修复 TD-002 时仅覆盖 WorkspaceMember 侧，User 模型按当前任务约束不动。
 - **修复计划日期**：2026-07-01（与 next-auth 升级 / 用户头像上传通道一并处理）
 
-### TD-2026-06-17-003 — Report 模型缺 title / createdBy 字段
+### TD-2026-06-17-003 — Report 模型缺 title / createdBy 字段 ✅ RESOLVED (2026-06-18, v3.21)
 
 - **位置**：
   - `apps/web/src/lib/server/report-service.ts`
@@ -60,13 +60,25 @@
 - **类型**：数据模型 / 字段缺失
 - **风险**：低（写入路径已删除字段，但响应仍返回 `title` 字符串，前端展示 OK 但与库内不一致）
 - **背景**：Report schema 不含 title / createdBy 列；service 层写库时已剥离这些字段。
-- **修复计划日期**：2026-07-01（迁移：补 title / createdBy 列 → 回填默认值）
+- **解决方案**：
+  - schema：添加 `title String @default("")` 与 `createdBy String @default("system")`。
+  - 迁移：`prisma/migrations/20260618130000_fix_report_title_createdby/migration.sql`
+    使用 SQLite `ALTER TABLE ADD COLUMN` + TEXT DEFAULT 无损追加。
+  - 服务层：`prisma.report.create()` 写入 `title: "${dateStr} ${typeLabel}"` 与 `createdBy: input.actor`；
+    返回类型增加 `createdBy` 字段。
+- **修复完成日期**：2026-06-18
 
-### TD-2026-06-17-004 — startWorkflowRun envelope 通过 inputContext 传递
+### ~~TD-2026-06-17-004~~ — RESOLVED 2026-06-18
 
-- **位置**：`apps/web/src/lib/server/workflow-run-starter.ts`
+- **位置**：`apps/web/src/lib/server/workflow-run-starter.ts` / `apps/web/src/lib/server/workflow/runtime-engine.ts`
 - **类型**：API 形态过渡
 - **风险**：低（绕道 inputContext 携带 envelope，类型上以 `as any` 过编译）
 - **背景**：runtime-engine 的 `startWorkflowRun` 不接受顶层 `input/envelope` 字段；
   当前用 `inputContext.envelope` 作为兼容路径。
-- **修复计划日期**：2026-07-15（v3.20：runtime-engine 暴露 `dispatchEnvelope` 直通 API）
+- **解决方案**：
+  - schema：WorkflowRun 新增 `envelopeSnapshot Json?` 列。
+  - 迁移：`prisma/migrations/20260618140000_add_workflow_run_envelope_snapshot/migration.sql`
+  - runtime-engine：新增 `dispatchEnvelope()` 一等公民 API，接受类型化的 envelope 顶层参数，
+    内部调用 `startWorkflowRun` 并持久化 `envelopeSnapshot`。
+  - workflow-run-starter：`as any` 已全部消除，改为调用 `dispatchEnvelope({ envelope, ... })`。
+- **修复完成日期**：2026-06-18

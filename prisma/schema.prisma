@@ -624,9 +624,10 @@ model WorkflowRun {
   triggerType String @default("manual")
   // 'manual' | 'scheduled' | 'event' | 'agent-dispatch'
 
-  inputContext  Json    @default(dbgenerated("'{}'"))
-  outputContext Json?
-  errorMessage  String?
+  inputContext      Json    @default(dbgenerated("'{}'"))
+  outputContext     Json?
+  envelopeSnapshot  Json?   // TD-004: TaskEnvelope snapshot from dispatchEnvelope
+  errorMessage      String?
 
   startedAt   DateTime?
   completedAt DateTime?
@@ -827,6 +828,8 @@ model Report {
   workspaceId  String
   workspace    Workspace @relation(fields: [workspaceId], references: [id])
   type         String    @default("MORNING") // MORNING | EVENING | WEEKLY
+  title        String    @default("")           // TD-003: "2026-06-18 晨报"
+  createdBy    String    @default("system")     // TD-003: actor email or "system"
   content      String // LLM 生成的 markdown 摘要
   generatedAt  DateTime  @default(now())
   dataSnapshot String // JSON：生成时使用的数据快照

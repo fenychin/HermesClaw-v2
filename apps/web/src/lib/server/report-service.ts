@@ -39,7 +39,7 @@ export interface GenerateReportInput {
   type?: ReportType
 }
 
-export async function generateAndStoreReport(input: GenerateReportInput): Promise<{ reportId: string; type: ReportType; title: string; content: string; createdAt: string }> {
+export async function generateAndStoreReport(input: GenerateReportInput): Promise<{ reportId: string; type: ReportType; title: string; content: string; createdAt: string; createdBy: string }> {
   const reportType = input.type ?? "MORNING"
   const reportId = crypto.randomUUID()
   const now = new Date()
@@ -97,9 +97,9 @@ export async function generateAndStoreReport(input: GenerateReportInput): Promis
   const dataSnapshot = { intelTitles, inquiryCount, urgentCount, pendingTasks, workflowSummary, date: dateStr, reportType }
   await Promise.all([
     updateAuditEntry({ auditId: auditEntry.auditId, status: "success", detail: `已生成${typeLabel} (${duration})`, contextSnapshot: { reportId, type: reportType, duration } }),
-    prisma.report.create({ data: { id: reportId, workspaceId: input.workspaceId, type: reportType, content, dataSnapshot: JSON.stringify(dataSnapshot) } }),
+    prisma.report.create({ data: { id: reportId, workspaceId: input.workspaceId, type: reportType, title: `${dateStr} ${typeLabel}`, createdBy: input.actor, content, dataSnapshot: JSON.stringify(dataSnapshot) } }),
     prisma.agentLog.create({ data: { id: crypto.randomUUID(), workspaceId: input.workspaceId, source: reportType === "WEEKLY" ? "weekly-brief" : reportType === "EVENING" ? "evening-brief" : "morning-brief", taskName: `生成${typeLabel} ${dateStr}`, status: "success", duration, detail: content.slice(0, 200), riskLevel: "low" } }),
   ]).catch(() => {})
 
-  return { reportId, type: reportType, title: `${dateStr} ${typeLabel}`, content, createdAt: now.toISOString() }
+  return { reportId, type: reportType, title: `${dateStr} ${typeLabel}`, content, createdAt: now.toISOString(), createdBy: input.actor }
 }
