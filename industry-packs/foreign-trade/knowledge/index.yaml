@@ -1,0 +1,30 @@
+# TD-SPRINT-C-002: Foreign Trade knowledge base index
+packId: foreign-trade
+version: "1.0.0"
+entries:
+  - id: incoterms-2020
+    title: Incoterms 2020 国际贸易术语
+    type: reference
+    tags: [贸易术语, FOB, CIF, EXW, DDP]
+    source: embedded
+    summary: >
+      国际商会 2020 版贸易术语解释通则，涵盖 FOB/CIF/EXW/DDP 等 11 种术语
+      的风险转移点、费用分担及单据要求。
+
+  - id: hs-code-lookup
+    title: HS 编码查询指引
+    type: guide
+    tags: [HS编码, 海关, 报关]
+    source: embedded
+    summary: >
+      海关协调制度编码（HS Code）查询方法，含常见品类编码示例及
+      申报注意事项。
+
+  - id: payment-terms-guide
+    title: 外贸付款方式指南
+    type: reference
+    tags: [T/T, L/C, D/P, D/A, 付款方式]
+    source: embedded
+    summary: >
+      常见外贸付款方式对比：电汇(T/T)、信用证(L/C)、托收(D/P, D/A)的
+      风险等级、适用场景及操作要点。

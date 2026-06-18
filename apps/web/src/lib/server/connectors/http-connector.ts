@@ -24,7 +24,14 @@ export async function executeHttpConnector(
   ConnectorLeaseSchema.parse(lease);
 
   // 2. 提取输入参数
-  const url = (input.url as string) || "https://httpbin.org/post";
+  // TD-SPRINT-C-001: 移除 httpbin 兜底；IM/消息类通道请改用 executeOpenClawGateway()
+  const url = input.url as string;
+  if (!url) {
+    throw new Error(
+      "[http-connector] input.url is required. " +
+      "For IM/messaging channels, use executeOpenClawGateway() instead of executeHttpConnector()."
+    );
+  }
   const body = (input.body as Record<string, unknown>) || {};
 
   // 3. 记录审计日志

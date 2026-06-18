@@ -1,0 +1,47 @@
+# TD-SPRINT-C-002: Minimum eval rules for foreign-trade Industry Pack
+# Used by harness-spec-generator to seed suggestedActions and boundaries
+
+packId: foreign-trade
+version: "1.0.0"
+rules:
+  - ruleId: ft-001
+    name: 询盘跟进自动化等级限制
+    description: 询盘跟进工作流最高支持 L3 自动化，发送前须人工确认邮件内容
+    applies_to:
+      - workflow: inquiry-followup
+      - workflow: followup-remind
+    constraint:
+      maxAutomationLevel: L3
+      requireHumanApproval: true
+      approvalStep: email-send
+
+  - ruleId: ft-002
+    name: 开发信发送频率限制
+    description: 同一收件人 7 天内不得发送超过 3 封开发信
+    applies_to:
+      - workflow: dev-letter
+    constraint:
+      maxFrequency: 3
+      frequencyWindowDays: 7
+      errorOnExceed: true
+
+  - ruleId: ft-003
+    name: 报价单生成不允许全自动发送
+    description: 报价单必须经人工审核后方可发送，自动化级别上限 L2
+    applies_to:
+      - workflow: quote-gen
+      - skill: generate-quotation
+    constraint:
+      maxAutomationLevel: L2
+      requireHumanApproval: true
+      approvalStep: quote-confirm
+
+  - ruleId: ft-004
+    name: 客户画像写入 CRM 需审批
+    description: 首次写入 CRM 的客户画像需 ADMIN 级别审批
+    applies_to:
+      - workflow: customer-profile
+      - connector: crm
+    constraint:
+      maxAutomationLevel: L2
+      requireRole: ADMIN

@@ -82,3 +82,42 @@
     内部调用 `startWorkflowRun` 并持久化 `envelopeSnapshot`。
   - workflow-run-starter：`as any` 已全部消除，改为调用 `dispatchEnvelope({ envelope, ... })`。
 - **修复完成日期**：2026-06-18
+
+---
+
+## v3.22 Sprint C (2026-06-18)
+
+### TD-SPRINT-C-001 — RESOLVED 2026-06-18
+
+OpenClaw Gateway 真实接入
+
+- **位置**：
+  - `apps/web/src/lib/server/connectors/openclaw-gateway-connector.ts`（新建）
+  - `apps/web/src/lib/server/connectors/http-connector.ts`
+  - `industry-packs/foreign-trade/connectors/mapping.yaml`
+  - `.env.example` / `.env.local`
+- **类型**：占位实现 / 接入缺失
+- **风险**：中（http-connector 默认回退到 `httpbin.org`，导致外贸邮件 / CRM 写操作静默打到调试服务）
+- **背景**：v3.21 之前所有连接器经 `executeHttpConnector` 转发，缺少 `input.url` 时回退到 httpbin；行业包 mapping.yaml 仅声明 `provider: http-connector`，无频道路由能力。
+- **解决方案**：
+  - 新建 `openclaw-gateway-connector.ts` 实现 `executeOpenClawGateway`，覆盖 6 个频道（email / whatsapp / wechat / dingtalk / sms / webhook），保留 `ConnectorLeaseSchema.parse` + `ActionReceiptSchema.parse` 契约校验。
+  - 移除 `http-connector.ts` 对 `httpbin.org` 的兜底，缺 `input.url` 改为显式抛错并指引使用 OpenClaw Gateway。
+  - `industry-packs/foreign-trade/connectors/mapping.yaml` 两个连接器 `provider: openclaw-gateway`，新增 `channel` 与 `endpointEnvVar` 字段。
+  - `.env.example` / `.env.local` 增补 `OPENCLAW_GATEWAY_BASE_URL` / `OPENCLAW_GATEWAY_API_KEY` / `OPENCLAW_GATEWAY_TIMEOUT_MS` 三项配置；本地默认指向 `http://localhost:7080`。
+  - `AbortController` 控制超时，`X-Idempotency-Key` 透传 OpenClaw 用于去重。
+- **修复完成日期**：2026-06-18
+
+### TD-SPRINT-C-002 — RESOLVED 2026-06-18
+
+外贸 Industry Pack 完整度核查
+
+- **位置**：`industry-packs/foreign-trade/`
+- **类型**：行业包资产缺失 / manifest 漂移
+- **风险**：低（knowledge 目录为空导致 SDK 加载时缺省检索源；manifest 与实际 skill / workflow 文件计数不一致）
+- **背景**：v3.21 以前 `industry-packs/foreign-trade/knowledge/` 完全为空；manifest 声明 8 skills / 9 workflows，实际磁盘上为 9 skills / 10 workflows（多出 `result-first-delivery.skill.yaml` 与 `intelligent-response-v2.workflow.yaml`）。
+- **解决方案**：
+  - 新建 `eval-rules/default.eval.yaml`（4 条规则 ft-001~ft-004，含 `maxAutomationLevel` / `requireHumanApproval` 约束），与既有 `rules.yaml` 共存。
+  - 新建 `dashboards/default.dashboard.yaml`（4 个 widgets：询盘数 / 跟进率 / 开发信发送量 / 报价管线），与既有 `kpi.yaml` 共存。
+  - 新建 `knowledge/index.yaml`（3 条知识条目：Incoterms 2020 / HS 编码 / 付款方式），填补空目录。
+  - manifest.yaml `directory.skills` 增补 `result-first-delivery`、`directory.workflows` 增补 `intelligent-response-v2`，与磁盘实际计数对齐；顶部加入 sprint 验证注释。
+- **修复完成日期**：2026-06-18

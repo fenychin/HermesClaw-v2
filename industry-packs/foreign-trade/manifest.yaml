@@ -1,3 +1,5 @@
+# TD-SPRINT-C-002 RESOLVED: manifest aligned with actual assets
+# Last validated: 2026-06-18
 packId: foreign-trade
 id: foreign-trade
 name: 外贸行业包
@@ -39,6 +41,7 @@ directory:
     - order-push
     - exhibition-leads
     - followup-remind
+    - intelligent-response-v2
   skills:
     - write-development-letter
     - generate-quotation
@@ -48,6 +51,7 @@ directory:
     - customer-profile
     - project-space
     - agent-dispatch
+    - result-first-delivery
   connectors:
     - email
     - crm
@@ -62,6 +66,6 @@ languages:
   - zh-CN
 status: active
 createdAt: "2026-06-15T00:00:00Z"
-updatedAt: "2026-06-15T00:00:00Z"
+updatedAt: "2026-06-18T00:00:00Z"
 version_field: "1.0.0"
 migrationRules: []

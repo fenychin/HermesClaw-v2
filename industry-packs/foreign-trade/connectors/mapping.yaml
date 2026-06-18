@@ -1,12 +1,18 @@
+# TD-SPRINT-C-001: Updated to use real OpenClaw Gateway connector
 - id: email
   name: 外贸邮件连接器
-  description: 映射至外贸邮件收发服务（基于 http-connector）
+  description: 通过 OpenClaw IM Gateway email 频道发送外贸询盘跟进邮件
   category: trade
   status: connected
-  provider: http-connector
+  provider: openclaw-gateway
+  channel: email
+  endpointEnvVar: OPENCLAW_GATEWAY_BASE_URL   # resolved at runtime
+
 - id: crm
   name: 客户关系管理(CRM)连接器
-  description: 自动同步客户画像与报价历史至 CRM 系统（基于 http-connector）
+  description: 通过 OpenClaw webhook 频道同步客户画像与报价历史至外部 CRM
   category: trade
   status: connected
-  provider: http-connector
+  provider: openclaw-gateway
+  channel: webhook
+  endpointEnvVar: OPENCLAW_GATEWAY_BASE_URL

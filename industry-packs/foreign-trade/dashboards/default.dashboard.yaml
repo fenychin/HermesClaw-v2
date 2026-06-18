@@ -1,0 +1,36 @@
+# TD-SPRINT-C-002: Foreign Trade default dashboard definition
+packId: foreign-trade
+dashboardId: ft-main
+name: 外贸业务概览
+version: "1.0.0"
+widgets:
+  - id: inquiry-stats
+    type: kpi-card
+    title: 本月询盘数
+    dataSource: workflow.inquiry-followup.run_count
+    period: month
+
+  - id: followup-rate
+    type: kpi-card
+    title: 跟进覆盖率
+    dataSource: workflow.followup-remind.completion_rate
+    period: month
+    format: percentage
+
+  - id: dev-letter-sent
+    type: kpi-card
+    title: 开发信发送量
+    dataSource: workflow.dev-letter.run_count
+    period: month
+
+  - id: quote-pipeline
+    type: table
+    title: 报价进行中
+    dataSource: workflow.quote-gen.active_runs
+    columns:
+      - field: customerName
+        label: 客户名称
+      - field: status
+        label: 状态
+      - field: createdAt
+        label: 创建时间
