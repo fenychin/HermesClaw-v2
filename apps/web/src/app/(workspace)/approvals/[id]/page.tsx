@@ -97,8 +97,8 @@ export default function ApprovalDetailPage({ params }: { params: Promise<{ id: s
         router.push("/approvals");
       } else {
         const updatedData = await apiClient.getProposals();
-        const found = (updatedData.proposals || []).find((p: HarnessProposal) => p.id === id);
-        setProposal(found || null);
+        const found = ((updatedData.proposals || []) as HarnessProposal[]).find((p) => p.id === id);
+        setProposal(found ?? null);
         if (found && found.status === "canary") {
           fetchMetrics(id);
         } else {

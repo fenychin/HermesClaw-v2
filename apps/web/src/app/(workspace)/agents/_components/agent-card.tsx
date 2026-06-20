@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/common/status-badge";
@@ -21,7 +21,7 @@ interface AgentCardProps {
   /** 自动化授权等级（AGENTS.md §4.7） */
   automationLevel?: string;
   isExpanded?: boolean;
-  onToggleExpand?: () => void;
+  onToggleExpand?: (id: string) => void;
 }
 
 interface WorkflowRunStatus {
@@ -70,7 +70,7 @@ function formatDuration(durationMs: number | null, startedAt: string | null, com
   return "-";
 }
 
-export function AgentCard({
+export const AgentCard = memo(function AgentCard({
   id,
   name,
   role,
@@ -282,7 +282,7 @@ export function AgentCard({
 
   return (
     <div
-      onClick={onToggleExpand}
+      onClick={() => onToggleExpand?.(id)}
       className={cn(
         "bg-card rounded-2xl border border-border p-5 hover:border-primary/40 transition-all flex flex-col gap-4 group cursor-pointer",
         isExpanded && "border-primary/60 ring-1 ring-primary/20"
@@ -596,5 +596,5 @@ export function AgentCard({
       )}
     </div>
   );
-}
+});
 

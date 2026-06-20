@@ -31,3 +31,23 @@ export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 if (process.env["NODE_ENV"] !== "production") {
   globalForPrisma.prisma = prisma;
 }
+
+// 启动时一次性校验默认 Workspace 存在性（从 buildWorkspaceContext 移出，避免每次请求重复查询）
+// 测试环境跳过（避免干扰测试用 DB 初始化顺序）
+if (process.env["NODE_ENV"] !== "test") {
+  prisma.workspace
+    .findUnique({ where: { id: "default" } })
+    .then((ws) => {
+      if (!ws) {
+        console.error(
+          "[workspace] 启动检查：默认 Workspace 不存在，数据库可能未初始化（运行 prisma db seed）",
+        );
+      }
+    })
+    .catch((err: unknown) => {
+      console.warn(
+        "[workspace] 启动检查：默认 Workspace 查询失败",
+        err instanceof Error ? err.message : err,
+      );
+    });
+}

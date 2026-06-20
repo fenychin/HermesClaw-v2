@@ -95,8 +95,12 @@ export function SuggestionPanel({
   } = useQuery({
     queryKey: ["hermes-suggestions"],
     queryFn: () => apiClient.getHermesSuggestions(),
-    // 进入 /new 页即刷新，体现「主动」语义；后续切 Tab 复用缓存
-    refetchOnMount: true,
+    // PERF: AI 建议无需秒级实时，staleTime=5min 避免每次进入 /new 页触发 LLM 调用（1~5s 延迟）
+    // 用户可通过右上角刷新按钮手动触发即时更新
+    staleTime: 5 * 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    gcTime: 10 * 60_000,
   });
 
   const suggestions = suggestionsResult?.suggestions ?? [];

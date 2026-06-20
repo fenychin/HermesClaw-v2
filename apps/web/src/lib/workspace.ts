@@ -1,3 +1,5 @@
+// PERF: DB 查询合并 — 3次串行查询 → 最多1次（缓存未命中时）+ 启动时1次默认workspace校验
+
 /**
  * 多租户 Workspace 工具集
  * —— 提供 workspaceId 解析、RBAC 门禁、权限判定
@@ -59,59 +61,50 @@ function isDevAuthBypassEnabled(): boolean {
   return process.env.NODE_ENV === "development" || process.env.DEV_BYPASS_AUTH === "true";
 }
 
-/** 从 session + 请求头解析 workspaceId */
-async function resolveWorkspaceId(
-  session: ResolvedSession | null,
-  request?: Request,
-): Promise<string> {
-  // 优先从请求头获取
-  if (request) {
-    const headerWs = request.headers.get("x-workspace-id");
-    if (headerWs) return headerWs;
-  }
+// ==============================
+// 合并查询：单次 DB 同时取 workspaceId + role
+// ==============================
 
-  // 从 session 查找用户所属的第一个 workspace
-  if (session) {
-    try {
+/**
+ * 单次 DB 查询同时获取 workspaceId + role，替代原先两次串行查询。
+ *
+ * - 有 headerWorkspaceId：`findUnique` 精确匹配（已知 workspaceId，O(1) 主键查找）
+ * - 无 headerWorkspaceId：`findFirst` 按 userId 找第一条成员记录，同时获取 workspaceId
+ *
+ * 返回 null 表示无有效成员关系，调用方回退 workspaceId="default" / role="VIEWER"。
+ */
+async function resolveWorkspaceMembershipFull(
+  session: ResolvedSession,
+  headerWorkspaceId?: string,
+): Promise<{ workspaceId: string; role: WorkspaceRole } | null> {
+  try {
+    if (headerWorkspaceId) {
+      // 已知 workspaceId → findUnique（主键，最快路径）
+      const membership = await prisma.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId: headerWorkspaceId,
+            userId: session.userId,
+          },
+        },
+      });
+      return membership
+        ? { workspaceId: headerWorkspaceId, role: membership.role as WorkspaceRole }
+        : null;
+    } else {
+      // 未知 workspaceId → findFirst，同时取回 workspaceId 和 role（原来两次查询合并为一次）
       const membership = await prisma.workspaceMember.findFirst({
         where: { userId: session.userId },
         orderBy: { workspaceId: "asc" },
       });
-      if (membership) return membership.workspaceId;
-    } catch (err) {
-      logger.warn("[workspace] 查询 WorkspaceMember 失败，回退默认 workspace", {
-        error: err instanceof Error ? err.message : "未知错误",
-        userId: session.userId,
-      });
+      return membership
+        ? { workspaceId: membership.workspaceId, role: membership.role as WorkspaceRole }
+        : null;
     }
-  }
-
-  return "default";
-}
-
-/**
- * 单次查询同时获取 workspaceId + role（避免 buildWorkspaceContext 二次查询）。
- * 返回 null 表示用户无有效 workspace 成员关系。
- */
-async function resolveWorkspaceMembership(
-  session: ResolvedSession,
-  workspaceId: string,
-): Promise<{ role: WorkspaceRole } | null> {
-  try {
-    const membership = await prisma.workspaceMember.findUnique({
-      where: {
-        workspaceId_userId: {
-          workspaceId,
-          userId: session.userId,
-        },
-      },
-    });
-    return membership ? { role: membership.role as WorkspaceRole } : null;
   } catch (err) {
-    logger.warn("[workspace] 查询成员角色失败", {
+    logger.warn("[workspace] 查询 WorkspaceMember 失败，回退默认 workspace", {
       error: err instanceof Error ? err.message : "未知错误",
       userId: session.userId,
-      workspaceId,
     });
     return null;
   }
@@ -126,8 +119,8 @@ export async function getCurrentRole(request?: Request): Promise<WorkspaceRole> 
   const session = await resolveSession();
   if (!session) return "VIEWER";
 
-  const workspaceId = await resolveWorkspaceId(session, request);
-  const membership = await resolveWorkspaceMembership(session, workspaceId);
+  const headerWorkspaceId = request?.headers.get("x-workspace-id") ?? undefined;
+  const membership = await resolveWorkspaceMembershipFull(session, headerWorkspaceId);
   return membership?.role ?? "VIEWER";
 }
 
@@ -136,9 +129,8 @@ export async function getCurrentRole(request?: Request): Promise<WorkspaceRole> 
 // ==============================
 
 /**
- * 轻量 TTL 缓存：避免同一 session 的多个并行 API 请求
- * 各自独立调用 buildWorkspaceContext 导致 SQLite 串行瓶颈。
- * 缓存 key = userId，TTL = 30 秒（session 角色变更不会太频繁）。
+ * 主缓存：key = `userId::workspaceId`，value = WorkspaceContext + expiresAt
+ * —— 缓存命中路径：auth() 一次 → 二级索引重建 key → 命中 → 0 次 DB 查询
  */
 interface CachedCtx {
   ctx: WorkspaceContext;
@@ -148,19 +140,59 @@ interface CachedCtx {
 const workspaceCtxCache = new Map<string, CachedCtx>();
 const WORKSPACE_CTX_CACHE_TTL = 300_000; // 5 分钟（角色变更极少，减少 DB 查询）
 
-function getCachedWorkspaceContext(session: ResolvedSession, workspaceId: string): WorkspaceContext | undefined {
-  const key = `${session.userId}::${workspaceId}`;
+/**
+ * 二级索引：userId → { workspaceId, expiresAt }
+ *
+ * 作用：当请求不带 x-workspace-id header 时，无需 DB 查询即可重建主缓存的 key。
+ * 写入时与主缓存同步更新，TTL 保持一致。
+ */
+const userWorkspaceIndex = new Map<string, { workspaceId: string; expiresAt: number }>();
+
+/**
+ * 在主缓存中查找 WorkspaceContext。
+ * 若无 headerWorkspaceId，先通过二级索引推导 workspaceId，再查主缓存。
+ * 完全不触发任何 DB 查询。
+ */
+function tryGetCachedCtx(
+  userId: string,
+  headerWorkspaceId?: string,
+): WorkspaceContext | undefined {
+  // 确定 cache key 所需的 workspaceId
+  let wsId: string | undefined = headerWorkspaceId;
+
+  if (!wsId) {
+    // 无 header → 通过二级索引还原用户上次使用的 workspaceId
+    const idx = userWorkspaceIndex.get(userId);
+    if (idx && idx.expiresAt > Date.now()) {
+      wsId = idx.workspaceId;
+    }
+  }
+
+  if (!wsId) return undefined; // 二级索引也未命中（首次请求），需要走 DB
+
+  const key = `${userId}::${wsId}`;
   const cached = workspaceCtxCache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.ctx;
   }
+  // 过期清理
   workspaceCtxCache.delete(key);
   return undefined;
 }
 
-function setCachedWorkspaceContext(session: ResolvedSession, workspaceId: string, ctx: WorkspaceContext): void {
-  const key = `${session.userId}::${workspaceId}`;
-  workspaceCtxCache.set(key, { ctx, expiresAt: Date.now() + WORKSPACE_CTX_CACHE_TTL });
+/**
+ * 写入主缓存 + 同步更新二级索引。
+ */
+function putCachedCtx(
+  userId: string,
+  workspaceId: string,
+  ctx: WorkspaceContext,
+): void {
+  const key = `${userId}::${workspaceId}`;
+  const expiresAt = Date.now() + WORKSPACE_CTX_CACHE_TTL;
+  workspaceCtxCache.set(key, { ctx, expiresAt });
+  // 二级索引：记录该用户最近一次使用的 workspaceId
+  userWorkspaceIndex.set(userId, { workspaceId, expiresAt });
 }
 
 // ==============================
@@ -177,49 +209,44 @@ export interface WorkspaceContext {
 
 /**
  * 从请求构建 workspace 上下文（供 Route Handler 使用）
- * —— 内置 TTL 缓存：同一 session 的后续请求直接命中缓存，减少 SQLite 串行查询
- * —— resolveWorkspaceId + resolveWorkspaceMembership 合并为最多 2 次 DB 查询
+ *
+ * 查询路径（性能优化后）：
+ *   缓存命中：auth() × 1 → 二级索引重建 key → 主缓存命中 → 返回（DB 查询 = 0）
+ *   缓存未命中：auth() × 1 → resolveWorkspaceMembershipFull × 1（DB 查询 ≤ 1）
+ *
+ * default workspace 存在性校验已移至 prisma.ts 启动时执行，不再每次请求重复校验。
  */
 export async function buildWorkspaceContext(request: Request): Promise<WorkspaceContext> {
   const session = await resolveSession();
-  const workspaceId = await resolveWorkspaceId(session, request);
+  const headerWorkspaceId = request.headers.get("x-workspace-id") ?? undefined;
 
-  // 开发 bypass
+  // ── 开发 bypass（无 session 时快速返回，不查 DB）────────────────
   if (!session && isDevAuthBypassEnabled()) {
     return {
-      workspaceId,
+      workspaceId: headerWorkspaceId ?? "default",
       role: "OWNER",
       userId: "dev-bypass-user",
       industryId: "foreign-trade",
     };
   }
 
-  // TTL 缓存命中（同一个 userId + workspaceId）
+  // ── 缓存命中：完全跳过所有 DB 查询 ──────────────────────────────
   if (session) {
-    const cached = getCachedWorkspaceContext(session, workspaceId);
+    const cached = tryGetCachedCtx(session.userId, headerWorkspaceId);
     if (cached) return cached;
   }
 
+  // ── 缓存未命中：单次合并 DB 查询 ────────────────────────────────
+  let workspaceId: string = headerWorkspaceId ?? "default";
   let role: WorkspaceRole = "VIEWER";
+
   if (session) {
-    const membership = await resolveWorkspaceMembership(session, workspaceId);
+    const membership = await resolveWorkspaceMembershipFull(session, headerWorkspaceId);
     if (membership) {
+      workspaceId = membership.workspaceId;
       role = membership.role;
     }
-  }
-
-  // 默认 workspace 存在性校验（轻量，仅 default 触发）
-  if (workspaceId === "default") {
-    try {
-      const ws = await prisma.workspace.findUnique({ where: { id: "default" } });
-      if (!ws) {
-        logger.error("[workspace] 默认 Workspace 不存在，数据库未初始化");
-      }
-    } catch (err) {
-      logger.warn("[workspace] 默认 Workspace 查询失败", {
-        error: err instanceof Error ? err.message : "未知错误",
-      });
-    }
+    // membership 为 null：workspaceId 保持 headerWorkspaceId 或 "default"，role 保持 "VIEWER"
   }
 
   // TODO: 未来从 WorkspaceSettings 或 IndustryPackInstallation 推导 industryId
@@ -227,9 +254,9 @@ export async function buildWorkspaceContext(request: Request): Promise<Workspace
 
   const ctx: WorkspaceContext = { workspaceId, role, userId: session?.userId, industryId };
 
-  // 写入缓存
+  // 写入主缓存 + 二级索引
   if (session) {
-    setCachedWorkspaceContext(session, workspaceId, ctx);
+    putCachedCtx(session.userId, workspaceId, ctx);
   }
 
   return ctx;

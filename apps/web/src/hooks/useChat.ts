@@ -48,6 +48,19 @@ export function useChat() {
   const conversationIdRef = useRef<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
 
+  // PERF: 用 ref 持有 messages 最新值，避免 sendMessage 因 messages 变化而重建，
+  // 防止每条消息发送/接收后触发 CommandBox / QuickCards 全量重渲染
+  const messagesRef = useRef<Message[]>(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  // PERF: 同理，用 ref 持有 isStreaming 避免 sendMessage 在流式开始/结束时重建
+  const isStreamingRef = useRef(isStreaming);
+  useEffect(() => {
+    isStreamingRef.current = isStreaming;
+  }, [isStreaming]);
+
   /** 本地待回放队列积压数（lazy init 直接读 localStorage，避免 effect 同步 setState） */
   const [pendingCount, setPendingCount] = useState<number>(() => {
     if (typeof window === "undefined") return 0;
@@ -132,7 +145,7 @@ export function useChat() {
 
   const sendMessage = useCallback(
     async (content: string, systemPrompt?: string, modelId?: string) => {
-      if (!content.trim() || isStreaming) return;
+      if (!content.trim() || isStreamingRef.current) return;
 
       const userMessage: Message = {
         id: Date.now().toString(),
@@ -156,7 +169,7 @@ export function useChat() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            messages: [...messages, userMessage].map((m) => ({
+            messages: [...messagesRef.current, userMessage].map((m) => ({
               role: m.role,
               content: m.content,
             })),
@@ -178,7 +191,7 @@ export function useChat() {
         // 复用共享 SSE 解析器（替换手写 ReadableStream 读取）
         await parseSSEStream(reader, {
           onData: (json) => {
-            const parsed = json as { text?: string; type?: string; trace?: any; reasoning?: string };
+            const parsed = json as { text?: string; type?: string; trace?: any; reasoning?: string; error?: unknown };
             if (parsed.text) {
               fullContent += parsed.text;
               setStreamingContent(fullContent);
@@ -250,7 +263,7 @@ export function useChat() {
         abortControllerRef.current = null;
       }
     },
-    [messages, isStreaming, persistConversation],
+    [persistConversation],
   );
 
   const stopStreaming = useCallback(() => {
@@ -259,6 +272,8 @@ export function useChat() {
 
   const clearMessages = useCallback(() => {
     setMessages([]);
+    messagesRef.current = [];
+    isStreamingRef.current = false;
     setStreamingContent("");
     setCurrentTrace(null);
     setError(null);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
@@ -82,6 +82,11 @@ export default function AgentsPage() {
   // 当前展开的智能体 ID
   const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
 
+  // PERF: 稳定化 toggle handler，防止 AgentCard memo 因每次渲染产生新函数引用而失效
+  const handleToggleExpand = useCallback((agentId: string) => {
+    setExpandedAgentId((prev) => (prev === agentId ? null : agentId));
+  }, []);
+
   const {
     data: agents,
     isLoading,
@@ -162,9 +167,7 @@ export default function AgentsPage() {
                   isBuiltIn={agent.isBuiltIn}
                   automationLevel={agent.automationLevel ?? "L2"}
                   isExpanded={expandedAgentId === agent.id}
-                  onToggleExpand={() =>
-                    setExpandedAgentId(expandedAgentId === agent.id ? null : agent.id)
-                  }
+                  onToggleExpand={handleToggleExpand}
                 />
               ))}
             </div>
@@ -193,9 +196,7 @@ export default function AgentsPage() {
                   isBuiltIn={agent.isBuiltIn}
                   automationLevel={agent.automationLevel ?? "L2"}
                   isExpanded={expandedAgentId === agent.id}
-                  onToggleExpand={() =>
-                    setExpandedAgentId(expandedAgentId === agent.id ? null : agent.id)
-                  }
+                  onToggleExpand={handleToggleExpand}
                 />
               ))}
             </div>
@@ -224,9 +225,7 @@ export default function AgentsPage() {
                   isBuiltIn={agent.isBuiltIn}
                   automationLevel={agent.automationLevel ?? "L2"}
                   isExpanded={expandedAgentId === agent.id}
-                  onToggleExpand={() =>
-                    setExpandedAgentId(expandedAgentId === agent.id ? null : agent.id)
-                  }
+                  onToggleExpand={handleToggleExpand}
                 />
               ))}
             </div>
