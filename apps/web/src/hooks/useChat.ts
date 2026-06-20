@@ -124,7 +124,8 @@ export function useChat() {
         // 本次保存成功 → 尝试回放之前积压的失败对话 + 通知侧边栏/面板刷新
         flush().catch(() => {});
         window.dispatchEvent(new CustomEvent("conversation-saved"));
-      } catch {
+      } catch (err) {
+        console.error("[useChat] persistConversation 失败", err);
         toast.error("对话保存失败", {
           description: "已暂存本地，网络恢复后自动同步",
         });
@@ -238,8 +239,8 @@ export function useChat() {
         setStreamingContent("");
         setCurrentTrace(null);
 
-        // 对话完成后持久化到数据库
-        persistConversation(content.trim(), fullContent, traceObj);
+        // 对话完成后持久化到数据库（后台异步，不阻塞 UI）
+        void persistConversation(content.trim(), fullContent, traceObj);
       } catch (err: unknown) {
         if (err instanceof Error && err.name !== "AbortError") {
           setError(err.message || "对话失败，请重试");
@@ -256,7 +257,7 @@ export function useChat() {
           setMessages((prev) => [...prev, partialMessage]);
           setStreamingContent("");
           setCurrentTrace(null);
-          persistConversation(content.trim(), fullContent, traceObj);
+          void persistConversation(content.trim(), fullContent, traceObj);
         }
       } finally {
         setIsStreaming(false);

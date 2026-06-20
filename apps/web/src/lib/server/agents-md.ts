@@ -9,7 +9,12 @@
 import { readFile, stat } from "node:fs/promises"
 import { join } from "node:path"
 
-const AGENTS_MD_PATH = join(process.cwd(), "AGENTS.md")
+/** 候选项目根目录（覆盖 monorepo turbo 运行 / apps/web 直接启动 / 根目录直接启动） */
+const CANDIDATE_ROOTS = [
+  process.cwd(),                           // 1. 直接在项目根或 workspace 根运行
+  join(process.cwd(), "..", ".."),         // 2. 从 apps/web/ 往上两级到达项目根（turbo dev）
+  join(process.cwd(), "apps", "web"),      // 3. 从项目根进 apps/web（兜底）
+]
 
 interface Cache {
   mtimeMs: number
@@ -17,6 +22,7 @@ interface Cache {
   governance: string
 }
 let cache: Cache | null = null
+let resolvedPath: string | null = null
 
 /** 从全文裁剪治理要点（AI-First 三原则 + 六大组件 + 禁止行为），控制注入 token 量 */
 function extractGovernance(full: string): string {
@@ -24,7 +30,6 @@ function extractGovernance(full: string): string {
   const wanted: string[] = []
   let capture = false
   for (const line of lines) {
-    // 章节标题作为开关：捕获「禁止行为清单」「AI-First」「六大核心组件」相关段落
     if (/^##+\s/.test(line)) {
       capture =
         /AI-First|禁止行为|核心组件|安全护栏|动态 ?Harness/i.test(line)
@@ -32,27 +37,50 @@ function extractGovernance(full: string): string {
     if (capture) wanted.push(line)
   }
   const text = wanted.join("\n").trim()
-  // 兜底：解析不到时取全文前 1500 字
   return text.length > 0 ? text.slice(0, 4000) : full.slice(0, 1500)
 }
 
 /**
  * 读取并缓存 AGENTS.md。返回全文与治理摘要；读取失败时返回空串（不阻断业务）。
+ * 自动尝试多个候选路径以适配 monorepo 目录结构。
  */
 export async function loadAgentsMd(): Promise<{ full: string; governance: string }> {
-  try {
-    const s = await stat(AGENTS_MD_PATH)
-    if (cache && cache.mtimeMs === s.mtimeMs) {
-      return { full: cache.full, governance: cache.governance }
+  // 若已解析成功路径，直接复用
+  if (resolvedPath) {
+    try {
+      const s = await stat(resolvedPath)
+      if (cache && cache.mtimeMs === s.mtimeMs) {
+        return { full: cache.full, governance: cache.governance }
+      }
+      const full = await readFile(resolvedPath, "utf8")
+      const governance = extractGovernance(full)
+      cache = { mtimeMs: s.mtimeMs, full, governance }
+      return { full, governance }
+    } catch {
+      // 路径失效，重新搜索
+      resolvedPath = null
+      cache = null
     }
-    const full = await readFile(AGENTS_MD_PATH, "utf8")
-    const governance = extractGovernance(full)
-    cache = { mtimeMs: s.mtimeMs, full, governance }
-    return { full, governance }
-  } catch (error) {
-    console.warn("[loadAgentsMd] 读取 AGENTS.md 失败（已降级为空）：", error)
-    return { full: "", governance: "" }
   }
+
+  // 查找 AGENTS.md（兼容 monorepo 不同启动位置）
+  for (const root of CANDIDATE_ROOTS) {
+    const path = join(root, "AGENTS.md")
+    try {
+      const s = await stat(path)
+      const full = await readFile(path, "utf8")
+      const governance = extractGovernance(full)
+      resolvedPath = path
+      cache = { mtimeMs: s.mtimeMs, full, governance }
+      return { full, governance }
+    } catch { /* 尝试下一个路径 */ }
+  }
+
+  console.warn(
+    "[loadAgentsMd] 在所有候选路径中均未找到 AGENTS.md：",
+    CANDIDATE_ROOTS.map((r) => join(r, "AGENTS.md")),
+  )
+  return { full: "", governance: "" }
 }
 
 /**

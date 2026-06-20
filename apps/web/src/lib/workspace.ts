@@ -249,6 +249,12 @@ export async function buildWorkspaceContext(request: Request): Promise<Workspace
     // membership 为 null：workspaceId 保持 headerWorkspaceId 或 "default"，role 保持 "VIEWER"
   }
 
+  // ── 开发环境兜底：已登录但无成员记录时，自动提升为 OWNER ─────
+  //    （用户可能登录了但 workspace 表未绑定该用户，避免角色降为 VIEWER 阻断所有写操作）
+  if (isDevAuthBypassEnabled() && role === "VIEWER") {
+    role = "OWNER";
+  }
+
   // TODO: 未来从 WorkspaceSettings 或 IndustryPackInstallation 推导 industryId
   const industryId = "foreign-trade";
 
