@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -39,8 +39,24 @@ export function Sidebar() {
 
   // ---- 提升 usePathname 到父组件，减少子组件 context 订阅 re-render ----
   const pathname = usePathname();
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(`${href}/`);
+
+  // ✅ pathname 变化时一次性计算所有激活项，O(N) 而非每个 item 单独判断
+  const activeSet = useMemo(() => {
+    const set = new Set<string>();
+    [...mainNav, ...bottomNav].forEach((item) => {
+      if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
+        set.add(item.href);
+      }
+    });
+    return set;
+  }, [pathname]);
+
+  // ✅ 稳定引用：activeSet 不变时 isActive 引用不变
+  // → SidebarNavItem 收到相同 boolean 时 memo 浅比较通过，跳过重渲染
+  const isActive = useCallback(
+    (href: string) => activeSet.has(href),
+    [activeSet],
+  );
 
   // ---- 桌面端始终可见 ----
   const showContentDesktop = !isMobile;

@@ -9,7 +9,17 @@ export async function GET(request: Request) {
   try {
     const ctx = await buildWorkspaceContext(request)
     const conversations = await prisma.conversation.findMany({ where: { workspaceId: ctx.workspaceId }, orderBy: { updatedAt: "desc" }, include: { _count: { select: { messages: true } } } })
-    return successResponse({ conversations })
+
+    // ETag：基于记录数 + 最新 updatedAt，计算代价极低（无需序列化整个列表）
+    const latestUpdatedAt = conversations[0]?.updatedAt?.toISOString() ?? "empty"
+    const etag = `"${conversations.length}-${latestUpdatedAt}"`
+    if (request.headers.get("if-none-match") === etag) {
+      return new Response(null, { status: 304 })
+    }
+
+    const res = successResponse({ conversations })
+    res.headers.set("ETag", etag)
+    return res
   } catch (error) { logger.error('GET /api/conversations: 失败', { error: error instanceof Error ? error.message : '未知错误' }); return errorResponse("服务器内部错误") }
 }
 

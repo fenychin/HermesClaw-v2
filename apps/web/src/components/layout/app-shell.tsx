@@ -16,28 +16,32 @@ export function AppShell({ children }: { children: ReactNode }) {
   //    幂等守卫：已加载过则不重复拉取（外壳重新挂载时复用已有数据）
   //    延迟至空闲时段执行，避免阻塞首屏渲染与路由切换
   useEffect(() => {
-    let idleId: number | null = null;
-    const timeoutId = window.setTimeout(() => {
-      idleId = requestIdleCallback(() => {
-        const agentState = useAgentStore.getState();
-        if (agentState.agents.length === 0 && !agentState.loading) {
-          agentState.loadAgents();
-        }
-        const projectState = useProjectStore.getState();
-        if (projectState.projects.length === 0 && !projectState.loading) {
-          projectState.loadProjects();
-        }
-        const tradeState = useTradeStore.getState();
-        if (tradeState.intelligence.length === 0 && !tradeState.loading) {
-          tradeState.loadIntelligence();
-        }
-      }, { timeout: 3000 });
-    }, 5000);
+    /** 共享预热逻辑，由 requestIdleCallback 或降级 setTimeout 调用 */
+    function warmup() {
+      const agentState = useAgentStore.getState();
+      if (agentState.agents.length === 0 && !agentState.loading) {
+        agentState.loadAgents();
+      }
+      const projectState = useProjectStore.getState();
+      if (projectState.projects.length === 0 && !projectState.loading) {
+        projectState.loadProjects();
+      }
+      const tradeState = useTradeStore.getState();
+      if (tradeState.intelligence.length === 0 && !tradeState.loading) {
+        tradeState.loadIntelligence();
+      }
+    }
 
-    return () => {
-      window.clearTimeout(timeoutId);
-      if (idleId !== null) cancelIdleCallback(idleId);
-    };
+    // Safari 不支持 requestIdleCallback，降级为 setTimeout 200ms
+    if (typeof requestIdleCallback === "undefined") {
+      const t = window.setTimeout(warmup, 200);
+      return () => window.clearTimeout(t);
+    }
+
+    // 首屏渲染完成后，在浏览器第一个空闲时段立即预热
+    // timeout: 1000 确保即使没有空闲时段，1 秒内也强制执行
+    const idleId = requestIdleCallback(warmup, { timeout: 1000 });
+    return () => cancelIdleCallback(idleId);
   }, []);
 
   return (

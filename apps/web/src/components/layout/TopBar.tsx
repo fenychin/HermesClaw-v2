@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -18,7 +19,7 @@ import { useUiStore, type Notification } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 
 // ============================================================
-// Mock 通知数据
+// Mock 通知数据（模块级常量，不在渲染函数内）
 // ============================================================
 
 const MOCK_NOTIFICATIONS: Notification[] = [
@@ -126,31 +127,224 @@ function useBreadcrumb() {
 }
 
 // ============================================================
-// TopBar 组件
+// 子组件 1：Breadcrumb
+// 唯一订阅源：useBreadcrumb()（内含 usePathname()）
+// 路由切换时只有此组件重渲染，其余子组件不受影响
+// ============================================================
+
+const Breadcrumb = memo(function Breadcrumb() {
+  const breadcrumb = useBreadcrumb();
+
+  return (
+    <nav className="flex items-center gap-1.5 text-sm">
+      {breadcrumb.map((crumb, i) => (
+        <span key={crumb.href} className="flex items-center gap-1.5">
+          {i > 0 && (
+            <ChevronRight className="text-hint size-3.5 shrink-0" />
+          )}
+          <span
+            className={cn(
+              i === breadcrumb.length - 1
+                ? "text-foreground font-medium"
+                : "text-muted-foreground",
+            )}
+          >
+            {crumb.label}
+          </span>
+        </span>
+      ))}
+    </nav>
+  );
+});
+
+// ============================================================
+// 子组件 2：NotificationBell
+// 唯一订阅源：useUiStore 中的 notificationPanelOpen /
+//             setNotificationPanelOpen / markAllNotificationsRead
+// ============================================================
+
+const NotificationBell = memo(function NotificationBell() {
+  const notificationPanelOpen = useUiStore((s) => s.notificationPanelOpen);
+  const setNotificationPanelOpen = useUiStore(
+    (s) => s.setNotificationPanelOpen,
+  );
+  const markAllNotificationsRead = useUiStore(
+    (s) => s.markAllNotificationsRead,
+  );
+
+  const notifications = MOCK_NOTIFICATIONS;
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setNotificationPanelOpen(!notificationPanelOpen)}
+        className={cn(
+          "hover:bg-accent text-muted-foreground hover:text-foreground flex size-8 items-center justify-center rounded-lg transition-colors",
+          notificationPanelOpen && "bg-accent text-foreground",
+        )}
+        aria-label="通知"
+      >
+        <Bell className="size-4" />
+        {/* 未读红点 */}
+        {unreadCount > 0 && (
+          <span className="bg-danger absolute right-1 top-1 flex size-2 items-center justify-center rounded-full ring-2 ring-background" />
+        )}
+      </button>
+
+      {/* 通知弹出面板 */}
+      <AnimatePresence>
+        {notificationPanelOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.97 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="bg-popover border-border absolute right-0 top-full mt-2 w-80 rounded-xl border shadow-xl"
+          >
+            {/* 面板头 */}
+            <div className="border-border flex items-center justify-between border-b px-4 py-3">
+              <h3 className="text-foreground text-sm font-semibold">
+                通知
+              </h3>
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  onClick={markAllNotificationsRead}
+                  className="text-brand hover:text-brand/80 flex items-center gap-1 text-xs font-medium transition-colors"
+                >
+                  <CheckCheck className="size-3" />
+                  全部已读
+                </button>
+              )}
+            </div>
+
+            {/* 通知列表 */}
+            <div className="max-h-[320px] overflow-y-auto">
+              {notifications.length === 0 ? (
+                <div className="text-hint px-4 py-8 text-center text-xs">
+                  暂无通知
+                </div>
+              ) : (
+                notifications.map((notif) => (
+                  <button
+                    key={notif.id}
+                    type="button"
+                    className={cn(
+                      "hover:bg-accent/60 flex w-full gap-3 px-4 py-3 text-left transition-colors",
+                      !notif.read && "bg-accent/30",
+                    )}
+                  >
+                    <div className="mt-0.5">
+                      <NotificationIcon type={notif.type} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p
+                          className={cn(
+                            "text-sm leading-snug",
+                            notif.read
+                              ? "text-muted-foreground"
+                              : "text-foreground font-medium",
+                          )}
+                        >
+                          {notif.title}
+                        </p>
+                        {!notif.read && (
+                          <span className="bg-brand mt-1.5 size-1.5 shrink-0 rounded-full" />
+                        )}
+                      </div>
+                      <p className="text-hint mt-0.5 line-clamp-1 text-xs">
+                        {notif.message}
+                      </p>
+                      <p className="text-hint mt-1 text-[10px]">
+                        {shortTime(notif.createdAt)}
+                      </p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+});
+
+// ============================================================
+// 子组件 3：UserAvatar
+// 唯一订阅源：useSession()（完全隔离 session 订阅）
+// session 变化时只有此组件重渲染
+// ============================================================
+
+const UserAvatar = memo(function UserAvatar() {
+  const { data: session } = useSession();
+
+  const userName = session?.user?.name ?? "用户";
+  const userInitial = userName.charAt(0).toUpperCase();
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-muted-foreground hidden text-sm md:inline">
+        {userName}
+      </span>
+      <button
+        type="button"
+        className="hover:ring-brand/30 flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand-blue text-xs font-bold text-white ring-2 ring-transparent transition-all"
+        aria-label="用户菜单"
+        title={userName}
+      >
+        {userInitial}
+      </button>
+    </div>
+  );
+});
+
+// ============================================================
+// 子组件 4：CommandPaletteHint
+// 无 store 订阅；接收父组件传入的稳定 onClick 引用
+// ============================================================
+
+const CommandPaletteHint = memo(function CommandPaletteHint({
+  onClick,
+}: {
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="bg-accent text-hint hover:text-foreground hidden items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs transition-colors sm:flex"
+    >
+      <kbd className="font-mono text-[10px]">⌘</kbd>
+      <kbd className="font-mono text-[10px]">K</kbd>
+    </button>
+  );
+});
+
+// ============================================================
+// TopBar 主组件
+// 唯一订阅源：useUiStore 中的 toggleMobileSidebar /
+//             setCommandPaletteOpen（均为稳定函数引用）
+// 路由切换、session 变化、通知状态变化均不触发主组件重渲染
 // ============================================================
 
 /**
  * 主内容区顶部 TopBar
- * —— 左侧：hamburger（移动端）+ 面包屑
- * —— 右侧：Cmd+K 提示 + 通知铃铛 + 用户头像
+ * —— 左侧：hamburger（移动端）+ Breadcrumb
+ * —— 右侧：CommandPaletteHint + NotificationBell + UserAvatar
  */
-export function TopBar() {
-  const setCommandPaletteOpen = useUiStore((s) => s.setCommandPaletteOpen);
-  const notificationPanelOpen = useUiStore((s) => s.notificationPanelOpen);
-  const setNotificationPanelOpen = useUiStore((s) => s.setNotificationPanelOpen);
+export const TopBar = memo(function TopBar() {
   const toggleMobileSidebar = useUiStore((s) => s.toggleMobileSidebar);
-  const markAllNotificationsRead = useUiStore((s) => s.markAllNotificationsRead);
+  const setCommandPaletteOpen = useUiStore((s) => s.setCommandPaletteOpen);
 
-  const { data: session } = useSession();
-  const breadcrumb = useBreadcrumb();
-
-  // 用户信息
-  const userName = session?.user?.name ?? "用户";
-  const userInitial = userName.charAt(0).toUpperCase();
-
-  // 使用 mock 通知（也可接入 store）
-  const notifications = MOCK_NOTIFICATIONS;
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  // 稳定引用，避免 CommandPaletteHint 因 props 变化重渲染
+  const handleOpenCommandPalette = useCallback(
+    () => setCommandPaletteOpen(true),
+    [setCommandPaletteOpen],
+  );
 
   return (
     <header className="border-border bg-background/80 sticky top-0 z-20 flex h-12 shrink-0 items-center justify-between border-b px-4 backdrop-blur-sm">
@@ -166,150 +360,15 @@ export function TopBar() {
           <Menu className="size-4" />
         </button>
 
-        {/* 面包屑 */}
-        <nav className="flex items-center gap-1.5 text-sm">
-          {breadcrumb.map((crumb, i) => (
-            <span key={crumb.href} className="flex items-center gap-1.5">
-              {i > 0 && (
-                <ChevronRight className="text-hint size-3.5 shrink-0" />
-              )}
-              <span
-                className={cn(
-                  i === breadcrumb.length - 1
-                    ? "text-foreground font-medium"
-                    : "text-muted-foreground",
-                )}
-              >
-                {crumb.label}
-              </span>
-            </span>
-          ))}
-        </nav>
+        <Breadcrumb />
       </div>
 
       {/* ---- 右侧 ---- */}
       <div className="flex items-center gap-3">
-        {/* Cmd+K 提示 */}
-        <button
-          type="button"
-          onClick={() => setCommandPaletteOpen(true)}
-          className="bg-accent text-hint hover:text-foreground hidden items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs transition-colors sm:flex"
-        >
-          <kbd className="font-mono text-[10px]">⌘</kbd>
-          <kbd className="font-mono text-[10px]">K</kbd>
-        </button>
-
-        {/* 通知铃铛 */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setNotificationPanelOpen(!notificationPanelOpen)}
-            className={cn(
-              "hover:bg-accent text-muted-foreground hover:text-foreground flex size-8 items-center justify-center rounded-lg transition-colors",
-              notificationPanelOpen && "bg-accent text-foreground",
-            )}
-            aria-label="通知"
-          >
-            <Bell className="size-4" />
-            {/* 未读红点 */}
-            {unreadCount > 0 && (
-              <span className="bg-danger absolute right-1 top-1 flex size-2 items-center justify-center rounded-full ring-2 ring-background" />
-            )}
-          </button>
-
-          {/* 通知弹出面板 */}
-          <AnimatePresence>
-            {notificationPanelOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: -4, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -4, scale: 0.97 }}
-                transition={{ duration: 0.15, ease: "easeOut" }}
-                className="bg-popover border-border absolute right-0 top-full mt-2 w-80 rounded-xl border shadow-xl"
-              >
-                {/* 面板头 */}
-                <div className="border-border flex items-center justify-between border-b px-4 py-3">
-                  <h3 className="text-foreground text-sm font-semibold">
-                    通知
-                  </h3>
-                  {unreadCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={markAllNotificationsRead}
-                      className="text-brand hover:text-brand/80 flex items-center gap-1 text-xs font-medium transition-colors"
-                    >
-                      <CheckCheck className="size-3" />
-                      全部已读
-                    </button>
-                  )}
-                </div>
-
-                {/* 通知列表 */}
-                <div className="max-h-[320px] overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <div className="text-hint px-4 py-8 text-center text-xs">
-                      暂无通知
-                    </div>
-                  ) : (
-                    notifications.map((notif) => (
-                      <button
-                        key={notif.id}
-                        type="button"
-                        className={cn(
-                          "hover:bg-accent/60 flex w-full gap-3 px-4 py-3 text-left transition-colors",
-                          !notif.read && "bg-accent/30",
-                        )}
-                      >
-                        <div className="mt-0.5">
-                          <NotificationIcon type={notif.type} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <p
-                              className={cn(
-                                "text-sm leading-snug",
-                                notif.read
-                                  ? "text-muted-foreground"
-                                  : "text-foreground font-medium",
-                              )}
-                            >
-                              {notif.title}
-                            </p>
-                            {!notif.read && (
-                              <span className="bg-brand mt-1.5 size-1.5 shrink-0 rounded-full" />
-                            )}
-                          </div>
-                          <p className="text-hint mt-0.5 line-clamp-1 text-xs">
-                            {notif.message}
-                          </p>
-                          <p className="text-hint mt-1 text-[10px]">
-                            {shortTime(notif.createdAt)}
-                          </p>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* 用户头像 + 名称（从 Auth.js session 读取） */}
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground hidden text-sm md:inline">
-            {userName}
-          </span>
-          <button
-            type="button"
-            className="hover:ring-brand/30 flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand-blue text-xs font-bold text-white ring-2 ring-transparent transition-all"
-            aria-label="用户菜单"
-            title={userName}
-          >
-            {userInitial}
-          </button>
-        </div>
+        <CommandPaletteHint onClick={handleOpenCommandPalette} />
+        <NotificationBell />
+        <UserAvatar />
       </div>
     </header>
   );
-}
+});

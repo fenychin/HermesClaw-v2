@@ -61,11 +61,44 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+
+      // ---- 档位一：严格禁止缓存（写操作 / 认证 / 实时流）----
+      // 涵盖：认证、对话消息、连接器执行、SSE 流、Harness 提案写操作
       {
-        // API 路由禁止缓存敏感数据
-        source: "/api/(.*)",
+        source:
+          "/api/(auth|chat|messages|connectors/execute|openclaw|harness/proposals)(.*)",
         headers: [
-          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate" },
+          {
+            key: "Cache-Control",
+            value: "no-store, no-cache, must-revalidate",
+          },
+        ],
+      },
+
+      // ---- 档位二：短缓存（只读列表，30s 内可复用）----
+      // 涵盖：大盘统计、智能体列表、项目列表、询盘、报价、对话列表、贸易情报
+      // s-maxage=30：CDN / 共享缓存最多复用 30 秒
+      // stale-while-revalidate=60：过期后 60 秒内仍可返回旧值，同时后台静默重取
+      // 与 dashboard/page.tsx 的 revalidate=60（ISR 60s）协作：
+      //   服务端每分钟最多重新生成一次，客户端 30s 内直接命中缓存，互不冲突
+      {
+        source:
+          "/api/(dashboard|agents|projects|quotations|inquiries|conversations|trade)(.*)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, s-maxage=30, stale-while-revalidate=60",
+          },
+        ],
+      },
+
+      // ---- 档位三：其余 API 保守兜底（禁止缓存）----
+      // 负向匹配：排除档位一、档位二已明确处理的前缀，其余全部 no-store
+      {
+        source:
+          "/api/((?!auth|chat|messages|connectors/execute|openclaw|harness/proposals|dashboard|agents|projects|quotations|inquiries|conversations|trade).*)",
+        headers: [
+          { key: "Cache-Control", value: "no-store" },
         ],
       },
     ];

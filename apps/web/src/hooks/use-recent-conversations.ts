@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { apiClient } from "@/lib/api-client";
 import { classifyTimeGroup } from "@/lib/date-utils";
 
@@ -52,39 +53,63 @@ export function mapApiConversations(
 }
 
 /**
+ * QueryKey 常量，供外部模块复用以共享同一份缓存。
+ * 侧边栏与任何其他页面使用相同 key 时，TanStack Query 会自动 dedup 请求。
+ */
+export const RECENT_CONVERSATIONS_QUERY_KEY = [
+  "recent-conversations",
+] as const;
+
+/**
  * 共享 Hook：从 API 加载真实对话列表 + 监听 conversation-saved 事件自动刷新
+ *
+ * 迁移至 TanStack Query：
+ * - staleTime 30s：侧边栏反复展开/折叠不重复请求
+ * - gcTime 5min：路由切换期间缓存保留，/recent 页面命中同一 key 时不再发起请求
+ * - refetchOnWindowFocus false：切回窗口不自动触发重取，减少无感知网络开销
  */
 export function useRecentConversations(enabled = true) {
-  const [apiConversations, setApiConversations] = useState<RecentRecord[]>([]);
+  const queryClient = useQueryClient();
 
-  const fetchConversations = useCallback(() => {
-    apiClient
-      .getConversations()
-      .then((data) => {
-        const convs =
-          (data as { conversations: Array<{ id: string; title: string; updatedAt: string }> }).conversations ?? [];
-        setApiConversations(mapApiConversations(convs, true));
-      })
-      .catch(() => {
-        /* 对话列表加载失败不阻断页面 */
-      });
-  }, []);
+  const { data, isLoading, error } = useQuery({
+    queryKey: RECENT_CONVERSATIONS_QUERY_KEY,
+    queryFn: async () => {
+      const res = (await apiClient.getConversations()) as {
+        conversations: Array<{ id: string; title: string; updatedAt: string }>;
+      };
+      return mapApiConversations(res.conversations ?? [], true);
+    },
+    enabled,
+    staleTime: 30_000,           // 30 秒内不重复请求
+    gcTime: 5 * 60_000,          // 5 分钟内缓存保留（路由切换复用）
+    refetchOnWindowFocus: false,  // 切回窗口不自动重取
+  });
 
-  useEffect(() => {
-    if (!enabled) return;
-    fetchConversations();
-  }, [enabled, fetchConversations]);
-
-  // 监听新对话保存事件，自动刷新
+  // 监听新对话保存事件 → 使缓存失效触发重取（而非直接 fetch）
   useEffect(() => {
     if (!enabled) return;
     const onConversationSaved = () => {
-      fetchConversations();
+      queryClient.invalidateQueries({
+        queryKey: RECENT_CONVERSATIONS_QUERY_KEY,
+      });
     };
     window.addEventListener("conversation-saved", onConversationSaved);
     return () =>
       window.removeEventListener("conversation-saved", onConversationSaved);
-  }, [enabled, fetchConversations]);
+  }, [enabled, queryClient]);
 
-  return { apiConversations, fetchConversations };
+  return {
+    /** 对话列表（向后兼容原有调用方） */
+    apiConversations: data ?? [],
+    isLoading,
+    error,
+    /**
+     * 向后兼容引用：触发缓存失效重取，而非直接裸 fetch。
+     * 现有调用方无需改动。
+     */
+    fetchConversations: () =>
+      queryClient.invalidateQueries({
+        queryKey: RECENT_CONVERSATIONS_QUERY_KEY,
+      }),
+  };
 }
