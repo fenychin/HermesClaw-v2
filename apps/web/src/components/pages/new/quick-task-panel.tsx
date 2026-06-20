@@ -54,7 +54,7 @@ export function QuickTaskPanel() {
     setResult(null);
     setAccepted(false);
     try {
-      const res = await fetch("/api/task", {
+      const res = await fetch("/api/hermes/task", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ taskType, input: input.trim() }),

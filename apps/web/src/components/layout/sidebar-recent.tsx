@@ -1,7 +1,6 @@
 "use client";
 
 import { memo, useState, useMemo } from "react";
-import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -41,15 +40,16 @@ const TYPE_COLOR: Record<RecentType, string> = {
  */
 export const SidebarRecent = memo(function SidebarRecent({
   collapsed = false,
+  isActive = false,
 }: {
   collapsed?: boolean;
+  isActive?: boolean;
 }) {
-  const pathname = usePathname();
-  const isActive = pathname === "/recent" || pathname.startsWith("/recent/");
   const [expanded, setExpanded] = useState(isActive);
+  const shouldLoadRecent = !collapsed && (expanded || isActive);
 
   // 从 API 获取真实对话列表（共享 hook：含自动刷新）
-  const { apiConversations } = useRecentConversations();
+  const { apiConversations } = useRecentConversations(shouldLoadRecent);
 
   // 仅取 API 真实最近对话并按更新时间排序展示（与右下角最近对话保持一致）
   const recentRecords = useMemo(() => {
@@ -116,6 +116,7 @@ export const SidebarRecent = memo(function SidebarRecent({
                   <Link
                     key={record.id}
                     href={linkHref}
+                    prefetch={false}
                     className={cn(
                       "flex items-center gap-2 px-2 py-1.5 rounded-md",
                       "hover:bg-sidebar-accent transition-colors",
@@ -135,6 +136,7 @@ export const SidebarRecent = memo(function SidebarRecent({
               {/* 查看全部 */}
               <Link
                 href="/recent"
+                prefetch={false}
                 className={cn(
                   "flex items-center justify-center gap-1 py-1.5 mt-1",
                   "text-hint hover:text-sidebar-foreground text-[11px]",

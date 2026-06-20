@@ -51,16 +51,17 @@ vi.mock("@/lib/server/agent-log", () => ({
   writeAgentLog: vi.fn().mockResolvedValue({}),
 }))
 
-// 核心 mock：在测试中，我们将 "trade.handle-inquiry" 模拟为 critical 高危动作，以此触发拦截路径测试
-vi.mock("@hermesclaw/event-contracts", async (importOriginal) => {
+// 核心 mock：在测试中，我们将特定 action 模拟为 critical 高危动作，以此触发拦截路径测试
+vi.mock("@/lib/server/check-automation-gate", async (importOriginal) => {
   const actual = await importOriginal<any>()
   return {
     ...actual,
-    isCriticalActionType: (actionType: string) => {
+    isCriticalActionType: (actionType: string, _criticalTypes?: readonly string[]) => {
       return (
         actionType === "trade.send-quotation" ||
         actionType === "trade.sign-contract" ||
-        actionType === "trade.handle-inquiry" // 测试环境下，将询盘处理判定为高危
+        actionType === "skill.send-quote" ||
+        actionType === "" || actionType === "test-validation-fail" // 空/无效 _type 也判高危以测试拦截链路
       );
     },
   }
@@ -94,12 +95,12 @@ describe("POST /api/workflows/run API 路由集成拦截测试", () => {
   })
 
   it("当高危动作输入校验失败时应被拦截并返回 400 以及详细错误警告", async () => {
-    // 缺失必填的 inquiryText
+    // 缺少 _type 字段，触发 TypedTaskInputSchema 基础校验
     const reqBody = {
       workflowId: "wf-test-1",
       inputs: {
-        _type: "trade.handle-inquiry",
-        // 缺少 inquiryText
+        // 没有 _type
+        data: "incomplete"
       },
     }
     const req = new Request("http://localhost/api/workflows/run", {
@@ -120,8 +121,8 @@ describe("POST /api/workflows/run API 路由集成拦截测试", () => {
     expect(logger.warn).toHaveBeenCalledWith(
       "[WorkflowScheduler] 执行被拦截：任务输入不符合 actionType 要求",
       expect.objectContaining({
-        actionType: "trade.handle-inquiry",
-        errors: expect.arrayContaining([expect.stringContaining("inquiryText")]),
+        actionType: "",
+        errors: expect.arrayContaining([expect.stringContaining("_type")]),
       })
     )
   })

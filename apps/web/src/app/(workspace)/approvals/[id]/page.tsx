@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/common/page-header";
 import { PageTransition } from "@/components/common/PageTransition";
 import { cn } from "@/lib/utils";
+import { apiClient } from "@/lib/api-client";
 import type { HarnessProposal } from "@hermesclaw/event-contracts";
 
 interface SnapshotDetail {
@@ -38,33 +39,26 @@ export default function ApprovalDetailPage({ params }: { params: Promise<{ id: s
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchMetrics = (proposalId: string) => {
-    fetch(`/api/proposals/${proposalId}/metrics`)
-      .then((r) => {
-        if (!r.ok) throw new Error("加载灰度指标失败");
-        return r.json();
-      })
-      .then((m) => {
-        if (m.success) {
-          setMetrics(m.metrics);
-        }
-      })
-      .catch((e) => console.error("Failed to load canary metrics:", e));
+  const fetchMetrics = async (proposalId: string) => {
+    try {
+      const data = await apiClient.getProposal(proposalId);
+      if (data?.proposal) {
+        const p = data.proposal as any;
+        if (p.canaryMetrics) setMetrics(p.canaryMetrics);
+      }
+    } catch (e) {
+      console.error("Failed to load canary metrics:", e);
+    }
   };
 
   useEffect(() => {
     let active = true;
-    fetch("/api/proposals")
-      .then((res) => {
-        if (!res.ok) throw new Error("加载提案失败");
-        return res.json();
-      })
+    apiClient.getProposals()
       .then((data) => {
         if (!active) return;
         const list = (data.proposals || []) as HarnessProposal[];
         const found = list.find((p) => p.id === id);
         setProposal(found || null);
-        
         if (found && found.status === "canary") {
           fetchMetrics(id);
         }
@@ -74,41 +68,35 @@ export default function ApprovalDetailPage({ params }: { params: Promise<{ id: s
         console.error("Error loading proposal detail:", err);
         if (active) setIsLoading(false);
       });
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [id]);
 
   const handleAction = async (action: "approve" | "reject" | "rollback") => {
     setIsSubmitting(true);
     const toastId = toast.loading("正在处理提案决策...");
     try {
-      const res = await fetch(`/api/proposals/${id}/${action}`, {
-        method: "POST",
-      });
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || data.message || "请求失败");
+      if (action === "rollback") {
+        const res = await fetch(`/api/harness/proposals/${id}/rollback`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || "请求失败");
+      } else {
+        const result = await apiClient.reviewProposal(id, action);
+        if (!result || !(result as any).proposal) throw new Error("操作失败");
       }
 
       toast.success(
-        action === "approve" 
-          ? "提案已审批通过，已进入灰度观察期 (Canary)！" 
-          : action === "reject" 
-            ? "提案已被拒绝并归档。" 
+        action === "approve"
+          ? "提案已审批通过，已进入灰度观察期 (Canary)！"
+          : action === "reject"
+            ? "提案已被拒绝并归档。"
             : "提案状态与关联 Agent 快照已完成一键回滚。",
         { id: toastId }
       );
 
-      // 刷新本页数据
       if (action === "reject" || action === "rollback") {
         router.push("/approvals");
       } else {
-        // 审批后刷新本提案内容
-        const updatedRes = await fetch("/api/proposals");
-        const updatedData = await updatedRes.json();
+        const updatedData = await apiClient.getProposals();
         const found = (updatedData.proposals || []).find((p: HarnessProposal) => p.id === id);
         setProposal(found || null);
         if (found && found.status === "canary") {

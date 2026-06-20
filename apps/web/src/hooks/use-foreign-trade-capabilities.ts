@@ -33,7 +33,7 @@ export function useForeignTradeCapabilities() {
 
   useEffect(() => {
     let active = true
-    fetch("/api/industry/foreign-trade/capabilities")
+    fetch("/api/industry-packs/foreign-trade/capabilities")
       .then((res) => {
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`)

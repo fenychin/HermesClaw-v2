@@ -2,30 +2,39 @@
 
 import { memo } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { NavItem } from "@/config/navigation";
+import { prewarmWorkspaceRoute } from "@/lib/workspace-route-prewarm";
 
 interface SidebarNavItemProps {
   item: NavItem;
   /** 侧边栏是否折叠（仅显示图标） */
   collapsed?: boolean;
+  /** 当前路由是否激活（由父组件传入，避免子组件自行 usePathname 导致全部 re-render） */
+  isActive: boolean;
 }
 
-/** 侧边栏单个导航项：根据当前路径高亮 active 态（支持二级路由） */
+/** 侧边栏单个导航项：根据 isActive 属性高亮 active 态（支持二级路由） */
 export const SidebarNavItem = memo(function SidebarNavItem({
   item,
   collapsed = false,
+  isActive,
 }: SidebarNavItemProps) {
-  const pathname = usePathname();
+  const router = useRouter();
   const Icon = item.icon;
-  const isActive =
-    pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+  const prewarm = () => {
+    router.prefetch(item.href);
+    prewarmWorkspaceRoute(item.href);
+  };
 
   return (
     <Link
       href={item.href}
       title={item.description ?? item.label}
+      onPointerEnter={prewarm}
+      onFocus={prewarm}
       className={cn(
         "flex items-center gap-3 rounded-xl px-3 h-10 text-sm font-medium transition-all duration-150",
         "text-muted-foreground hover:bg-accent/50 hover:text-foreground",

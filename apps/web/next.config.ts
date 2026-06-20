@@ -1,3 +1,4 @@
+import path from "path";
 import type { NextConfig } from "next";
 import bundleAnalyzer from "@next/bundle-analyzer";
 
@@ -10,7 +11,7 @@ const nextConfig: NextConfig = {
 
   // 显式锁定项目根目录，避免 Next 因上层目录残留的 package-lock.json 误判 workspace root
   turbopack: {
-    root: __dirname,
+    root: path.join(__dirname, "../.."),
   },
 
   // ★ 将原生 Node 模块从 webpack 打包中排除（serverExternalPackages 对 webpack 与 Turbopack 均生效）
@@ -66,6 +67,27 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "Cache-Control", value: "no-store, no-cache, must-revalidate" },
         ],
+      },
+    ];
+  },
+
+  // 路由重定向：废弃旧路由→新路由
+  async redirects() {
+    return [
+      {
+        source: "/api/proposals/:path*",
+        destination: "/api/harness/proposals/:path*",
+        permanent: true,
+      },
+      {
+        source: "/api/task",
+        destination: "/api/hermes/task",
+        permanent: true,
+      },
+      {
+        source: "/api/industry/:path*",
+        destination: "/api/industry-packs/:path*",
+        permanent: true,
       },
     ];
   },

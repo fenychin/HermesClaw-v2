@@ -7,4 +7,4 @@ export const GET = withRBAC<RouteContext<{ id: string }>>(async (_request: any, 
     if (!rollback) return Response.json({ success: false, error: `回滚记录未找到: ${id}` }, { status: 404 })
     return Response.json({ success: true, data: rollback })
   } catch (error) { return Response.json({ success: false, error: error instanceof Error ? error.message : "获取回滚详情失败" }, { status: 500 }) }
-}, "MEMBER")
+}, "VIEWER")

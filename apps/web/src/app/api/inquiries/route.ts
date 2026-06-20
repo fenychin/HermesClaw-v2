@@ -1,12 +1,11 @@
 import { successResponse, errorResponse } from "@/lib/api-utils"
 import { buildWorkspaceContext, type WorkspaceContext } from "@/lib/workspace"
 import { withRBAC } from "@/lib/server/api-handler"
-import { listInquiries, type InquiryHandlerDeps } from "@hermesclaw/hermes-kernel"
+import { listInquiries, createInquiry, type InquiryHandlerDeps } from "@foreign-trade/handlers/inquiry-handler"
 import { validateBody, InquiryCreateSchema } from "@/lib/server/validators"
 import { actorFromSession } from "@/lib/server/audit"
 import { auditedWrite } from "@/lib/server/audited-write"
 import { prisma } from "@/lib/prisma"
-import { createInquiry } from "@hermesclaw/hermes-kernel"
 
 const deps: InquiryHandlerDeps = { prisma }
 

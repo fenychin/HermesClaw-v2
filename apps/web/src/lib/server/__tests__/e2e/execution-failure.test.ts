@@ -129,7 +129,7 @@ describe("E2E Integration Link 3: Execution Failure, Retry, and Exhaustion Path"
     expect(retryAudits[0].detail).toContain("Retry count: 1")
 
     const failedAudit = await prisma.auditLog.findFirst({
-      where: { workspaceId, action: "workflow.run.failed", targetId: workflowId }
+      where: { workspaceId, action: "workflow.run.error", targetId: workflowId }
     })
     expect(failedAudit).not.toBeNull()
     expect(failedAudit?.detail).toContain(run.runId)

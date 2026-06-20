@@ -1,13 +1,21 @@
 "use client";
 
-import { PageTransition } from "@/components/common/PageTransition";
-import { FilesPageClient } from "@/components/pages/files/files-page-client";
+import FilesPageClient from "./page-client";
+import { PageHeader } from "@/components/common/page-header";
 
-/** 文件：企业内容供给链（PRD 10.7） */
-export default function FilesPage() {
+function FilesRouteSkeleton() {
   return (
-    <PageTransition>
-      <FilesPageClient />
-    </PageTransition>
+    <div className="p-6 space-y-6">
+      <PageHeader title="文件" description="企业内容供给链与结构化解析" />
+      <div className="space-y-3">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="bg-card rounded-xl border border-border p-3 h-[52px] animate-pulse" />
+        ))}
+      </div>
+    </div>
   );
+}
+
+export default function FilesPage() {
+  return <FilesPageClient />;
 }

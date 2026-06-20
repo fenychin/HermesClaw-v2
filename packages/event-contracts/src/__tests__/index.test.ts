@@ -50,9 +50,7 @@ const REQUIRED_SCHEMA_EXPORTS = [
   "ArtifactPayloadSchema",
   "TypedExecutionEventSchema",
   // P2 新增 Task Payloads
-  "HandleInquiryPayloadSchema",
-  "GenerateDevLetterPayloadSchema",
-  "GenerateQuotationPayloadSchema",
+  "SkillPayloadSchema",
   "GenericPayloadSchema",
   "TypedTaskInputSchema",
   // 公共基础
@@ -130,11 +128,10 @@ const REQUIRED_TYPE_EXPORTS = [
   "ArtifactPayload",
   "TypedExecutionEvent",
   // P2 新增 Task Payloads
-  "HandleInquiryPayload",
-  "GenerateDevLetterPayload",
-  "GenerateQuotationPayload",
+  "SkillPayload",
   "GenericPayload",
   "TypedTaskInput",
+  "IndustryPayloadRegistry",
 ]
 
 describe("index.ts 导出完整性", () => {
@@ -191,10 +188,4 @@ describe("index.ts 导出完整性", () => {
     )
   })
 
-  it("辅助函数 isCriticalActionType 已导出且可调用", () => {
-    expect("isCriticalActionType" in index).toBe(true)
-    expect(typeof (index as Record<string, unknown>).isCriticalActionType).toBe(
-      "function",
-    )
-  })
 })

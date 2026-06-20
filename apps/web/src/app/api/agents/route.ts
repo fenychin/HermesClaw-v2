@@ -21,7 +21,7 @@ export const GET = withRBAC(async (req: Request, ctx: any) => {
     })
     return ApiResponse.ok({ agents: data })
   } catch (error) { logger.error('GET /api/agents: 失败', { error: error instanceof Error ? error.message : '未知错误' }); return ApiResponse.apiError("服务器内部错误", 500) }
-}, 'MEMBER')
+}, 'VIEWER')
 
 export const POST = withRBAC(async (req: Request, ctx: any) => {
   try {

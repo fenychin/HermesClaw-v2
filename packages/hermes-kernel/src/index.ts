@@ -55,10 +55,6 @@ export type { CanaryMetrics, CanaryThresholds } from './harness/lifecycle'
 export { generateReport } from './handlers/report-handler'
 export type { ReportHandlerDeps, ReportGenerateInput, ReportGenerateResult, ReportType } from './handlers/report-handler'
 
-// Inquiry Handler
-export { listInquiries, createInquiry, generateInquiryEmail } from './handlers/inquiry-handler'
-export type { InquiryHandlerDeps, InquiryListInput, InquiryCreateInput, InquiryGenerateEmailInput } from './handlers/inquiry-handler'
-
 // Workflow Handler
 export { listWorkflows, getWorkflow, listWorkflowRuns, getWorkflowRun, cancelWorkflowRun } from './handlers/workflow-handler'
 export type { WorkflowHandlerDeps, WorkflowListInput, WorkflowGetInput, WorkflowRunListInput, WorkflowRunGetInput } from './handlers/workflow-handler'

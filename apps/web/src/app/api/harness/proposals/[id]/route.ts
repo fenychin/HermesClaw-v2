@@ -13,7 +13,7 @@ export const GET = withRBAC<RouteContext<{ id: string }>>(async (_request: Reque
     if (!proposal) return errorResponse("提案不存在", 404)
     return successResponse({ proposal: serializeProposal(proposal) })
   } catch (error) { logger.error('GET /api/harness/proposals/[id]: 失败'); return errorResponse("服务器内部错误") }
-}, 'MEMBER')
+}, 'VIEWER')
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {

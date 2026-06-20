@@ -1,9 +1,7 @@
 "use client"
 
-import { createQueryListHook } from "@/hooks/use-query-factory"
-
 // ==============================
-// 类型定义
+// 类型定义（供 use-foreign-trade-capabilities.ts 使用）
 // ==============================
 
 export interface AgentItem {
@@ -32,37 +30,6 @@ export interface ConnectorItem {
   status: string
   provider: string
 }
-
-// ==============================
-// Hooks（工厂生成）
-// ==============================
-
-/** 智能体列表 */
-export const useAgents = createQueryListHook<AgentItem>({
-  queryKey: ["agents"],
-  url: "/api/agents",
-  dataField: "agents",
-  errorLabel: "获取智能体列表",
-  staleTime: 60_000,
-})
-
-/** 技能列表 */
-export const useSkills = createQueryListHook<SkillItem>({
-  queryKey: ["skills"],
-  url: "/api/skills",
-  dataField: "skills",
-  errorLabel: "获取技能列表",
-  staleTime: 120_000,
-})
-
-/** 连接器列表 */
-export const useConnectors = createQueryListHook<ConnectorItem>({
-  queryKey: ["connectors"],
-  url: "/api/connectors",
-  dataField: "connectors",
-  errorLabel: "获取连接器列表",
-  staleTime: 120_000,
-})
 
 // ==============================
 // 筛选函数

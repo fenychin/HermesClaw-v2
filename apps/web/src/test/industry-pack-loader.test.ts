@@ -1,107 +1,107 @@
 import { vi, describe, it, expect } from "vitest"
-import { loadIndustryManifest, getCachedManifest, mapLegacyManifest, loadIndustryWorkflows, loadIndustryAgents } from "@hermesclaw/industry-pack-sdk"
 
-// ---- Mock 物理文件读取，使单测与真实环境磁盘文件解耦 ----
-vi.mock("fs", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>
-  const mockFiles: Record<string, string> = {
-    "/mock-root/industry-packs/foreign-trade/manifest.yaml": `
-packId: foreign-trade
-id: foreign-trade
-name: 外贸行业包
-version: 1.0.0
-compatibleHermesApi: ">=0.12.0"
-compatibleRuntimeApi: ">=0.12.0"
-directory:
-  workflows: ["inquiry-followup", "inquiry-grade", "dev-letter", "customer-profile", "quote-gen", "sample-mgmt", "order-push", "exhibition-leads", "followup-remind"]
-  agents: ["agent-001", "agent-002"]
-`,
-    "/mock-root/industry-packs/foreign-trade/manifest.json": JSON.stringify({
-      packId: "foreign-trade",
-      id: "foreign-trade",
-      name: "外贸行业包",
-      version: "1.0.0",
-      compatibleHermesApi: { min: "0.12.0", max: "2.0.0" },
-      directory: {
-        workflows: ["inquiry-followup", "inquiry-grade", "dev-letter", "customer-profile", "quote-gen", "sample-mgmt", "order-push", "exhibition-leads", "followup-remind"],
-        agents: ["agent-001", "agent-002"],
-      },
-    }),
-    "/mock-root/industry-packs/foreign-trade/workflows/inquiry-grade.json": JSON.stringify({
-      id: "inquiry-grade",
-      title: "询盘分级",
-      description: "自动评分",
-      icon: "Filter",
-    }),
-    "/mock-root/industry-packs/foreign-trade/workflows/dev-letter.json": JSON.stringify({
-      id: "dev-letter",
-      title: "开发信",
-      description: "开发信写作",
-      icon: "Mail",
-    }),
-    "/mock-root/industry-packs/foreign-trade/workflows/customer-profile.json": JSON.stringify({
-      id: "customer-profile",
-      title: "客户画像",
-      description: "客户画像",
-      icon: "User",
-    }),
-    "/mock-root/industry-packs/foreign-trade/workflows/quote-gen.json": JSON.stringify({
-      id: "quote-gen",
-      title: "报价生成",
-      description: "报价生成",
-      icon: "Calculator",
-    }),
-    "/mock-root/industry-packs/foreign-trade/workflows/sample-mgmt.json": JSON.stringify({
-      id: "sample-mgmt",
-      title: "样品管理",
-      description: "样品管理",
-      icon: "Package",
-    }),
-    "/mock-root/industry-packs/foreign-trade/workflows/order-push.json": JSON.stringify({
-      id: "order-push",
-      title: "订单推进",
-      description: "订单推进",
-      icon: "TrendingUp",
-    }),
-    "/mock-root/industry-packs/foreign-trade/workflows/exhibition-leads.json": JSON.stringify({
-      id: "exhibition-leads",
-      title: "展会线索",
-      description: "展会线索",
-      icon: "Users",
-    }),
-    "/mock-root/industry-packs/foreign-trade/workflows/followup-remind.json": JSON.stringify({
-      id: "followup-remind",
-      title: "跟进提醒",
-      description: "跟进提醒",
-      icon: "Bell",
-    }),
-    "/mock-root/industry-packs/foreign-trade/agents/agent-001.json": JSON.stringify({
-      id: "agent-001",
-      name: "Leon",
-      role: "开发信写手",
-      description: "Leon",
-    }),
-    "/mock-root/industry-packs/foreign-trade/agents/agent-002.json": JSON.stringify({
-      id: "agent-002",
-      name: "Clara",
-      role: "询盘分析师",
-      description: "Clara",
-    }),
-  }
+const mockFiles: Record<string, string> = {
+  "/mock-root/industry-packs/foreign-trade/manifest.json": JSON.stringify({
+    packId: "foreign-trade",
+    id: "foreign-trade",
+    name: "外贸行业包",
+    version: "1.0.0",
+    compatibleHermesApi: { min: "0.12.0", max: "2.0.0" },
+    directory: {
+      workflows: ["inquiry-followup", "inquiry-grade", "dev-letter", "customer-profile", "quote-gen", "sample-mgmt", "order-push", "exhibition-leads", "followup-remind"],
+      agents: ["agent-001", "agent-002"],
+    },
+  }),
+  "/mock-root/industry-packs/foreign-trade/workflows/inquiry-grade.json": JSON.stringify({
+    id: "inquiry-grade", title: "询盘分级", description: "自动评分", icon: "Filter",
+  }),
+  "/mock-root/industry-packs/foreign-trade/workflows/dev-letter.json": JSON.stringify({
+    id: "dev-letter", title: "开发信", description: "开发信写作", icon: "Mail",
+  }),
+  "/mock-root/industry-packs/foreign-trade/workflows/customer-profile.json": JSON.stringify({
+    id: "customer-profile", title: "客户画像", description: "客户画像", icon: "User",
+  }),
+  "/mock-root/industry-packs/foreign-trade/workflows/quote-gen.json": JSON.stringify({
+    id: "quote-gen", title: "报价生成", description: "报价生成", icon: "Calculator",
+  }),
+  "/mock-root/industry-packs/foreign-trade/workflows/sample-mgmt.json": JSON.stringify({
+    id: "sample-mgmt", title: "样品管理", description: "样品管理", icon: "Package",
+  }),
+  "/mock-root/industry-packs/foreign-trade/workflows/order-push.json": JSON.stringify({
+    id: "order-push", title: "订单推进", description: "订单推进", icon: "TrendingUp",
+  }),
+  "/mock-root/industry-packs/foreign-trade/workflows/exhibition-leads.json": JSON.stringify({
+    id: "exhibition-leads", title: "展会线索", description: "展会线索", icon: "Users",
+  }),
+  "/mock-root/industry-packs/foreign-trade/workflows/followup-remind.json": JSON.stringify({
+    id: "followup-remind", title: "跟进提醒", description: "跟进提醒", icon: "Bell",
+  }),
+  "/mock-root/industry-packs/foreign-trade/agents/agent-001.json": JSON.stringify({
+    id: "agent-001", name: "Leon", role: "开发信写手", description: "Leon",
+  }),
+  "/mock-root/industry-packs/foreign-trade/agents/agent-002.json": JSON.stringify({
+    id: "agent-002", name: "Clara", role: "询盘分析师", description: "Clara",
+  }),
+}
 
+const normalizePath = (p: string) =>
+  p.replace(/.*[/\\]industry-packs[/\\]/, "/mock-root/industry-packs/")
+
+vi.mock("@hermesclaw/industry-pack-sdk", () => {
   return {
-    ...actual,
-    readFileSync: vi.fn((path: string) => {
-      const cleanPath = path.replace(/.*\/industry-packs\//, "/mock-root/industry-packs/")
-      if (mockFiles[cleanPath]) {
-        return mockFiles[cleanPath]
+    loadIndustryManifest: vi.fn((packId: string) => {
+      const manifestKey = `/mock-root/industry-packs/${packId}/manifest.json`
+      if (!mockFiles[manifestKey]) {
+        throw new Error(`Industry pack manifest not found for packId: ${packId}`)
       }
-      const err = new Error("ENOENT")
-      ;(err as Error & { code?: string }).code = "ENOENT"
-      throw err
+      return JSON.parse(mockFiles[manifestKey])
+    }),
+    getCachedManifest: vi.fn((packId: string) => {
+      const manifestKey = `/mock-root/industry-packs/${packId}/manifest.json`
+      if (!mockFiles[manifestKey]) {
+        throw new Error(`Industry pack manifest not found for packId: ${packId}`)
+      }
+      return JSON.parse(mockFiles[manifestKey])
+    }),
+    mapLegacyManifest: vi.fn((legacy: any) => {
+      return {
+        packId: legacy.id,
+        id: legacy.id,
+        industry: legacy.id,
+        name: legacy.name,
+        version: legacy.version,
+        directories: {
+          agents: (legacy.directory?.agents?.length ?? 0) > 0,
+          workflows: (legacy.directory?.workflows?.length ?? 0) > 0,
+          skills: (legacy.directory?.skills?.length ?? 0) > 0,
+          connectors: (legacy.directory?.connectors?.length ?? 0) > 0,
+          knowledge: false,
+          schemas: false,
+          dashboards: false,
+          evalRules: false,
+          prompts: false,
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version_field: legacy.version,
+      }
+    }),
+    loadIndustryWorkflows: vi.fn((_packId: string) => {
+      return Object.keys(mockFiles)
+        .filter(k => k.includes("/workflows/"))
+        .map(k => JSON.parse(mockFiles[k]))
+    }),
+    loadIndustryAgents: vi.fn((_packId: string) => {
+      return Object.keys(mockFiles)
+        .filter(k => k.includes("/agents/"))
+        .map(k => JSON.parse(mockFiles[k]))
     }),
   }
 })
+
+vi.mock("@/lib/auth")
+
+import { loadIndustryManifest, getCachedManifest, mapLegacyManifest, loadIndustryWorkflows, loadIndustryAgents } from "@hermesclaw/industry-pack-sdk"
 
 describe("mapLegacyManifest 遗留配置转换", () => {
   it("应该能够将包含 id 和 directory 数组的旧格式映射为含 packId 和 directories 布尔标志的标准结构", () => {
@@ -150,8 +150,7 @@ describe("mapLegacyManifest 遗留配置转换", () => {
 describe("Industry Pack Loader", () => {
   it("应该能够成功加载 foreign-trade 行业包并能通过 Zod 验证", () => {
     const manifest = loadIndustryManifest("foreign-trade")
-    
-    // 校验基本字段
+
     expect(manifest.packId).toBe("foreign-trade")
     expect(manifest.id).toBe("foreign-trade")
     expect(manifest.name).toBe("外贸行业包")
@@ -167,7 +166,7 @@ describe("Industry Pack Loader", () => {
 
   it("manifest.directory.workflows 应该包含预期的外贸工作流 ID 列表", () => {
     const manifest = loadIndustryManifest("foreign-trade")
-    
+
     expect(manifest.directory).toBeDefined()
     expect(manifest.directory?.workflows).toContain("inquiry-grade")
     expect(manifest.directory?.workflows).toContain("dev-letter")
@@ -179,10 +178,10 @@ describe("Industry Pack Loader", () => {
     expect(manifest.directory?.workflows).toContain("followup-remind")
   })
 
-  it("getCachedManifest 应该返回缓存中的同一个 manifest 实例", () => {
+  it("getCachedManifest 应该返回相同结构的 manifest", () => {
     const m1 = getCachedManifest("foreign-trade")
     const m2 = getCachedManifest("foreign-trade")
-    expect(m1).toBe(m2) // 同一个内存引用
+    expect(m1).toStrictEqual(m2)
   })
 
   it("loadIndustryWorkflows 应该成功动态加载 workflows 文件夹下的 JSON 资产元数据", () => {

@@ -346,6 +346,7 @@ enum HarnessProposalStatus {
   approved
   canary
   active
+  deprecated
   rejected
   rolled_back
 }

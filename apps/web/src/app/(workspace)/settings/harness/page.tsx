@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ProposalCard } from "./_components/proposal-card";
 import { L3ApproveAlert } from "./_components/l3-approve-alert";
 import { ProposalDetailSheet } from "./_components/proposal-detail-sheet";
-import { useHarnessProposalStore } from "@/stores/harness-proposal-store";
+import { useTradeStore } from "@/stores/trade-store";
 import {
   ShieldCheck,
   Clock,
@@ -52,7 +52,7 @@ function filterByTab(
  *    所有 Harness 变更均须经由人类审批（§3.1），此页面为审批操作的唯一 UI 入口
  */
 export default function HarnessApprovalPage() {
-  const { proposals, fetchProposals, approveProposal, rejectProposal } = useHarnessProposalStore();
+  const { harnessProposals: proposals, loadProposals: fetchProposals, approveProposal, rejectProposal } = useTradeStore();
   const [activeTab, setActiveTab] = useState<TabValue>("pending");
 
   useEffect(() => {

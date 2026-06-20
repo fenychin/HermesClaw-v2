@@ -74,7 +74,7 @@ export default function WorkflowDetailPage({ params }: PageProps) {
         }
 
         // 回退到 pack（v2 dir 形态：meta + dag + steps）
-        const packRes = await fetch(`/api/industry/foreign-trade/workflows/${id}`)
+        const packRes = await fetch(`/api/industry-packs/foreign-trade/workflows/${id}`)
         if (packRes.ok) {
           const pack = await packRes.json() as {
             meta: { id: string; title: string; description: string }

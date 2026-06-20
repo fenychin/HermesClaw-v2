@@ -1,3 +1,4 @@
+/** @deprecated 此路由不在 MVP 必做范围（PRD §9.2，"高级 BI"暂缓），计划在未来版本移除。 */
 import { prisma } from "@/lib/prisma"; import { logger } from '@/lib/logger'
 import { successResponse, errorResponse } from "@/lib/api-utils"; import type { WorkspaceContext } from "@/lib/workspace"
 import { withRBAC } from "@/lib/server/api-handler"

@@ -12,8 +12,8 @@ import {
   mockSkills,
   mockProjects,
   mockMemories,
-} from '../src/lib/server/__mocks__/mock-data'
-import { mockProposals as sharedProposals } from '../src/app/(workspace)/settings/harness/_data/mock-proposals'
+} from '../apps/web/src/lib/server/__mocks__/mock-data'
+import { mockProposals as sharedProposals } from '../apps/web/src/app/(workspace)/settings/harness/_data/mock-proposals'
 import { createSeedPrisma } from './seed-utils'
 import { foreignTradeSkillTemplates, toSkillDbRecord } from './seed-skills'
 
@@ -81,6 +81,17 @@ async function main() {
       role: 'admin',
     },
   })
+
+  // ---- 默认工作空间成员（admin → OWNER）----
+  const adminUser = await prisma.user.findUnique({ where: { email: 'admin@hermesclaw.ai' } })
+  if (adminUser) {
+    await prisma.workspaceMember.upsert({
+      where: { workspaceId_userId: { workspaceId: 'default', userId: adminUser.id } },
+      update: { role: 'OWNER' },
+      create: { workspaceId: 'default', userId: adminUser.id, role: 'OWNER' },
+    })
+    console.log('→ 已将管理员添加至默认工作空间 (OWNER)')
+  }
 
   // ---- 技能（通用 + 外贸行业模板）----
   const totalSkills = mockSkills.length + foreignTradeSkillTemplates.length

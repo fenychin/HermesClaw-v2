@@ -1,15 +1,14 @@
 import { NextRequest } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { ChatMessageSchema, validateBody } from "@/lib/server/validators";
-import { buildWorkspaceContext, requireWritable, ForbiddenError } from "@/lib/workspace";
+import { buildWorkspaceContext, ForbiddenError } from "@/lib/workspace";
 import { selectModel } from "@/lib/server/model-router";
-import { openChatStream, callDeepSeekText } from "@/lib/server/llm-provider";
+import { openChatStream } from "@/lib/server/llm-provider";
 import { loadIndustryPrompt } from "@hermesclaw/industry-pack-sdk";
 import { getGovernanceClause } from "@/lib/server/agents-md";
 import { createTrace, addTraceStep, completeTraceStep } from "@/lib/server/reasoning-trace";
 import { writeAgentLog } from "@/lib/server/agent-log";
-import { createSseResponse, parseIntent } from "@hermesclaw/hermes-kernel";
-import { prisma } from "@/lib/prisma";
+import { createSseResponse } from "@hermesclaw/hermes-kernel";
 
 export const runtime = "nodejs";
 
@@ -22,25 +21,8 @@ export async function POST(req: NextRequest) {
   if (p instanceof Response) return p;
 
   let ctx;
-  try { ctx = await buildWorkspaceContext(req); requireWritable(ctx.role); }
-  catch (e) { return e instanceof ForbiddenError ? Response.json({ error: e.message }, { status: 403 }) : (() => { throw e; })(); }
-
-  const lastUserMsg = [...p.messages].reverse().find((m: any) => m.role === "user");
-  const parseResult = await parseIntent(
-    {
-      rawText: lastUserMsg?.content || "",
-      workspaceId: ctx.workspaceId,
-      userId: ctx.user?.id || "anonymous",
-      conversationHistory: p.messages.map((m: any) => ({ role: m.role as "user" | "assistant", content: m.content })),
-    },
-    {
-      callLlm: async (system: string, user: string) => {
-        const result = await callDeepSeekText({ systemPrompt: system, userPrompt: user, model: "deepseek-chat" });
-        return result;
-      },
-      prisma,
-    },
-  ).catch(() => null);
+  try { ctx = await buildWorkspaceContext(req); }
+  catch (e) { throw e; }
 
   return createSseResponse({ ...p, workspaceId: ctx.workspaceId, industryId: ctx.industryId }, {
     openStream: (o: any, od: any) => openChatStream({ ...o, maxTokens: o.maxTokens ?? 8192 }, od),

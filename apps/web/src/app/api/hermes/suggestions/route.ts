@@ -1,3 +1,4 @@
+/** @deprecated 此路由不在 MVP 必做范围（PRD §9.2），计划在未来版本移除。 */
 import { generateHermesSuggestions } from "@/lib/server/hermes-suggestions"
 import { logger } from '@/lib/logger'; import { writeAgentLog } from "@/lib/server/agent-log"
 import { successResponse, errorResponse } from "@/lib/api-utils"

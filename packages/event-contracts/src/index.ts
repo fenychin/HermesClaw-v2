@@ -199,19 +199,15 @@ export type {
 
 // Task payloads
 export {
-  HandleInquiryPayloadSchema,
-  GenerateDevLetterPayloadSchema,
-  GenerateQuotationPayloadSchema,
+  SkillPayloadSchema,
   GenericPayloadSchema,
   TypedTaskInputSchema,
-  isCriticalActionType,
 } from "./task-payloads"
 export type {
-  HandleInquiryPayload,
-  GenerateDevLetterPayload,
-  GenerateQuotationPayload,
+  SkillPayload,
   GenericPayload,
   TypedTaskInput,
+  IndustryPayloadRegistry,
 } from "./task-payloads"
 
 // domain-boundary

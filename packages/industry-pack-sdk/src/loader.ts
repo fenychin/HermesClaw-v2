@@ -1,5 +1,5 @@
 import { readFileSync, existsSync, readdirSync } from "fs"
-import { join } from "path"
+import { join, resolve } from "path"
 import yaml from "yaml"
 import { IndustryManifestSchema } from "@hermesclaw/event-contracts"
 import type { IndustryManifest } from "@hermesclaw/event-contracts"
@@ -18,7 +18,21 @@ import {
 import { mapLegacyManifest } from "./legacy-mapper"
 import type { IndustryPackLoaderOptions, IndustryPackAuditEvent } from "./types"
 
-const PACKS_DIR = join(process.cwd(), "industry-packs")
+function resolvePacksDir(): string {
+  const candidates = [
+    join(process.cwd(), "industry-packs"),
+    resolve(process.cwd(), "..", "industry-packs"),
+    resolve(process.cwd(), "..", "..", "industry-packs"),
+  ]
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate
+  }
+
+  return candidates[candidates.length - 1]
+}
+
+const PACKS_DIR = resolvePacksDir()
 
 // ─── 依赖注入：SDK 全局配置（三域原则） ──────────────────────────
 
@@ -116,7 +130,16 @@ function assertSafeAssetId(assetId: string): void {
  * 通用文件资源读取工具：优先尝试 .yaml 和 .yml，最后退化尝试 .json
  */
 function readAssetFile(basePathWithoutExt: string): { parsed: any; ext: string } {
-  const exts = [".yaml", ".yml", ".json"];
+  const exts = [
+    ".yaml",
+    ".yml",
+    ".json",
+    ".skill.yaml",
+    ".workflow.yaml",
+    ".dashboard.yaml",
+    ".eval.yaml",
+    ".connector.yaml",
+  ];
   for (const ext of exts) {
     const filePath = basePathWithoutExt + ext;
     if (existsSync(filePath)) {
@@ -362,7 +385,21 @@ export function loadIndustrySkills(packId: string): PackSkillAsset[] {
     const basePath = join(PACKS_DIR, packId, "skills", skillId)
     try {
       const { parsed } = readAssetFile(basePath)
-      const verified = PackSkillAssetSchema.parse(parsed)
+      const verified = (() => {
+        try {
+          return PackSkillAssetSchema.parse(parsed)
+        } catch {
+          const raw = parsed as Record<string, unknown>
+          return PackSkillAssetSchema.parse({
+            id: typeof raw.id === "string" ? raw.id : skillId,
+            name: typeof raw.displayName === "string" ? raw.displayName : typeof raw.name === "string" ? raw.name : skillId,
+            description: typeof raw.description === "string" ? raw.description : "",
+            version: typeof raw.version === "string" ? raw.version : "1.0.0",
+            category: typeof raw.category === "string" ? raw.category : "foreign-trade",
+            status: typeof raw.status === "string" ? raw.status : "active",
+          })
+        }
+      })()
       skills.push(verified)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

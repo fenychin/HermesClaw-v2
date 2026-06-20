@@ -25,6 +25,7 @@ import {
 import { PageHeader } from "@/components/common/page-header";
 import { PageTransition } from "@/components/common/PageTransition";
 import { cn } from "@/lib/utils";
+import { apiClient } from "@/lib/api-client";
 import type { HarnessProposal } from "@hermesclaw/event-contracts";
 import { useCurrentWorkspaceRole } from "@/hooks/use-workspace-role";
 import { useWorkspaceData } from "@/hooks/use-workspace";
@@ -76,13 +77,9 @@ export default function ApprovalsPage() {
   // 加载 Proposals (升级提案)
   const fetchProposals = useCallback((silent = false) => {
     if (!silent) setIsProposalsLoading(true);
-    fetch("/api/proposals")
-      .then((res) => {
-        if (!res.ok) throw new Error("加载提案失败");
-        return res.json();
-      })
+    apiClient.getProposals()
       .then((data) => {
-        setProposals(data.proposals || []);
+        setProposals((data.proposals || []) as HarnessProposal[]);
         setIsProposalsLoading(false);
       })
       .catch((err) => {

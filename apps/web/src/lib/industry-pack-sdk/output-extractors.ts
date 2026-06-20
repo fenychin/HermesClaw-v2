@@ -1,1 +1,1 @@
-export * from '@hermesclaw/industry-pack-sdk'
+export * from "../../../../../packages/industry-pack-sdk/src/output-extractors"

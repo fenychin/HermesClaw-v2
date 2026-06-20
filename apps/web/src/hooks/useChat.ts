@@ -166,7 +166,11 @@ export function useChat() {
           signal: abortControllerRef.current.signal,
         });
 
-        if (!response.ok) throw new Error("请求失败");
+        if (!response.ok) {
+          let serverMsg = `服务器错误 (${response.status})`;
+          try { const errBody = await response.json(); if (errBody.error) serverMsg = errBody.error; } catch {}
+          throw new Error(serverMsg);
+        }
         if (!response.body) throw new Error("响应流为空");
 
         const reader = response.body.getReader();
@@ -202,6 +206,10 @@ export function useChat() {
               }
               traceObj = newTrace;
               setCurrentTrace(traceObj);
+            } else if (parsed.error) {
+              const errMsg = typeof parsed.error === "string" ? parsed.error : JSON.stringify(parsed.error);
+              setError(errMsg);
+              abortControllerRef.current?.abort();
             }
           },
         });

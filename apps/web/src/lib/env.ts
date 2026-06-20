@@ -13,7 +13,7 @@
  */
 export function verifyRequiredEnv(): string[] {
   const missing: string[] = [];
-  const required = ["ANTHROPIC_API_KEY", "DATABASE_URL"];
+  const required = ["ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY", "DATABASE_URL"];
   for (const key of required) {
     if (!process.env[key] || process.env[key]!.trim() === "") {
       missing.push(key);

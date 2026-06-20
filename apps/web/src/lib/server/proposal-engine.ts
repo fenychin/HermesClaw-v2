@@ -133,7 +133,7 @@ ${stats.knowledgeGaps.map(g => `  * [${g.resolved ? "已解决" : "待补充"}] 
     snapshotAt: new Date().toISOString()
   }
 
-  const dbData = {
+  const dbData: any = {
     id,
     proposalId,
     workspaceId,
@@ -148,7 +148,7 @@ ${stats.knowledgeGaps.map(g => `  * [${g.resolved ? "已解决" : "待补充"}] 
     affectedAgents: JSON.stringify([]),
     rollbackPlan: "一键恢复关联 Agent 至之前的 Harness 快照版本",
     status: "draft", // 初始状态为 draft
-    previousSnapshot: JSON.stringify(snapshot)
+    previousSnapshot: snapshot
   }
 
   // 写入数据库
@@ -185,7 +185,9 @@ ${stats.knowledgeGaps.map(g => `  * [${g.resolved ? "已解决" : "待补充"}] 
     status: created.status as unknown as HarnessProposal["status"],
     reviewedBy: created.reviewedBy,
     reviewedAt: created.reviewedAt ? new Date(created.reviewedAt) : null,
-    previousSnapshot: created.previousSnapshot ? JSON.parse(created.previousSnapshot) : null,
+    previousSnapshot: typeof created.previousSnapshot === "string"
+      ? JSON.parse(created.previousSnapshot)
+      : created.previousSnapshot,
     createdAt: created.createdAt,
     updatedAt: created.updatedAt,
     version: "1.0.0"

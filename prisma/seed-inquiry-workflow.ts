@@ -17,8 +17,8 @@ import {
   loadForeignTradeSkills,
   toSkillDbRecord,
 } from './seed-skills'
-import { stringifyJsonField } from '../src/lib/api-utils'
-import { loadIndustryWorkflowDag } from '../src/lib/industry-pack-sdk'
+import { stringifyJsonField } from '../apps/web/src/lib/api-utils'
+import { loadIndustryWorkflowDag } from '../apps/web/src/lib/industry-pack-sdk'
 
 const prisma = createSeedPrisma()
 

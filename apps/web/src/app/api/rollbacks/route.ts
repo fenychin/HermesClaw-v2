@@ -7,7 +7,7 @@ export const GET = withRBAC(async (request: any, ctx: any) => {
     const result = await listRollbacks(ctx.workspaceId, { agentId: searchParams.get("agentId") || undefined, status: (searchParams.get("status") as RollbackStatus) || undefined })
     return Response.json({ success: true, data: result })
   } catch (error) { return Response.json({ success: false, error: error instanceof Error ? error.message : "获取回滚列表失败" }, { status: 500 }) }
-}, "MEMBER")
+}, "VIEWER")
 
 export const POST = withRBAC(async (request: any, ctx: any) => {
   try {

@@ -7,7 +7,7 @@
  *   import { createSeedPrisma } from './seed-utils'
  *   const prisma = createSeedPrisma()
  */
-import { PrismaClient } from '../src/generated/prisma-v2/client'
+import { PrismaClient } from '../apps/web/src/generated/prisma-v2/client'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 
 /**

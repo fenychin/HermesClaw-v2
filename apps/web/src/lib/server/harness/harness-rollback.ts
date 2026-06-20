@@ -64,15 +64,23 @@ export interface RollbackError {
  * 解析 previousSnapshot JSON 字符串为 AgentStateSnapshot
  * 校验必要字段完整性，不合格则抛出
  */
-function parseSnapshot(raw: string | null): AgentStateSnapshot {
+function parseSnapshot(raw: unknown): AgentStateSnapshot {
   if (!raw) {
     throw new RollbackException("提案未包含回滚快照（previousSnapshot 为空），无法回滚", 422)
   }
 
   let parsed: unknown
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
+  if (typeof raw === "string") {
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      throw new RollbackException("回滚快照数据格式损坏，无法解析", 422)
+    }
+  } else {
+    parsed = raw
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new RollbackException("回滚快照数据格式损坏，无法解析", 422)
   }
 

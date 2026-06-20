@@ -348,7 +348,21 @@ describe("E2E Integration Test: Scenario A Link", () => {
       }
     })
 
-    // 5. Create Settings
+    // 5. Create Workflow with email connector node
+    await prisma.workflow.create({
+      data: {
+        id: "wf-test-a",
+        workspaceId,
+        name: "L2 Agent",
+        status: "active",
+        nodes: JSON.stringify([
+          { id: "node-1", config: { nodeType: "connector-call", capabilityId: "built-in.email", inputData: {} } }
+        ]),
+        edges: JSON.stringify([])
+      }
+    })
+
+    // 6. Create Settings
     await prisma.workspaceSettings.create({
       data: {
         workspaceId,
@@ -406,7 +420,7 @@ describe("E2E Integration Test: Scenario A Link", () => {
     const logs = await getAuditChain(currentTaskId)
     const actions = logs.map(l => l.action)
 
-    const requiredActions = ["task.dispatch", "connector.execute", "workflow.run.completed"]
+    const requiredActions = ["workflow.run.started", "connector.execute", "workflow.run.completed"]
     const missing = requiredActions.filter((act) => !actions.includes(act))
     
     if (missing.length > 0) {

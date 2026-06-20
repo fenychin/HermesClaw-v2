@@ -82,7 +82,8 @@ export function useOpenClawStream(
 
   const [connected, setConnected] = useState(false)
   const [connecting, setConnecting] = useState(false)
-  const [recentEvents, setRecentEvents] = useState<SSERawEvent[]>([])
+  const recentEventsRef = useRef<SSERawEvent[]>([])
+  const lastAgentStateRef = useRef<Record<string, Pick<AgentExecutionState, 'status' | 'currentTask' | 'progress' | 'lastError' | 'lastEventAt'>>>({})
 
   const updateAgentExecutionState = useUiStore((s) => s.updateAgentExecutionState)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -142,14 +143,10 @@ export function useOpenClawStream(
             }
 
             // 追加到最近事件列表（保留最近 50 条）
-            if (mountedRef.current) {
-              setRecentEvents((prev) =>
-                [event, ...prev].slice(0, 50),
-              )
-            }
+            recentEventsRef.current = [event, ...recentEventsRef.current].slice(0, 50)
 
             // 更新 Zustand 中的智能体执行状态
-            updateAgentExecutionState({
+            const nextState = {
               agentId: eventAgentId,
               status,
               currentTask: raw.payload?.taskName as string | undefined,
@@ -158,7 +155,21 @@ export function useOpenClawStream(
               lastError: type === 'tool.call.failed' || type === 'task:failed'
                 ? (raw.payload?.error as string | undefined) ?? '未知错误'
                 : undefined,
-            })
+            }
+
+            const prevState = lastAgentStateRef.current[eventAgentId]
+            const { agentId: _ignored, ...snapshot } = nextState
+            if (
+              !prevState ||
+              prevState.status !== snapshot.status ||
+              prevState.currentTask !== snapshot.currentTask ||
+              prevState.progress !== snapshot.progress ||
+              prevState.lastError !== snapshot.lastError ||
+              prevState.lastEventAt !== snapshot.lastEventAt
+            ) {
+              lastAgentStateRef.current[eventAgentId] = snapshot
+              updateAgentExecutionState(nextState)
+            }
           },
         })
       })
@@ -228,5 +239,5 @@ export function useOpenClawStream(
     }
   }, [])
 
-  return { connected, connecting, recentEvents, disconnect, reconnect }
+  return { connected, connecting, recentEvents: recentEventsRef.current, disconnect, reconnect }
 }

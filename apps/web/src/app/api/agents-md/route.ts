@@ -1,3 +1,4 @@
+/** @deprecated 此路由不在 MVP 必做范围（PRD §9.2），计划在未来版本移除。 */
 /**
  * GET /api/agents-md —— 读取 AGENTS.md 最高规则文档
  *

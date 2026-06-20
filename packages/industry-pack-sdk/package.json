@@ -10,6 +10,16 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
+    },
+    "./output-extractors": {
+      "types": "./dist/output-extractors.d.ts",
+      "import": "./dist/output-extractors.mjs",
+      "require": "./dist/output-extractors.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.mjs",
+      "require": "./dist/types.js"
     }
   },
   "scripts": {

@@ -8,7 +8,8 @@ function serializeP(p: any) { return HarnessProposalSchema.parse({ id: p.id, pro
 export const GET = withRBAC(async (req: Request, ctx: WorkspaceContext, _routeCtx: RouteContext) => {
   try {
     const status = new URL(req.url).searchParams.get('status')
-    const proposals = await prisma.harnessProposal.findMany({ where: { workspaceId: ctx.workspaceId, ...(status ? { status } : {}) }, orderBy: { createdAt: 'desc' } })
+    const where = status ? ({ workspaceId: ctx.workspaceId, status } as any) : { workspaceId: ctx.workspaceId }
+    const proposals = await prisma.harnessProposal.findMany({ where, orderBy: { createdAt: 'desc' } })
     return ApiResponse.ok(proposals.map(serializeP))
   } catch (error) { return ApiResponse.error(error instanceof Error ? error.message : '未知错误', 500) }
-}, 'MEMBER')
+}, 'VIEWER')

@@ -27,7 +27,11 @@ const SYSTEM_ROUTES = [
 ];
 
 /** 开发环境免认证路由（仅本地测试使用） */
-const DEV_BYPASS_ROUTES = ["/api/chat", "/api/task", "/api/conversations"];
+const DEV_BYPASS_ROUTES = ["/api/chat", "/api/hermes/task", "/api/conversations"];
+
+function isDevAuthBypassEnabled(): boolean {
+  return process.env.NODE_ENV === "development" || process.env.DEV_BYPASS_AUTH === "true";
+}
 
 /** 写操作方法 */
 const WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
@@ -78,27 +82,17 @@ export function middleware(request: NextRequest) {
     }
 
     // 开发环境免认证：DEV_BYPASS_AUTH=true 时放行 chat/task API
-    if (
-      process.env.DEV_BYPASS_AUTH === "true" &&
-      DEV_BYPASS_ROUTES.some((route) => pathname.startsWith(route))
-    ) {
+    if (isDevAuthBypassEnabled() && DEV_BYPASS_ROUTES.some((route) => pathname.startsWith(route))) {
       return NextResponse.next();
     }
 
-    // 写操作：要求有效 session，VIEWER 角色拦截
+    // 写操作：要求有效 session（WorkspaceMemer 角色检查由各路由 withRBAC 负责）
     if (WRITE_METHODS.includes(request.method)) {
       const sessionToken = getSessionToken(request);
       if (!sessionToken) {
         return NextResponse.json(
           { success: false, error: "未登录，写操作需要认证" },
           { status: 401 },
-        );
-      }
-      const role = getRoleFromSessionToken(sessionToken);
-      if (role === "VIEWER") {
-        return NextResponse.json(
-          { success: false, error: "VIEWER 角色不可执行写操作" },
-          { status: 403 },
         );
       }
     }

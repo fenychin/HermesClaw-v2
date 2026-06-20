@@ -314,22 +314,6 @@ export const apiClient = {
   getHermesSuggestions: () =>
     apiFetch<HermesSuggestionsResult>("/api/hermes/suggestions"),
 
-  // ---- 智慧大脑指标 ----
-  getBrainStats: () =>
-    apiFetch<{
-      hitRate: number;
-      hitRateTrend: number[];
-      tokensSaved: number;
-      knowledgeGaps: Array<{
-        id: string;
-        description: string;
-        missingType: "mid" | "long";
-        suggestedAction: string;
-        detectedAt: string;
-        resolved: boolean;
-      }>;
-    }>("/api/brain/stats"),
-
   // ---- Harness Spec 生成（P6 Spec-First）----
   generateHarnessSpec: (data: {
     businessIntent: string

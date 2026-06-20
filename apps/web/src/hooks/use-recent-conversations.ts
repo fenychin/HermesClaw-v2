@@ -54,7 +54,7 @@ export function mapApiConversations(
 /**
  * 共享 Hook：从 API 加载真实对话列表 + 监听 conversation-saved 事件自动刷新
  */
-export function useRecentConversations() {
+export function useRecentConversations(enabled = true) {
   const [apiConversations, setApiConversations] = useState<RecentRecord[]>([]);
 
   const fetchConversations = useCallback(() => {
@@ -71,18 +71,20 @@ export function useRecentConversations() {
   }, []);
 
   useEffect(() => {
+    if (!enabled) return;
     fetchConversations();
-  }, [fetchConversations]);
+  }, [enabled, fetchConversations]);
 
   // 监听新对话保存事件，自动刷新
   useEffect(() => {
+    if (!enabled) return;
     const onConversationSaved = () => {
       fetchConversations();
     };
     window.addEventListener("conversation-saved", onConversationSaved);
     return () =>
       window.removeEventListener("conversation-saved", onConversationSaved);
-  }, [fetchConversations]);
+  }, [enabled, fetchConversations]);
 
   return { apiConversations, fetchConversations };
 }

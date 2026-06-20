@@ -19,7 +19,12 @@ export function Providers({ children }: { children: ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 60_000,
+            gcTime: 5 * 60_000, // 缓存保留 5 分钟（跨页面导航复用，减少重复请求）
             refetchOnWindowFocus: false,
+            refetchOnMount: (query) => {
+              // 已有数据的查询不自动重新拉取（staleTime 控制刷新时机）
+              return query.state.data === undefined;
+            },
           },
         },
       }),

@@ -17,7 +17,7 @@ import 'dotenv/config'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { createSeedPrisma } from './seed-utils'
-import { stringifyJsonField } from '../src/lib/api-utils'
+import { stringifyJsonField } from '../apps/web/src/lib/api-utils'
 
 const prisma = createSeedPrisma()
 

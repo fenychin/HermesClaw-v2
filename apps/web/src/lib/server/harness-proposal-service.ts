@@ -33,7 +33,7 @@ export async function decideProposal(opts: { existing: any; action: "approve" | 
     if (!gate.ok) return { ok: false as const, response: gate.response }
   }
   const entry = await createAuditEntry({ actor: opts.reviewedBy, action: opts.action === "approve" ? "approve.proposal" : "reject.proposal", targetType: "proposal", targetId: opts.existing.id, detail: `${opts.existing.proposalId} · ${propChange?.automationLevel}`, riskLevel: propChange?.riskLevel, workspaceId: opts.workspaceId, triggeredBy: "user" })
-  const data = { status: opts.action === "approve" ? "approved" : "rejected", reviewedBy: opts.reviewedBy, reviewedAt: new Date() }
+  const data: any = { status: opts.action === "approve" ? "approved" : "rejected", reviewedBy: opts.reviewedBy, reviewedAt: new Date() }
   const proposal = await prisma.harnessProposal.update({ where: { id: opts.existing.id }, data })
   await updateAuditEntry({ auditId: entry.auditId, status: "success" })
   if (opts.action === "reject") void writeAgentLog({ source: 'human-correction', taskName: `提案已拒绝：${opts.existing.proposalId}`, status: 'success', duration: '0s', detail: `提案已被拒绝`, riskLevel: 'medium' })

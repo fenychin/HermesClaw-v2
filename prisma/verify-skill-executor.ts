@@ -12,8 +12,8 @@
  */
 import 'dotenv/config'
 import { createSeedPrisma } from './seed-utils'
-import { runWorkflow } from '../src/lib/server/workflow/dag-runner'
-import { stringifyJsonField } from '../src/lib/api-utils'
+import { runWorkflow } from '../apps/web/src/lib/server/workflow/dag-runner'
+import { stringifyJsonField } from '../apps/web/src/lib/api-utils'
 
 const prisma = createSeedPrisma()
 

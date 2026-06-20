@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { mainNav, bottomNav } from "@/config/navigation";
@@ -10,6 +11,7 @@ import { useUiStore } from "@/stores/ui-store";
 import { SidebarNavItem } from "./sidebar-nav-item";
 import { SidebarRecent } from "./sidebar-recent";
 import { cn } from "@/lib/utils";
+import { prewarmWorkspaceRoute } from "@/lib/workspace-route-prewarm";
 
 /** 左侧固定侧边栏：品牌区 + 主导航 + 可展开最近 + 左下角固定设置 */
 export function Sidebar() {
@@ -35,6 +37,11 @@ export function Sidebar() {
     }
   }, [isMobile, setMobileSidebarOpen]);
 
+  // ---- 提升 usePathname 到父组件，减少子组件 context 订阅 re-render ----
+  const pathname = usePathname();
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`);
+
   // ---- 桌面端始终可见 ----
   const showContentDesktop = !isMobile;
 
@@ -55,6 +62,8 @@ export function Sidebar() {
       >
         <Link
           href={siteConfig.defaultRoute}
+          onPointerEnter={() => prewarmWorkspaceRoute(siteConfig.defaultRoute)}
+          onFocus={() => prewarmWorkspaceRoute(siteConfig.defaultRoute)}
           className={cn(
             "text-foreground font-semibold text-sm whitespace-nowrap transition-all duration-150",
             sidebarCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto"
@@ -85,7 +94,11 @@ export function Sidebar() {
           // "最近"使用可展开面板（SidebarRecent），其余用标准导航项
           if (item.href === "/recent") {
             return (
-              <SidebarRecent key={item.href} collapsed={sidebarCollapsed} />
+              <SidebarRecent
+                key={item.href}
+                collapsed={sidebarCollapsed}
+                isActive={isActive(item.href)}
+              />
             );
           }
           return (
@@ -93,6 +106,7 @@ export function Sidebar() {
               key={item.href}
               item={item}
               collapsed={sidebarCollapsed}
+              isActive={isActive(item.href)}
             />
           );
         })}
@@ -105,6 +119,7 @@ export function Sidebar() {
             key={item.href}
             item={item}
             collapsed={sidebarCollapsed}
+            isActive={isActive(item.href)}
           />
         ))}
       </div>

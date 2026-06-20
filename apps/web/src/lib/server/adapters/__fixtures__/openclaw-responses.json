@@ -5,9 +5,7 @@
       "taskId": "task-pact",
       "status": "succeeded",
       "outputs": {
-        "success": true,
-        "mock": true,
-        "url": "https://httpbin.org/post"
+        "summary": "Mock task \"pact-task\" completed successfully."
       },
       "durationMs": "<NUMBER>",
       "completedAt": "<ISO_TIMESTAMP>"

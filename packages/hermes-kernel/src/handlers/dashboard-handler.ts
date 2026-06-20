@@ -328,7 +328,7 @@ export async function getDashboardOverview(
   const getProposalAdoptionRate = async (start: Date, end: Date) => {
     const [t, a] = await Promise.all([
       p.harnessProposal.count({ where: { workspaceId, createdAt: { gte: start, lte: end } } }),
-      p.harnessProposal.count({ where: { workspaceId, status: { in: ["active", "canary", "rolled-back", "deprecated"] }, createdAt: { gte: start, lte: end } } }),
+      p.harnessProposal.count({ where: { workspaceId, status: { in: ["active", "canary", "rolled_back", "deprecated"] }, createdAt: { gte: start, lte: end } } }),
     ]);
     return t > 0 ? a / t : 1.0;
   };

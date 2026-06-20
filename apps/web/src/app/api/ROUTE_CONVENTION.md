@@ -109,7 +109,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 | `/api/orchestration/*` | `packages/hermes-kernel/src/orchestration` | — |
 | `/api/workflows/*` | `packages/hermes-kernel/src/handlers/workflow-handler.ts` | `apps/web/src/lib/server/workflow/*` |
 | `/api/memory/*` | `packages/hermes-kernel/src/memory` | `apps/web/src/lib/server/memory-service.ts` / `memory-mutations.ts` |
-| `/api/inquiries/*` | `packages/hermes-kernel/src/handlers/inquiry-handler.ts` | — |
+| `/api/inquiries/*` | `industry-packs/foreign-trade/src/handlers/inquiry-handler.ts` | — |
 | `/api/agents/*` | `packages/hermes-kernel/src/handlers/agent-handler.ts` | `apps/web/src/lib/server/agent-mutations.ts` / `agent-execute-service.ts` |
 | `/api/connectors/*` | `packages/hermes-kernel/src/handlers/connector-handler.ts` | `apps/web/src/lib/server/connectors/*` / `connector-mutations.ts` |
 | `/api/workspace/*` | `packages/hermes-kernel/src/handlers/workspace-handler.ts` | `apps/web/src/lib/server/workspace-member-service.ts` |

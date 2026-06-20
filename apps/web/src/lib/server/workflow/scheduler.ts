@@ -15,7 +15,9 @@ import { writeAgentLog } from "@/lib/server/agent-log"
 import { hermesClient } from "@/lib/server/adapters/hermes"
 // LEGACY ENGINE ROUTE: Operating on WorkflowNodeRun table.
 import { runWorkflow as runLocalWorkflow } from "@/lib/server/workflow/dag-runner"
-import { TypedTaskInputSchema, isCriticalActionType } from "@hermesclaw/event-contracts"
+import { TypedTaskInputSchema } from "@hermesclaw/event-contracts"
+import { isCriticalActionType } from "@/lib/server/check-automation-gate"
+import { TRADE_CRITICAL_ACTION_TYPES } from "@foreign-trade/policy/critical-actions"
 import { TaskInputValidationError, HermesApiError } from "@/lib/server/exceptions"
 
 export interface ScheduleOptions {
@@ -57,7 +59,7 @@ export class WorkflowSchedulerService {
     // 1. 参数校验：如果属于高危/关键动作，验证输入是否符合 Zod schema
     const actionType = typeof inputs._type === "string" ? inputs._type : ""
     const typedInput = TypedTaskInputSchema.safeParse(inputs)
-    if (!typedInput.success && isCriticalActionType(actionType)) {
+    if (!typedInput.success && isCriticalActionType(actionType, TRADE_CRITICAL_ACTION_TYPES)) {
       const errorMsg = "任务输入不符合 actionType 要求"
       const validationErrors = typedInput.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`)
       logger.warn(`[WorkflowScheduler] 执行被拦截：${errorMsg}`, {
@@ -89,7 +91,7 @@ export class WorkflowSchedulerService {
     })
 
     // 3. 动态审计风险级别确定：若 actionType 为高危类型则为 high，否则默认为 medium
-    const auditRisk: AuditRiskLevel = isCriticalActionType(actionType) ? "high" : "medium"
+    const auditRisk: AuditRiskLevel = isCriticalActionType(actionType, TRADE_CRITICAL_ACTION_TYPES) ? "high" : "medium"
 
     // 4. 路由分发与执行
     if (engine === "hermes") {

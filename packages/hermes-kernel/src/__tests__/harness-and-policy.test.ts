@@ -1068,7 +1068,7 @@ describe("Sprint 3 E2E 场景验证", () => {
       const result = await checkPolicy(
         {
           workspaceId: "ws-e2e",
-          action: "trade.send-quotation",
+          action: "critical.send-quotation",
           riskLevel: "high",
         },
         { prisma },
@@ -1093,7 +1093,7 @@ describe("Sprint 3 E2E 场景验证", () => {
       const result = await checkPolicy(
         {
           workspaceId: "ws-e2e",
-          action: "trade.send-quotation",
+          action: "critical.send-quotation",
           riskLevel: "medium",
         },
         { prisma },
@@ -1110,7 +1110,7 @@ describe("Sprint 3 E2E 场景验证", () => {
       const result = await checkPolicy(
         {
           workspaceId: "ws-e2e",
-          action: "trade.sign-contract",
+          action: "critical.sign-contract",
           riskLevel: "high",
         },
         { prisma },
@@ -1130,7 +1130,7 @@ describe("Sprint 3 E2E 场景验证", () => {
       const result = await checkPolicy(
         {
           workspaceId: "ws-e2e",
-          action: "trade.send-quotation",
+          action: "critical.send-quotation",
           riskLevel: "high",
         },
         { prisma },
@@ -1145,7 +1145,7 @@ describe("Sprint 3 E2E 场景验证", () => {
       const result = await checkPolicy(
         {
           workspaceId: "ws-e2e",
-          action: "trade.handle-inquiry",
+          action: "routine.handle-action",
           riskLevel: "low",
         },
         { prisma },

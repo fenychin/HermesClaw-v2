@@ -6,14 +6,14 @@
  * 用法：pnpm seed:trade   （或 pnpm exec tsx prisma/seed-trade.ts）
  */
 import 'dotenv/config'
-import { PrismaClient } from '../src/generated/prisma-v2/client'
+import { PrismaClient } from '../apps/web/src/generated/prisma-v2/client'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import {
   mockInquiries,
   mockIntelligence,
   mockQuotations,
   mockExchangeRates,
-} from '../src/lib/server/__mocks__/mock-data'
+} from '../apps/web/src/lib/server/__mocks__/mock-data'
 
 const adapter = new PrismaBetterSqlite3({
   url: process.env['DATABASE_URL'] ?? 'file:./dev.db',
