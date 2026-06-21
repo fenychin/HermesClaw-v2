@@ -21,6 +21,7 @@ import {
   Zap,
   ChevronDown,
   Bot,
+  Sparkles,
 } from "lucide-react";
 import { useAgentStore } from "@/stores/agent-store";
 import { useProjectStore } from "@/stores/project-store";
@@ -64,10 +65,8 @@ interface CommandBoxProps {
   error?: string | null;
   /** 外部触发聚焦（值变化时 focus textarea） */
   focusKey?: number;
-  /** 当前选中的模型 ID（如 "deepseek-v4-pro"） */
-  selectedModelId?: string;
-  /** 模型变更回调 */
-  onModelChange?: (modelId: string) => void;
+  /** 触发智能体引导向导回调 */
+  onStartWizard?: (initialPrompt: string) => void;
 }
 
 /**
@@ -83,8 +82,7 @@ export function CommandBox({
   isStreaming = false,
   error = null,
   focusKey,
-  selectedModelId,
-  onModelChange,
+  onStartWizard,
 }: CommandBoxProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -721,14 +719,6 @@ export function CommandBox({
 
         {/* 右侧：模型选择器 + 语音输入 + 发送 / 停止按钮 */}
         <div className="flex items-center gap-2">
-          {/* 模型选择器（紧凑行内下拉） */}
-          {onModelChange && selectedModelId && (
-            <ModelSelectorInline
-              value={selectedModelId}
-              onChange={onModelChange}
-              disabled={isStreaming}
-            />
-          )}
 
           {/* 语音输入按钮（置于中间，突出重要性） */}
           <button
@@ -784,6 +774,36 @@ export function CommandBox({
         )}
       </AnimatePresence>
 
+      {/* 新建智能体入口底座 */}
+      {onStartWizard && (
+        <div className={cn(
+          "border-t border-border/60 mt-4 pt-3 mx-[-16px] mb-[-16px] px-4 py-2.5 bg-accent/10 rounded-b-2xl",
+          "flex items-center justify-between text-xs select-none"
+        )}>
+          <button
+            type="button"
+            onClick={() => onStartWizard(value)}
+            className="text-muted-foreground hover:text-primary flex items-center gap-1.5 transition-colors group font-medium"
+          >
+            <Bot className="size-3.5 text-primary group-hover:rotate-12 transition-transform" />
+            <span>简单描述需求，由此智能引导创建专属智能体 →</span>
+          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onStartWizard(value)}
+              className="text-[10px] font-semibold text-primary hover:text-white bg-primary/10 hover:bg-primary border border-primary/30 rounded-lg px-2.5 py-1 flex items-center gap-1 transition-all shadow-sm shrink-0"
+            >
+              <Sparkles className="size-3" />
+              <span>新建智能体</span>
+            </button>
+            <span className="text-hint text-[10px] scale-90 origin-right shrink-0">
+              Hermes 自进化向导
+            </span>
+          </div>
+        </div>
+      )}
+
       {showAgentDrawer && (
         <AgentConfigDrawer
           onClose={() => setShowAgentDrawer(false)}
@@ -793,119 +813,7 @@ export function CommandBox({
   );
 }
 
-// ============================================================
-// 行内模型选择器（Provider + 具体型号选择）
-// ============================================================
 
-interface ModelSelectorInlineProps {
-  value: string; // model ID (e.g. "deepseek-v4-pro")
-  onChange: (modelId: string) => void;
-  disabled?: boolean;
-}
-
-function ModelSelectorInline({ value, onChange, disabled }: ModelSelectorInlineProps) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const current = SELECTABLE_MODELS.find((m) => m.id === value) ?? SELECTABLE_MODELS[0];
-
-  // 按 Provider 分组
-  const groups = SELECTABLE_MODELS.reduce((acc, m) => {
-    if (!acc[m.provider]) acc[m.provider] = [];
-    acc[m.provider].push(m);
-    return acc;
-  }, {} as Record<string, SelectableModel[]>);
-
-  const providerLabels: Record<string, string> = {
-    anthropic: "Anthropic",
-    deepseek: "DeepSeek",
-  };
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen(!open)}
-        className={cn(
-          "flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs transition-colors",
-          "hover:bg-accent border border-border",
-          disabled && "opacity-50 cursor-not-allowed",
-        )}
-        title={`${current.label} ${current.version}`}
-      >
-        <span className={cn("size-2 rounded-full shrink-0", current.color)} />
-        <span className="text-muted-foreground font-medium">{current.label}</span>
-        <span className="text-hint text-[10px] hidden sm:inline">{current.version}</span>
-        <ChevronDown className={cn("size-3 text-hint transition-transform", open && "rotate-180")} />
-      </button>
-
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 6, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 6, scale: 0.96 }}
-            transition={{ duration: 0.12, ease: "easeOut" }}
-            className="absolute bottom-full right-0 mb-2 w-56 bg-popover border border-border rounded-xl shadow-2xl z-50 overflow-hidden"
-          >
-            <div className="py-1">
-              <p className="text-hint text-[10px] font-bold px-3 py-1.5 uppercase tracking-wider">
-                选择模型
-              </p>
-              {Object.entries(groups).map(([provider, models]) => (
-                <div key={provider} className="mb-1 last:mb-0">
-                  <p className="text-hint text-[9px] px-3 py-0.5 uppercase tracking-wider opacity-60">
-                    {providerLabels[provider] ?? provider}
-                  </p>
-                  {models.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      disabled={!m.available}
-                      onClick={() => {
-                        if (!m.available) return;
-                        onChange(m.id);
-                        setOpen(false);
-                      }}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2 text-left transition-colors",
-                        m.id === value ? "bg-accent" : "hover:bg-accent",
-                        !m.available && "opacity-40 cursor-not-allowed",
-                      )}
-                    >
-                      <span className={cn("size-2.5 rounded-full shrink-0", m.color)} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-foreground text-sm font-medium flex items-center gap-2">
-                          {m.version}
-                          {m.id === value && (
-                            <span className="text-success text-[9px] font-normal">✓ 当前</span>
-                          )}
-                        </p>
-                      </div>
-                      {!m.available && (
-                        <span className="text-hint text-[9px] shrink-0">需 API Key</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
 
 // ============================================================
 // 微型 Popover 组件

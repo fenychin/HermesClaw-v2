@@ -5,8 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { CommandBox } from "@/components/pages/new/command-box";
 import { ConversationArea } from "@/components/pages/new/conversation-area";
 import { useChat } from "@/hooks/useChat";
-import { useModelPreference } from "@/hooks/use-model-preference";
+import { SELECTABLE_MODELS } from "@/config/models";
 import { useUiStore } from "@/stores/ui-store";
+import { ModelSelectorInline } from "@/components/workspace/ModelSelectorInline";
+import { useModelPreference } from "@/hooks/use-model-preference";
 
 
 /**
@@ -94,6 +96,16 @@ function ProjectChatInner() {
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-background">
+      {/* 顶部操作控制栏（常驻） */}
+      <div className="sticky top-0 flex justify-between items-center px-4 md:px-8 py-3 bg-background/95 backdrop-blur z-20 shrink-0">
+        {/* 左侧：模型选择器 */}
+        <ModelSelectorInline
+          value={selectedModelId}
+          onChange={handleModelChange}
+          disabled={isStreaming}
+        />
+      </div>
+
       {/* 对话历史 — 撑满上方空间 */}
       {hasMessages && (
         <div className="flex-1 min-h-0 overflow-hidden px-4 md:px-8 pt-6">
@@ -138,8 +150,6 @@ function ProjectChatInner() {
             onStop={stopStreaming}
             isStreaming={isStreaming}
             error={error}
-            selectedModelId={selectedModelId}
-            onModelChange={handleModelChange}
           />
         </div>
       </div>
