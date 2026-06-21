@@ -94,7 +94,7 @@ export default function LoginPage() {
       }
 
       // 3. 跳转至控制台
-      router.push("/new");
+      router.push("/workspace/chat");
       router.refresh();
     } catch (err: any) {
       setSubmitError(err.message || "登录失败，请稍后重试");
@@ -102,7 +102,7 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = () => {
-    signIn("google", { callbackUrl: "/new" });
+    signIn("google", { callbackUrl: "/workspace/chat" });
   };
 
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";

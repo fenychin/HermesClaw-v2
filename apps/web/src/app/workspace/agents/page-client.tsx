@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { AgentCard } from "./_components/agent-card";
 import { NewAgentDialog } from "./_components/new-agent-dialog";
 import { cn } from "@/lib/utils";
+import { useWorkspaceMode } from "../layout";
 
 export interface AgentData {
   id: string;
@@ -83,6 +84,11 @@ export default function AgentsPage({
 }: {
   initialData?: AgentData[];
 }) {
+  const { setMode } = useWorkspaceMode();
+  useEffect(() => {
+    setMode("config");
+  }, [setMode]);
+
   // 当前展开的智能体 ID
   const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
 

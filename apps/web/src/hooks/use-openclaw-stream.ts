@@ -84,6 +84,7 @@ export function useOpenClawStream(
   const [connecting, setConnecting] = useState(false)
   const recentEventsRef = useRef<SSERawEvent[]>([])
   const lastAgentStateRef = useRef<Record<string, Pick<AgentExecutionState, 'status' | 'currentTask' | 'progress' | 'lastError' | 'lastEventAt'>>>({})
+  const retryCountRef = useRef(0)
 
   const updateAgentExecutionState = useUiStore((s) => s.updateAgentExecutionState)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -120,6 +121,7 @@ export function useOpenClawStream(
         setConnected(true)
         setConnecting(false)
         onConnect?.()
+        retryCountRef.current = 0 // 成功连接后，重置重试计数器
 
         // 使用共享 SSE 解析器读取事件流
         const reader = response.body.getReader()
@@ -177,6 +179,12 @@ export function useOpenClawStream(
         if (err instanceof Error && err.name === 'AbortError') return
         const error = err instanceof Error ? err : new Error(String(err))
         console.warn('[useOpenClawStream] 连接错误:', error.message)
+        // 遭遇 429 报错直接惩罚性避退到 3 阶 (约 24 秒)；其余常规断连则递增重试阶数
+        if (error.message.includes('429')) {
+          retryCountRef.current = Math.max(retryCountRef.current + 1, 3)
+        } else {
+          retryCountRef.current += 1
+        }
         onError?.(error)
       })
       .finally(() => {
@@ -188,9 +196,11 @@ export function useOpenClawStream(
 
         // 自动重连——通过 connectRef 访问最新 connect 引用
         if (mountedRef.current && reconnectIntervalMs > 0) {
+          // 指数退避计算下一次重连延时，最大限制在 30 秒以防止重试风暴
+          const delay = Math.min(reconnectIntervalMs * Math.pow(2, retryCountRef.current), 30000)
           reconnectTimerRef.current = setTimeout(() => {
             if (mountedRef.current) connectRef.current()
-          }, reconnectIntervalMs)
+          }, delay)
         }
       })
   }, [buildUrl, updateAgentExecutionState, reconnectIntervalMs, onConnect, onError])

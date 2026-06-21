@@ -41,7 +41,7 @@ export default function GlobalError({
               重试
             </button>
             <Link
-              href="/new"
+              href="/workspace/chat"
               className="flex items-center gap-2 bg-accent hover:bg-accent/80 text-foreground px-4 py-2 rounded-xl text-sm transition-colors"
             >
               <Home className="w-4 h-4" />

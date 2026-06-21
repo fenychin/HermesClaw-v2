@@ -24,6 +24,7 @@
     "@auth/prisma-adapter": "^2.11.2",
     "@base-ui/react": "^1.5.0",
     "@hermesclaw/event-contracts": "workspace:*",
+    "@hermesclaw/shared-types": "workspace:*",
     "@hermesclaw/hermes-kernel": "workspace:*",
     "@hermesclaw/industry-pack-sdk": "workspace:*",
     "@hermesclaw/openclaw-adapter": "workspace:*",

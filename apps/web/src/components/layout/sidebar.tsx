@@ -11,6 +11,7 @@ import { useUiStore } from "@/stores/ui-store";
 import { useUser } from "@/hooks/use-user";
 import { SidebarNavItem } from "./sidebar-nav-item";
 import { SidebarRecent } from "./sidebar-recent";
+import { SidebarBrain } from "./sidebar-brain";
 import { cn } from "@/lib/utils";
 import { prewarmWorkspaceRoute } from "@/lib/workspace-route-prewarm";
 
@@ -52,7 +53,15 @@ export function Sidebar() {
   const activeSet = useMemo(() => {
     const set = new Set<string>();
     [...mainNav, ...bottomNav].forEach((item) => {
-      if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
+      if (item.href === "/workspace/chat") {
+        if (pathname.startsWith("/workspace/")) {
+          set.add(item.href);
+        }
+      } else if (item.href === "/brain/memory") {
+        if (pathname.startsWith("/brain/")) {
+          set.add(item.href);
+        }
+      } else if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
         set.add(item.href);
       }
     });
@@ -119,6 +128,16 @@ export function Sidebar() {
           if (item.href === "/recent") {
             return (
               <SidebarRecent
+                key={item.href}
+                collapsed={sidebarCollapsed}
+                isActive={isActive(item.href)}
+              />
+            );
+          }
+          // "智慧大脑"使用下拉折叠面板（SidebarBrain）
+          if (item.href === "/brain/memory") {
+            return (
+              <SidebarBrain
                 key={item.href}
                 collapsed={sidebarCollapsed}
                 isActive={isActive(item.href)}

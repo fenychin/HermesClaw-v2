@@ -47,9 +47,8 @@ export interface NavSection {
 /** 一级主导航（左侧栏主体，对应 PRD 9.1） */
 export const mainNav: NavItem[] = [
   /* ——— 第一板块：系统 ——— */
-  { href: "/new", label: "新对话", icon: Sparkles, description: "快速发起需求、对话与任务的超级入口" },
-  { href: "/agents", label: "智能体", icon: Bot, description: "创建、管理与升级企业数字员工" },
-  { href: "/brain", label: "智慧大脑", icon: Brain, description: "记忆、技能与连接器的控制面中枢" },
+  { href: "/workspace/chat", label: "新对话", icon: Sparkles, description: "快速发起需求、对话与任务的超级入口" },
+  { href: "/brain/memory", label: "智慧大脑", icon: Brain, description: "记忆、技能与连接器的控制面中枢" },
   /* ——— 第二板块：行业 ——— */
   { href: "/foreign-trade", label: "外贸", icon: Ship, description: "外贸行业工作台与专属工作流" },
   { href: "/dashboard", label: "行业动态", icon: LayoutDashboard, description: "行业情报、询盘雷达与经营监测" },
@@ -64,24 +63,23 @@ export const navSections: NavSection[] = [
   {
     label: "系统",
     items: [
-      mainNav[0], // 新话题
-      mainNav[1], // 智能体
-      mainNav[2], // 智慧大脑
+      mainNav[0], // 新对话
+      mainNav[1], // 智慧大脑
     ],
   },
   {
     label: "行业",
     items: [
-      mainNav[3], // 外贸
-      mainNav[4], // 动态大盘
-      mainNav[5], // 项目空间
+      mainNav[2], // 外贸
+      mainNav[3], // 动态大盘
+      mainNav[4], // 项目空间
     ],
   },
   {
     label: "资料库",
     items: [
-      mainNav[6], // 文件
-      mainNav[7], // 最近
+      mainNav[5], // 文件
+      mainNav[6], // 最近
     ],
   },
 ];

@@ -100,7 +100,7 @@ export default function SettingsLayout({
             </div>
             {/* 关闭按钮 (X，右上角) */}
             <button
-              onClick={() => router.push("/new")}
+              onClick={() => router.push("/workspace/chat")}
               className="flex size-6 items-center justify-center rounded-md border border-[#262626] bg-[#171717] text-[#B3B3B3] hover:text-[#F5F5F5] hover:border-[#333333] transition-all duration-200 shadow-sm cursor-pointer group"
               title="关闭设置"
             >

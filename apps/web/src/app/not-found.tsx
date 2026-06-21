@@ -14,7 +14,7 @@ export default function NotFound() {
           这个页面不存在或已被移除
         </p>
         <Link
-          href="/new"
+          href="/workspace/chat"
           className="bg-[#6D5EF9] hover:bg-[#5D4EE9] text-white px-5 py-2.5 rounded-xl text-sm transition-colors"
         >
           回到工作台

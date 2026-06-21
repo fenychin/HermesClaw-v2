@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useRecentConversations, type RecentRecord } from "@/hooks/use-recent-conversations";
@@ -28,9 +29,16 @@ const TIME_GROUP_LABELS: Record<string, string> = {
 export function RecentPanel() {
   const router = useRouter();
   const { apiConversations } = useRecentConversations();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const conversationsToRender = mounted ? apiConversations : [];
 
   // 按时间分组
-  const grouped = apiConversations.reduce(
+  const grouped = conversationsToRender.reduce(
     (acc, record) => {
       const group = record.timeGroup || classifyTimeGroup(record.timestamp);
       if (!acc[group]) acc[group] = [];
@@ -45,7 +53,7 @@ export function RecentPanel() {
     return order.indexOf(a) - order.indexOf(b);
   });
 
-  if (apiConversations.length === 0) {
+  if (conversationsToRender.length === 0) {
     return (
       <div className="px-1 py-4">
         <div className="flex items-center gap-2 mb-3">
@@ -69,7 +77,7 @@ export function RecentPanel() {
           最近对话
         </span>
         <span className="text-hint text-[10px] ml-auto">
-          {apiConversations.length}
+          {conversationsToRender.length}
         </span>
       </div>
 

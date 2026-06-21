@@ -466,3 +466,18 @@ Harness Runtime 至少由以下对象组成：
 3. HermesClaw 不以「修改上游源码」作为首选路径，而是：  
    - 优先通过配置、Industry Pack、Harness、Connector 等扩展点实现业务目标。  
    - 仅在证明无法通过扩展层实现时，采用「上游贡献 PR + 本地兼容层」方案。
+
+---
+
+## 第八章：前端架构与三域 Store 隔离防线约定
+
+### 8.1 前端状态机划分
+- **会话态 Store (`sessionStore`)**：负责流式聊天、历史列表、WebSocket 推送等与特定会话强关联的状态。
+- **配置态 Store (`agentConfigStore`)**：负责智能体选用列表、用户临时挂载的技能 patches，禁止与会话消息和状态混用。
+- **桥接 Store (`sessionContextStore`)**：连接两者的轻量通道，在 context 中只传 `agentId` 和 `workspaceId` 等 ID 字符串，绝对禁止传入 `AgentPolicy` 或敏感策略对象。
+
+### 8.2 脑中枢 `/brain` 边界隔离
+- `/brain` 页面及其全部子页面（`/brain/memory`、`/brain/kpi`、`/brain/knowledge` 等）绝对禁止 `import` 任何工作空间 Store（`sessionStore`，`agentConfigStore`）。
+- 脑中枢的所有数据必须通过独立的 `api/brain/*` 管道获取，不复用 `workspace.ts` 等会话专属接口。
+- `/brain` 页面中不得展示任何 `ExecutionEvent` 任务轨迹或 WebSocket 会话流，保障三域边界的只读演化属性。
+- 必须通过专门的自动化测试 `store-boundaries.test.ts` 进行集成守卫，检测违反 store 导入或 payload 携带受限字段的行为。

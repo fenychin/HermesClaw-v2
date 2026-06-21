@@ -78,7 +78,7 @@ function isUpgradeRecord(r: RecentRecordEnriched): boolean {
 
 /** 获取记录的可导航链接 */
 function getRecordHref(record: RecentRecordEnriched): string {
-  return record.href || "/new";
+  return record.href || "/workspace/chat";
 }
 
 // ============================================================

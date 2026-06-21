@@ -7,5 +7,5 @@ export const siteConfig = {
   /** 一句话定位（PRD 17） */
   tagline: "面向中小企业的 AI 数字员工基础平台",
   /** 根路由默认落地页（PRD：新话题为超级入口） */
-  defaultRoute: "/new",
+  defaultRoute: "/workspace/chat",
 } as const;

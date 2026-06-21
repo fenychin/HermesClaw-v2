@@ -10,7 +10,7 @@ import { validateTaskAutomationLevel } from "@/lib/server/guardrail"
 import { createApprovalCheckpoint } from "@/lib/server/approval"
 import crypto from "crypto"
 
-const idempotencyMap = new Map<string, { workflowRunId?: string; checkpointId?: string; status: 'running' | 'pending_approval'; timestamp: number }>()
+const idempotencyMap = new Map<string, { taskId?: string; workflowRunId?: string; checkpointId?: string; status: 'running' | 'pending_approval'; timestamp: number }>()
 
 export class StartWorkflowRunError extends Error {
   constructor(public readonly httpStatus: number, message: string, public readonly code?: string) { super(message); this.name = "StartWorkflowRunError" }
@@ -20,7 +20,7 @@ export async function startAgentWorkflowRun(opts: { agentId: string; input: any;
   for (const [key, val] of idempotencyMap.entries()) if (Date.now() - val.timestamp > 600000) idempotencyMap.delete(key)
   if (opts.idempotencyKey) {
     const cached = idempotencyMap.get(opts.idempotencyKey)
-    if (cached) return { status: cached.status, ...(cached.status === 'pending_approval' ? { checkpointId: cached.checkpointId } : { workflowRunId: cached.workflowRunId }) }
+    if (cached) return { status: cached.status, taskId: cached.taskId, ...(cached.status === 'pending_approval' ? { checkpointId: cached.checkpointId } : { workflowRunId: cached.workflowRunId }) }
   }
   const agent = await prisma.agent.findUnique({ where: { id: opts.agentId } })
   if (!agent) throw new StartWorkflowRunError(404, "Agent not found", "NOT_FOUND")
@@ -37,8 +37,8 @@ export async function startAgentWorkflowRun(opts: { agentId: string; input: any;
       const checkpoint = await prisma.approvalCheckpoint.findFirst({ where: { workflowRunId: envelope.workflowRunId, decision: 'pending' }, orderBy: { createdAt: 'desc' } })
       const checkpointId = checkpoint?.id || `acp-${envelope.workflowRunId}`
       if (!checkpoint) try { await createApprovalCheckpoint({ taskId: envelope.taskId, workflowRunId: envelope.workflowRunId, workspaceId: envelope.workspaceId, triggerReason: 'risk.level.high', riskLevel: envelope.riskLevel, automationLevel: envelope.automationLevel ?? 'L3', actionSummary: `高危动作等待审批：${envelope.actionType}`, inputSnapshot: envelope.input ?? {}, policySnapshotVersion: envelope.policySnapshotVersion ?? '1.0.0', expiresAt: new Date(Date.now() + 86400000), creator: opts.userId || 'system' }) } catch {}
-      if (opts.idempotencyKey) idempotencyMap.set(opts.idempotencyKey, { checkpointId, status: 'pending_approval', timestamp: Date.now() })
-      return { status: 'pending_approval', checkpointId }
+      if (opts.idempotencyKey) idempotencyMap.set(opts.idempotencyKey, { taskId: envelope.taskId, checkpointId, status: 'pending_approval', timestamp: Date.now() })
+      return { status: 'pending_approval', checkpointId, taskId: envelope.taskId }
     }
     throw err
   }
@@ -60,6 +60,6 @@ export async function startAgentWorkflowRun(opts: { agentId: string; input: any;
     },
   )
   executeWorkflowRun(run.runId, opts.workspaceId).catch(() => {})
-  if (opts.idempotencyKey) idempotencyMap.set(opts.idempotencyKey, { workflowRunId: run.runId, status: 'running', timestamp: Date.now() })
-  return { workflowRunId: run.runId, status: 'running' }
+  if (opts.idempotencyKey) idempotencyMap.set(opts.idempotencyKey, { taskId: envelope.taskId, workflowRunId: run.runId, status: 'running', timestamp: Date.now() })
+  return { workflowRunId: run.runId, status: 'running', taskId: envelope.taskId }
 }

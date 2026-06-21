@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useMemo } from "react";
+import { memo, useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -51,12 +51,18 @@ export const SidebarRecent = memo(function SidebarRecent({
   // 从 API 获取真实对话列表（共享 hook：含自动刷新）
   const { apiConversations } = useRecentConversations(shouldLoadRecent);
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // 仅取 API 真实最近对话并按更新时间排序展示（与右下角最近对话保持一致）
   const recentRecords = useMemo(() => {
+    if (!mounted) return [];
     return [...apiConversations]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 8);
-  }, [apiConversations]);
+  }, [apiConversations, mounted]);
 
   /** 收起态时强制折叠（派生状态，避免在 effect 中 setState） */
   const effectiveExpanded = collapsed ? false : expanded;

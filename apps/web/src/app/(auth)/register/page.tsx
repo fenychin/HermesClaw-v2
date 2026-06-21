@@ -100,7 +100,7 @@ export default function RegisterPage() {
   };
 
   const handleGoogleLogin = () => {
-    signIn("google", { callbackUrl: "/new" });
+    signIn("google", { callbackUrl: "/workspace/chat" });
   };
 
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";

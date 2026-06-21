@@ -20,12 +20,14 @@ import {
   Globe,
   Zap,
   ChevronDown,
+  Bot,
 } from "lucide-react";
 import { useAgentStore } from "@/stores/agent-store";
 import { useProjectStore } from "@/stores/project-store";
 import { apiClient } from "@/lib/api-client";
 import type { Agent, Project } from "@/types";
 import { toast } from "sonner";
+import { AgentConfigDrawer } from "@/components/workspace/AgentConfigDrawer";
 
 // 模型配置从 src/config/models.ts 统一导入（单一数据源）
 import { SELECTABLE_MODELS, type SelectableModel } from "@/config/models";
@@ -105,6 +107,7 @@ export function CommandBox({
 
   // /命令 弹窗
   const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [showAgentDrawer, setShowAgentDrawer] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 语音权限提示（首次使用）
@@ -517,7 +520,7 @@ export function CommandBox({
 
 
 
-          {/* @ 智能体 */}
+          {/* Agent 库 */}
           <div className="relative">
             <button
               ref={agentBtnRef}
@@ -529,9 +532,9 @@ export function CommandBox({
                   ? "text-primary bg-primary/10"
                   : "text-hint hover:text-foreground hover:bg-accent",
               )}
-              title="@ 智能体"
+              title="Agent 库"
             >
-              <AtSign className="size-4" />
+              <Bot className="size-4" />
             </button>
 
             {/* 智能体下拉弹窗 */}
@@ -602,6 +605,21 @@ export function CommandBox({
                         </button>
                       ))
                     )}
+                  </div>
+
+                  {/* 管理入口 */}
+                  <div className="border-t border-border p-1 bg-accent/20">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveDropdown(null);
+                        setShowAgentDrawer(true);
+                      }}
+                      className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
+                    >
+                      <Bot className="size-3.5 text-[#6D5EF9]" />
+                      <span>管理智能体库 (Agent 库)</span>
+                    </button>
                   </div>
                 </Popover>
               )}
@@ -765,6 +783,12 @@ export function CommandBox({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {showAgentDrawer && (
+        <AgentConfigDrawer
+          onClose={() => setShowAgentDrawer(false)}
+        />
+      )}
     </motion.div>
   );
 }

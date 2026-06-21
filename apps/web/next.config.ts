@@ -123,6 +123,26 @@ const nextConfig: NextConfig = {
         destination: "/api/industry-packs/:path*",
         permanent: true,
       },
+      {
+        source: "/new",
+        destination: "/workspace/chat",
+        permanent: true,
+      },
+      {
+        source: "/new-chat",
+        destination: "/workspace/chat",
+        permanent: true,
+      },
+      {
+        source: "/agents",
+        destination: "/workspace/agents",
+        permanent: true,
+      },
+      {
+        source: "/brain",
+        destination: "/brain/memory",
+        permanent: false,
+      },
     ];
   },
 
