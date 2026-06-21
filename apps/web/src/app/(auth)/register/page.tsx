@@ -53,8 +53,10 @@ export default function RegisterPage() {
     try {
       let token = data.turnstileToken;
       if (!token) {
-        if (process.env.NODE_ENV === "development") {
-          token = "dev-token-bypass";
+        // 无 Turnstile siteKey = 未配置 = 自动跳过
+        // 或 NEXT_PUBLIC_DISABLE_TURNSTILE=true = 显式禁用
+        if (!siteKey || process.env.NEXT_PUBLIC_DISABLE_TURNSTILE === "true") {
+          token = "dev-skip";
         } else {
           setSubmitError("请完成人机验证挑战");
           return;
@@ -101,7 +103,7 @@ export default function RegisterPage() {
     signIn("google", { callbackUrl: "/new" });
   };
 
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA";
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
   return (
     <div className="space-y-6">

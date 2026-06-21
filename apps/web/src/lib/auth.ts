@@ -30,12 +30,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   /** 信任请求中的 Host 头（本地开发/反向代理环境必需） */
   trustHost: true,
-  secret: process.env.AUTH_SECRET || "hermesclaw-default-development-secret-key-32chars",
+  secret: process.env.AUTH_SECRET || (process.env.NODE_ENV === "development" ? "hermesclaw-dev-secret-do-not-use-in-production" : ""),
   providers: [
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID || "placeholder-client-id",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "placeholder-client-secret",
-      allowDangerousEmailAccountLinking: true, // 允许关联同邮箱的凭据账户与 Google 账户
+      clientId: process.env.GOOGLE_CLIENT_ID || "google-oauth-not-configured",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "google-oauth-not-configured",
+      allowDangerousEmailAccountLinking: false, // 禁止自动关联：用户必须显式登录后才关联 OAuth 账户
     }),
     Credentials({
       name: "credentials",

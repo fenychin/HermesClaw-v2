@@ -1,5 +1,12 @@
+/**
+ * Forgot Password API — 发送重置密码邮件
+ * Phase 2: 真实邮件服务 + Prisma Token 持久化（替换旧 console.log mock）
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
+import { sendPasswordResetEmail } from "@/lib/server/mail-service";
+import crypto from "crypto";
 import { z } from "zod";
 
 const forgotPasswordSchema = z.object({
@@ -8,9 +15,13 @@ const forgotPasswordSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    // Rate limit: 每分钟 3 次（防邮箱枚举）
+    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "127.0.0.1";
+    if (!rateLimit(`forgot-password:${ip}`, 3, 60_000)) {
+      return NextResponse.json({ error: "请求过于频繁，请稍后重试" }, { status: 429 });
+    }
 
-    // 校验输入
+    const body = await req.json();
     const validation = forgotPasswordSchema.safeParse(body);
     if (!validation.success) {
       const firstError = validation.error.issues[0]?.message || "邮箱格式有误";
@@ -20,27 +31,39 @@ export async function POST(req: NextRequest) {
     const { email } = validation.data;
 
     // 查找用户
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
-
+    const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return NextResponse.json({ error: "该邮箱尚未注册" }, { status: 400 });
+      // 防枚举：邮箱不存在也返回成功消息
+      return NextResponse.json({
+        success: true,
+        message: "如果该邮箱已注册，您将收到重置密码邮件",
+      });
     }
 
-    // 模拟生成重置 Token，并打印模拟链接
-    const mockToken = Math.random().toString(36).substring(2, 15);
-    const mockResetUrl = `${req.nextUrl.origin}/reset-password?token=${mockToken}&email=${encodeURIComponent(email)}`;
-    
-    console.log("=========================================");
-    console.log(`[AUTH] 忘记密码请求已收到。`);
-    console.log(`用户邮箱: ${email}`);
-    console.log(`模拟重置密码 URL: ${mockResetUrl}`);
-    console.log("=========================================");
+    // 生成密码重置 Token（1 小时有效）
+    const token = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 3600_000); // 1 小时
+
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        token,
+        expiresAt,
+      },
+    });
+
+    // 发送重置邮件
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+    const resetUrl = `${baseUrl}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+    const sent = await sendPasswordResetEmail(email, resetUrl);
+
+    if (!sent) {
+      return NextResponse.json({ error: "邮件发送失败，请稍后重试" }, { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,
-      message: "邮件已发送，请查收",
+      message: "如果该邮箱已注册，您将收到重置密码邮件",
     });
   } catch (error) {
     console.error("Forgot Password API error:", error);

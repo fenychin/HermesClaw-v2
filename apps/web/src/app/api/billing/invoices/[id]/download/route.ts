@@ -1,53 +1,51 @@
+/**
+ * Invoice Download API — 下载发票
+ * Phase 2: 从数据库查询真实发票 URL（替换旧 mock PDF）
+ */
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(
-  req: Request,
+  _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id: invoiceId } = await params;
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "请先登录" }, { status: 401 });
 
-  // 模拟发票 PDF 内容
-  const pdfContent = `%PDF-1.4
-1 0 obj
-<< /Title (Invoice ${invoiceId}) /Creator (HermesClaw Billing) >>
-endobj
-2 0 obj
-<< /Type /Catalog /Pages 3 0 R >>
-endobj
-3 0 obj
-<< /Type /Pages /Kids [4 0 R] /Count 1 >>
-endobj
-4 0 obj
-<< /Type /Page /Parent 3 0 R /MediaBox [0 0 612 792] /Contents 5 0 R >>
-endobj
-5 0 obj
-<< /Length 80 >>
-stream
-BT
-/F1 12 Tf
-72 712 Td
-(HermesClaw Invoice ${invoiceId} - Paid successfully) Tj
-ET
-endstream
-endobj
-xref
-0 6
-0000000000 65535 f 
-0000000009 00000 n 
-0000000078 00000 n 
-0000000127 00000 n 
-0000000188 00000 n 
-0000000282 00000 n 
-trailer
-<< /Size 6 /Root 2 0 R >>
-startxref
-381
-%%EOF`;
+  try {
+    const { id: invoiceId } = await params;
 
-  return new Response(pdfContent, {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename=invoice_${invoiceId}.pdf`,
-    },
-  });
+    // 查询真实发票
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: invoiceId, userId: session.user.id },
+      select: { stripeInvoiceUrl: true, stripeInvoicePdf: true },
+    });
+
+    if (!invoice) {
+      return NextResponse.json({ error: "发票不存在" }, { status: 404 });
+    }
+
+    // 如果有 Stripe URL，重定向到 Stripe
+    if (invoice.stripeInvoiceUrl) {
+      return NextResponse.redirect(invoice.stripeInvoiceUrl);
+    }
+
+    if (invoice.stripeInvoicePdf) {
+      // 代理下载 PDF
+      const response = await fetch(invoice.stripeInvoicePdf);
+      const pdfBuffer = await response.arrayBuffer();
+      return new Response(pdfBuffer, {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename=invoice_${invoiceId}.pdf`,
+        },
+      });
+    }
+
+    return NextResponse.json({ error: "发票文件不可用" }, { status: 404 });
+  } catch (error) {
+    console.error("Failed to download invoice:", error);
+    return NextResponse.json({ error: "下载失败" }, { status: 500 });
+  }
 }

@@ -1,17 +1,61 @@
-import { NextResponse } from "next/server";
+/**
+ * Rewards Tasks API — 获取奖励任务状态 + 完成任务
+ * Phase 2: 真实 Prisma 实现（替换旧 mock）
+ */
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { getUserRewards, completeRewardTask, type RewardTaskId } from "@/lib/server/credit-service";
+import { buildWorkspaceContext } from "@/lib/workspace";
+import { writeAuditLog } from "@/lib/server/audit";
 
 export async function GET() {
-  // 模拟返回 10 个积分任务的初始完成状态
-  return NextResponse.json([
-    { taskId: "task_connect_x", completed: false, completedAt: null },
-    { taskId: "task_connect_discord", completed: false, completedAt: null },
-    { taskId: "task_join_discord", completed: false, completedAt: null },
-    { taskId: "task_verify_email", completed: true, completedAt: "2026-06-18 10:00" },
-    { taskId: "task_create_workspace", completed: true, completedAt: "2026-06-18 10:05" },
-    { taskId: "task_bind_connector", completed: true, completedAt: "2026-06-19 14:20" },
-    { taskId: "task_run_workflow", completed: false, completedAt: null },
-    { taskId: "task_enable_pack", completed: false, completedAt: null },
-    { taskId: "task_daily_login", completed: false, completedAt: null },
-    { taskId: "task_run_workflow_daily", completed: false, completedAt: null }
-  ]);
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "请先登录" }, { status: 401 });
+  }
+
+  try {
+    const tasks = await getUserRewards(session.user.id);
+    return NextResponse.json(tasks);
+  } catch (error) {
+    console.error("Failed to fetch reward tasks:", error);
+    return NextResponse.json({ error: "获取任务失败" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "请先登录" }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    const { taskId } = body;
+    if (!taskId) {
+      return NextResponse.json({ error: "请指定任务 ID" }, { status: 400 });
+    }
+
+    const ctx = await buildWorkspaceContext(req);
+    const result = await completeRewardTask(session.user.id, ctx.workspaceId, taskId as RewardTaskId);
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+
+    // 审计留痕
+    await writeAuditLog({
+      actor: session.user.email || session.user.id,
+      action: "reward.task.completed",
+      targetType: "reward",
+      targetId: taskId,
+      detail: `完成任务获得 ${result.points} 积分`,
+      workspaceId: ctx.workspaceId,
+    });
+
+    return NextResponse.json({ success: true, points: result.points });
+  } catch (error) {
+    console.error("Failed to complete reward task:", error);
+    return NextResponse.json({ error: "完成任务失败" }, { status: 500 });
+  }
 }

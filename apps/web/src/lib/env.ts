@@ -13,7 +13,23 @@
  */
 export function verifyRequiredEnv(): string[] {
   const missing: string[] = [];
-  const required = ["ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY", "DATABASE_URL"];
+  const required = [
+    // 核心 API
+    "ANTHROPIC_API_KEY",
+    "DEEPSEEK_API_KEY",
+    "DATABASE_URL",
+  ];
+
+  // 生产环境额外强制要求的变量
+  if (process.env.NODE_ENV === "production") {
+    required.push(
+      "AUTH_SECRET",          // Auth.js JWT 签名密钥
+      "GOOGLE_CLIENT_ID",     // Google OAuth
+      "GOOGLE_CLIENT_SECRET",
+      "TURNSTILE_SECRET_KEY", // Cloudflare Turnstile
+    );
+  }
+
   for (const key of required) {
     if (!process.env[key] || process.env[key]!.trim() === "") {
       missing.push(key);

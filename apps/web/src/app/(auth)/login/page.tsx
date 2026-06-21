@@ -56,8 +56,10 @@ export default function LoginPage() {
     try {
       let token = data.turnstileToken;
       if (!token) {
-        if (process.env.NODE_ENV === "development") {
-          token = "dev-token-bypass";
+        // 无 Turnstile siteKey = 未配置 = 自动跳过
+        // 或 NEXT_PUBLIC_DISABLE_TURNSTILE=true = 显式禁用
+        if (!siteKey || process.env.NEXT_PUBLIC_DISABLE_TURNSTILE === "true") {
+          token = "dev-skip";
         } else {
           setSubmitError("请完成人机验证挑战");
           return;
@@ -103,7 +105,7 @@ export default function LoginPage() {
     signIn("google", { callbackUrl: "/new" });
   };
 
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA";
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
   return (
     <div className="space-y-6">
@@ -221,22 +223,23 @@ export default function LoginPage() {
         </div>
 
         {/* Turnstile 验证框 */}
-        <div className="bg-[#1F1F1F] p-3 border border-[#262626] rounded-[12px] flex flex-col items-center justify-center gap-1.5 min-h-[74px]">
-          {mounted && (
-            <Turnstile
-              siteKey={siteKey}
-              options={{ theme: "dark" }}
-              onSuccess={(token) => setValue("turnstileToken", token, { shouldValidate: true })}
-              onError={() => setValue("turnstileToken", "")}
-              onExpire={() => setValue("turnstileToken", "")}
-            />
-          )}
-          {process.env.NODE_ENV === "development" && (
-            <div className="text-[10px] text-[#B3B3B3]/40 text-center leading-normal select-none">
-              本地开发环境下，若验证码加载失败将自动启用免检绕过
-            </div>
-          )}
-        </div>
+        {siteKey ? (
+          <div className="bg-[#1F1F1F] p-3 border border-[#262626] rounded-[12px] flex flex-col items-center justify-center gap-1.5 min-h-[74px]">
+            {mounted && (
+              <Turnstile
+                siteKey={siteKey}
+                options={{ theme: "dark" }}
+                onSuccess={(token) => setValue("turnstileToken", token, { shouldValidate: true })}
+                onError={() => setValue("turnstileToken", "")}
+                onExpire={() => setValue("turnstileToken", "")}
+              />
+            )}
+          </div>
+        ) : (
+          <div className="text-[10px] text-[#B3B3B3]/40 text-center leading-normal select-none py-2">
+            人机验证已禁用（开发模式）
+          </div>
+        )}
 
         {/* CTA 按钮 */}
         <button

@@ -1,32 +1,58 @@
-import { NextResponse } from "next/server";
+/**
+ * Invites History API — 获取用户邀请历史
+ * Phase 2: 真实 Prisma 实现（替换旧 mock）
+ */
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const page = parseInt(searchParams.get("page") || "1");
-  const limit = parseInt(searchParams.get("limit") || "5");
+export async function GET(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "请先登录" }, { status: 401 });
+  }
 
-  // 模拟全量邀请记录数据
-  const allInvites = [
-    { email: "alex.wong@outlook.com", date: "2026-06-20 18:30", status: "Registered", points: 50 },
-    { email: "sarah_k@gmail.com", date: "2026-06-20 11:15", status: "Registered", points: 50 },
-    { email: "dev.li@tencent.com", date: "2026-06-19 09:40", status: "Pending", points: 0 },
-    { email: "j.smith@yahoo.com", date: "2026-06-18 22:12", status: "Registered", points: 50 },
-    { email: "hr_maria@baidu.com", date: "2026-06-17 15:04", status: "Registered", points: 50 },
-    { email: "tony_stark@stark.com", date: "2026-06-16 11:20", status: "Pending", points: 0 }
-  ];
+  try {
+    const { searchParams } = new URL(req.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "5");
 
-  const total = allInvites.length;
-  const startIndex = (page - 1) * limit;
-  const endIndex = page * limit;
-  const data = allInvites.slice(startIndex, endIndex);
+    const [data, total] = await Promise.all([
+      prisma.invite.findMany({
+        where: { inviterId: session.user.id },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          inviteeEmail: true,
+          status: true,
+          pointsAwarded: true,
+          createdAt: true,
+          registeredAt: true,
+        },
+      }),
+      prisma.invite.count({ where: { inviterId: session.user.id } }),
+    ]);
 
-  return NextResponse.json({
-    data,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit)
-    }
-  });
+    const formatted = data.map((inv) => ({
+      email: inv.inviteeEmail || "待填写",
+      date: inv.createdAt.toISOString().replace("T", " ").substring(0, 16),
+      status: inv.status === "registered" ? "Registered" : "Pending",
+      points: inv.pointsAwarded,
+    }));
+
+    return NextResponse.json({
+      data: formatted,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Failed to fetch invites:", error);
+    return NextResponse.json({ error: "获取邀请记录失败" }, { status: 500 });
+  }
 }

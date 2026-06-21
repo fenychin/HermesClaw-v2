@@ -299,7 +299,7 @@ export function AccountMenu() {
 
           {/* 文档 */}
           <a
-            href="/docs"
+            href="https://hermesclaw.ai/docs"
             target="_blank"
             rel="noopener noreferrer"
             onClick={closeMenu}

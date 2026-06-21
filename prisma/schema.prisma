@@ -1123,6 +1123,174 @@ model EmailSendLog {
   @@index([connectorId, createdAt])
 }
 
+// ============================================================
+// Phase 1 账单与订阅（账户中心 Billing）
+// —— 发布前审计新增：补齐 Subscription / Invoice / PaymentMethod 模型
+// ============================================================
+model Subscription {
+  id                     String   @id @default(cuid())
+  userId                 String
+  workspaceId            String
+  planId                 String   @default("free") // free | pro | pro_plus | max | ultra
+  status                 String   @default("active") // active | past_due | canceled | trialing
+  stripeSubscriptionId   String?  // Stripe Subscription ID
+  stripeCustomerId       String?  // Stripe Customer ID
+  stripePriceId          String?  // Stripe Price ID
+  currentPeriodStart     DateTime
+  currentPeriodEnd       DateTime
+  cancelAtPeriodEnd      Boolean  @default(false)
+  canceledAt             DateTime?
+  trialEndsAt            DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([stripeCustomerId])
+  @@index([status])
+}
+
+model Invoice {
+  id                String   @id @default(cuid())
+  userId            String
+  workspaceId       String
+  stripeInvoiceId   String?  // Stripe Invoice ID
+  stripeInvoiceUrl  String?  // Stripe Hosted Invoice URL
+  stripeInvoicePdf  String?  // Stripe Invoice PDF URL
+  subscriptionId    String?
+  amount            Float
+  currency          String   @default("usd")
+  status            String   @default("open") // draft | open | paid | void | uncollectible
+  invoiceDate       DateTime
+  paidAt            DateTime?
+  planName          String?  // e.g. "Professional 月付"
+  createdAt         DateTime @default(now())
+
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([status])
+}
+
+model PaymentMethod {
+  id                     String   @id @default(cuid())
+  userId                 String
+  stripePaymentMethodId  String?
+  brand                  String   // visa | mastercard | amex | etc
+  last4                  String   // 卡号末 4 位
+  expMonth               Int
+  expYear                Int
+  isDefault              Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ============================================================
+// Phase 1 积分与奖励（账户中心 Rewards）
+// ============================================================
+model CreditLedger {
+  id          String   @id @default(cuid())
+  userId      String
+  workspaceId String
+  amount      Float    // 正=收入, 负=支出
+  type        String   // subscription | daily_reward | reward_task | invite_bonus | purchase | usage
+  description String
+  referenceId String?  // 关联 taskId / inviteId / invoiceId
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([workspaceId, type])
+}
+
+model RewardLedger {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String
+  taskId      String    // 任务标识
+  rewardType  String    // connect_x | connect_discord | verify_email | create_workspace | etc
+  points      Int
+  status      String    @default("pending") // pending | awarded | rejected
+  awardedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, taskId]) // 去重：同一用户同一任务只能领取一次
+  @@index([userId])
+}
+
+model Invite {
+  id            String    @id @default(cuid())
+  inviterId     String    // 邀请人
+  inviteeEmail  String
+  inviteCode    String    @unique // 唯一邀请码
+  status        String    @default("pending") // pending | registered
+  pointsAwarded Int       @default(0)
+  createdAt     DateTime  @default(now())
+  registeredAt  DateTime?
+
+  @@index([inviterId, createdAt])
+}
+
+// ============================================================
+// Phase 1 密钥与偏好（账户中心 Settings）
+// ============================================================
+model Secret {
+  id             String   @id @default(cuid())
+  userId         String
+  workspaceId    String?
+  name           String
+  type           String   // api_key | token | password
+  encryptedValue String   // AES-256-GCM 加密后的值
+  scope          String   @default("[\"read\"]") // JSON 数组: ["read","write","admin","execute"]
+  lastUsedAt     DateTime?
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([workspaceId])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String?
+  name        String
+  prefix      String    // 存储前 12 字符用于列表显示
+  hash        String    // bcrypt hash of full key
+  permission  String    // read | write | admin
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([workspaceId])
+}
+
+model UserPreference {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  theme               String   @default("dark")
+  language            String   @default("zh-CN")
+  defaultWorkspaceId  String?
+  notificationSettings String  @default("{}") // JSON
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+// ============================================================
+// (保留原有 IndustryPackInstallation 模型)
+// ============================================================
 model IndustryPackInstallation {
   id             String @id @default(cuid())
   installationId String @unique

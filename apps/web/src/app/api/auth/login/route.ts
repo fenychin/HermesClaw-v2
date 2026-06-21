@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
@@ -10,7 +11,11 @@ const loginSchema = z.object({
 });
 
 async function validateTurnstile(token: string): Promise<boolean> {
-  const secret = process.env.TURNSTILE_SECRET_KEY || "1x0000000000000000000000000000000AA";
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  if (!secret) {
+    if (process.env.NODE_ENV === "development") return true; // 开发环境免检
+    throw new Error("TURNSTILE_SECRET_KEY is required");
+  }
   try {
     const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
       method: "POST",
@@ -29,6 +34,12 @@ async function validateTurnstile(token: string): Promise<boolean> {
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 每分钟 5 次登录尝试（防暴力破解）
+    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "127.0.0.1";
+    if (!rateLimit(`login:${ip}`, 5, 60_000)) {
+      return NextResponse.json({ error: "登录尝试过于频繁，请稍后重试" }, { status: 429 });
+    }
+
     const body = await req.json();
 
     // Zod 数据格式校验
@@ -40,9 +51,9 @@ export async function POST(req: NextRequest) {
 
     const { email, password, turnstileToken } = validation.data;
 
-    // Turnstile 验证：在本地开发环境下，如果为空或为 bypass token 则免检放行
+    // Turnstile 验证：生产环境强制验证；开发环境可通过 DISABLE_TURNSTILE=true 跳过
     let isTurnstileValid = false;
-    if (process.env.NODE_ENV === "development" && (!turnstileToken || turnstileToken === "dev-token-bypass")) {
+    if (process.env.DISABLE_TURNSTILE === "true") {
       isTurnstileValid = true;
     } else if (turnstileToken) {
       isTurnstileValid = await validateTurnstile(turnstileToken);
