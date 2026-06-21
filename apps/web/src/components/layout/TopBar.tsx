@@ -17,6 +17,7 @@ import {
 import { mainNav, bottomNav, brainNav } from "@/config/navigation";
 import { useUiStore, type Notification } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
+import { AccountMenu } from "@/components/layout/AccountMenu";
 
 // ============================================================
 // Mock 通知数据（模块级常量，不在渲染函数内）
@@ -279,29 +280,6 @@ const NotificationBell = memo(function NotificationBell() {
 // session 变化时只有此组件重渲染
 // ============================================================
 
-const UserAvatar = memo(function UserAvatar() {
-  const { data: session } = useSession();
-
-  const userName = session?.user?.name ?? "用户";
-  const userInitial = userName.charAt(0).toUpperCase();
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-muted-foreground hidden text-sm md:inline">
-        {userName}
-      </span>
-      <button
-        type="button"
-        className="hover:ring-brand/30 flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand-blue text-xs font-bold text-white ring-2 ring-transparent transition-all"
-        aria-label="用户菜单"
-        title={userName}
-      >
-        {userInitial}
-      </button>
-    </div>
-  );
-});
-
 // ============================================================
 // 子组件 4：CommandPaletteHint
 // 无 store 订阅；接收父组件传入的稳定 onClick 引用
@@ -367,7 +345,7 @@ export const TopBar = memo(function TopBar() {
       <div className="flex items-center gap-3">
         <CommandPaletteHint onClick={handleOpenCommandPalette} />
         <NotificationBell />
-        <UserAvatar />
+        <AccountMenu />
       </div>
     </header>
   );

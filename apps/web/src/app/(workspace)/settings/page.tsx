@@ -1,36 +1,21 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { PageHeader } from "@/components/common/page-header";
-
-/** 设置板块局部骨架屏占位图 */
-function SettingsRouteSkeleton() {
-  return (
-    <div className="flex flex-col h-full p-6 max-w-7xl mx-auto space-y-6">
-      <PageHeader title="设置" description="企业配置、模型路由、连接器授权与系统偏好" />
-      <div className="flex flex-1 gap-8 mt-6 min-h-0 overflow-hidden animate-pulse">
-        {/* 左侧导航占位 */}
-        <div className="w-48 shrink-0 space-y-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-10 bg-accent/40 border border-border/30 rounded-xl"
-            />
-          ))}
-        </div>
-        {/* 右侧主面板占位 */}
-        <div className="flex-1 bg-card/45 border border-border/30 rounded-2xl p-6 h-[450px]" />
-      </div>
-    </div>
-  );
-}
-
-// 动态懒加载设置客户端，禁用 SSR 以加快首次路由响应
-const SettingsPageClient = dynamic(() => import("./settings-page-client"), {
-  ssr: false,
-  loading: () => <SettingsRouteSkeleton />,
-});
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 export default function SettingsPage() {
-  return <SettingsPageClient />;
+  const router = useRouter();
+
+  useEffect(() => {
+    // 自动重定向至个人资料配置子页
+    router.replace("/settings/profile");
+  }, [router]);
+
+  return (
+    <div className="flex h-screen items-center justify-center bg-[#050505] text-[#B3B3B3] gap-2.5 select-none font-sans">
+      <Loader2 className="size-5 animate-spin text-[#6D5EF9]" />
+      <span className="text-sm">正在载入设置中心...</span>
+    </div>
+  );
 }

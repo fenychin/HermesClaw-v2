@@ -31,7 +31,7 @@ const DEV_BYPASS_ROUTES = ["/api/chat", "/api/task", "/api/conversations"];
 const WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
 
 /** 公开页面（无需登录即可访问） */
-const PUBLIC_PAGES = ["/login"];
+const PUBLIC_PAGES = ["/login", "/register", "/forgot-password"];
 
 /** 从请求 cookie 中读取 session token（兼容开发 / 生产 cookie 名） */
 function getSessionToken(request: NextRequest): string | undefined {

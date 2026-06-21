@@ -4,10 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, X, ArrowUpCircle, Sparkles } from "lucide-react";
 import { mainNav, bottomNav } from "@/config/navigation";
 import { siteConfig } from "@/config/site";
 import { useUiStore } from "@/stores/ui-store";
+import { useUser } from "@/hooks/use-user";
 import { SidebarNavItem } from "./sidebar-nav-item";
 import { SidebarRecent } from "./sidebar-recent";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,13 @@ export function Sidebar() {
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const mobileSidebarOpen = useUiStore((s) => s.mobileSidebarOpen);
   const setMobileSidebarOpen = useUiStore((s) => s.setMobileSidebarOpen);
+
+  // Zustand 全局状态
+  const { points, subscriptionPoints, plan } = useUser();
+
+  // 积分计算进度百分比 (最高 100%)
+  const totalPointsLimit = subscriptionPoints + 100;
+  const progressPercent = Math.min(100, Math.round((points / totalPointsLimit) * 100));
 
   /** 响应式检测：< 1024px 为移动端 */
   const [isMobile, setIsMobile] = useState(false);
@@ -130,14 +138,74 @@ export function Sidebar() {
 
       {/* 左下角固定设置 */}
       <div className="mt-auto space-y-1 px-3 py-3 shrink-0">
-        {bottomNav.map((item) => (
+        {/* 1. 推荐奖励 */}
+        {(() => {
+          const rewardsItem = bottomNav.find((item) => item.href === "/rewards");
+          if (!rewardsItem) return null;
+          return (
+            <SidebarNavItem
+              key={rewardsItem.href}
+              item={rewardsItem}
+              collapsed={sidebarCollapsed}
+              isActive={isActive(rewardsItem.href)}
+            />
+          );
+        })()}
+
+        {/* 2. 升级套餐卡片 (展开态为卡片，折叠态为图标) */}
+        {!sidebarCollapsed ? (
+          <div className="bg-[#171717] border border-[#262626] rounded-xl p-3 my-2 mx-1 select-none">
+            <div className="flex justify-between items-center text-xs font-semibold mb-2">
+              <span className="flex items-center gap-1 text-[#F5F5F5]">
+                <Sparkles className="size-3.5 text-[#6D5EF9] fill-[#6D5EF9]" />
+                {plan === "pro" ? "专业套餐" : plan === "enterprise" ? "企业套餐" : "免费套餐"}
+              </span>
+              <span className="text-[#B3B3B3]">
+                <strong className="text-[#F5F5F5] font-bold">{points}</strong> 积分
+              </span>
+            </div>
+            {/* 积分条 */}
+            <div className="w-full h-1 bg-[#262626] rounded-full overflow-hidden mb-3">
+              <div 
+                className="h-full bg-[#6D5EF9] rounded-full transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            {/* 升级大按钮 */}
+            <Link
+              href="/billing/plans"
+              className="w-full h-9 bg-[#1F1F1F] text-[#F5F5F5] border border-[#262626] hover:bg-[#2A2A2A] hover:border-[#333333] transition-all rounded-[10px] text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <ArrowUpCircle className="size-4 text-[#6D5EF9]" />
+              <span>升级套餐</span>
+            </Link>
+          </div>
+        ) : (
           <SidebarNavItem
-            key={item.href}
-            item={item}
-            collapsed={sidebarCollapsed}
-            isActive={isActive(item.href)}
+            item={{
+              href: "/billing/plans",
+              label: "升级套餐",
+              icon: ArrowUpCircle,
+              description: "升级您的套餐计划"
+            }}
+            collapsed={true}
+            isActive={isActive("/billing/plans")}
           />
-        ))}
+        )}
+
+        {/* 3. ⚙️ 设置 */}
+        {(() => {
+          const settingsItem = bottomNav.find((item) => item.href === "/settings");
+          if (!settingsItem) return null;
+          return (
+            <SidebarNavItem
+              key={settingsItem.href}
+              item={settingsItem}
+              collapsed={sidebarCollapsed}
+              isActive={isActive(settingsItem.href)}
+            />
+          );
+        })()}
       </div>
     </div>
   );

@@ -10,18 +10,22 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Turnstile } from "@marsidev/react-turnstile";
 import Link from "next/link";
 
-const loginSchema = z.object({
+const registerSchema = z.object({
   email: z.string().email("请输入有效的邮箱地址"),
-  password: z.string().min(1, "密码不能为空"),
-  rememberMe: z.boolean().optional(),
+  password: z.string().min(6, "密码长度不能少于 6 位"),
+  confirmPassword: z.string(),
   turnstileToken: z.string().optional(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "两次输入的密码不一致",
+  path: ["confirmPassword"],
 });
 
-type LoginFormValues = z.infer<typeof loginSchema>;
+type RegisterFormValues = z.infer<typeof registerSchema>;
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [mounted, setMounted] = useState(false);
 
@@ -34,17 +38,17 @@ export default function LoginPage() {
     handleSubmit,
     setValue,
     formState: { errors, isSubmitting },
-  } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+  } = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
     defaultValues: {
       email: "",
       password: "",
-      rememberMe: false,
+      confirmPassword: "",
       turnstileToken: "",
     },
   });
 
-  const onSubmit = async (data: LoginFormValues) => {
+  const onSubmit = async (data: RegisterFormValues) => {
     setSubmitError("");
     try {
       let token = data.turnstileToken;
@@ -57,23 +61,24 @@ export default function LoginPage() {
         }
       }
 
-      // 1. 调用本地登录 API 路由（执行 Turnstile 校验与密码比对）
-      const res = await fetch("/api/auth/login", {
+      // 1. 调用注册 API 路由
+      const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: data.email,
           password: data.password,
+          confirmPassword: data.confirmPassword,
           turnstileToken: token,
         }),
       });
 
       const result = await res.json();
       if (!res.ok) {
-        throw new Error(result.error || "登录校验失败");
+        throw new Error(result.error || "注册校验失败");
       }
 
-      // 2. 校验成功，在 next-auth 中登录并写入 session cookie
+      // 2. 注册成功后，自动调用 signIn 进行登录，以便下一阶段有 session 状态
       const signInRes = await signIn("credentials", {
         email: data.email,
         password: data.password,
@@ -81,14 +86,14 @@ export default function LoginPage() {
       });
 
       if (signInRes?.error) {
-        throw new Error("同步登录会话失败，请重试");
+        throw new Error("注册成功，但自动登录失败，请手动登录");
       }
 
-      // 3. 跳转至控制台
-      router.push("/new");
+      // 3. 重定向到引导页 /onboarding
+      router.push("/onboarding");
       router.refresh();
     } catch (err: any) {
-      setSubmitError(err.message || "登录失败，请稍后重试");
+      setSubmitError(err.message || "注册失败，请稍后重试");
     }
   };
 
@@ -103,10 +108,10 @@ export default function LoginPage() {
       {/* 标题 */}
       <div className="text-center lg:text-left select-none">
         <div className="text-[#F5F5F5] text-2xl font-bold tracking-tight">
-          欢迎回来
+          创建账户
         </div>
         <div className="text-[#B3B3B3] text-xs mt-1">
-          请选择您的登录方式继续
+          填写您的基本信息以建立新账户
         </div>
       </div>
 
@@ -117,7 +122,7 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* Google OAuth 登录按钮 */}
+      {/* Google OAuth 注册按钮 */}
       <button
         type="button"
         onClick={handleGoogleLogin}
@@ -141,7 +146,7 @@ export default function LoginPage() {
             d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
           />
         </svg>
-        使用 Google 登录
+        使用 Google 注册
       </button>
 
       {/* 分割线 */}
@@ -151,7 +156,7 @@ export default function LoginPage() {
         <div className="flex-1 h-px bg-[#262626]" />
       </div>
 
-      {/* 登录表单 */}
+      {/* 注册表单 */}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {/* 邮箱 */}
         <div className="flex flex-col gap-1.5">
@@ -171,19 +176,13 @@ export default function LoginPage() {
 
         {/* 密码 */}
         <div className="flex flex-col gap-1.5">
-          <div className="flex justify-between items-center select-none">
-            <label className="text-[#F5F5F5] text-xs font-semibold">密码</label>
-            <Link
-              href="/forgot-password"
-              className="text-[#6D5EF9] text-xs hover:underline"
-            >
-              忘记密码？
-            </Link>
-          </div>
+          <label className="text-[#F5F5F5] text-xs font-semibold select-none">
+            设置密码
+          </label>
           <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
-              placeholder="••••••••"
+              placeholder="最少 6 位密码"
               {...register("password")}
               className="w-full h-10 pl-3 pr-10 text-sm bg-transparent border border-[#262626] rounded-[12px] text-[#F5F5F5] placeholder:text-[#B3B3B3]/40 outline-none transition-all focus-visible:border-[#6D5EF9] focus-visible:ring-2 focus-visible:ring-[#6D5EF9]/20"
             />
@@ -200,17 +199,29 @@ export default function LoginPage() {
           )}
         </div>
 
-        {/* 记住我 */}
-        <div className="flex items-center gap-2 select-none py-1">
-          <input
-            id="rememberMe"
-            type="checkbox"
-            {...register("rememberMe")}
-            className="size-4 rounded-[4px] border-[#262626] bg-transparent text-[#6D5EF9] focus:ring-[#6D5EF9]/20 focus:ring-2 cursor-pointer"
-          />
-          <label htmlFor="rememberMe" className="text-[#B3B3B3] text-xs cursor-pointer">
-            记住我
+        {/* 确认密码 */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[#F5F5F5] text-xs font-semibold select-none">
+            确认密码
           </label>
+          <div className="relative">
+            <input
+              type={showConfirmPassword ? "text" : "password"}
+              placeholder="请再次输入密码"
+              {...register("confirmPassword")}
+              className="w-full h-10 pl-3 pr-10 text-sm bg-transparent border border-[#262626] rounded-[12px] text-[#F5F5F5] placeholder:text-[#B3B3B3]/40 outline-none transition-all focus-visible:border-[#6D5EF9] focus-visible:ring-2 focus-visible:ring-[#6D5EF9]/20"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#B3B3B3] hover:text-[#F5F5F5] transition-colors"
+            >
+              {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
+          {errors.confirmPassword && (
+            <span className="text-[#ff6b6b] text-xs leading-none mt-0.5">{errors.confirmPassword.message}</span>
+          )}
         </div>
 
         {/* Turnstile 验证框 */}
@@ -240,25 +251,25 @@ export default function LoginPage() {
           {isSubmitting ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" />
-              正在登录...
+              正在创建账户...
             </>
           ) : (
-            "登 录"
+            "创建账户"
           )}
         </button>
       </form>
 
       {/* 底部跳转 */}
       <div className="text-center text-xs select-none">
-        <span className="text-[#B3B3B3]">还没有账号？</span>
-        <Link href="/register" className="text-[#6D5EF9] hover:underline font-semibold ml-1">
-          注册
+        <span className="text-[#B3B3B3]">已有账号？</span>
+        <Link href="/login" className="text-[#6D5EF9] hover:underline font-semibold ml-1">
+          登录
         </Link>
       </div>
 
       {/* 服务条款 & 隐私政策 */}
       <div className="text-center text-[10px] text-[#B3B3B3]/40 leading-normal pt-2 select-none">
-        登录即表示您同意我们的
+        注册即表示您同意我们的
         <br />
         <Link href="/terms" className="text-[#6D5EF9]/60 hover:text-[#6D5EF9] transition-colors">服务条款</Link>
         与

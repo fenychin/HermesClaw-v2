@@ -21,6 +21,7 @@ import {
   // 设置子导航图标
   ShieldCheck,
   Users,
+  Gift,
 } from "lucide-react";
 
 /** 单个导航项 */
@@ -87,6 +88,7 @@ export const navSections: NavSection[] = [
 
 /** 左下角固定导航（PRD 9.1：设置固定左下角） */
 export const bottomNav: NavItem[] = [
+  { href: "/rewards", label: "推荐奖励", icon: Gift, description: "在 HermesClaw 赚取积分的所有方式" },
   { href: "/settings", label: "设置", icon: Settings, description: "企业、团队、模型路由与升级审批" },
 ];
 
