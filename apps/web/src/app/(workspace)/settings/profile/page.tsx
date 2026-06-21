@@ -61,7 +61,12 @@ export default function ProfileSettingsPage() {
         const res = await fetch("/api/settings/profile");
         if (res.ok) {
           const data = await res.json();
-          setProfile(data);
+          if (data && data.connections) {
+            setProfile({
+              twitter: data.connections.twitter || { connected: false, username: "" },
+              discord: data.connections.discord || { connected: false, username: "" },
+            });
+          }
         }
       } catch (err) {
         toast.error("拉取个人资料失败");
@@ -257,7 +262,9 @@ export default function ProfileSettingsPage() {
                 <div className="text-[#F5F5F5] text-sm font-semibold">X (Twitter)</div>
                 <div className="text-xs text-[#B3B3B3] mt-0.5 truncate max-w-[200px] select-all">
                   {profile.twitter.connected
-                    ? `${profile.twitter.username} (连接于 ${profile.twitter.connectedAt})`
+                    ? profile.twitter.connectedAt
+                      ? `${profile.twitter.username} (连接于 ${profile.twitter.connectedAt})`
+                      : profile.twitter.username
                     : "未连接"}
                 </div>
               </div>
@@ -293,7 +300,9 @@ export default function ProfileSettingsPage() {
                 <div className="text-[#F5F5F5] text-sm font-semibold">Discord</div>
                 <div className="text-xs text-[#B3B3B3] mt-0.5 truncate max-w-[200px] select-all">
                   {profile.discord.connected
-                    ? `${profile.discord.username} (连接于 ${profile.discord.connectedAt})`
+                    ? profile.discord.connectedAt
+                      ? `${profile.discord.username} (连接于 ${profile.discord.connectedAt})`
+                      : profile.discord.username
                     : "未连接"}
                 </div>
               </div>
