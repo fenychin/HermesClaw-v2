@@ -78,11 +78,15 @@ function toAgentData(api: any): AgentData {
   };
 }
 
-export default function AgentsPage() {
+export default function AgentsPage({
+  initialData,
+}: {
+  initialData?: AgentData[];
+}) {
   // 当前展开的智能体 ID
   const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
 
-  // PERF: 稳定化 toggle handler，防止 AgentCard memo 因每次渲染产生新函数引用而失效
+  // PERF: 稳定化 toggle handler
   const handleToggleExpand = useCallback((agentId: string) => {
     setExpandedAgentId((prev) => (prev === agentId ? null : agentId));
   }, []);
@@ -105,6 +109,8 @@ export default function AgentsPage() {
     },
     staleTime: 60_000,
     retry: 3,
+    // R5: 服务端预取的数据直接作为初始值，消除客户端加载闪烁
+    placeholderData: initialData,
   });
 
   const displayAgents: AgentData[] = agents ?? [];

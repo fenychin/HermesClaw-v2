@@ -279,12 +279,49 @@ export interface DashboardOverviewInput {
   period: string;
 }
 
+// ==============================
+// Dashboard Overview 内存缓存
+// ↓ P0-1 修复：避免每次请求跑 29+ 次串行化 SQLite 查询
+//   缓存 key = workspaceId::period，TTL = 30s（对应前端轮询间隔）
+//   30s 内命中直接返回，完全跳过所有 DB 操作
+// ==============================
+
+interface DashboardCacheEntry {
+  data: any;
+  expiresAt: number;
+}
+
+const overviewCache = new Map<string, DashboardCacheEntry>();
+const DASHBOARD_CACHE_TTL_MS = 30_000; // 30 秒
+// 定时清理过期条目：每 5 分钟清理一次，防止内存泄漏
+let lastCacheCleanup = 0;
+const CACHE_CLEANUP_INTERVAL_MS = 300_000;
+
+function cleanExpiredCacheEntries(): void {
+  const now = Date.now();
+  if (now - lastCacheCleanup < CACHE_CLEANUP_INTERVAL_MS) return;
+  lastCacheCleanup = now;
+  for (const [key, entry] of overviewCache) {
+    if (entry.expiresAt < now) overviewCache.delete(key);
+  }
+}
+
 export async function getDashboardOverview(
   input: DashboardOverviewInput,
   deps: DashboardHandlerDeps,
 ): Promise<any> {
   const { workspaceId } = input;
   const periodDays = input.period === "30d" ? 30 : 7;
+
+  // ↓ 缓存检查：命中则直接返回，跳过所有 DB 查询
+  cleanExpiredCacheEntries();
+  const cacheKey = `${workspaceId}::${input.period}`;
+  const cached = overviewCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    // 更新返回时间戳（客户端判断数据时效）
+    return { ...cached.data, updatedAt: new Date().toISOString() };
+  }
+
   const now = new Date();
   const { prisma: p } = deps;
   const currentStart = new Date(now.getTime() - periodDays * 86400000);
@@ -310,13 +347,48 @@ export async function getDashboardOverview(
   };
   const getInstalledPackCount = () => p.industryPackInstallation.count({ where: { workspaceId, status: "installed" } });
 
-  const getRate = async (actionOk: string, actionFail: string, start: Date, end: Date) => {
-    const [ok, fail] = await Promise.all([
-      p.auditLog.count({ where: { workspaceId, action: actionOk, createdAt: { gte: start, lte: end } } }),
-      p.auditLog.count({ where: { workspaceId, action: actionFail, createdAt: { gte: start, lte: end } } }),
-    ]);
-    return ok + fail > 0 ? ok / (ok + fail) : 1.0;
-  };
+  // ── P1-1 修复：合并审计日志查询 ──
+  // 原 8 次 getRate() × 2 次 auditLog.count() = 16 次独立查询
+  // → 用 groupBy batch 查询一次获取所有 action 计数，降为 2 次查询
+  type AuditAction =
+    | "approval.granted" | "approval.rejected"
+    | "harness.rollback.completed" | "harness.rollback.aborted"
+    | "email.sent" | "email.failed"
+    | "canary.promoted" | "canary.aborted"
+    | "approval.requested"
+    | "EvalCompleted" | "EvalAnomalyDetected";
+
+  async function batchAuditCounts(start: Date, end: Date): Promise<Map<string, number>> {
+    const groups = await p.auditLog.groupBy({
+      by: ["action"],
+      where: { workspaceId, action: { in: [
+        "approval.granted", "approval.rejected",
+        "harness.rollback.completed", "harness.rollback.aborted",
+        "email.sent", "email.failed",
+        "canary.promoted", "canary.aborted",
+        "approval.requested",
+        "EvalCompleted", "EvalAnomalyDetected",
+      ]}, createdAt: { gte: start, lte: end } },
+      _count: { action: true },
+    });
+    const map = new Map<string, number>();
+    for (const g of groups as any[]) map.set(g.action, g._count.action);
+    return map;
+  }
+
+  function calcRate(ok: string, fail: string, counts: Map<string, number>): number {
+    const okCount = counts.get(ok) ?? 0;
+    const failCount = counts.get(fail) ?? 0;
+    return okCount + failCount > 0 ? okCount / (okCount + failCount) : 1.0;
+  }
+
+  // 合并：当前周期 + 前一周期的审计查询同时发出
+  const [auditCurrent, auditPrev, audit30d, audit60d] = await Promise.all([
+    batchAuditCounts(currentStart, now),
+    batchAuditCounts(prevStart, prevEnd),
+    batchAuditCounts(thirtyDaysAgo, now),
+    batchAuditCounts(sixtyDaysAgo, thirtyDaysAgo),
+  ]);
   const getTaskCompletionRate = async (start: Date, end: Date) => {
     const [c, t] = await Promise.all([
       p.workflowRun.count({ where: { workspaceId, status: "completed", createdAt: { gte: start, lte: end } } }),
@@ -351,16 +423,19 @@ export async function getDashboardOverview(
     getAvgDailyTasks(currentStart, now),
     getWorkflowRunsByStatus(),
     getInstalledPackCount(),
-    getRate("approval.granted", "approval.rejected", thirtyDaysAgo, now),
-    getRate("harness.rollback.completed", "harness.rollback.aborted", thirtyDaysAgo, now),
+    // ↓ calcRate 从合并审计查询结果（audit30d / auditCurrent）中提取
+    Promise.resolve(calcRate("approval.granted", "approval.rejected", audit30d)),
+    Promise.resolve(calcRate("harness.rollback.completed", "harness.rollback.aborted", audit30d)),
     getTaskCompletionRate(currentStart, now),
-    getRate("email.sent", "email.failed", currentStart, now),
+    Promise.resolve(calcRate("email.sent", "email.failed", auditCurrent)),
     (async () => { const runs = await p.workflowRun.findMany({ where: { workspaceId, status: "completed", durationMs: { not: null }, createdAt: { gte: currentStart, lte: now } }, select: { durationMs: true } }); return runs.length > 0 ? runs.reduce((s: number, r: any) => s + (r.durationMs || 0), 0) / runs.length : 1200; })(),
-    (async () => { const [reqs, total] = await Promise.all([p.auditLog.count({ where: { workspaceId, action: "approval.requested", createdAt: { gte: currentStart, lte: now } } }), p.workflowRun.count({ where: { workspaceId, createdAt: { gte: currentStart, lte: now } } })]); return total > 0 ? reqs / total : 0.0; })(),
+    // humanInterventionRate: approval.requested / total workflow runs
+    (async () => { const reqs = auditCurrent.get("approval.requested") ?? 0; const total = await p.workflowRun.count({ where: { workspaceId, createdAt: { gte: currentStart, lte: now } } }); return total > 0 ? reqs / total : 0.0; })(),
     (async () => { const [c, w] = await Promise.all([p.stepRun.count({ where: { workspaceId, status: "completed", createdAt: { gte: currentStart, lte: now } } }), p.stepRun.count({ where: { workspaceId, status: "completed", outputData: { not: null }, createdAt: { gte: currentStart, lte: now } } })]); return c > 0 ? w / c : 1.0; })(),
     getProposalAdoptionRate(thirtyDaysAgo, now),
-    getRate("canary.promoted", "canary.aborted", thirtyDaysAgo, now),
-    (async () => { const [cc, ac] = await Promise.all([p.auditLog.count({ where: { workspaceId, action: "EvalCompleted", createdAt: { gte: thirtyDaysAgo, lte: now } } }), p.auditLog.count({ where: { workspaceId, action: "EvalAnomalyDetected", detail: { contains: "memoryHitRate" }, createdAt: { gte: thirtyDaysAgo, lte: now } } })]); return cc > 0 ? Math.max(0.70, 1.0 - (ac / cc) * 0.30) : 0.88; })(),
+    Promise.resolve(calcRate("canary.promoted", "canary.aborted", audit30d)),
+    // avgMemoryHitRate: 从批量审计结果计算
+    (() => { const cc = audit30d.get("EvalCompleted") ?? 0; const ac = audit30d.get("EvalAnomalyDetected") ?? 0; return cc > 0 ? Math.max(0.70, 1.0 - (ac / cc) * 0.30) : 0.88; })(),
     getDailyWorkflowRuns(),
   ]);
 
@@ -370,19 +445,21 @@ export async function getDashboardOverview(
   ] = await Promise.all([
     getActiveWorkspaces(new Date(currentStart.getTime() - 7 * 86400000), currentStart),
     getAvgDailyTasks(prevStart, prevEnd),
-    getRate("approval.granted", "approval.rejected", sixtyDaysAgo, thirtyDaysAgo),
-    getRate("harness.rollback.completed", "harness.rollback.aborted", sixtyDaysAgo, thirtyDaysAgo),
+    // ↓ calcRate 从合并审计查询结果（audit60d / auditPrev）中提取
+    Promise.resolve(calcRate("approval.granted", "approval.rejected", audit60d)),
+    Promise.resolve(calcRate("harness.rollback.completed", "harness.rollback.aborted", audit60d)),
     getTaskCompletionRate(prevStart, prevEnd),
-    getRate("email.sent", "email.failed", prevStart, prevEnd),
+    Promise.resolve(calcRate("email.sent", "email.failed", auditPrev)),
     (async () => { const runs = await p.workflowRun.findMany({ where: { workspaceId, status: "completed", durationMs: { not: null }, createdAt: { gte: prevStart, lte: prevEnd } }, select: { durationMs: true } }); return runs.length > 0 ? runs.reduce((s: number, r: any) => s + (r.durationMs || 0), 0) / runs.length : 1200; })(),
-    (async () => { const [reqs, total] = await Promise.all([p.auditLog.count({ where: { workspaceId, action: "approval.requested", createdAt: { gte: prevStart, lte: prevEnd } } }), p.workflowRun.count({ where: { workspaceId, createdAt: { gte: prevStart, lte: prevEnd } } })]); return total > 0 ? reqs / total : 0.0; })(),
+    // prevHumanInterventionRate: approval.requested / total prev workflow runs
+    (async () => { const reqs = auditPrev.get("approval.requested") ?? 0; const total = await p.workflowRun.count({ where: { workspaceId, createdAt: { gte: prevStart, lte: prevEnd } } }); return total > 0 ? reqs / total : 0.0; })(),
     (async () => { const [c, w] = await Promise.all([p.stepRun.count({ where: { workspaceId, status: "completed", createdAt: { gte: prevStart, lte: prevEnd } } }), p.stepRun.count({ where: { workspaceId, status: "completed", outputData: { not: null }, createdAt: { gte: prevStart, lte: prevEnd } } })]); return c > 0 ? w / c : 1.0; })(),
     getProposalAdoptionRate(sixtyDaysAgo, thirtyDaysAgo),
-    getRate("canary.promoted", "canary.aborted", sixtyDaysAgo, thirtyDaysAgo),
-    (async () => { const [cc, ac] = await Promise.all([p.auditLog.count({ where: { workspaceId, action: "EvalCompleted", createdAt: { gte: sixtyDaysAgo, lte: thirtyDaysAgo } } }), p.auditLog.count({ where: { workspaceId, action: "EvalAnomalyDetected", detail: { contains: "memoryHitRate" }, createdAt: { gte: sixtyDaysAgo, lte: thirtyDaysAgo } } })]); return cc > 0 ? Math.max(0.70, 1.0 - (ac / cc) * 0.30) : 0.88; })(),
+    Promise.resolve(calcRate("canary.promoted", "canary.aborted", audit60d)),
+    (() => { const cc = audit60d.get("EvalCompleted") ?? 0; const ac = audit60d.get("EvalAnomalyDetected") ?? 0; return cc > 0 ? Math.max(0.70, 1.0 - (ac / cc) * 0.30) : 0.88; })(),
   ]);
 
-  return {
+  const result = {
     platform: { activeWorkspaces, avgDailyTasks, workflowRunsByStatus, installedPackCount, proposalApprovalRate, rollbackRate },
     execution: { taskCompletionRate, connectorSuccessRate, avgEventLatencyMs, humanInterventionRate, receiptCompletenessRate },
     evolution: { proposalAdoptionRate, canarySuccessRate, avgMemoryHitRate },
@@ -394,4 +471,9 @@ export async function getDashboardOverview(
     dailyWorkflowRuns,
     updatedAt: new Date().toISOString(),
   };
+
+  // 写入缓存（TTL = 30s）
+  overviewCache.set(cacheKey, { data: result, expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS });
+
+  return result;
 }

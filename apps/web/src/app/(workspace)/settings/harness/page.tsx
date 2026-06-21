@@ -52,7 +52,7 @@ function filterByTab(
  *    所有 Harness 变更均须经由人类审批（§3.1），此页面为审批操作的唯一 UI 入口
  */
 export default function HarnessApprovalPage() {
-  const { harnessProposals: proposals, loadProposals: fetchProposals, approveProposal, rejectProposal } = useTradeStore();
+  const { harnessProposals: proposals = [], loadProposals: fetchProposals, approveProposal, rejectProposal } = useTradeStore();
   const [activeTab, setActiveTab] = useState<TabValue>("pending");
 
   useEffect(() => {

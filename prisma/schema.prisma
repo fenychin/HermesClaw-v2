@@ -232,6 +232,7 @@ model Project {
   @@index([workspaceId])
   @@index([status])
   @@index([type])
+  @@index([workspaceId, createdAt])
 }
 
 // ============================================================
@@ -396,6 +397,8 @@ model HarnessProposal {
   @@index([targetSkillId])
   @@index([createdAt])
   @@index([canaryStartedAt])
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, createdAt])
 }
 
 // ============================================================
@@ -455,6 +458,8 @@ model AuditLog {
   @@index([workspaceId])
   @@index([status])
   @@index([automationLevel])
+  @@index([workspaceId, action, createdAt])
+  @@index([workspaceId, createdAt])
 }
 
 // ============================================================
@@ -475,6 +480,8 @@ model Inquiry {
   createdAt   DateTime  @default(now())
 
   @@index([workspaceId])
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, priority])
 }
 
 // ============================================================
@@ -495,6 +502,7 @@ model MarketIntelligence {
   createdAt       DateTime  @default(now())
 
   @@index([workspaceId])
+  @@index([workspaceId, publishedAt])
 }
 
 // ============================================================
@@ -675,6 +683,7 @@ model WorkflowRun {
   @@index([workspaceId, status, createdAt])
   @@index([workflowId, status])
   @@index([workflowId, workspaceId, createdAt(sort: Desc)])
+  @@index([workspaceId, createdAt])
 }
 
 // 单节点运行记录（与 AuditLog/AgentLog 互补，承载结构化 IO）
@@ -736,6 +745,8 @@ model StepRun {
 
   @@index([runId, status])
   @@index([workspaceId, nodeType])
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, createdAt])
 }
 
 model OrchestrationSession {

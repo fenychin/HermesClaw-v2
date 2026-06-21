@@ -1,47 +1,48 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./TopBar";
-import { OpenClawStreamBridge } from "./openclaw-stream-bridge";
 import { useAgentStore } from "@/stores/agent-store";
 import { useProjectStore } from "@/stores/project-store";
 import { useTradeStore } from "@/stores/trade-store";
 
+// PERF: SSE 连接逻辑懒加载 — 从 main-app.js 移除 useOpenClawStream (~5KB)
+const OpenClawStreamBridge = dynamic(() => import("./openclaw-stream-bridge").then(m => ({ default: m.OpenClawStreamBridge })), { ssr: false });
+
 /** 工作台外壳：左侧侧边栏 + 右侧（TopBar + 主内容滚动区） */
 export function AppShell({ children }: { children: ReactNode }) {
 
-  // 全局预加载智能体和项目数据（供侧边栏、命令框等全局组件使用）
-  // —— 用 getState() 读取，避免订阅 store 触发额外渲染；
-  //    幂等守卫：已加载过则不重复拉取（外壳重新挂载时复用已有数据）
-  //    延迟至空闲时段执行，避免阻塞首屏渲染与路由切换
+  // ── 分级渲染策略 (R5) ──
+  //   L0 (<100ms): 页面内容渲染 — 用户看到的第一个有效帧
+  //   L1 (1.5s):  侧边栏 Store 预热 — 错峰加载，不抢占页面数据请求
+  //   冷却期 2min，避免路由切换时重复请求
   useEffect(() => {
-    /** 共享预热逻辑，由 requestIdleCallback 或降级 setTimeout 调用 */
+    const COOLDOWN_MS = 120_000;
+
     function warmup() {
+      const now = Date.now();
       const agentState = useAgentStore.getState();
-      if (agentState.agents.length === 0 && !agentState.loading) {
+      if (agentState.agents.length === 0 && !agentState.loading && (now - ((agentState as any)._lastLoadedAt ?? 0)) > COOLDOWN_MS) {
         agentState.loadAgents();
+        (agentState as any)._lastLoadedAt = now;
       }
       const projectState = useProjectStore.getState();
-      if (projectState.projects.length === 0 && !projectState.loading) {
+      if (projectState.projects.length === 0 && !projectState.loading && (now - ((projectState as any)._lastLoadedAt ?? 0)) > COOLDOWN_MS) {
         projectState.loadProjects();
+        (projectState as any)._lastLoadedAt = now;
       }
       const tradeState = useTradeStore.getState();
-      if (tradeState.intelligence.length === 0 && !tradeState.loading) {
+      if (tradeState.intelligence.length === 0 && !tradeState.loading && (now - ((tradeState as any)._lastLoadedAt ?? 0)) > COOLDOWN_MS) {
         tradeState.loadIntelligence();
+        (tradeState as any)._lastLoadedAt = now;
       }
     }
 
-    // Safari 不支持 requestIdleCallback，降级为 setTimeout 200ms
-    if (typeof requestIdleCallback === "undefined") {
-      const t = window.setTimeout(warmup, 200);
-      return () => window.clearTimeout(t);
-    }
-
-    // 首屏渲染完成后，在浏览器第一个空闲时段立即预热
-    // timeout: 1000 确保即使没有空闲时段，1 秒内也强制执行
-    const idleId = requestIdleCallback(warmup, { timeout: 1000 });
-    return () => cancelIdleCallback(idleId);
+    // L1: 页面渲染完成后 1.5s 再预热侧边栏数据
+    const t = window.setTimeout(warmup, 1500);
+    return () => window.clearTimeout(t);
   }, []);
 
   return (

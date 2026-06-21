@@ -1,9 +1,11 @@
-import { PageHeader } from "@/components/common/page-header";
-
+/**
+ * 动态大盘 Loading 骨架屏
+ * ── 零外部依赖
+ */
 export default function DashboardLoading() {
   return (
     <div className="p-6 space-y-6">
-      <PageHeader title="行业动态" description="外贸动态经营与数据概览" />
+      <div className="h-7 w-48 bg-accent/40 rounded animate-pulse" />
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="bg-card rounded-2xl border border-border p-5 h-[104px] animate-pulse" />

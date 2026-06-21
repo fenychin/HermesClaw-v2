@@ -7,8 +7,15 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { Turnstile } from "@marsidev/react-turnstile";
+import dynamic from "next/dynamic";
 import Link from "next/link";
+
+// PERF: Turnstile 懒加载 (12MB main-app.js 的显著贡献者)
+// Cloudflare Turnstile 脚本在浏览器端加载，SSR 时不需要
+const Turnstile = dynamic(
+  () => import("@marsidev/react-turnstile").then((mod) => mod.Turnstile),
+  { ssr: false, loading: () => <div className="h-[65px] bg-[#1F1F1F] border border-[#262626] rounded-[12px] animate-pulse" /> }
+);
 
 const loginSchema = z.object({
   email: z.string().email("请输入有效的邮箱地址"),

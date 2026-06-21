@@ -1,6 +1,6 @@
 # CLAUDE.md — HermesClaw 工程协作与实现约束
-## 版本：v2.0
-## 日期：2026-06-18
+## 版本：v3.0
+## 日期：2026-06-21
 
 ---
 
@@ -285,3 +285,107 @@ OpenClaw 不得：
 - Hermes ↔ OpenClaw 之间的关键路径必须有 e2e 测试（模拟真实事件与回执）。  
 - 所有与高危动作相关的改动，必须在测试中覆盖：拒绝路径、审批路径、回滚路径。  
 - CI 流水线必须执行：类型检查 + 单元测试 + e2e 测试 + lint + schema 断言。
+
+---
+
+# 11. 性能优化方法论（v3.0 新增）
+
+## 11.1 性能诊断四层模型
+
+所有页面响应慢的问题，按以下四层自上而下排查。**每层修复后必须实测验证，再进入下一层。**
+
+| 层级 | 诊断点 | 典型瓶颈 | 测量手段 |
+| --- | --- | --- | --- |
+| **L0 — 编译层** | 开发模式 bundler 冷编译速度 | Webpack 10-15s vs Turbopack 1-2s | `curl -w "%{time_total}"` 测首次 TTFB |
+| **L1 — 渲染层** | SSR/RSC 渲染 + JS 传输 + 水合 | main-app.js >10MB、骨架屏编译延迟 | 浏览器 DevTools → Network → JS 体积 |
+| **L2 — 数据层** | API 响应时间 + 数据库查询 | N+1 查询、全表扫描、SQLite 锁竞争 | `curl` 测 `/api/*` 路由耗时 |
+| **L3 — 组件层** | 客户端水合后渲染效率 | 过多 useEffect 级联触发、Store 重复订阅 | React DevTools Profiler |
+
+## 11.2 诊断流程（必须按顺序执行）
+
+```
+1. 先用 curl 测 /api/health → 排除编译层问题（首次 >5s = 编译慢）
+2. 再用 curl 测目标页面 TTFB → 排除渲染层问题（首次 >3s = SSR 慢）
+3. 再用 curl 测具体 /api/* 路由 → 定位数据层瓶颈
+4. 最后用 React Profiler → 定位组件层瓶颈
+```
+
+## 11.3 各层优化手段（按效果排序）
+
+### L0 — 编译层
+
+| 手段 | 效果 | 适用场景 |
+| --- | --- | --- |
+| **Webpack → Turbopack** | 冷编译 5-10x 加速 | 开发模式（生产无影响） |
+| `loading.tsx` 零外部依赖 | 骨架屏 <1ms 发送 | 所有页面必须 |
+| 删除重复 middleware / layout | 消除 bundler 漂移 | 根目录残留文件 |
+| 动态导入重型组件 | main-app.js 体积减小 | `dynamic(() => import(...), { ssr: false })` |
+
+### L1 — 渲染层
+
+| 手段 | 效果 | 适用场景 |
+| --- | --- | --- |
+| **服务端直取数据（SSR fetch）** | 消除客户端 API 往返 + 加载闪烁 | 页面首次加载 |
+| `useQuery` 接 `placeholderData` | 服务端数据无缝衔接客户端缓存 | 已有 TanStack Query 的页面 |
+| 懒加载非首屏组件 | 减少首帧渲染组件数 | `CommandPalette`、`NotificationBell` 等 |
+| 分级渲染策略 | 页面内容先出现，侧边栏数据后加载 | `AppShell` 级 `useEffect` 延迟 |
+
+### L2 — 数据层
+
+| 手段 | 效果 | 适用场景 |
+| --- | --- | --- |
+| **内存缓存（Map + TTL）** | 30s 内重复请求 0 次 DB 查询 | 高频聚合查询 |
+| **复合索引** | `count()/groupBy()` 80ms→1ms | `AuditLog`、`WorkflowRun`、`StepRun` 等 |
+| **批量查询合并** | 16 次 `count()` → 4 次 `groupBy()` | 同表多条件聚合 |
+| O(n²)→O(n) 数据结构 | 嵌套循环 → Map/Set 预索引 | JS 端数据处理 |
+
+### L3 — 组件层
+
+| 手段 | 效果 | 适用场景 |
+| --- | --- | --- |
+| Zustand selector 精准订阅 | 避免无关状态变更触发重渲染 | 所有 `useStore` 调用 |
+| `memo` + `useCallback` 稳定引用 | 跳过子树重渲染 | 列表项、导航项 |
+| 懒加载重型 UI 库 | 首帧不解析 | `recharts`、`framer-motion`、`cmdk` |
+
+## 11.4 服务端直取数据模式（推荐范式）
+
+```tsx
+// page.tsx (Server Component) — 服务端直接查库
+import { prisma } from "@/lib/prisma";
+import PageClient from "./page-client";
+
+export default async function Page() {
+  let initialData;
+  try {
+    initialData = await prisma.xxx.findMany({ where: {...}, orderBy: {...} });
+  } catch {} // 降级为客户端加载
+
+  return <PageClient initialData={initialData} />;
+}
+
+// page-client.tsx (Client Component) — 接 placeholderData
+export default function PageClient({ initialData }: { initialData?: X[] }) {
+  const { data } = useQuery({
+    queryKey: ["key"],
+    queryFn: () => fetch("/api/xxx").then(r => r.json()),
+    placeholderData: initialData,  // ← 服务端数据无缝衔接
+  });
+}
+```
+
+## 11.5 禁止的优化反模式
+
+- ❌ 先优化组件层再优化数据层（治标不治本）
+- ❌ 在 `loading.tsx` 中导入任何组件库（`PageHeader`、`lucide-react` 等）
+- ❌ 在 `useEffect` 中同步发起 3+ 个 API 调用（应错峰或合并）
+- ❌ 使用 `await import()` 在每个请求中动态导入 Prisma（应静态 import）
+- ❌ 在渲染函数内创建新对象/数组作为 `useMemo` 依赖
+- ❌ 在 `"use client"` 组件中直接调用 `prisma`（会在客户端报错）
+
+## 11.6 优化提交规范
+
+每次性能优化 commit 必须包含：
+1. **问题描述**：哪个页面、多慢、复现步骤
+2. **根因分析**：具体到哪个文件、哪个函数、哪个查询
+3. **实测数据**：优化前/后的 `curl -w "%{time_total}"` 或 React Profiler 截图
+4. **影响范围**：是否影响其他页面或 API

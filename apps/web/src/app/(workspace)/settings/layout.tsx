@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useUser } from "@/hooks/use-user";
-import { X, User, Settings, CreditCard, Shield, Code, Sparkles } from "lucide-react";
+import { X, User, Settings, CreditCard, Shield, Code, Sparkles, Server } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,9 @@ const NAV_ITEMS = [
   { label: "密钥", href: "/settings/secrets", icon: Shield },
   { label: "API 密钥", href: "/settings/api-keys", icon: Code },
 ];
+
+/** 系统级设置独立入口 */
+const SYSTEM_ENTRY = { label: "系统设置", href: "/settings/system", icon: Server };
 
 export default function SettingsLayout({
   children,
@@ -36,6 +39,9 @@ export default function SettingsLayout({
     (item) => pathname === item.href || pathname.startsWith(item.href + "/")
   ) || pathname === "/settings/security"; // 包含安全子页
 
+  // 系统设置页走 workspace 主布局，不使用个人设置中心的双栏框架
+  const isSystemSettingsPage = pathname === SYSTEM_ENTRY.href || pathname.startsWith(SYSTEM_ENTRY.href);
+
   // 如果没有挂载，提供骨架屏避免 hydration mismatch
   if (!mounted) {
     return (
@@ -47,7 +53,7 @@ export default function SettingsLayout({
   }
 
   // 如果是不在配置项内的老配置页面，则进行直通渲染，绝不破坏原有页面
-  if (!isAuthSettingsPage) {
+  if (!isAuthSettingsPage || isSystemSettingsPage) {
     return <>{children}</>;
   }
 
@@ -125,6 +131,29 @@ export default function SettingsLayout({
                 </Link>
               );
             })}
+
+            {/* 分隔线 */}
+            <div className="h-px bg-[#1F1F1F] mx-1 my-2" />
+
+            {/* 系统设置独立入口 */}
+            {(() => {
+              const SysIcon = SYSTEM_ENTRY.icon;
+              const isSystemActive = pathname === SYSTEM_ENTRY.href || pathname.startsWith(SYSTEM_ENTRY.href);
+              return (
+                <Link
+                  href={SYSTEM_ENTRY.href}
+                  className={cn(
+                    "flex items-center gap-2.5 px-3 h-10 rounded-lg text-sm transition-all relative cursor-pointer",
+                    isSystemActive
+                      ? "bg-[#1F1F1F] text-[#F5F5F5] font-semibold border-l-2 border-l-[#6D5EF9] rounded-l-none"
+                      : "text-[#B3B3B3] hover:text-[#F5F5F5] hover:bg-[#1F1F1F]/40"
+                  )}
+                >
+                  <SysIcon className={cn("size-4", isSystemActive ? "text-[#6D5EF9]" : "text-[#B3B3B3]")} />
+                  <span>{SYSTEM_ENTRY.label}</span>
+                </Link>
+              );
+            })()}
           </nav>
         </div>
 

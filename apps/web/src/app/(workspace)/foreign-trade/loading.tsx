@@ -1,9 +1,8 @@
-import { PageHeader } from "@/components/common/page-header";
-
+/** 外贸工作台 Loading — 零外部依赖 */
 export default function ForeignTradeLoading() {
   return (
     <div className="p-6 space-y-6">
-      <PageHeader title="外贸工作台" description="今日经营概览" />
+      <div className="h-7 w-40 bg-accent/40 rounded animate-pulse" />
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="bg-card rounded-2xl border border-border p-5 h-[104px] animate-pulse" />
