@@ -12,26 +12,23 @@ export async function GET() {
   if (!session?.user?.id) return NextResponse.json({ error: "请先登录" }, { status: 401 });
 
   try {
-    // 查询真实订阅状态
-    const subscription = await prisma.subscription.findFirst({
-      where: { userId: session.user.id },
-      orderBy: { createdAt: "desc" },
-    });
-
-    // 查询真实支付方式
-    const paymentMethod = await prisma.paymentMethod.findFirst({
-      where: { userId: session.user.id, isDefault: true },
-    });
-
-    // 查询真实积分
-    const totalPoints = await getUserPoints(session.user.id);
-
-    // 查询最近发票
-    const invoices = await prisma.invoice.findMany({
-      where: { userId: session.user.id },
-      orderBy: { invoiceDate: "desc" },
-      take: 6,
-    });
+    // ★ v3.0 性能优化（CLAUDE.md §11.3 L2）：4 次顺序 await → 并行 Promise.all
+    //   四个查询互不依赖，并行执行消除不必要的顺序等待
+    const [subscription, paymentMethod, totalPoints, invoices] = await Promise.all([
+      prisma.subscription.findFirst({
+        where: { userId: session.user.id },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.paymentMethod.findFirst({
+        where: { userId: session.user.id, isDefault: true },
+      }),
+      getUserPoints(session.user.id),
+      prisma.invoice.findMany({
+        where: { userId: session.user.id },
+        orderBy: { invoiceDate: "desc" },
+        take: 6,
+      }),
+    ]);
 
     return NextResponse.json({
       plan: {

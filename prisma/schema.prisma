@@ -186,6 +186,8 @@ model AgentLog {
   @@index([agentId])
   @@index([status])
   @@index([createdAt])
+  // v3.0 性能优化（CLAUDE.md §11.3 L2）：最常用复合查询 workspaceId+agentId+createdAt
+  @@index([workspaceId, agentId, createdAt])
 }
 
 // ============================================================
@@ -285,6 +287,8 @@ model MemoryRevision {
   createdAt   DateTime  @default(now())
 
   @@index([workspaceId])
+  // v3.0 性能优化（CLAUDE.md §11.3 L2）：MemoryRevision 最常按 memoryId 查询
+  @@index([memoryId])
 }
 
 // ============================================================
@@ -416,6 +420,8 @@ model Conversation {
 
   @@index([workspaceId])
   @@index([createdAt])
+  // v3.0 性能优化（CLAUDE.md §11.3 L2）：Conversation 列表按 updatedAt 排序，需复合索引避免 filesort
+  @@index([workspaceId, updatedAt])
 }
 
 model ConversationMessage {
@@ -747,6 +753,8 @@ model StepRun {
   @@index([workspaceId, nodeType])
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, createdAt])
+  // v3.0 性能优化（CLAUDE.md §11.3 L2）：timeout 轮询需要 (status, startedAt) 扫描
+  @@index([status, startedAt])
 }
 
 model OrchestrationSession {

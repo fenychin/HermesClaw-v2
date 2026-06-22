@@ -9,6 +9,23 @@ const withBundleAnalyzer = bundleAnalyzer({
 const nextConfig: NextConfig = {
   // ★ Next.js 15.3+ 默认启用 Instrumentation Hook，无需 experimental.instrumentationHook
 
+  // ★ 按 CLAUDE.md §11.3(L1) — 对 barrel-export 库做模块级 tree-shaking
+  //   将所有命名导出映射为独立文件路径，避免打包未使用的模块
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "framer-motion",
+      "recharts",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-select",
+      "@radix-ui/react-tabs",
+      "@radix-ui/react-tooltip",
+      "react-hook-form",
+      "zod",
+    ],
+  },
+
   // 显式锁定项目根目录，避免 Next 因上层目录残留的 package-lock.json 误判 workspace root
   turbopack: {
     root: path.join(__dirname, "../.."),

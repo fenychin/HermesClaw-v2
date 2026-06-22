@@ -52,7 +52,11 @@ function filterByTab(
  *    所有 Harness 变更均须经由人类审批（§3.1），此页面为审批操作的唯一 UI 入口
  */
 export default function HarnessApprovalPage() {
-  const { harnessProposals: proposals = [], loadProposals: fetchProposals, approveProposal, rejectProposal } = useTradeStore();
+  // v3.0 性能优化（CLAUDE.md §11.3 L3）：精准 selector 替代宽泛解构，避免无关状态变更触发重渲染
+  const proposals = useTradeStore((s) => s.harnessProposals) ?? [];
+  const fetchProposals = useTradeStore((s) => s.loadProposals);
+  const approveProposal = useTradeStore((s) => s.approveProposal);
+  const rejectProposal = useTradeStore((s) => s.rejectProposal);
   const [activeTab, setActiveTab] = useState<TabValue>("pending");
 
   useEffect(() => {
@@ -154,6 +158,8 @@ export default function HarnessApprovalPage() {
   }, []);
 
   /* 批准流程：L4 拒绝、L3 二次确认、L1/L2 调 API（AGENTS.md §4.7） */
+  // v3.0 性能优化（CLAUDE.md §11.3 L3）：useMutation 对象引用每次渲染都变化，
+  // 改为直接依赖稳定的 .mutate 函数，避免 useCallback 失效
   const handleApprove = useCallback((proposal: HarnessProposal) => {
     const level = resolveAutomationLevel(
       proposal.proposedChange.automationLevel,
@@ -175,20 +181,21 @@ export default function HarnessApprovalPage() {
 
     // L1/L2：直接调 API 审批（走服务端 checkAutomationGate + 审计）
     approveMutation.mutate({ proposal, confirmed: false });
-  }, [approveMutation]);
+  }, [approveMutation.mutate]);
 
   /* 二次确认后执行真实 approve API */
   const handleConfirmApprove = useCallback(
     (proposal: HarnessProposal) => {
       approveMutation.mutate({ proposal, confirmed: true });
     },
-    [approveMutation],
+    [approveMutation.mutate],
   );
 
   /* 拒绝：调真实 API（走服务端 checkAutomationGate + RBAC + 审计） */
+  // v3.0 性能优化：依赖 rejectMutation.mutate 而非 rejectMutation 对象
   const handleReject = useCallback((proposal: HarnessProposal) => {
     rejectMutation.mutate(proposal);
-  }, [rejectMutation]);
+  }, [rejectMutation.mutate]);
 
   return (
     <div className="flex gap-6 p-6 min-h-full">
