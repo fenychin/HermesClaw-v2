@@ -207,6 +207,35 @@ export function useNebulaRender({
   const hoveredRef = useRef<string | null>(null)
   const pausedRef = useRef(false)
 
+  // ─── 容器尺寸追踪（ResizeObserver → state，触发渲染重建） ──────
+
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect
+        setContainerSize((prev) =>
+          prev.width === Math.round(width) && prev.height === Math.round(height)
+            ? prev
+            : { width: Math.round(width), height: Math.round(height) },
+        )
+      }
+    })
+
+    observer.observe(container)
+    // 立即读取一次（ResizeObserver 首帧可能不触发）
+    const rect = container.getBoundingClientRect()
+    if (rect.width > 0 && rect.height > 0) {
+      setContainerSize({ width: Math.round(rect.width), height: Math.round(rect.height) })
+    }
+
+    return () => observer.disconnect()
+  }, [containerRef])
+
   // 同步 ref
   useEffect(() => { layoutRef.current = layout }, [layout])
   useEffect(() => { selectedRef.current = selectedNodeId }, [selectedNodeId])
@@ -280,14 +309,15 @@ export function useNebulaRender({
   // D3 2D Canvas 渲染
   useEffect(() => {
     if (renderMode !== "d3-2d" || !containerRef.current) return
+    if (containerSize.width === 0 || containerSize.height === 0) return
 
     // 清理 Three.js
     threeRef.current?.dispose()
     threeRef.current = null
 
     const container = containerRef.current
-    const { width, height } = container.getBoundingClientRect()
-    if (width === 0 || height === 0) return
+    const width = containerSize.width
+    const height = containerSize.height
 
     // 创建 Canvas
     if (!canvasRef.current) {
@@ -349,11 +379,12 @@ export function useNebulaRender({
       canvasRef.current = null
       rendererRef.current = null
     }
-  }, [renderMode, containerRef, selectNode, recordFrame, onNodeHover])
+  }, [renderMode, containerRef, containerSize, selectNode, recordFrame, onNodeHover])
 
   // Three.js 3D 渲染
   useEffect(() => {
     if (renderMode !== "three-3d" || !containerRef.current) return
+    if (containerSize.width === 0 || containerSize.height === 0) return
 
     // 清理 D3 canvas
     canvasRef.current?.remove()
@@ -361,8 +392,8 @@ export function useNebulaRender({
     rendererRef.current = null
 
     const container = containerRef.current
-    const { width, height } = container.getBoundingClientRect()
-    if (width === 0 || height === 0) return
+    const width = containerSize.width
+    const height = containerSize.height
 
     // 延迟导入 Three.js（不阻塞页面加载）
     let disposed = false
@@ -530,7 +561,7 @@ export function useNebulaRender({
       dispose?.()
       threeRef.current = null
     }
-  }, [renderMode, containerRef, selectNode, recordFrame, onNodeHover])
+  }, [renderMode, containerRef, containerSize, selectNode, recordFrame, onNodeHover])
 
   return {
     renderMode,

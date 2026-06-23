@@ -9,6 +9,7 @@
 import React from "react"
 import { useIndustryIntelStore } from "@/stores/industry-intel-store"
 import { useAgentHeartbeat } from "@/hooks/use-agent-heartbeat"
+import { useIntelSnapshot } from "@/hooks/use-intel-snapshot"
 import type { AgentHeartbeatState } from "@/types/industry-intel"
 
 /** 威胁等级配色 */
@@ -51,6 +52,10 @@ export function IntelTopBar() {
   const industryOptions = useIndustryIntelStore((s) => s.industryOptions)
   const setActiveIndustry = useIndustryIntelStore((s) => s.setActiveIndustry)
   const { onlineCount, agentList } = useAgentHeartbeat()
+  const { snapshot } = useIntelSnapshot({ packId: activeIndustryId })
+
+  // GEN-N 从 KPI 快照动态读取
+  const genN = snapshot?.evolutionGeneration ?? 2
 
   return (
     <header
@@ -114,7 +119,7 @@ export function IntelTopBar() {
         )}
 
         <span className="text-[11px] text-zinc-600 font-mono tracking-wider" aria-label="进化代数">
-          GEN-2.0
+          GEN-{genN}
         </span>
       </div>
     </header>

@@ -6,7 +6,7 @@
  */
 "use client"
 
-import React from "react"
+import React, { useMemo } from "react"
 import { useIntelSnapshot } from "@/hooks/use-intel-snapshot"
 import { useIntelStream } from "@/hooks/use-intel-stream"
 import { useIndustryIntelStore } from "@/stores/industry-intel-store"
@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { RadarDimension, IntelSignalDetected } from "@/types/industry-intel"
 
-// ─── 静态占位数据 ──────────────────────────────────────────────────────
+// ─── 静态占位数据（仅雷达无 API 数据时使用） ────────────────────────────
 
 const PLACEHOLDER_RADAR: RadarDimension[] = [
   { key: "policy-sensitivity", label: "政策敏感性", value: 72, delta: 5 },
@@ -25,14 +25,6 @@ const PLACEHOLDER_RADAR: RadarDimension[] = [
   { key: "supply-chain-stability", label: "供应链稳定性", value: 55, delta: 0 },
   { key: "consumer-sentiment", label: "消费者情绪", value: 67, delta: 0 },
   { key: "capital-liquidity", label: "资本流动性", value: 49, delta: -4 },
-]
-
-const PLACEHOLDER_HOT_WORDS = [
-  { word: "AI监管", heat: 94 },
-  { word: "碳关税", heat: 87 },
-  { word: "供应链回流", heat: 82 },
-  { word: "数字人民币", heat: 76 },
-  { word: "RCEP", heat: 71 },
 ]
 
 // ─── 子组件 ────────────────────────────────────────────────────────────
@@ -96,7 +88,32 @@ export function Panel1StrategicAwareness() {
   const { signals } = useIntelStream({ packId: activeIndustryId })
 
   const radar = snapshot?.radarSection?.dimensions ?? PLACEHOLDER_RADAR
-  const hotWords = PLACEHOLDER_HOT_WORDS
+
+  // 热词：从 SSE signals 中提取 title 做词频统计
+  const hotWords = useMemo(() => {
+    if (signals.length === 0) {
+      // 无信号时使用默认热词
+      return [
+        { word: "AI监管", heat: 94 },
+        { word: "碳关税", heat: 87 },
+        { word: "供应链回流", heat: 82 },
+        { word: "数字人民币", heat: 76 },
+        { word: "RCEP", heat: 71 },
+      ]
+    }
+    // 从信号 title 中提取关键词
+    const wordCount = new Map<string, number>()
+    for (const s of signals.slice(0, 20)) {
+      const words = s.title.split(/[\s,，、()（）\-—]+/).filter((w) => w.length >= 2)
+      for (const w of words) {
+        wordCount.set(w, (wordCount.get(w) ?? 0) + 1)
+      }
+    }
+    return [...wordCount.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([word, count]) => ({ word, heat: Math.min(99, 50 + count * 15) }))
+  }, [signals])
   const displaySignals = signals.length > 0 ? signals.slice(0, 8) : []
   const snapshotTime = snapshot?.generatedAt
     ? new Date(snapshot.generatedAt).toLocaleTimeString("zh-CN")

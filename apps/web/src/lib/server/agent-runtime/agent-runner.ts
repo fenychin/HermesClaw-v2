@@ -167,8 +167,8 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
 
   const dagNodes = buildDagFromWorkflowTemplate(workflowSteps)
 
-  // 5. 注入真实 action
-  const skillCtx: SkillExecContext = { workspaceId, industryId: packId, agentId }
+  // 5. 注入真实 action（传入 prisma 以便 skill 读取真实数据）
+  const skillCtx: SkillExecContext = { workspaceId, industryId: packId, agentId, prisma }
   const dagWithActions: DagNode[] = dagNodes.map((node) => ({
     ...node,
     action: (() => {
@@ -225,6 +225,29 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
 
   // 7. 执行 DAG
   const dagResult = await runDag(dagWithActions, dagCtx)
+
+  // 7a. 将 DAG 产出持久化到 WorkflowRun.outputContext（供 getKpiSnapshot/getKnowledgeGraph 读取）
+  try {
+    const nodeOutputs: Record<string, unknown> = {}
+    for (const [nodeId, output] of dagResult.nodeResults) {
+      nodeOutputs[nodeId] = output
+    }
+    await prisma.workflowRun.update({
+      where: { runId },
+      data: {
+        outputContext: JSON.stringify(nodeOutputs),
+        status: dagResult.status === "completed" ? "completed" : "failed",
+        completedAt: new Date(),
+        durationMs: dagResult.durationMs,
+      },
+    })
+  } catch (err) {
+    logger.error("[AgentRunner] WorkflowRun 产出持久化失败", {
+      agentId,
+      runId,
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
 
   // 8. 写 AgentLog（agentId 置 null 避免 FK 约束——A1-A5 不在 Agent 表中）
   await writeAgentLog({
