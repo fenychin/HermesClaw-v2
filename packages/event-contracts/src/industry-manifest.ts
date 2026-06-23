@@ -120,5 +120,82 @@ export const IndustryManifestSchema = z.object({
   updatedAt: z.string(),
   /** 契约版本。 */
   version_field: VersionSchema,
+
+  // ─── V2 门户升级专项扩展（Phase 2）───────────────────────────
+
+  /** Dashboard 配置声明（每个 pack 可声明多个 dashboard）。 */
+  dashboards: z
+    .array(
+      z.object({
+        id: IdSchema,
+        name: z.string().min(1),
+        version: VersionSchema,
+        description: z.string().default(""),
+        /** 是否为行业情报中心大屏（五板块布局）。 */
+        isIntelCenter: z.boolean().default(false),
+      }),
+    )
+    .default([]),
+
+  /** KPI Schema 声明（定义该行业包的 KPI 指标计算方式）。 */
+  kpiSchemas: z
+    .array(
+      z.object({
+        id: IdSchema,
+        name: z.string().min(1),
+        /** 指标计算方法：api(调用REST) / sse(实时推送) / computed(前端计算)。 */
+        method: z.enum(["api", "sse", "computed"]),
+        /** 数据源路径（如 /api/v1/industry/kpi-snapshot）。 */
+        dataSource: z.string().min(1),
+        /** 刷新间隔（秒）。 */
+        refreshIntervalSec: z.number().int().nonnegative().default(30),
+      }),
+    )
+    .default([]),
+
+  /** Agent 绑定声明（Agent ID → 面板映射 + 心跳频率）。 */
+  agentBindings: z
+    .array(
+      z.object({
+        agentId: z.enum(["A1", "A2", "A3", "A4", "A5"]),
+        panelId: z.enum(["P1", "P2", "P3", "P4", "P5"]),
+        label: z.string().min(1),
+        heartbeatIntervalSec: z.number().int().nonnegative(),
+        automationLevel: z.enum(["L1", "L2"]),
+        triggerType: z.enum(["scheduled", "event-driven", "user-initiated"]),
+      }),
+    )
+    .default([]),
+
+  /** SSE 订阅声明（前端按此建立 EventSource 连接）。 */
+  sseSubscriptions: z
+    .array(
+      z.object({
+        eventType: z.string().min(1),
+        /** 消费面板 ID。 */
+        panelId: z.enum(["P1", "P2", "P3", "P4", "P5"]),
+        /** 优先级（P0 立即 / P1 ≤100ms / P2 ≤1s / P3 SWR 30s / P4 SWR 5min）。 */
+        priority: z.enum(["P0", "P1", "P2", "P3", "P4"]),
+        /** 前端本地缓冲大小。 */
+        bufferSize: z.number().int().positive().default(50),
+      }),
+    )
+    .default([]),
+
+  /** 路由配置（深链接参数映射）。 */
+  routeConfig: z
+    .object({
+      basePath: z.string().default("/industry-intelligence"),
+      deepLinks: z
+        .array(
+          z.object({
+            param: z.string().min(1),
+            panel: z.enum(["P1", "P2", "P3", "P4", "P5"]),
+            description: z.string().default(""),
+          }),
+        )
+        .default([]),
+    })
+    .optional(),
 })
 export type IndustryManifest = z.infer<typeof IndustryManifestSchema>

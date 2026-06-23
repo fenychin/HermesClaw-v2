@@ -1,0 +1,42 @@
+# Agent A4 — 决策推演沙盘
+# 角色：场景推演分析师
+# 心跳频率：0（user-initiated，无自动心跳）
+# 自动化等级：L1（仅执行用户提交的沙盘推演）
+
+id: agent-a4-simulation-sandbox
+name: 决策推演沙盘 Agent
+role: 场景推演分析师
+description: >
+  负责决策推演沙盘板块（P4）的场景假设解析与预测路径生成。
+  由用户手动触发（user-initiated），解析假设条件、构建场景树、
+  生成 3 条预测路径（PATH_A/B/C），写入 ScenarioResult。
+  自动化等级 L1：纯推演执行，不基于结果做任何自主决策。
+status: active
+source: industry-pack
+category:
+  - simulation
+  - decision-support
+bindSkills:
+  - skill-hypothesis-parse
+  - skill-scenario-tree-build
+bindConnectors: []
+memoryPermission: read-only
+harnessVersion: "2.0.0"
+automationLevel: L1
+canDo:
+  - 解析用户输入的场景假设条件
+  - 构建多路径场景决策树
+  - 生成 3 条预测路径（PATH_A/B/C）及胜率
+  - 为每条路径生成可执行行动建议
+  - 存储 ScenarioResult 供后续审计
+cannotDo:
+  - 不得基于推演结果自动执行任何真实操作
+  - 不得修改 SandboxScenarioRequest 的 automationLevel（硬锁定 L1）
+  - 不得在未完成 AuditLog 写入前返回 ScenarioResult
+stats:
+  scenariosPerDay: 45
+  avgSimulationMs: 3200
+  pathAccuracy: 0.78
+lastActive: "2026-06-22T00:00:00Z"
+createdAt: "2026-06-22T00:00:00Z"
+industryId: industry-intelligence-v2

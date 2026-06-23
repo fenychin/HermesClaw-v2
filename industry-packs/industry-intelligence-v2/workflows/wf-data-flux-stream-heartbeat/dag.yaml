@@ -1,0 +1,50 @@
+# Workflow Template: 数据流实时推送心跳
+# 绑定 Agent: A2
+# 触发方式: event-driven (3s)
+# 自动化等级: L1
+
+id: wf-data-flux-stream-heartbeat
+name: 数据流实时推送心跳
+description: >
+  每 3s 执行一次数据流采集与推送：
+  1. 调用 skill-market-flow-tick 采集多源市场数据
+  2. 聚合资金流向、趋势、竞对活动
+  3. 推送 intel.flow.tick SSE 事件
+  4. 监控数据源连接器健康状态
+templateId: wf-data-flux-stream-heartbeat
+nodes:
+  - id: market-tick
+    kind: skill
+    name: 市场数据采集
+    handler: skill-market-flow-tick
+    config:
+      sources:
+        - capital-flow
+        - market-trend
+        - competitor-activity
+      intervalMs: 3000
+  - id: health-check
+    kind: task
+    name: 连接器健康检查
+    handler: checkConnectorHealth
+    config:
+      connectors:
+        - http-market-data
+        - sse-gateway
+  - id: emit-tick
+    kind: task
+    name: 推送 Flow Tick
+    handler: emitFlowTick
+    config:
+      eventType: intel.flow.tick
+      priority: P1
+      bufferSize: 300
+edges:
+  - from: market-tick
+    to: health-check
+  - from: health-check
+    to: emit-tick
+requiredSkills:
+  - skill-market-flow-tick
+automationLevel: L1
+riskLevel: low

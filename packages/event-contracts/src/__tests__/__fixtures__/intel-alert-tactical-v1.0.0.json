@@ -1,0 +1,12 @@
+{
+  "eventType": "intel.alert.tactical",
+  "alertId": "alert_fixture_001",
+  "title": "美国商务部对中国光伏产品发起双反调查",
+  "description": "DOC宣布对原产于中国的晶体硅光伏产品发起反倾销和反补贴调查",
+  "impactAnalysis": "预计影响对美出口额约$2.3B，涉及12家主要出口企业",
+  "suggestedAction": "建议立即启动法律应对程序，同时评估转向东南亚产能的可行性",
+  "threatLevel": "CRITICAL",
+  "triggeredAt": "2026-06-22T10:02:00Z",
+  "linkedSignalIds": ["sig_fixture_001"],
+  "version": "1.0.0"
+}

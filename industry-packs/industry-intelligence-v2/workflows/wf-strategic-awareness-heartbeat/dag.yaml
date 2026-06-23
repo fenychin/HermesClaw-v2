@@ -1,0 +1,92 @@
+# Workflow Template: 战略态势感知心跳
+# 绑定 Agent: A1
+# 触发方式: scheduled (30s)
+# 自动化等级: L2
+
+id: wf-strategic-awareness-heartbeat
+name: 战略态势感知心跳
+description: >
+  每 30s 执行一次战略态势扫描：
+  1. 调用 skill-radar-score-compute 计算 8 维雷达得分
+  2. 调用 skill-policy-nlp-scan 扫描政策热词矩阵
+  3. 调用 skill-event-signal-classify 分类战术信号
+  4. 更新 IndustryIntelSnapshot 并推送 SSE 事件
+templateId: wf-strategic-awareness-heartbeat
+nodes:
+  - id: radar-compute
+    kind: skill
+    name: 雷达得分计算
+    handler: skill-radar-score-compute
+    config:
+      dimensions: 8
+      source: agent-log
+      lookbackSec: 3600
+  - id: policy-scan
+    kind: skill
+    name: 政策热词扫描
+    handler: skill-policy-nlp-scan
+    config:
+      source: http-market-data
+      languages:
+        - zh-CN
+        - en
+  - id: signal-classify
+    kind: skill
+    name: 信号分类
+    handler: skill-event-signal-classify
+    config:
+      categories:
+        - market-anomaly
+        - competitor-move
+        - compliance-risk
+      confidenceThreshold: 60
+  - id: snapshot-update
+    kind: data-write
+    name: 快照更新
+    handler: updateIntelSnapshot
+    config:
+      target: IndustryIntelSnapshot
+      fields:
+        - radarSection
+        - signalFeed
+        - systemStatus
+  - id: alert-check
+    kind: condition
+    name: 告警判定
+    config:
+      condition: threatLevel
+      operator: gte
+      value: HIGH
+      trueBranch: emit-alert
+      falseBranch: emit-heartbeat
+  - id: emit-alert
+    kind: task
+    name: 发出战术告警
+    handler: emitTacticalAlert
+    config:
+      eventType: intel.alert.tactical
+      priority: P0
+  - id: emit-heartbeat
+    kind: noop
+    name: 心跳完成
+edges:
+  - from: radar-compute
+    to: policy-scan
+  - from: policy-scan
+    to: signal-classify
+  - from: signal-classify
+    to: snapshot-update
+  - from: snapshot-update
+    to: alert-check
+  - from: alert-check
+    to: emit-alert
+    when: "true"
+  - from: alert-check
+    to: emit-heartbeat
+    when: "false"
+requiredSkills:
+  - skill-radar-score-compute
+  - skill-policy-nlp-scan
+  - skill-event-signal-classify
+automationLevel: L2
+riskLevel: medium

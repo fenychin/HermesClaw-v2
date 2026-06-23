@@ -1,0 +1,15 @@
+# Skill: 提案草案生成
+# 所属 Agent: A5
+# 类别: evolution / proposal
+
+id: skill-proposal-draft-generate
+name: 提案草案生成
+displayName: 进化提案草案生成器
+description: >
+  基于 HarnessMetrics 生成 EvolutionProposal 草案。
+  包含变更证据、影响分析、回滚策略。
+  每周期最多生成 3 个提案，按影响得分排序。
+  所有提案必须通过 HumanApprovalCheckpoint 才能进入 applied 状态。
+version: "2.0.0"
+category: evolution
+status: active

@@ -1,0 +1,171 @@
+# Industry Intelligence Center v2.0 — Industry Pack Manifest
+# 三域原则第三域：行业情报中心大屏作为可装载 dashboard 资产
+# 不修改 Hermes / OpenClaw 核心代码
+packId: industry-intelligence-v2
+id: industry-intelligence-v2
+name: 行业特种作战情报中心 v2.0
+version: 2.0.0
+industry: cross-industry
+description: >
+  行业情报中心 v2.0 大屏 — 五板块实时情报中枢。
+  包含战略态势感知(P1)、数据流量动力学(P2)、行业生态星云(P3)、
+  决策推演沙盘(P4)、人机进化核心(P5)。
+  每个板块绑定独立心跳 Agent（A1-A5），通过 SSE 事件流驱动。
+author: HermesClaw Team
+compatibleHermesApi: ">=1.0.0"
+compatibleRuntimeApi: ">=1.0.0"
+directories:
+  agents: true
+  workflows: true
+  skills: true
+  knowledge: true
+  connectors: true
+  schemas: true
+  dashboards: true
+  evalRules: true
+  prompts: true
+directory:
+  agents:
+    - agent-a1-strategic-awareness
+    - agent-a2-data-flux
+    - agent-a3-nebula-core
+    - agent-a4-simulation-sandbox
+    - agent-a5-evolution-core
+  workflows:
+    - wf-strategic-awareness-heartbeat
+    - wf-data-flux-stream-heartbeat
+    - wf-nebula-topology-heartbeat
+    - wf-evolution-heartbeat
+  skills:
+    - skill-radar-score-compute
+    - skill-policy-nlp-scan
+    - skill-event-signal-classify
+    - skill-market-flow-tick
+    - skill-entity-graph-update
+    - skill-hypothesis-parse
+    - skill-scenario-tree-build
+    - skill-harness-eval-report-read
+    - skill-proposal-draft-generate
+  connectors:
+    - http-market-data
+    - sse-gateway
+  prompts:
+    - intel-system
+languages:
+  - zh-CN
+status: active
+createdAt: "2026-06-22T00:00:00Z"
+updatedAt: "2026-06-22T00:00:00Z"
+version_field: "2.0.0"
+migrationRules:
+  - fromVersion: "1.0.0"
+    toVersion: "2.0.0"
+    description: >
+      从 v1 静态行业大盘升级至 v2 五板块实时情报中心。
+      新增 A1-A5 心跳 Agent、SSE 事件流、沙盘推演、进化闭环。
+    breaking: true
+    rollbackStrategy: >
+      停用 v2 Agent、恢复 v1 静态大盘、清除 SSE 订阅。
+      回滚不删除 v2 审计日志。
+
+# ─── V2 门户扩展字段 ────────────────────────────────────────
+
+dashboards:
+  - id: industry-intelligence-v2
+    name: 行业特种作战情报中心
+    version: "2.0.0"
+    description: 五板块实时情报中枢大屏
+    isIntelCenter: true
+
+kpiSchemas:
+  - id: kpi-snapshot
+    name: 行业情报总快照
+    method: api
+    dataSource: /api/v1/industry/kpi-snapshot
+    refreshIntervalSec: 30
+  - id: knowledge-graph
+    name: 星云全量图谱
+    method: api
+    dataSource: /api/v1/industry/knowledge-graph
+    refreshIntervalSec: 0
+  - id: flow-tick-stream
+    name: 资金流向实时流
+    method: sse
+    dataSource: intel.flow.tick
+    refreshIntervalSec: 3
+  - id: connector-health
+    name: 数据源健康度
+    method: api
+    dataSource: /api/v1/runtime/connector-health
+    refreshIntervalSec: 10
+
+agentBindings:
+  - agentId: A1
+    panelId: P1
+    label: 战略态势感知
+    heartbeatIntervalSec: 30
+    automationLevel: L2
+    triggerType: scheduled
+  - agentId: A2
+    panelId: P2
+    label: 数据流量动力学
+    heartbeatIntervalSec: 3
+    automationLevel: L1
+    triggerType: event-driven
+  - agentId: A3
+    panelId: P3
+    label: 行业生态星云
+    heartbeatIntervalSec: 300
+    automationLevel: L2
+    triggerType: scheduled
+  - agentId: A4
+    panelId: P4
+    label: 决策推演沙盘
+    heartbeatIntervalSec: 0
+    automationLevel: L1
+    triggerType: user-initiated
+  - agentId: A5
+    panelId: P5
+    label: 人机进化核心
+    heartbeatIntervalSec: 3600
+    automationLevel: L2
+    triggerType: scheduled
+
+sseSubscriptions:
+  - eventType: intel.flow.tick
+    panelId: P2
+    priority: P1
+    bufferSize: 300
+  - eventType: intel.signal.detected
+    panelId: P1
+    priority: P2
+    bufferSize: 50
+  - eventType: intel.topology.updated
+    panelId: P3
+    priority: P3
+    bufferSize: 20
+  - eventType: intel.alert.tactical
+    panelId: P1
+    priority: P0
+    bufferSize: 10
+  - eventType: intel.evolution.proposal-created
+    panelId: P5
+    priority: P4
+    bufferSize: 20
+  - eventType: intel.agent.heartbeat
+    panelId: P1
+    priority: P3
+    bufferSize: 5
+
+routeConfig:
+  basePath: /industry-intelligence
+  deepLinks:
+    - param: panel=sandbox
+      panel: P4
+      description: 深链接到沙盘推演板块
+    - param: panel=evolution
+      panel: P5
+      description: 深链接到进化核心板块
+    - param: alert=:alertId
+      panel: P1
+      description: 从告警跳入并高亮板块

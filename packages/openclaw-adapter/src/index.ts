@@ -60,6 +60,18 @@ export type { ExecutorCallback } from './execution-bus'
 // 连接器管理
 export { getConnectors, updateConnector } from './client/openclaw-client'
 
+// Intel SSE 事件流（Phase 1 — V2 门户升级专项）
+export {
+  subscribeIntelStream,
+  unsubscribeIntelStream,
+  getIntelSubscriberCount,
+  emitIntelEvent,
+  sendIntelHeartbeat,
+  sendFlowTickCompensation,
+  getRecentFlowTicks,
+} from './intel-stream'
+export type { IntelStreamFilter } from './intel-stream'
+
 // 类型
 export type {
   OpenClawAdapterConfig,

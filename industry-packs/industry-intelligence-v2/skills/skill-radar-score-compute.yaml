@@ -1,0 +1,15 @@
+# Skill: 雷达得分计算
+# 所属 Agent: A1
+# 类别: intelligence / strategic-analysis
+
+id: skill-radar-score-compute
+name: 雷达得分计算
+displayName: 8维雷达得分计算
+description: >
+  从 AgentLog 记录中提取最近 1h 的数据，计算 8 维雷达得分：
+  政策敏感性、市场波动性、竞对活跃度、合规风险度、
+  技术变革速度、供应链稳定性、消费者情绪、资本流动性。
+  每维得分 0-100，附带 modelConfidence 与趋势方向。
+version: "2.0.0"
+category: intelligence
+status: active

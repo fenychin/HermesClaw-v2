@@ -1,0 +1,9 @@
+{
+  "eventType": "intel.agent.heartbeat",
+  "agentId": "A1",
+  "status": "running",
+  "lastRunAt": "2026-06-22T09:59:30Z",
+  "nextRunAt": "2026-06-22T10:00:00Z",
+  "heartbeatAt": "2026-06-22T10:00:00Z",
+  "version": "1.0.0"
+}

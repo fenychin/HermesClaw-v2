@@ -1,0 +1,119 @@
+# Industry Intelligence v2.0 — Schema 定义
+# 行业包自定义 Schema（补充核心契约层）
+
+# ─── KPI Snapshot 响应 Schema ──────────────────────────────────────
+kpi_snapshot_response:
+  type: object
+  required:
+    - snapshotId
+    - packId
+    - generatedAt
+    - radarSection
+    - signalFeed
+    - systemStatus
+  properties:
+    snapshotId:
+      type: string
+      description: 快照唯一标识
+    packId:
+      type: string
+      description: 行业包 ID
+    generatedAt:
+      type: string
+      format: date-time
+      description: 快照生成时间
+    radarSection:
+      type: object
+      description: 8 维雷达数据
+    signalFeed:
+      type: array
+      description: 信号流
+      maxItems: 50
+    systemStatus:
+      type: object
+      description: 系统健康状态
+
+# ─── Knowledge Graph 响应 Schema ────────────────────────────────────
+knowledge_graph_response:
+  type: object
+  required:
+    - nodes
+    - edges
+    - generatedAt
+  properties:
+    nodes:
+      type: array
+      description: 图谱节点
+    edges:
+      type: array
+      description: 图谱边
+    generatedAt:
+      type: string
+      format: date-time
+
+# ─── Connector Health 响应 Schema ───────────────────────────────────
+connector_health_response:
+  type: object
+  required:
+    - connectors
+    - overallStatus
+  properties:
+    connectors:
+      type: array
+      items:
+        type: object
+        properties:
+          connectorId:
+            type: string
+          status:
+            type: string
+            enum: [healthy, degraded, down]
+          lastHeartbeat:
+            type: string
+            format: date-time
+          latencyMs:
+            type: integer
+    overallStatus:
+      type: string
+      enum: [healthy, degraded, down]
+
+# ─── Sandbox Submit 请求/响应 Schema ────────────────────────────────
+sandbox_submit_request:
+  type: object
+  required:
+    - packId
+    - scenario
+    - hypothesis
+    - timeHorizon
+  properties:
+    packId:
+      type: string
+    scenario:
+      type: string
+      description: 场景描述
+    hypothesis:
+      type: string
+      description: 假设条件
+    timeHorizon:
+      type: string
+      description: 时间范围（如 "30d", "90d"）
+
+sandbox_scenario_result:
+  type: object
+  required:
+    - resultId
+    - taskId
+    - status
+    - paths
+  properties:
+    resultId:
+      type: string
+    taskId:
+      type: string
+    status:
+      type: string
+      enum: [running, completed, failed]
+    paths:
+      type: array
+      minItems: 3
+      maxItems: 3

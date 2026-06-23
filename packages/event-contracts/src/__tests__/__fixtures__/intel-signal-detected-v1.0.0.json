@@ -1,0 +1,10 @@
+{
+  "eventType": "intel.signal.detected",
+  "signalId": "sig_fixture_001",
+  "title": "检测到竞对在东南亚市场降价",
+  "threatLevel": "L2",
+  "confidence": 0.85,
+  "source": "竞品价格监控",
+  "detectedAt": "2026-06-22T09:58:00Z",
+  "version": "1.0.0"
+}

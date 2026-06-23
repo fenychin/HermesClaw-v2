@@ -1,0 +1,9 @@
+{
+  "eventType": "intel.evolution.proposal-created",
+  "proposalId": "prop_fixture_001",
+  "proposalType": "AgentPolicy",
+  "confidence": 0.78,
+  "createdAt": "2026-06-22T11:00:00Z",
+  "evolutionProposalId": "evol_prop_001",
+  "version": "1.0.0"
+}

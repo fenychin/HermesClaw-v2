@@ -1,0 +1,14 @@
+# Skill: 实体图谱更新
+# 所属 Agent: A3
+# 类别: knowledge-graph / topology
+
+id: skill-entity-graph-update
+name: 实体图谱更新
+displayName: 知识图谱增量更新器
+description: >
+  扫描行业知识图谱的实体关系变更（新增、修改、删除候选）。
+  检测孤立节点并生成清理建议。
+  每批次最多处理 50 个变更，超出则分批次执行。
+version: "2.0.0"
+category: knowledge-graph
+status: active

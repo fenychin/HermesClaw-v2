@@ -35,13 +35,36 @@ export type IndustryPackManifest = z.infer<typeof IndustryPackManifestSchema>
  */
 export interface IndustryPackAuditEvent {
   /** 事件类型 */
-  type: "PACK_LOADED" | "PACK_REJECTED" | "BOUNDARY_VIOLATION"
+  type:
+    | "PACK_LOADED"
+    | "PACK_REJECTED"
+    | "BOUNDARY_VIOLATION"
+    | "DASHBOARD_LOADED"
+    | "DASHBOARD_REJECTED"
+    | "COMPATIBILITY_CHECK_PASSED"
+    | "COMPATIBILITY_CHECK_FAILED"
   /** 行业包 ID */
   packId: string
   /** ISO-8601 时间戳 */
   timestamp: string
   /** 附加上下文 */
   detail?: Record<string, unknown>
+}
+
+/** 兼容性校验结果 */
+export interface CompatibilityCheckResult {
+  /** 是否通过兼容性检查。 */
+  passed: boolean
+  /** Hermes API 兼容性。 */
+  hermesCompatible: boolean
+  /** Runtime API 兼容性。 */
+  runtimeCompatible: boolean
+  /** 缺失的迁移规则版本对。 */
+  missingMigrationRules: string[]
+  /** 失败原因描述列表。 */
+  failures: string[]
+  /** 检查时间。 */
+  checkedAt: string
 }
 
 /**

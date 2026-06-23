@@ -1,8 +1,14 @@
 import { readFileSync, existsSync, readdirSync } from "fs"
 import { join, resolve } from "path"
 import yaml from "yaml"
-import { IndustryManifestSchema } from "@hermesclaw/event-contracts"
-import type { IndustryManifest } from "@hermesclaw/event-contracts"
+import {
+  IndustryManifestSchema,
+  DashboardConfigSchema,
+} from "@hermesclaw/event-contracts"
+import type {
+  IndustryManifest,
+  DashboardConfig,
+} from "@hermesclaw/event-contracts"
 import {
   WorkflowMetaSchema,
   WorkflowDagFileSchema,
@@ -536,6 +542,225 @@ export function clearCache(packId?: string): void {
 }
 
 export const clearManifestCache = clearCache
+
+// ─── Dashboard 配置加载与校验（Phase 2） ─────────────────────────
+
+const dashboardConfigCache = new Map<string, DashboardConfig>()
+
+/**
+ * 加载行业包的 Dashboard 配置并校验。
+ *
+ * 从 dashboards/ 目录读取 YAML，经 DashboardConfigSchema 强校验后，
+ * 生成前端可直接消费的 DashboardConfig JSON。
+ *
+ * 校验失败时触发 DASHBOARD_REJECTED 审计事件并抛出。
+ *
+ * @param packId 行业包 ID
+ * @param dashboardId 指定 dashboard ID，不传则加载第一个
+ * @returns 通过 Zod 校验的 DashboardConfig
+ * @throws 文件不存在 / schema 校验失败时抛出
+ */
+export function loadIndustryDashboardConfig(
+  packId: string,
+  dashboardId?: string,
+): DashboardConfig {
+  assertSafePackId(packId)
+
+  const cacheKey = dashboardId ? `${packId}::${dashboardId}` : `${packId}::default`
+  if (dashboardConfigCache.has(cacheKey)) {
+    return dashboardConfigCache.get(cacheKey)!
+  }
+
+  const dashboards = loadIndustryDashboards(packId)
+  if (dashboards.length === 0) {
+    throw new Error(`No dashboards found for packId: ${packId}`)
+  }
+
+  const raw = dashboardId
+    ? dashboards.find((d: Record<string, unknown>) => d.dashboardId === dashboardId)
+    : dashboards[0]
+
+  if (!raw) {
+    throw new Error(
+      `Dashboard "${dashboardId}" not found in pack: ${packId}. Available: ${
+        dashboards.map((d: Record<string, unknown>) => d.dashboardId).join(", ")
+      }`,
+    )
+  }
+
+  const result = DashboardConfigSchema.safeParse(raw)
+  if (!result.success) {
+    const detail = {
+      errors: result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
+    }
+    emitAuditEvent({
+      type: "DASHBOARD_REJECTED",
+      packId,
+      timestamp: new Date().toISOString(),
+      detail,
+    })
+    throw new Error(
+      `Dashboard config validation failed for pack: ${packId}: ${JSON.stringify(detail.errors)}`,
+    )
+  }
+
+  const config = result.data
+
+  // 交叉校验：dashboard 中声明的 panel agentId 必须与 manifest agentBindings 一致
+  const manifest = getCachedManifest(packId)
+  const manifestAgentBindings = manifest.agentBindings || []
+  const manifestAgentIds = new Set(manifestAgentBindings.map((b) => b.agentId))
+
+  for (const panel of config.panels) {
+    if (!manifestAgentIds.has(panel.agentId)) {
+      throw new Error(
+        `Dashboard panel ${panel.panelId} references agentId "${panel.agentId}" ` +
+        `not declared in manifest agentBindings. Known agents: ${[...manifestAgentIds].join(", ")}`,
+      )
+    }
+  }
+
+  dashboardConfigCache.set(cacheKey, config)
+
+  emitAuditEvent({
+    type: "DASHBOARD_LOADED",
+    packId,
+    timestamp: new Date().toISOString(),
+    detail: {
+      dashboardId: config.dashboardId,
+      version: config.version,
+      panels: config.panels.length,
+    },
+  })
+
+  return config
+}
+
+// ─── 兼容性校验（Phase 2） ────────────────────────────────────────
+
+/**
+ * 语义版本比较。
+ * 将 semver 字符串转为 [major, minor, patch] 数组后逐段比较。
+ * 返回 1（a > b）、0（相等）、-1（a < b）。
+ */
+function compareSemver(a: string, b: string): number {
+  const aParts = a.split(".").map(Number)
+  const bParts = b.split(".").map(Number)
+  for (let i = 0; i < 3; i++) {
+    if (aParts[i] > bParts[i]) return 1
+    if (aParts[i] < bParts[i]) return -1
+  }
+  return 0
+}
+
+/**
+ * 检查单个版本号是否落在 VersionRange 范围内。
+ * min ≤ version ≤ max。
+ */
+function versionInRange(version: string, range: { min: string; max: string }): boolean {
+  return compareSemver(version, range.min) >= 0 && compareSemver(version, range.max) <= 0
+}
+
+/**
+ * 校验行业包的兼容性声明。
+ *
+ * 依据 CLAUDE.md §6.3，以下三项缺一不可：
+ * 1. `compatibleHermesApi` — 包声明的 Hermes API 版本区间
+ * 2. `compatibleRuntimeApi` — 包声明的 Runtime API 版本区间
+ * 3. `migrationRules` — 至少包含一条迁移规则（fromVersion → toVersion）
+ *
+ * 校验逻辑：
+ * - 将当前 Hermes API / Runtime API 版本与包的 VersionRange 比较
+ * - 检查 migrationRules 是否覆盖了当前包的 fromVersion → toVersion
+ * - 任何一项不通过则返回 passed: false 并列出 failures
+ *
+ * @param packId 行业包 ID
+ * @param currentHermesVersion 当前 Hermes API 版本（如 "1.0.0"）
+ * @param currentRuntimeVersion 当前 Runtime API 版本（如 "1.0.0"）
+ * @returns CompatibilityCheckResult
+ */
+export function validateIndustryPackCompatibility(
+  packId: string,
+  currentHermesVersion: string,
+  currentRuntimeVersion: string,
+): import("./types").CompatibilityCheckResult {
+  const manifest = getCachedManifest(packId)
+  const failures: string[] = []
+  let hermesCompatible = false
+  let runtimeCompatible = false
+
+  // 检查 Hermes API 兼容性
+  const hermesRange = manifest.compatibleHermesApi
+  if (hermesRange && hermesRange.min && hermesRange.max) {
+    hermesCompatible = versionInRange(currentHermesVersion, hermesRange as { min: string; max: string })
+    if (!hermesCompatible) {
+      failures.push(
+        `Hermes API: pack requires ${hermesRange.min}-${hermesRange.max}, current is ${currentHermesVersion}`,
+      )
+    }
+  } else {
+    failures.push("Hermes API: pack manifest missing compatibleHermesApi declaration")
+  }
+
+  // 检查 Runtime API 兼容性
+  const runtimeRange = manifest.compatibleRuntimeApi
+  if (runtimeRange && runtimeRange.min && runtimeRange.max) {
+    runtimeCompatible = versionInRange(currentRuntimeVersion, runtimeRange as { min: string; max: string })
+    if (!runtimeCompatible) {
+      failures.push(
+        `Runtime API: pack requires ${runtimeRange.min}-${runtimeRange.max}, current is ${currentRuntimeVersion}`,
+      )
+    }
+  } else {
+    failures.push("Runtime API: pack manifest missing compatibleRuntimeApi declaration")
+  }
+
+  // 检查 migrationRules 完整性
+  const migrationRules = manifest.migrationRules || []
+  const missingMigrationRules: string[] = []
+  if (migrationRules.length === 0) {
+    missingMigrationRules.push("no migration rules defined")
+    failures.push("Migration: pack manifest must declare at least one migrationRule")
+  } else {
+    // 检查是否存在覆盖当前版本的迁移规则
+    const currentVersion = manifest.version
+    const hasMigrationForCurrent = migrationRules.some(
+      (r) => r.toVersion === currentVersion,
+    )
+    if (!hasMigrationForCurrent) {
+      missingMigrationRules.push(`missing migration rule for toVersion=${currentVersion}`)
+      failures.push(
+        `Migration: no migrationRule found covering toVersion=${currentVersion}`,
+      )
+    }
+  }
+
+  const passed = failures.length === 0
+
+  const eventType = passed ? "COMPATIBILITY_CHECK_PASSED" : "COMPATIBILITY_CHECK_FAILED"
+  emitAuditEvent({
+    type: eventType,
+    packId,
+    timestamp: new Date().toISOString(),
+    detail: {
+      hermesCompatible,
+      runtimeCompatible,
+      missingMigrationRules,
+      failures,
+      currentHermesVersion,
+      currentRuntimeVersion,
+    },
+  })
+
+  return {
+    passed,
+    hermesCompatible,
+    runtimeCompatible,
+    missingMigrationRules,
+    failures,
+    checkedAt: new Date().toISOString(),
+  }
+}
 
 // ─── 新增：IndustryPackLoader 边界守护类（三域原则第三域） ────────────────
 import { IndustryPackManifestSchema, type IndustryPackManifest } from './types'

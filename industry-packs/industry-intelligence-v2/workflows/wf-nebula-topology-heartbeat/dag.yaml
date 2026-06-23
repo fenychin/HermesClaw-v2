@@ -1,0 +1,62 @@
+# Workflow Template: 星云拓扑更新心跳
+# 绑定 Agent: A3
+# 触发方式: scheduled (5min)
+# 自动化等级: L2
+
+id: wf-nebula-topology-heartbeat
+name: 星云拓扑更新心跳
+description: >
+  每 5min 执行一次知识图谱拓扑更新：
+  1. 调用 skill-entity-graph-update 扫描实体关系变更
+  2. 检测新增/变更/孤立节点
+  3. 批量更新图数据库
+  4. 推送 intel.topology.updated SSE 事件
+templateId: wf-nebula-topology-heartbeat
+nodes:
+  - id: graph-scan
+    kind: skill
+    name: 图谱扫描
+    handler: skill-entity-graph-update
+    config:
+      scanMode: incremental
+      lookbackMin: 5
+      maxChangesPerBatch: 50
+  - id: orphan-check
+    kind: condition
+    name: 孤立节点检测
+    config:
+      condition: orphanCount
+      operator: gt
+      value: 0
+      trueBranch: suggest-cleanup
+      falseBranch: emit-topology
+  - id: suggest-cleanup
+    kind: task
+    name: 建议清理
+    handler: suggestOrphanCleanup
+    config:
+      action: suggest
+      requiresApproval: true
+  - id: emit-topology
+    kind: task
+    name: 推送拓扑更新
+    handler: emitTopologyUpdate
+    config:
+      eventType: intel.topology.updated
+      priority: P3
+      bufferSize: 20
+edges:
+  - from: graph-scan
+    to: orphan-check
+  - from: orphan-check
+    to: suggest-cleanup
+    when: "true"
+  - from: orphan-check
+    to: emit-topology
+    when: "false"
+  - from: suggest-cleanup
+    to: emit-topology
+requiredSkills:
+  - skill-entity-graph-update
+automationLevel: L2
+riskLevel: medium

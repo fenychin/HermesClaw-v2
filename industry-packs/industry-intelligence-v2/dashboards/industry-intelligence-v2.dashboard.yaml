@@ -1,0 +1,274 @@
+# Industry Intelligence Center v2.0 — Dashboard Configuration
+# 五板块布局 + 数据依赖 + Agent 绑定 + 深链接参数
+# 前端读取此配置后映射到 React 组件树（解耦组件实现）
+
+dashboardId: industry-intelligence-v2
+packId: industry-intelligence-v2
+industry: cross-industry
+name: 行业特种作战情报中心 v2.0
+description: >
+  五板块实时情报中枢大屏：
+  P1 战略态势感知 / P2 数据流量动力学 / P3 行业生态星云 /
+  P4 决策推演沙盘 / P5 人机进化核心
+version: "2.0.0"
+
+# ─── 五面板配置 ─────────────────────────────────────────────────────
+
+panels:
+  - panelId: P1
+    title: 战略态势感知
+    description: 8维雷达图 + 政策热词矩阵 + 战术信号流 + 威胁等级
+    widthPct: 16
+    agentId: A1
+    heartbeatIntervalMs: 30000
+    rootComponent: Panel1StrategicAwareness
+    deepLinkParam: alert=:alertId
+    dataDependencies:
+      - key: kpi-snapshot
+        type: rest
+        source: /api/v1/industry/kpi-snapshot
+        required: true
+        refreshIntervalMs: 30000
+    sseSubscriptions:
+      - eventType: intel.signal.detected
+        panelId: P1
+        priority: P2
+        bufferSize: 50
+      - eventType: intel.alert.tactical
+        panelId: P1
+        priority: P0
+        bufferSize: 10
+      - eventType: intel.agent.heartbeat
+        panelId: P1
+        priority: P3
+        bufferSize: 5
+    refreshStrategy:
+      swrIntervalMs: 30000
+      sseIncremental: true
+      waitForRequired: true
+
+  - panelId: P2
+    title: 数据流量与动力学
+    description: 资金流向曲线 + 市场趋势多曲线 + 竞对活动图 + 数据源健康
+    widthPct: 20
+    agentId: A2
+    heartbeatIntervalMs: 3000
+    rootComponent: Panel2DataFlux
+    dataDependencies:
+      - key: flow-tick-stream
+        type: sse
+        source: intel.flow.tick
+        required: false
+      - key: connector-health
+        type: rest
+        source: /api/v1/runtime/connector-health
+        required: false
+        refreshIntervalMs: 10000
+      - key: kpi-snapshot
+        type: rest
+        source: /api/v1/industry/kpi-snapshot
+        required: false
+        refreshIntervalMs: 30000
+    sseSubscriptions:
+      - eventType: intel.flow.tick
+        panelId: P2
+        priority: P1
+        bufferSize: 300
+    refreshStrategy:
+      swrIntervalMs: 0
+      sseIncremental: true
+      waitForRequired: false
+
+  - panelId: P3
+    title: 行业生态全景星云
+    description: Three.js 3D 力导向图 + D3 2D 降级 + 节点详情浮层
+    widthPct: 28
+    agentId: A3
+    heartbeatIntervalMs: 300000
+    rootComponent: Panel3NebulaCoreMap
+    dataDependencies:
+      - key: knowledge-graph
+        type: rest
+        source: /api/v1/industry/knowledge-graph
+        required: true
+    sseSubscriptions:
+      - eventType: intel.topology.updated
+        panelId: P3
+        priority: P3
+        bufferSize: 20
+    refreshStrategy:
+      swrIntervalMs: 0
+      sseIncremental: true
+      waitForRequired: true
+
+  - panelId: P4
+    title: 决策推演沙盘
+    description: 场景输入表单 + 推演进度跟踪 + 三路径预测 + 结果卡片
+    widthPct: 20
+    agentId: A4
+    heartbeatIntervalMs: 0
+    rootComponent: Panel4SimulationSandbox
+    deepLinkParam: panel=sandbox
+    dataDependencies:
+      - key: sandbox-submit
+        type: rest
+        source: /api/v1/sandbox/submit
+        required: false
+      - key: scenario-result
+        type: rest
+        source: /api/v1/sandbox/scenario-results/:id
+        required: false
+    sseSubscriptions: []
+    refreshStrategy:
+      swrIntervalMs: 0
+      sseIncremental: false
+      waitForRequired: false
+
+  - panelId: P5
+    title: 人机进化核心
+    description: 进化DNA可视化 + 决策对齐度 + 权重调整日志 + 提案列表 + 授权签名
+    widthPct: 16
+    agentId: A5
+    heartbeatIntervalMs: 3600000
+    rootComponent: Panel5EvolutionCore
+    deepLinkParam: panel=evolution
+    dataDependencies:
+      - key: evolution-proposals
+        type: rest
+        source: /api/v1/harness/evolution-proposals
+        required: true
+        refreshIntervalMs: 60000
+      - key: evaluation-report
+        type: rest
+        source: /api/v1/harness/evaluation-report
+        required: false
+        refreshIntervalMs: 300000
+      - key: latest-approval
+        type: rest
+        source: /api/v1/audit/latest-approval
+        required: false
+        refreshIntervalMs: 60000
+    sseSubscriptions:
+      - eventType: intel.evolution.proposal-created
+        panelId: P5
+        priority: P4
+        bufferSize: 20
+    refreshStrategy:
+      swrIntervalMs: 60000
+      sseIncremental: true
+      waitForRequired: true
+
+# ─── 布局配置 ──────────────────────────────────────────────────────
+
+layout:
+  default:
+    columns:
+      - panels: [P1]
+        widthPct: 16
+      - panels: [P2]
+        widthPct: 20
+      - panels: [P3]
+        widthPct: 28
+      - panels: [P4]
+        widthPct: 20
+      - panels: [P5]
+        widthPct: 16
+  medium:
+    columns:
+      - panels: [P1, P2]
+        widthPct: 36
+      - panels: [P3]
+        widthPct: 28
+      - panels: [P4, P5]
+        widthPct: 36
+  small:
+    columns:
+      - panels: [P1, P2, P3, P4, P5]
+        widthPct: 100
+
+# ─── 路由配置 ──────────────────────────────────────────────────────
+
+route:
+  basePath: /industry-intelligence
+  deepLinks:
+    - param: panel=sandbox
+      panel: P4
+      description: 深链接到沙盘推演板块
+    - param: panel=evolution
+      panel: P5
+      description: 深链接到进化核心板块
+    - param: alert=:alertId
+      panel: P1
+      description: 从告警跳入并高亮板块
+
+# ─── Agent 心跳绑定 ────────────────────────────────────────────────
+
+agents:
+  - agentId: A1
+    label: 态势
+    heartbeatIntervalMs: 30000
+    triggerType: scheduled
+    automationLevel: L2
+    workflowTemplateId: wf-strategic-awareness-heartbeat
+    skillIds:
+      - skill-radar-score-compute
+      - skill-policy-nlp-scan
+      - skill-event-signal-classify
+  - agentId: A2
+    label: 数据流
+    heartbeatIntervalMs: 3000
+    triggerType: event-driven
+    automationLevel: L1
+    workflowTemplateId: wf-data-flux-stream-heartbeat
+    skillIds:
+      - skill-market-flow-tick
+  - agentId: A3
+    label: 星云
+    heartbeatIntervalMs: 300000
+    triggerType: scheduled
+    automationLevel: L2
+    workflowTemplateId: wf-nebula-topology-heartbeat
+    skillIds:
+      - skill-entity-graph-update
+  - agentId: A4
+    label: 沙盘
+    heartbeatIntervalMs: 0
+    triggerType: user-initiated
+    automationLevel: L1
+    skillIds:
+      - skill-hypothesis-parse
+      - skill-scenario-tree-build
+  - agentId: A5
+    label: 进化
+    heartbeatIntervalMs: 3600000
+    triggerType: scheduled
+    automationLevel: L2
+    workflowTemplateId: wf-evolution-heartbeat
+    skillIds:
+      - skill-harness-eval-report-read
+      - skill-proposal-draft-generate
+
+# ─── 性能阈值 ──────────────────────────────────────────────────────
+
+performance:
+  lcpMs: 1500
+  inpMs: 150
+  clsMax: 0.05
+  sseReconnectMs: 2000
+  threeJsTargetFps: 60
+  threeJsDegradeFps: 30
+  memoryLimitMb: 300
+
+# ─── 兼容性 ────────────────────────────────────────────────────────
+
+compatibleHermesApi: ">=1.0.0"
+compatibleRuntimeApi: ">=1.0.0"
+migrationRules:
+  - fromVersion: "1.0.0"
+    toVersion: "2.0.0"
+    description: 从 v1 静态大盘升级至 v2 五板块实时情报中心
+    breaking: true
+    rollbackStrategy: 停用 v2 Agent、恢复 v1 静态大盘、清除 SSE 订阅
+
+generatedAt: "2026-06-22T00:00:00Z"
+contractVersion: "1.0.0"

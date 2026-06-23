@@ -1,0 +1,4 @@
+id: wf-strategic-awareness-heartbeat
+title: 战略态势感知心跳
+description: 每 30s 扫描政策热词矩阵、计算 8 维雷达得分、分类战术信号，自动触发告警
+icon: radar

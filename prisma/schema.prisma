@@ -1010,6 +1010,31 @@ model HarnessRollback {
 }
 
 // ============================================================
+// ActionReceipt 回执存储（Phase 6 — 四层日志证据链之 Receipt Store）
+// ============================================================
+model ActionReceipt {
+  id                String   @id @default(cuid())
+  receiptId         String   @unique
+  taskId            String
+  workflowRunId     String
+  connectorId       String
+  idempotencyKey    String
+  outcome           String   // 'success' | 'failure'
+  executedAt        DateTime
+  response          Json?
+  errorCode         String?
+  compensationStrategy String?
+  version           String   @default("1.0.0")
+  workspaceId       String
+
+  createdAt         DateTime @default(now())
+
+  @@index([workspaceId, taskId])
+  @@index([workspaceId, workflowRunId])
+  @@index([idempotencyKey])
+}
+
+// ============================================================
 // 能力版本管理与能力调用遥测
 // ============================================================
 model CapabilityVersion {

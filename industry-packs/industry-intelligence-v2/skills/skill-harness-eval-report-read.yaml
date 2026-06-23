@@ -1,0 +1,15 @@
+# Skill: Harness 评估报告读取
+# 所属 Agent: A5
+# 类别: evolution / evaluation
+
+id: skill-harness-eval-report-read
+name: Harness评估报告读取
+displayName: Harness 评估报告分析器
+description: >
+  读取最近 24h 的 Harness 评估报告，提取关键指标：
+  决策对齐度（decisionAlignment）、权重漂移（weightDrift）、
+  策略有效性（policyEffectiveness）、自动化等级偏差。
+  输出结构化 HarnessMetrics 供进化提案生成使用。
+version: "2.0.0"
+category: evolution
+status: active

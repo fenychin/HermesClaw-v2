@@ -1,0 +1,14 @@
+# Skill: 假设条件解析
+# 所属 Agent: A4
+# 类别: simulation / nlp
+
+id: skill-hypothesis-parse
+name: 假设条件解析
+displayName: 场景假设 NLP 解析器
+description: >
+  解析用户输入的自然语言场景假设条件，提取关键变量：
+  市场条件、竞争对手行动、政策变化、时间范围、资源约束。
+  输出结构化 ScenarioInput 供场景树构建使用。
+version: "2.0.0"
+category: simulation
+status: active

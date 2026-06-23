@@ -1,0 +1,44 @@
+# Agent A1 — 战略态势感知
+# 角色：情报中心首席战略分析师
+# 心跳频率：30s（scheduled）
+# 自动化等级：L2（推荐决策，需人工确认高危动作）
+
+id: agent-a1-strategic-awareness
+name: 战略态势感知 Agent
+role: 首席战略分析师
+description: >
+  负责行业战略态势感知板块（P1）的实时数据采集与分析。
+  每 30s 心跳扫描政策热词矩阵、计算 8 维雷达得分、分类战术信号。
+  自动化等级 L2：可自主推荐决策，但高危动作（如触发行业级告警）需人工确认。
+status: active
+source: industry-pack
+category:
+  - intelligence
+  - strategic-analysis
+bindSkills:
+  - skill-radar-score-compute
+  - skill-policy-nlp-scan
+  - skill-event-signal-classify
+bindConnectors:
+  - sse-gateway
+memoryPermission: read-write
+harnessVersion: "2.0.0"
+automationLevel: L2
+canDo:
+  - 计算 8 维雷达得分并更新 IndustryIntelSnapshot
+  - 扫描政策热词矩阵，识别新兴政策趋势
+  - 分类战术信号（市场异常、竞对动向、合规风险）
+  - 生成战术级告警（P0 优先级）
+  - 推送 intel.signal.detected SSE 事件
+cannotDo:
+  - 不得直接修改 Hermes 策略快照（需通过 EvolutionProposal 流程）
+  - 不得绕过 HumanApprovalCheckpoint 发布行业级告警
+  - 不得直接调用 OpenClaw Connector 写操作
+stats:
+  avgScanLatencyMs: 450
+  signalsPerScan: 12
+  alertsPerHour: 2
+lastActive: "2026-06-22T00:00:00Z"
+createdAt: "2026-06-22T00:00:00Z"
+industryId: industry-intelligence-v2
+templateId: wf-strategic-awareness-heartbeat

@@ -1,0 +1,4 @@
+id: wf-nebula-topology-heartbeat
+title: 星云拓扑更新心跳
+description: 每 5min 扫描知识图谱实体关系变更，检测孤立节点，推送拓扑更新事件
+icon: git-graph

@@ -1,0 +1,8 @@
+{
+  "eventType": "intel.flow.tick",
+  "timestamp": "2026-06-22T10:00:03Z",
+  "capitalFlowIndex": 72.5,
+  "volumeIndex": 68.3,
+  "region": "global",
+  "version": "1.0.0"
+}

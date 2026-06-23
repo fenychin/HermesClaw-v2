@@ -1,0 +1,16 @@
+{
+  "requestId": "req_sandbox_001",
+  "workspaceId": "ws_demo",
+  "industryId": "foreign-trade",
+  "automationLevel": "L1",
+  "scenarioInput": {
+    "targetMarket": "欧盟",
+    "productCategory": "光伏组件",
+    "priceStrategy": "降价5%",
+    "timeWindow": "2026Q3-Q4"
+  },
+  "hypothesisLabel": "若对欧盟降价5%，能否在Q3前抢占8%市场份额？",
+  "callbackTarget": "topic:sandbox.result",
+  "idempotencyKey": "idem_sandbox_20260622_001",
+  "version": "1.0.0"
+}

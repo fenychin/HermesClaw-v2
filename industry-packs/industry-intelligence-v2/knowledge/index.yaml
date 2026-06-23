@@ -1,0 +1,59 @@
+# Industry Intelligence v2.0 — 行业知识索引
+# 此文件声明行业包的领域知识资产清单
+# 实际知识文档位于 knowledge/ 子目录
+
+packId: industry-intelligence-v2
+version: "2.0.0"
+generatedAt: "2026-06-22T00:00:00Z"
+
+# ─── 知识域 ────────────────────────────────────────────────────────
+
+domains:
+  - id: cross-industry-intelligence
+    name: 跨行业情报分析
+    description: 多行业通用的战略情报分析方法论与最佳实践
+    documents:
+      - radar-dimension-guide.md
+      - signal-classification-taxonomy.md
+
+  - id: market-data-flux
+    name: 市场数据流量分析
+    description: 资金流向、市场趋势、竞对活动的数据采集与分析模型
+    documents:
+      - capital-flow-indicators.md
+      - market-trend-detection.md
+
+  - id: knowledge-graph-topology
+    name: 知识图谱拓扑
+    description: 行业实体关系建模、力导向图布局算法、拓扑更新策略
+    documents:
+      - entity-relationship-model.md
+      - force-layout-parameters.md
+
+  - id: scenario-simulation
+    name: 场景推演方法论
+    description: 多路径决策树构建、蒙特卡洛模拟、胜率计算方法
+    documents:
+      - scenario-tree-methodology.md
+      - win-rate-calibration.md
+
+  - id: evolution-governance
+    name: 进化治理
+    description: Harness 评估指标、提案生命周期、人机协同决策流程
+    documents:
+      - harness-evaluation-metrics.md
+      - proposal-lifecycle.md
+
+# ─── 术语表 ────────────────────────────────────────────────────────
+
+glossary:
+  - term: 雷达维度
+    definition: 行业战略态势的 8 个评估维度（政策敏感性、市场波动性、竞对活跃度、合规风险度、技术变革速度、供应链稳定性、消费者情绪、资本流动性）
+  - term: 战术信号
+    definition: 需立即关注的短期市场事件，按置信度分类为市场异常/竞对动向/合规风险
+  - term: 预测路径
+    definition: 沙盘推演生成的 3 条可能结果路径（PATH_A 乐观/PATH_B 基准/PATH_C 悲观），每条路径附带胜率与行动建议
+  - term: 决策对齐度
+    definition: Agent 实际决策与 Harness 策略期望之间的一致性度量（0-1），低于 0.7 触发进化提案
+  - term: 星云图
+    definition: 行业生态知识图谱的 3D 力导向可视化表示，节点=实体，边=关系

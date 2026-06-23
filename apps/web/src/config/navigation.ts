@@ -3,12 +3,12 @@ import {
   Ship,
   Sparkles,
   LayoutDashboard,
-  Bot,
   FolderKanban,
   Brain,
   FileText,
   Clock,
   Settings,
+  Radar,
   // 智慧大脑二级图标
   Zap,
   Database,
@@ -52,6 +52,7 @@ export const mainNav: NavItem[] = [
   /* ——— 第二板块：行业 ——— */
   { href: "/foreign-trade", label: "外贸", icon: Ship, description: "外贸行业工作台与专属工作流" },
   { href: "/dashboard", label: "行业动态", icon: LayoutDashboard, description: "行业情报、询盘雷达与经营监测" },
+  { href: "/industry-intelligence", label: "行业情报中心", icon: Radar, description: "五板块实时情报中枢大屏" },
   { href: "/projects", label: "空间", icon: FolderKanban, description: "面向客户 / 订单 / 市场的 AI 工作单元" },
   /* ——— 第三板块：资料库 ——— */
   { href: "/files", label: "文件", icon: FileText, description: "企业内容供给链与结构化解析" },
@@ -72,14 +73,15 @@ export const navSections: NavSection[] = [
     items: [
       mainNav[2], // 外贸
       mainNav[3], // 动态大盘
-      mainNav[4], // 项目空间
+      mainNav[4], // 行业情报中心
+      mainNav[5], // 项目空间
     ],
   },
   {
     label: "资料库",
     items: [
-      mainNav[5], // 文件
-      mainNav[6], // 最近
+      mainNav[6], // 文件
+      mainNav[7], // 最近
     ],
   },
 ];

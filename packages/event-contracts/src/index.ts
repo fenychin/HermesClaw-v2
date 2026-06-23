@@ -234,4 +234,81 @@ export type {
 // industry-pack-manifest
 export * from "./industry-pack-manifest"
 
+// industry-intel-snapshot (Phase 0 — V2 门户升级专项)
+export {
+  IndustryIntelSnapshotSchema,
+  RadarDimensionSchema,
+  SignalItemSchema,
+  INDUSTRY_INTEL_SNAPSHOT_VERSION,
+} from "./industry-intel-snapshot"
+export type {
+  IndustryIntelSnapshot,
+  RadarDimension,
+  SignalItem,
+} from "./industry-intel-snapshot"
+
+// sandbox-scenario (Phase 0 — V2 门户升级专项)
+export {
+  SandboxScenarioRequestSchema,
+  ScenarioResultSchema,
+  PredictionPathSchema,
+  ActionRecommendationSchema,
+  SANDBOX_SCENARIO_REQUEST_VERSION,
+  SCENARIO_RESULT_VERSION,
+} from "./sandbox-scenario"
+export type {
+  SandboxScenarioRequest,
+  ScenarioResult,
+  PredictionPath,
+  ActionRecommendation,
+} from "./sandbox-scenario"
+
+// intel-sse-events (Phase 0 — V2 门户升级专项)
+export {
+  IntelSSEEventSchema,
+  IntelFlowTickSchema,
+  IntelSignalDetectedSchema,
+  IntelTopologyUpdatedSchema,
+  IntelAlertTacticalSchema,
+  IntelEvolutionProposalCreatedSchema,
+  IntelAgentHeartbeatSchema,
+  GraphNodeSchema,
+  GraphEdgeSchema,
+  INTEL_SSE_EVENT_VERSION,
+} from "./intel-sse-events"
+export type {
+  IntelSSEEvent,
+  IntelFlowTick,
+  IntelSignalDetected,
+  IntelTopologyUpdated,
+  IntelAlertTactical,
+  IntelEvolutionProposalCreated,
+  IntelAgentHeartbeat,
+  GraphNode,
+  GraphEdge,
+} from "./intel-sse-events"
+
+// dashboard-config (Phase 2 — V2 门户升级专项)
+export {
+  DashboardConfigSchema,
+  PanelConfigSchema,
+  PanelDataDependencySchema,
+  AgentHeartbeatBindingSchema,
+  SSESubscriptionSchema,
+  LayoutConfigSchema,
+  RouteConfigSchema,
+  PerformanceThresholdsSchema,
+  DASHBOARD_CONFIG_VERSION,
+} from "./dashboard-config"
+export type {
+  DashboardConfig,
+  PanelConfig,
+  PanelDataDependency,
+  AgentHeartbeatBinding,
+  SSESubscription,
+  LayoutConfig,
+  RouteConfig,
+  PerformanceThresholds,
+} from "./dashboard-config"
+
 

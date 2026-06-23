@@ -1,0 +1,14 @@
+# Skill: 市场流量采集
+# 所属 Agent: A2
+# 类别: data-stream / market
+
+id: skill-market-flow-tick
+name: 市场流量采集
+displayName: 多源市场流量采集器
+description: >
+  从 http-market-data 连接器采集资金流向、市场趋势、竞对活动数据。
+  每 3s 推一个 tick，聚合为时间序列曲线。
+  包含数据源健康度检查（响应时间、错误率、数据新鲜度）。
+version: "2.0.0"
+category: data-stream
+status: active

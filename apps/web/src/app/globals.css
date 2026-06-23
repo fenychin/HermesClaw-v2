@@ -192,3 +192,20 @@ strong, b, h1, h2, h3, h4, h5, h6 {
   color: #d4d4d8 !important;       /* 常用纯白文字类：降噪为一级标准文字色 (84% 明度) */
 }
 
+/* ============================================================
+   行业情报中心 — CommandTicker 滚动动画
+   ============================================================ */
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+  width: max-content;
+}
+

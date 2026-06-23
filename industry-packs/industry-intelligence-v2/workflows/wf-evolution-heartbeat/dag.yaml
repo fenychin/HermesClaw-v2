@@ -1,0 +1,78 @@
+# Workflow Template: 进化评估心跳
+# 绑定 Agent: A5
+# 触发方式: scheduled (1h)
+# 自动化等级: L2
+
+id: wf-evolution-heartbeat
+name: 进化评估心跳
+description: >
+  每 1h 执行一次 Harness 评估与进化提案生成：
+  1. 调用 skill-harness-eval-report-read 读取评估报告
+  2. 分析决策对齐度与权重漂移
+  3. 调用 skill-proposal-draft-generate 生成提案草案
+  4. 推送 intel.evolution.proposal-created SSE 事件
+  5. 记录 AuditLog（proposal.create）
+templateId: wf-evolution-heartbeat
+nodes:
+  - id: eval-read
+    kind: skill
+    name: 读取评估报告
+    handler: skill-harness-eval-report-read
+    config:
+      lookbackH: 24
+      metrics:
+        - decisionAlignment
+        - weightDrift
+        - policyEffectiveness
+  - id: alignment-check
+    kind: condition
+    name: 对齐度判定
+    config:
+      condition: decisionAlignment
+      operator: lt
+      value: 0.7
+      trueBranch: generate-proposal
+      falseBranch: log-healthy
+  - id: generate-proposal
+    kind: skill
+    name: 生成提案草案
+    handler: skill-proposal-draft-generate
+    config:
+      evidenceRequired: true
+      maxProposalsPerCycle: 3
+  - id: audit-log
+    kind: data-write
+    name: 写入审计日志
+    handler: writeAuditLog
+    config:
+      action: proposal.create
+      riskLevel: medium
+  - id: emit-proposal
+    kind: task
+    name: 推送提案事件
+    handler: emitProposalCreated
+    config:
+      eventType: intel.evolution.proposal-created
+      priority: P4
+      bufferSize: 20
+  - id: log-healthy
+    kind: noop
+    name: 健康记录
+edges:
+  - from: eval-read
+    to: alignment-check
+  - from: alignment-check
+    to: generate-proposal
+    when: "true"
+  - from: alignment-check
+    to: log-healthy
+    when: "false"
+  - from: generate-proposal
+    to: audit-log
+  - from: audit-log
+    to: emit-proposal
+requiredSkills:
+  - skill-harness-eval-report-read
+  - skill-proposal-draft-generate
+automationLevel: L2
+riskLevel: medium

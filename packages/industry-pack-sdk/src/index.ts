@@ -26,6 +26,8 @@ export {
   loadIndustrySkills,
   loadIndustrySchemas,
   loadIndustryEvalRules,
+  loadIndustryDashboardConfig,
+  validateIndustryPackCompatibility,
   clearCache,
   clearManifestCache,
   configureIndustryPackLoader,
@@ -62,6 +64,11 @@ export type {
 } from "./output-extractors"
 
 export { IndustryPackManifestSchema } from './types'
-export type { IndustryPackManifest, IndustryPackLoaderOptions, IndustryPackAuditEvent } from './types'
+export type {
+  IndustryPackManifest,
+  IndustryPackLoaderOptions,
+  IndustryPackAuditEvent,
+  CompatibilityCheckResult,
+} from './types'
 export { IndustryPackLoader } from './loader'
 

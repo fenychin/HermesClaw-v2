@@ -1,0 +1,13 @@
+{
+  "eventType": "intel.topology.updated",
+  "added": [
+    { "id": "node_101", "label": "BYD", "category": "company", "weight": 0.85 },
+    { "id": "node_102", "label": "CATL", "category": "company", "weight": 0.78 }
+  ],
+  "removed": [],
+  "updated": [
+    { "id": "edge_501", "source": "node_101", "target": "node_102", "relation": "supply", "weight": 0.65 }
+  ],
+  "timestamp": "2026-06-22T10:05:00Z",
+  "version": "1.0.0"
+}

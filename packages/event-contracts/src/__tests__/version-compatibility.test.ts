@@ -17,6 +17,16 @@ import { ExecutionSummarySchema } from "../execution-summary"
 import { CapabilityRegistrationSchema } from "../capability-registration"
 import { ConnectorLeaseSchema } from "../connector-lease"
 import { HumanApprovalCheckpointSchema } from "../human-approval-checkpoint"
+import { IndustryIntelSnapshotSchema } from "../industry-intel-snapshot"
+import { SandboxScenarioRequestSchema, ScenarioResultSchema } from "../sandbox-scenario"
+import {
+  IntelFlowTickSchema,
+  IntelSignalDetectedSchema,
+  IntelTopologyUpdatedSchema,
+  IntelAlertTacticalSchema,
+  IntelEvolutionProposalCreatedSchema,
+  IntelAgentHeartbeatSchema,
+} from "../intel-sse-events"
 import { roundTrip } from "../shared"
 
 const FIXTURES = join(__dirname, "__fixtures__")
@@ -60,6 +70,51 @@ const CONTRACTS = [
     name: "HumanApprovalCheckpoint",
     fixture: "human-approval-checkpoint-v1.0.0.json",
     schema: HumanApprovalCheckpointSchema,
+  },
+  {
+    name: "IndustryIntelSnapshot",
+    fixture: "industry-intel-snapshot-v1.0.0.json",
+    schema: IndustryIntelSnapshotSchema,
+  },
+  {
+    name: "SandboxScenarioRequest",
+    fixture: "sandbox-scenario-request-v1.0.0.json",
+    schema: SandboxScenarioRequestSchema,
+  },
+  {
+    name: "ScenarioResult",
+    fixture: "scenario-result-v1.0.0.json",
+    schema: ScenarioResultSchema,
+  },
+  {
+    name: "IntelFlowTick",
+    fixture: "intel-flow-tick-v1.0.0.json",
+    schema: IntelFlowTickSchema,
+  },
+  {
+    name: "IntelSignalDetected",
+    fixture: "intel-signal-detected-v1.0.0.json",
+    schema: IntelSignalDetectedSchema,
+  },
+  {
+    name: "IntelTopologyUpdated",
+    fixture: "intel-topology-updated-v1.0.0.json",
+    schema: IntelTopologyUpdatedSchema,
+  },
+  {
+    name: "IntelAlertTactical",
+    fixture: "intel-alert-tactical-v1.0.0.json",
+    schema: IntelAlertTacticalSchema,
+  },
+  {
+    name: "IntelEvolutionProposalCreated",
+    fixture: "intel-evolution-proposal-created-v1.0.0.json",
+    schema: IntelEvolutionProposalCreatedSchema,
+  },
+  {
+    name: "IntelAgentHeartbeat",
+    fixture: "intel-agent-heartbeat-v1.0.0.json",
+    schema: IntelAgentHeartbeatSchema,
   },
 ]
 

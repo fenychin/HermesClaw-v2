@@ -1,0 +1,62 @@
+{
+  "runId": "run_sandbox_001",
+  "paths": [
+    {
+      "label": "PATH_A",
+      "description": "最优路径：降价5% + 欧盟本地仓前置部署",
+      "winRate": 0.72,
+      "data": [
+        { "t": "2026Q2", "value": 100 },
+        { "t": "2026Q3", "value": 108 },
+        { "t": "2026Q4", "value": 115 },
+        { "t": "2027Q1", "value": 125 }
+      ],
+      "isRecommended": true
+    },
+    {
+      "label": "PATH_B",
+      "description": "基准路径：维持现价 + 现有渠道",
+      "winRate": 0.45,
+      "data": [
+        { "t": "2026Q2", "value": 100 },
+        { "t": "2026Q3", "value": 102 },
+        { "t": "2026Q4", "value": 105 },
+        { "t": "2027Q1", "value": 108 }
+      ],
+      "isRecommended": false
+    },
+    {
+      "label": "PATH_C",
+      "description": "最差路径：降价触发反倾销调查",
+      "winRate": 0.15,
+      "data": [
+        { "t": "2026Q2", "value": 100 },
+        { "t": "2026Q3", "value": 95 },
+        { "t": "2026Q4", "value": 82 },
+        { "t": "2027Q1", "value": 70 }
+      ],
+      "isRecommended": false
+    }
+  ],
+  "recommendations": [
+    {
+      "recommendationId": "rec_001",
+      "title": "启动欧盟本地仓选址",
+      "description": "建议在荷兰或波兰选址部署前置仓，降低CBAM合规成本",
+      "priority": 1,
+      "linkedPath": "PATH_A",
+      "estimatedImpact": "预计降低物流成本12%，缩短交货周期至3天"
+    },
+    {
+      "recommendationId": "rec_002",
+      "title": "聘请欧盟贸易法律顾问",
+      "description": "应对潜在的反倾销风险，提前准备法律应对方案",
+      "priority": 2,
+      "linkedPath": "PATH_C",
+      "estimatedImpact": "降低反倾销调查应对成本约40%"
+    }
+  ],
+  "disclaimer": "AI 建议 / 仅供参考",
+  "generatedAt": "2026-06-22T10:05:00Z",
+  "version": "1.0.0"
+}

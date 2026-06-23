@@ -1,0 +1,38 @@
+# Connector: SSE Gateway
+# 类型: sse
+# 用途: 推送 Intel SSE 事件到前端面板
+
+id: sse-gateway
+name: SSE 事件网关
+type: sse
+description: >
+  行业情报中心 SSE 事件推送网关。
+  负责将 IntelSSEEvent 推送到前端 EventSource 消费者。
+  支持事件优先级路由、环形缓冲补偿、断线重连。
+status: active
+config:
+  endpoint: /api/stream/industry-intel
+  heartbeatIntervalMs: 30000
+  maxBufferSize: 300
+  reconnectTimeoutMs: 2000
+  eventTypes:
+    - intel.flow.tick
+    - intel.signal.detected
+    - intel.topology.updated
+    - intel.alert.tactical
+    - intel.evolution.proposal-created
+    - intel.agent.heartbeat
+  priorityRouting:
+    P0: immediate
+    P1: 100ms
+    P2: 1000ms
+    P3: 30000ms
+    P4: 300000ms
+healthCheck:
+  endpoint: /api/stream/industry-intel/health
+  intervalMs: 30000
+capabilities:
+  - sse-event-push
+  - priority-routing
+  - ring-buffer-compensation
+  - auto-reconnect

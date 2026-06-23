@@ -19,7 +19,7 @@ export interface DashboardHandlerDeps {
     workflowRun: { findMany: (args: any) => Promise<any[]>; count: (args: any) => Promise<number>; groupBy: (args: any) => Promise<any[]> };
     marketIntelligence: { findMany: (args: any) => Promise<any[]> };
     industryPackInstallation: { count: (args: any) => Promise<number> };
-    auditLog: { count: (args: any) => Promise<number> };
+    auditLog: { count: (args: any) => Promise<number>; groupBy: (args: any) => Promise<any[]> };
     harnessProposal: { count: (args: any) => Promise<number>; findFirst: (args: any) => Promise<any> };
     stepRun: { count: (args: any) => Promise<number> };
   };

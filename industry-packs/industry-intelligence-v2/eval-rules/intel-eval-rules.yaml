@@ -1,0 +1,92 @@
+# Industry Intelligence v2.0 — 评估规则
+# 用于 Harness 评估引擎的规则集
+# 每个规则定义评估维度、触发条件与评分标准
+
+packId: industry-intelligence-v2
+version: "2.0.0"
+
+rules:
+  - id: eval-radar-freshness
+    name: 雷达数据新鲜度
+    description: 检查 IndustryIntelSnapshot 的雷达数据是否在 60s 内更新
+    dimension: data-quality
+    condition:
+      field: radarSection.generatedAt
+      operator: age_lt
+      value: 60
+      unit: seconds
+    scoring:
+      pass: 1.0
+      warn: 0.5
+      fail: 0.0
+    weight: 0.15
+
+  - id: eval-signal-confidence
+    name: 信号置信度阈值
+    description: 检查 signalFeed 中信号的 modelConfidence 是否 >= 60
+    dimension: signal-quality
+    condition:
+      field: signalFeed[*].modelConfidence
+      operator: gte
+      value: 60
+    scoring:
+      pass: 1.0
+      warn: 0.7
+      fail: 0.3
+    weight: 0.20
+
+  - id: eval-threat-response-time
+    name: 威胁响应时效
+    description: HIGH/CRITICAL 威胁从检测到告警推送的延迟 <= 5s
+    dimension: responsiveness
+    condition:
+      field: systemStatus.threatResponseLatencyMs
+      operator: lte
+      value: 5000
+    scoring:
+      pass: 1.0
+      warn: 0.6
+      fail: 0.0
+    weight: 0.25
+
+  - id: eval-connector-uptime
+    name: 连接器可用率
+    description: 所有声明的连接器健康状态为 healthy 的比例 >= 0.95
+    dimension: reliability
+    condition:
+      field: connectorHealth.healthyRatio
+      operator: gte
+      value: 0.95
+    scoring:
+      pass: 1.0
+      warn: 0.5
+      fail: 0.0
+    weight: 0.15
+
+  - id: eval-sandbox-accuracy
+    name: 沙盘推演准确率
+    description: 历史 ScenarioResult 的实际结果与预测路径的匹配率 >= 0.6
+    dimension: prediction-quality
+    condition:
+      field: sandboxAccuracy
+      operator: gte
+      value: 0.6
+    scoring:
+      pass: 1.0
+      warn: 0.5
+      fail: 0.2
+    weight: 0.15
+
+  - id: eval-evolution-alignment
+    name: 进化决策对齐度
+    description: 最近 10 个已应用提案的决策对齐度均值 >= 0.7
+    dimension: governance
+    condition:
+      field: decisionAlignmentAvg
+      operator: gte
+      value: 0.7
+    scoring:
+      pass: 1.0
+      warn: 0.5
+      fail: 0.0
+    weight: 0.10

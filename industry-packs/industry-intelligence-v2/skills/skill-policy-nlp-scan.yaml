@@ -1,0 +1,14 @@
+# Skill: 政策热词 NLP 扫描
+# 所属 Agent: A1
+# 类别: intelligence / nlp
+
+id: skill-policy-nlp-scan
+name: 政策热词NLP扫描
+displayName: 政策热词矩阵扫描
+description: >
+  从外部数据源采集政策文本，通过 NLP 提取热词、构建共现矩阵。
+  识别新兴政策趋势，计算热词热度得分与变化率。
+  支持中英文双语处理。
+version: "2.0.0"
+category: intelligence
+status: active

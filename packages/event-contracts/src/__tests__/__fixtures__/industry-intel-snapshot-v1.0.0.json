@@ -1,0 +1,45 @@
+{
+  "snapshotId": "snap_001",
+  "industryId": "foreign-trade",
+  "workspaceId": "ws_demo",
+  "generatedAt": "2026-06-22T10:00:00Z",
+  "modelConfidence": 94.2,
+  "evolutionGeneration": 3,
+  "threatLevel": "MEDIUM",
+  "radarSection": {
+    "dimensions": [
+      { "key": "market-heat", "label": "市场热度", "value": 72, "delta": 3.1, "source": "海关进出口数据" },
+      { "key": "competitor-intensity", "label": "竞对强度", "value": 58, "delta": -2.0, "source": "竞品社交媒体" },
+      { "key": "policy-risk", "label": "政策风险", "value": 45, "delta": 1.5, "source": "政策NLP扫描" },
+      { "key": "capital-flow", "label": "资金流向", "value": 81, "delta": 5.2, "source": "资金流指数" },
+      { "key": "tech-change", "label": "技术变化", "value": 63, "delta": 0.3, "source": "专利数据库" },
+      { "key": "sentiment", "label": "舆情温度", "value": 55, "delta": -1.8, "source": "舆情采集" },
+      { "key": "supply-chain", "label": "供应链压力", "value": 39, "delta": 0.9, "source": "物流数据" },
+      { "key": "regulatory-density", "label": "监管密度", "value": 48, "delta": 2.1, "source": "法规数据库" }
+    ]
+  },
+  "signalFeed": [
+    {
+      "signalId": "sig_001",
+      "title": "美国对华光伏组件关税调整",
+      "description": "USTR 发布新一轮301关税复审结果，光伏组件税率由25%上调至35%",
+      "threatLevel": "L3",
+      "confidence": 0.92,
+      "source": "USTR公告",
+      "detectedAt": "2026-06-22T09:45:00Z",
+      "region": "北美"
+    },
+    {
+      "signalId": "sig_002",
+      "title": "欧盟碳边境调节机制(CBAM)过渡期结束",
+      "description": "CBAM正式进入全面实施阶段，钢铁铝制品出口需提供碳排放证书",
+      "threatLevel": "L2",
+      "confidence": 0.88,
+      "source": "EU Official Journal",
+      "detectedAt": "2026-06-22T09:30:00Z",
+      "region": "欧盟"
+    }
+  ],
+  "systemStatus": "OPERATIONAL",
+  "version": "1.0.0"
+}

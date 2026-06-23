@@ -1,0 +1,34 @@
+# Connector: HTTP 市场数据源
+# 类型: http
+# 用途: 采集外部市场数据（资金流向、趋势、竞对活动）
+
+id: http-market-data
+name: HTTP 市场数据连接器
+type: http
+description: >
+  通过 HTTP REST API 采集多源市场数据：
+  资金流向指数、行业趋势曲线、竞对活动日志。
+  支持分页、重试、超时配置。
+status: active
+config:
+  baseUrl: "${MARKET_DATA_API_BASE}"
+  timeoutMs: 5000
+  retryCount: 3
+  retryBackoffMs: 1000
+  headers:
+    Accept: application/json
+    User-Agent: HermesClaw-IndustryIntel/2.0
+  endpoints:
+    capitalFlow: /api/v2/market/capital-flow
+    marketTrend: /api/v2/market/trends
+    competitorActivity: /api/v2/market/competitor-activity
+healthCheck:
+  endpoint: /api/health
+  intervalMs: 10000
+  timeoutMs: 3000
+  healthyThreshold: 2
+  unhealthyThreshold: 3
+capabilities:
+  - capital-flow-streaming
+  - market-trend-aggregation
+  - competitor-monitoring

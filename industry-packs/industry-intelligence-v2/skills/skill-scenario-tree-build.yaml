@@ -1,0 +1,15 @@
+# Skill: 场景树构建
+# 所属 Agent: A4
+# 类别: simulation / decision-tree
+
+id: skill-scenario-tree-build
+name: 场景树构建
+displayName: 多路径场景决策树构建器
+description: >
+  基于结构化 ScenarioInput 构建多路径决策树。
+  生成 3 条预测路径（PATH_A/B/C）：
+  乐观路径、基准路径、悲观路径。
+  每条路径附带 winRate（0-1）、时间序列数据点、可执行行动建议。
+version: "2.0.0"
+category: simulation
+status: active

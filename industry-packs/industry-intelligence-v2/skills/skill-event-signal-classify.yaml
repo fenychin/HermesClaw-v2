@@ -1,0 +1,14 @@
+# Skill: 事件信号分类
+# 所属 Agent: A1
+# 类别: intelligence / classification
+
+id: skill-event-signal-classify
+name: 事件信号分类
+displayName: 战术信号分类器
+description: >
+  对采集到的原始事件信号进行分类：
+  市场异常（market-anomaly）、竞对动向（competitor-move）、合规风险（compliance-risk）。
+  计算每条信号的置信度（0-100），低于阈值（默认 60）的信号不推送到面板。
+version: "2.0.0"
+category: intelligence
+status: active

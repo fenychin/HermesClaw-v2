@@ -1,0 +1,4 @@
+id: wf-data-flux-stream-heartbeat
+title: 数据流实时推送心跳
+description: 每 3s 采集多源市场数据并推送 intel.flow.tick SSE 事件，监控数据源健康
+icon: activity

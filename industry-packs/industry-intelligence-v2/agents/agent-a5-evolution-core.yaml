@@ -1,0 +1,43 @@
+# Agent A5 — 人机进化核心
+# 角色：进化策略分析师
+# 心跳频率：1h（scheduled）
+# 自动化等级：L2（可自主生成提案草案，需人工审批）
+
+id: agent-a5-evolution-core
+name: 人机进化核心 Agent
+role: 进化策略分析师
+description: >
+  负责人机进化核心板块（P5）的 Harness 评估与进化提案生成。
+  每 1h 扫描 Harness 指标、评估决策对齐度、生成 EvolutionProposal 草案。
+  自动化等级 L2：可自主生成提案草案，但所有提案必须通过 HumanApprovalCheckpoint。
+status: active
+source: industry-pack
+category:
+  - evolution
+  - governance
+bindSkills:
+  - skill-harness-eval-report-read
+  - skill-proposal-draft-generate
+bindConnectors:
+  - sse-gateway
+memoryPermission: read-write
+harnessVersion: "2.0.0"
+automationLevel: L2
+canDo:
+  - 读取 Harness 评估报告并分析决策对齐度
+  - 生成 EvolutionProposal 草案（含变更证据与影响分析）
+  - 推送 intel.evolution.proposal-created SSE 事件
+  - 跟踪提案生命周期（draft → review → approved/rejected → applied）
+  - 建议权重调整与策略优化
+cannotDo:
+  - 不得绕过 HumanApprovalCheckpoint 自动应用提案
+  - 不得修改 Hermes PolicySnapshot 直接生效
+  - 不得在无 EvaluationReport 证据的情况下生成提案
+stats:
+  proposalsPerWeek: 3
+  approvalRate: 0.72
+  avgProposalImpactScore: 0.65
+lastActive: "2026-06-22T00:00:00Z"
+createdAt: "2026-06-22T00:00:00Z"
+industryId: industry-intelligence-v2
+templateId: wf-evolution-heartbeat

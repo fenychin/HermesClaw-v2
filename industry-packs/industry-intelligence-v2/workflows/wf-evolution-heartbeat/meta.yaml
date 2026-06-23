@@ -1,0 +1,4 @@
+id: wf-evolution-heartbeat
+title: 进化评估心跳
+description: 每 1h 读取 Harness 评估报告，分析决策对齐度，生成 EvolutionProposal 草案
+icon: dna

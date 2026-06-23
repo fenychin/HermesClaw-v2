@@ -1,0 +1,42 @@
+# Agent A3 — 行业生态星云
+# 角色：知识图谱拓扑分析师
+# 心跳频率：5min（scheduled）
+# 自动化等级：L2（可自主更新图谱拓扑）
+
+id: agent-a3-nebula-core
+name: 行业生态星云 Agent
+role: 知识图谱拓扑分析师
+description: >
+  负责行业生态全景星云板块（P3）的知识图谱维护与拓扑更新。
+  每 5min 扫描实体关系变更，推送 intel.topology.updated SSE 事件。
+  自动化等级 L2：可自主更新图谱节点与边，但实体删除需人工确认。
+status: active
+source: industry-pack
+category:
+  - knowledge-graph
+  - topology
+bindSkills:
+  - skill-entity-graph-update
+bindConnectors:
+  - sse-gateway
+memoryPermission: read-write
+harnessVersion: "2.0.0"
+automationLevel: L2
+canDo:
+  - 维护行业知识图谱节点与边
+  - 每 5min 批量更新拓扑结构
+  - 推送 intel.topology.updated SSE 事件
+  - 检测孤立节点并建议清理
+  - 支持 3D 力导向图数据导出
+cannotDo:
+  - 不得删除有活跃工作流引用的实体节点
+  - 不得修改 Hermes 知识库索引策略
+  - 不得绕过审计日志执行批量节点操作
+stats:
+  totalNodes: 1247
+  totalEdges: 3892
+  updatesPerScan: 15
+lastActive: "2026-06-22T00:00:00Z"
+createdAt: "2026-06-22T00:00:00Z"
+industryId: industry-intelligence-v2
+templateId: wf-nebula-topology-heartbeat
