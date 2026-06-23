@@ -206,7 +206,31 @@ self.onmessage = (e: MessageEvent<{
     if (energy < MIN_ENERGY) break
   }
 
-  // 计算 2D 投影
+  // ─── 布局完成后：计算包围盒并居中 ──────────────────────────────────
+
+  let minX = Infinity, minY = Infinity, minZ = Infinity
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity
+  for (const node of nodes) {
+    minX = Math.min(minX, node.position.x)
+    minY = Math.min(minY, node.position.y)
+    minZ = Math.min(minZ, node.position.z)
+    maxX = Math.max(maxX, node.position.x)
+    maxY = Math.max(maxY, node.position.y)
+    maxZ = Math.max(maxZ, node.position.z)
+  }
+
+  const centerX = (minX + maxX) / 2
+  const centerY = (minY + maxY) / 2
+  const centerZ = (minZ + maxZ) / 2
+
+  // 将节点簇中心平移到原点（便于相机 lookAt 和 2D 投影居中）
+  for (const node of nodes) {
+    node.position.x -= centerX
+    node.position.y -= centerY
+    node.position.z -= centerZ
+  }
+
+  // 计算 2D 投影（基于校准后的位置，确保居中）
   for (const node of nodes) {
     node.position2d = {
       x: node.position.x + width / 2,

@@ -103,13 +103,16 @@ agentBindings:
   - agentId: A1
     panelId: P1
     label: 战略态势感知
-    heartbeatIntervalSec: 30
+    # Phase 2 调整：30s → 300s（5min）。A1 每次需 8 次 Tavily + 1 次 DeepSeek，
+    # 频率过高会瞬间耗尽 Tavily 免费额度（1000 次/月）。
+    heartbeatIntervalSec: 300
     automationLevel: L2
     triggerType: scheduled
   - agentId: A2
     panelId: P2
     label: 数据流量动力学
-    heartbeatIntervalSec: 3
+    # Phase 2 调整：3s → 30s。A2 tick 是高频指标，但 3s 在 LLM 模式下不现实。
+    heartbeatIntervalSec: 30
     automationLevel: L1
     triggerType: event-driven
   - agentId: A3

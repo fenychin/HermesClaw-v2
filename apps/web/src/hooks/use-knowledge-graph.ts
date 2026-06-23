@@ -10,6 +10,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useContainerSize } from "@/hooks/use-container-size"
 import { fetchKnowledgeGraph } from "@/services/api/industry-intel-api"
 import { useIntelStream } from "@/hooks/use-intel-stream"
 import { useIndustryIntelStore } from "@/stores/industry-intel-store"
@@ -24,6 +25,8 @@ const MAX_NODES = 500
 
 interface UseKnowledgeGraphOptions {
   packId: string | null
+  /** 容器 ref，用于获取真实尺寸传递给 Worker */
+  containerRef?: React.RefObject<HTMLDivElement | null>
 }
 
 interface UseKnowledgeGraphReturn {
@@ -45,6 +48,7 @@ interface UseKnowledgeGraphReturn {
 
 export function useKnowledgeGraph({
   packId,
+  containerRef,
 }: UseKnowledgeGraphOptions): UseKnowledgeGraphReturn {
   const [nodes, setNodes] = useState<GraphNode[]>([])
   const [edges, setEdges] = useState<GraphEdge[]>([])
@@ -52,6 +56,8 @@ export function useKnowledgeGraph({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastDiff, setLastDiff] = useState<GraphDiff | null>(null)
+
+  const containerSize = useContainerSize(containerRef)
 
   const workerRef = useRef<Worker | null>(null)
   const layoutRequestedRef = useRef(false)
@@ -209,6 +215,11 @@ export function useKnowledgeGraph({
         target: e.target,
         weight: e.weight,
       })),
+      options: {
+        width: containerSize.width,
+        height: containerSize.height,
+        depth: Math.min(containerSize.width, containerSize.height) * 0.8,
+      },
     })
   }, [nodes, edges])
 

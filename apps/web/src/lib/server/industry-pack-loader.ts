@@ -9,6 +9,7 @@ import {
   CapabilityAlreadyRegisteredError
 } from "./capability-registry"
 import { validateManifest, type IndustryPackManifest } from "@hermesclaw/event-contracts"
+import { validateIndustryPackCompatibility } from "@hermesclaw/industry-pack-sdk"
 import type { IndustryPackInstallation, Prisma } from "@/generated/prisma-v2/client"
 import { compareSemver, satisfiesSemver } from "./utils/semver"
 export { satisfiesSemver }
@@ -195,6 +196,25 @@ export async function installPack(
   const sysVer = activeGetSystemVersion()
   if (manifest.minHarnessCoreVersion && compareSemver(sysVer, manifest.minHarnessCoreVersion) < 0) {
     throw new PackCoreVersionIncompatibleError(manifest.packId, sysVer, manifest.minHarnessCoreVersion)
+  }
+
+  // 3b. 校验 Industry Pack 兼容性声明（CLAUDE.md §6.3）
+  const compatResult = validateIndustryPackCompatibility(manifest.packId, sysVer, sysVer)
+  if (!compatResult.passed) {
+    await activeWriteAuditLog({
+      actor: installedBy || 'system',
+      action: 'pack.install.compatibility_failed',
+      targetType: 'pack',
+      targetId: manifest.packId,
+      detail: `兼容性校验失败: ${compatResult.failures.join('; ')}`,
+      riskLevel: 'medium',
+      workspaceId
+    })
+    throw new PackCoreVersionIncompatibleError(
+      manifest.packId,
+      sysVer,
+      `compatibility check failed: ${compatResult.failures.join('; ')}`
+    )
   }
 
   // 4. 解析并校验前置依赖项

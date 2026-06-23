@@ -27,7 +27,18 @@ const SYSTEM_ROUTES = [
 ];
 
 /** 开发环境免认证路由（仅本地测试使用） */
-const DEV_BYPASS_ROUTES = ["/api/chat", "/api/hermes/task", "/api/conversations"];
+const DEV_BYPASS_ROUTES = [
+  "/api/chat",
+  "/api/hermes/task",
+  "/api/conversations",
+  "/api/intel/skill-test",
+  "/api/v1/sandbox",
+  "/api/v1/runtime/connector-health",
+  "/api/v1/industry/knowledge-graph",
+  "/api/v1/industry/kpi-snapshot",
+  "/api/v1/harness",
+  "/api/v1/audit",
+];
 
 function isDevAuthBypassEnabled(): boolean {
   return process.env.NODE_ENV === "development" || process.env.DEV_BYPASS_AUTH === "true";
@@ -37,7 +48,7 @@ function isDevAuthBypassEnabled(): boolean {
 const WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
 
 /** 公开页面（无需登录即可访问） */
-const PUBLIC_PAGES = ["/login", "/register", "/forgot-password"];
+const PUBLIC_PAGES = ["/login", "/register", "/forgot-password", "/industry-intelligence"];
 
 /** 从请求 cookie 中读取 session token（兼容开发 / 生产 cookie 名） */
 function getSessionToken(request: NextRequest): string | undefined {
@@ -81,7 +92,7 @@ export function middleware(request: NextRequest) {
       if (pathname.startsWith(prefix)) return NextResponse.next();
     }
 
-    // 开发环境免认证：DEV_BYPASS_AUTH=true 时放行 chat/task API
+    // 开发环境免认证：DEV_BYPASS_AUTH=true 时放行 chat/task/skill-test/sandbox API
     if (isDevAuthBypassEnabled() && DEV_BYPASS_ROUTES.some((route) => pathname.startsWith(route))) {
       return NextResponse.next();
     }

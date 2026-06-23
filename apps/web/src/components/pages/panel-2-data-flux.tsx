@@ -6,7 +6,7 @@
  */
 "use client"
 
-import React, { useMemo } from "react"
+import React, { useMemo, useEffect } from "react"
 import { useIntelSnapshot } from "@/hooks/use-intel-snapshot"
 import { useIntelStream } from "@/hooks/use-intel-stream"
 import { useIndustryIntelStore } from "@/stores/industry-intel-store"
@@ -42,9 +42,30 @@ function MiniCurve({
   color: string
 }) {
   const maxVal = Math.max(...data, 1)
-  const points = data
-    .map((v, i) => `${(i / (data.length - 1)) * 100},${100 - (v / maxVal) * 60}`)
-    .join(" ")
+
+  // 生成平滑贝塞尔路径 (catmull-rom → cubic bezier)
+  const pathD = useMemo(() => {
+    if (data.length < 2) return ""
+    const pts = data.map((v, i) => ({
+      x: (i / (data.length - 1)) * 100,
+      y: 100 - (v / maxVal) * 60,
+    }))
+
+    let d = `M${pts[0].x},${pts[0].y}`
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)]
+      const p1 = pts[i]
+      const p2 = pts[i + 1]
+      const p3 = pts[Math.min(pts.length - 1, i + 2)]
+      const tension = 0.3
+      const cp1x = p1.x + (p2.x - p0.x) * tension
+      const cp1y = p1.y + (p2.y - p0.y) * tension
+      const cp2x = p2.x - (p3.x - p1.x) * tension
+      const cp2y = p2.y - (p3.y - p1.y) * tension
+      d += ` C${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`
+    }
+    return d
+  }, [data, maxVal])
 
   return (
     <div className="flex-1 min-w-0" aria-label={`${label} 趋势曲线`}>
@@ -55,8 +76,19 @@ function MiniCurve({
         preserveAspectRatio="none"
         aria-hidden="true"
       >
-        <polyline
-          points={points}
+        {/* 渐变填充区域 */}
+        <defs>
+          <linearGradient id={`grad-${label}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.15" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path
+          d={pathD + ` L100,60 L0,60 Z`}
+          fill={`url(#grad-${label})`}
+        />
+        <path
+          d={pathD}
           fill="none"
           stroke={color}
           strokeWidth="1.5"
@@ -98,20 +130,29 @@ export function Panel2DataFlux() {
     return flowTicks.slice(-300)
   }, [flowTicks])
 
-  // 用 tick 数据生成曲线，或使用占位数据
-  const curveData = useMemo(() => {
+  // 用 tick 数据生成曲线
+  const capitalFlowData = useMemo(() => {
     if (tickBuffer.length > 5) {
       return tickBuffer.map((t) => {
-        // 合约字段：capitalFlowIndex / volumeIndex 直属 IntelFlowTick
         const tick = t as unknown as Record<string, number>
-        return tick.capitalFlowIndex ?? tick.volumeIndex ?? 50
+        return tick.capitalFlowIndex ?? 50
       })
     }
     return PLACEHOLDER_CURVE
   }, [tickBuffer])
 
+  const volumeData = useMemo(() => {
+    if (tickBuffer.length > 5) {
+      return tickBuffer.map((t) => {
+        const tick = t as unknown as Record<string, number>
+        return tick.volumeIndex ?? 50
+      })
+    }
+    return PLACEHOLDER_CURVE.map(v => Math.max(0, Math.min(100, v + (Math.random() - 0.5) * 20)))
+  }, [tickBuffer])
+
   // 拉取连接器健康状态
-  React.useEffect(() => {
+  useEffect(() => {
     fetchConnectorHealth()
       .then(setConnectorHealth)
       .catch(() => { /* 静默降级 */ })
@@ -136,7 +177,10 @@ export function Panel2DataFlux() {
           {snapshotLoading && tickBuffer.length === 0 ? (
             <Skeleton className="h-14 w-full bg-zinc-800" />
           ) : (
-            <MiniCurve data={curveData} label="资本流动指数" color="#10b981" />
+            <div className="flex gap-2">
+              <MiniCurve data={capitalFlowData} label="资本流动指数" color="#10b981" />
+              <MiniCurve data={volumeData} label="成交量指数" color="#3b82f6" />
+            </div>
           )}
         </section>
 
@@ -161,15 +205,15 @@ export function Panel2DataFlux() {
         {/* 数据源连接器健康 */}
         <section aria-label="连接器健康状态">
           <h4 className="text-[11px] text-zinc-500 mb-1">数据源健康</h4>
-          {connectorHealth.length === 0 ? (
-            <p className="text-[10px] text-zinc-600 italic">加载中…</p>
-          ) : (
-            <div className="space-y-1">
-              {connectorHealth.map((item) => (
+          <div className="space-y-1">
+            {connectorHealth.length === 0 ? (
+              <p className="text-[10px] text-zinc-500 italic">检测中…</p>
+            ) : (
+              connectorHealth.map((item) => (
                 <ConnectorStatusBadge key={item.connectorId} item={item} />
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
         </section>
       </CardContent>
     </Card>

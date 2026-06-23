@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { RadarDimension, IntelSignalDetected } from "@/types/industry-intel"
 
-// ─── 静态占位数据（仅雷达无 API 数据时使用） ────────────────────────────
+// ─── 静态占位数据（雷达无 API 数据时使用） ────────────────────────────────
 
 const PLACEHOLDER_RADAR: RadarDimension[] = [
   { key: "policy-sensitivity", label: "政策敏感性", value: 72, delta: 5 },
@@ -27,34 +27,114 @@ const PLACEHOLDER_RADAR: RadarDimension[] = [
   { key: "capital-liquidity", label: "资本流动性", value: 49, delta: -4 },
 ]
 
-// ─── 子组件 ────────────────────────────────────────────────────────────
+// ─── 极坐标雷达图 ────────────────────────────────────────────────────────
 
-function RadarBar({ dim }: { dim: RadarDimension }) {
-  const score = dim.value
-  const barColor =
-    score >= 70 ? "bg-emerald-500" : score >= 50 ? "bg-amber-500" : "bg-red-500"
-  const deltaStr =
-    dim.delta != null ? (dim.delta > 0 ? "↑" : dim.delta < 0 ? "↓" : "→") : "→"
-  const deltaColor =
-    dim.delta != null && dim.delta > 0 ? "text-red-400" : dim.delta != null && dim.delta < 0 ? "text-emerald-400" : "text-zinc-500"
+function PolarRadar({ dimensions }: { dimensions: RadarDimension[] }) {
+  const cx = 80, cy = 80, r = 68
+  const levels = 4 // 4 个同心环（0, 25, 50, 75, 100）
+
+  // 每个维度的弧度（从上开始，顺时针）
+  const step = (2 * Math.PI) / dimensions.length
+  const startAngle = -Math.PI / 2 // 12 点钟方向
+
+  // 网格线（环形 + 射线）
+  const gridCircles = Array.from({ length: levels }, (_, i) => {
+    const lr = (r / levels) * (i + 1)
+    return (
+      <circle
+        key={`grid-${i}`}
+        cx={cx} cy={cy} r={lr}
+        fill="none"
+        stroke="rgb(39 39 42 / 0.6)"
+        strokeWidth="0.5"
+      />
+    )
+  })
+
+  const gridLines = dimensions.map((_, i) => {
+    const angle = startAngle + i * step
+    const x = cx + Math.cos(angle) * r
+    const y = cy + Math.sin(angle) * r
+    return (
+      <line
+        key={`ray-${i}`}
+        x1={cx} y1={cy} x2={x} y2={y}
+        stroke="rgb(39 39 42 / 0.6)"
+        strokeWidth="0.5"
+      />
+    )
+  })
+
+  // 标签
+  const labels = dimensions.map((dim, i) => {
+    const angle = startAngle + i * step
+    const lr = r + 14
+    const x = cx + Math.cos(angle) * lr
+    const y = cy + Math.sin(angle) * lr
+    return (
+      <text
+        key={dim.key}
+        x={x} y={y}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        className="fill-zinc-400 text-[6px]"
+        fontSize="6"
+      >
+        {dim.label.length > 4 ? dim.label.slice(0, 4) : dim.label}
+      </text>
+    )
+  })
+
+  // 数据多边形 + 填充
+  const dataPoints = dimensions.map((dim, i) => {
+    const angle = startAngle + i * step
+    const vr = (dim.value / 100) * r
+    return { x: cx + Math.cos(angle) * vr, y: cy + Math.sin(angle) * vr }
+  })
+  const polyPoints = dataPoints.map(p => `${p.x},${p.y}`).join(" ")
+
+  // 数据点圆
+  const dataDots = dataPoints.map((p, i) => (
+    <circle key={`dot-${i}`} cx={p.x} cy={p.y} r="2" fill="#3b82f6" />
+  ))
+
+  // 数值标签
+  const valueLabels = dimensions.map((dim, i) => {
+    const angle = startAngle + i * step
+    const vr = (dim.value / 100) * r
+    const x = cx + Math.cos(angle) * vr
+    const y = cy + Math.sin(angle) * vr
+    const offsetX = Math.cos(angle) * 8
+    const offsetY = Math.sin(angle) * 8
+    return (
+      <text
+        key={`val-${i}`}
+        x={x + offsetX} y={y + offsetY}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        className="fill-zinc-300 text-[5px]"
+        fontSize="5"
+      >
+        {dim.value}
+      </text>
+    )
+  })
 
   return (
-    <div className="flex items-center gap-2 text-xs" role="listitem" aria-label={`${dim.label}: ${score}分`}>
-      <span className="w-24 text-zinc-400 truncate" title={dim.label}>
-        {dim.label}
-      </span>
-      <div className="flex-1 h-3 bg-zinc-800 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-          style={{ width: `${score}%` }}
-        />
-      </div>
-      <span className="w-8 text-right text-zinc-300 font-mono">{score}</span>
-      <span className={`w-5 text-center text-xs ${deltaColor}`}>{deltaStr}</span>
-      {dim.delta != null && (
-        <span className="w-8 text-right text-zinc-600 font-mono">{dim.delta > 0 ? "+" : ""}{dim.delta}</span>
-      )}
-    </div>
+    <svg viewBox="0 0 160 160" className="w-full h-40" aria-label="雷达图">
+      {gridCircles}
+      {gridLines}
+      <polygon
+        points={polyPoints}
+        fill="rgba(59,130,246,0.12)"
+        stroke="#3b82f6"
+        strokeWidth="1"
+        strokeLinejoin="round"
+      />
+      {dataDots}
+      {labels}
+      {valueLabels}
+    </svg>
   )
 }
 
@@ -132,7 +212,7 @@ export function Panel1StrategicAwareness() {
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 space-y-3 overflow-auto pt-0">
-        {/* 8 维雷达 */}
+        {/* 8 维极坐标雷达 */}
         <section aria-label="8维雷达得分">
           <h4 className="text-[11px] text-zinc-500 mb-1.5">雷达得分</h4>
           {isLoading ? (
@@ -142,11 +222,7 @@ export function Panel1StrategicAwareness() {
               ))}
             </div>
           ) : (
-            <div className="space-y-1" role="list">
-              {radar.map((dim, i) => (
-                <RadarBar key={dim.key || `radar-${i}`} dim={dim} />
-              ))}
-            </div>
+            <PolarRadar dimensions={radar} />
           )}
         </section>
 

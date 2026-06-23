@@ -11,15 +11,14 @@
  */
 "use client"
 
-import { useEffect, useRef, useCallback, useState, useMemo } from "react"
+import { useEffect, useRef, useCallback, useState } from "react"
+import { useContainerSize } from "@/hooks/use-container-size"
 import type * as THREE from "three"
 import type {
   ForceLayoutResult,
   RenderMode,
   RenderPerf,
   GraphNode,
-  LayoutNode,
-  LayoutEdge,
 } from "@/types/nebula-graph"
 
 // ─── 性能阈值 ──────────────────────────────────────────────────────────
@@ -73,22 +72,126 @@ class D3CanvasRenderer {
   private ctx: CanvasRenderingContext2D
   private width = 0
   private height = 0
+  private dpr = 1
+
+  // 视口变换（平移 + 缩放）
+  private tx = 0
+  private ty = 0
+  private zoom = 1
+
+  // 拖拽状态
+  private isDown = false
+  private moved = false
+  private dragStartX = 0
+  private dragStartY = 0
+  private dragBaseTx = 0
+  private dragBaseTy = 0
+
+  // 外部回调
+  private _onClickNode: ((id: string | null) => void) | null = null
+  private _onHoverNode: ((id: string | null) => void) | null = null
+  private _layoutRef: ForceLayoutResult | null = null
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
     this.ctx = canvas.getContext("2d")!
+    this.bindEvents()
   }
+
+  setCallbacks(opts: {
+    onClickNode?: ((id: string | null) => void) | null
+    onHoverNode?: ((id: string | null) => void) | null
+  }) {
+    this._onClickNode = opts.onClickNode ?? null
+    this._onHoverNode = opts.onHoverNode ?? null
+  }
+
+  // ─── 事件绑定 ────────────────────────────────────────────────────────
+
+  private bindEvents() {
+    this.canvas.addEventListener("mousedown", this._handleDown)
+    window.addEventListener("mousemove", this._handleMove)
+    window.addEventListener("mouseup", this._handleUp)
+    this.canvas.addEventListener("wheel", this._handleWheel, { passive: false })
+    this.canvas.addEventListener("mousemove", this._handleHover)
+  }
+
+  unbindEvents() {
+    window.removeEventListener("mousemove", this._handleMove)
+    window.removeEventListener("mouseup", this._handleUp)
+  }
+
+  // ─── 事件处理 ────────────────────────────────────────────────────────
+
+  private _handleDown = (e: MouseEvent) => {
+    this.isDown = true
+    this.moved = false
+    this.dragStartX = e.clientX
+    this.dragStartY = e.clientY
+    this.dragBaseTx = this.tx
+    this.dragBaseTy = this.ty
+  }
+
+  private _handleMove = (e: MouseEvent) => {
+    if (!this.isDown) return
+    const dx = e.clientX - this.dragStartX
+    const dy = e.clientY - this.dragStartY
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      this.moved = true
+    }
+    this.tx = this.dragBaseTx + dx
+    this.ty = this.dragBaseTy + dy
+  }
+
+  private _handleUp = () => {
+    this.isDown = false
+  }
+
+  private _handleWheel = (e: WheelEvent) => {
+    e.preventDefault()
+    const rect = this.canvas.getBoundingClientRect()
+    const mx = e.clientX - rect.left
+    const my = e.clientY - rect.top
+
+    const delta = -e.deltaY * 0.001
+    const newZoom = Math.max(0.1, Math.min(10, this.zoom * (1 + delta)))
+    const ratio = newZoom / this.zoom
+    this.tx = mx - ratio * (mx - this.tx)
+    this.ty = my - ratio * (my - this.ty)
+    this.zoom = newZoom
+  }
+
+  private _handleHover = (e: MouseEvent) => {
+    if (this.isDown || !this._layoutRef) return
+    const rect = this.canvas.getBoundingClientRect()
+    const g = this.screenToGraph(e.clientX - rect.left, e.clientY - rect.top)
+    const hit = this.hitTest(g.x, g.y, this._layoutRef)
+    this._onHoverNode?.(hit)
+  }
+
+  // ─── 坐标转换 ────────────────────────────────────────────────────────
+
+  screenToGraph(sx: number, sy: number): { x: number; y: number } {
+    return {
+      x: (sx - this.tx) / this.zoom,
+      y: (sy - this.ty) / this.zoom,
+    }
+  }
+
+  // ─── 尺寸 ─────────────────────────────────────────────────────────────
 
   resize(w: number, h: number) {
     this.width = w
     this.height = h
-    const dpr = window.devicePixelRatio || 1
-    this.canvas.width = w * dpr
-    this.canvas.height = h * dpr
+    this.dpr = window.devicePixelRatio || 1
+    this.canvas.width = w * this.dpr
+    this.canvas.height = h * this.dpr
     this.canvas.style.width = `${w}px`
     this.canvas.style.height = `${h}px`
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
   }
+
+  // ─── 渲染 ──────────────────────────────────────────────────────────────
 
   render(
     layout: ForceLayoutResult,
@@ -97,6 +200,11 @@ class D3CanvasRenderer {
   ) {
     const { ctx, width, height } = this
     ctx.clearRect(0, 0, width, height)
+    this._layoutRef = layout
+
+    ctx.save()
+    ctx.translate(this.tx, this.ty)
+    ctx.scale(this.zoom, this.zoom)
 
     // 边
     for (const edge of layout.edges) {
@@ -138,6 +246,7 @@ class D3CanvasRenderer {
     }
 
     ctx.globalAlpha = 1
+    ctx.restore()
   }
 
   hitTest(x: number, y: number, layout: ForceLayoutResult): string | null {
@@ -197,6 +306,7 @@ export function useNebulaRender({
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const rendererRef = useRef<D3CanvasRenderer | null>(null)
   const threeRef = useRef<{ dispose: () => void } | null>(null)
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const fpsSamplesRef = useRef<number[]>([])
   const lastFrameTimeRef = useRef(0)
   const animFrameRef = useRef(0)
@@ -206,35 +316,11 @@ export function useNebulaRender({
   const selectedRef = useRef<string | null>(null)
   const hoveredRef = useRef<string | null>(null)
   const pausedRef = useRef(false)
+  const sceneRef = useRef<THREE.Scene | null>(null)
 
   // ─── 容器尺寸追踪（ResizeObserver → state，触发渲染重建） ──────
 
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
-
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect
-        setContainerSize((prev) =>
-          prev.width === Math.round(width) && prev.height === Math.round(height)
-            ? prev
-            : { width: Math.round(width), height: Math.round(height) },
-        )
-      }
-    })
-
-    observer.observe(container)
-    // 立即读取一次（ResizeObserver 首帧可能不触发）
-    const rect = container.getBoundingClientRect()
-    if (rect.width > 0 && rect.height > 0) {
-      setContainerSize({ width: Math.round(rect.width), height: Math.round(rect.height) })
-    }
-
-    return () => observer.disconnect()
-  }, [containerRef])
+  const containerSize = useContainerSize(containerRef)
 
   // 同步 ref
   useEffect(() => { layoutRef.current = layout }, [layout])
@@ -332,28 +418,14 @@ export function useNebulaRender({
       container.appendChild(canvas)
       canvasRef.current = canvas
       rendererRef.current = new D3CanvasRenderer(canvas)
-
-      // 点击事件
-      canvas.addEventListener("click", (e) => {
-        if (!rendererRef.current || !layoutRef.current) return
-        const rect = canvas.getBoundingClientRect()
-        const x = e.clientX - rect.left
-        const y = e.clientY - rect.top
-        const hit = rendererRef.current.hitTest(x, y, layoutRef.current)
-        selectNode(hit)
-      })
-
-      // hover 事件
-      canvas.addEventListener("mousemove", (e) => {
-        if (!rendererRef.current || !layoutRef.current) return
-        const rect = canvas.getBoundingClientRect()
-        const x = e.clientX - rect.left
-        const y = e.clientY - rect.top
-        const hit = rendererRef.current.hitTest(x, y, layoutRef.current)
-        if (hit !== hoveredRef.current) {
-          setHoveredNodeId(hit)
-          onNodeHover?.(hit)
-        }
+      rendererRef.current.setCallbacks({
+        onClickNode: (id) => selectNode(id),
+        onHoverNode: (id) => {
+          if (id !== hoveredRef.current) {
+            setHoveredNodeId(id)
+            onNodeHover?.(id)
+          }
+        },
       })
     }
 
@@ -375,6 +447,7 @@ export function useNebulaRender({
 
     return () => {
       cancelAnimationFrame(animFrameRef.current)
+      rendererRef.current?.unbindEvents()
       canvasRef.current?.remove()
       canvasRef.current = null
       rendererRef.current = null
@@ -399,7 +472,7 @@ export function useNebulaRender({
     let disposed = false
     let dispose: (() => void) | undefined
 
-    import("three").then((THREE) => {
+    import("three").then(async (THREE) => {
       if (disposed || renderMode !== "three-3d") return
 
       const testCanvas = document.createElement("canvas")
@@ -410,9 +483,21 @@ export function useNebulaRender({
         return
       }
 
+      // 动态导入 OrbitControls（独立 chunk，不增加 three 主包体积）
+      let OrbitControlsCtor: typeof import("three/examples/jsm/controls/OrbitControls.js").OrbitControls | undefined
+      try {
+        const mod = await import("three/examples/jsm/controls/OrbitControls.js")
+        OrbitControlsCtor = mod.OrbitControls
+      } catch {
+        console.warn("[Nebula] OrbitControls not available, continuing without")
+      }
+
       const scene = new THREE.Scene()
-      const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000)
+      const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000)
       camera.position.z = 300
+
+      cameraRef.current = camera
+      sceneRef.current = scene
 
       const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false })
       renderer.setSize(width, height)
@@ -421,8 +506,21 @@ export function useNebulaRender({
       renderer.domElement.style.top = "0"
       renderer.domElement.style.left = "0"
       renderer.domElement.setAttribute("aria-label", "行业生态星云 3D 力导向图")
-      renderer.domElement.style.cursor = "pointer"
+      renderer.domElement.style.cursor = "grab"
       container.appendChild(renderer.domElement)
+
+      // OrbitControls（支持拖拽旋转/平移/缩放）
+      let controls: { update: () => void; dispose: () => void } | null = null
+      if (OrbitControlsCtor) {
+        controls = new OrbitControlsCtor(camera, renderer.domElement)
+        controls.enableDamping = true
+        controls.dampingFactor = 0.08
+        controls.rotateSpeed = 0.5
+        controls.zoomSpeed = 0.8
+        controls.minDistance = 10
+        controls.maxDistance = 5000
+        renderer.domElement.style.cursor = "grab"
+      }
 
       // 光照
       scene.add(new THREE.AmbientLight(0x404040, 0.6))
@@ -483,6 +581,40 @@ export function useNebulaRender({
           scene.add(mesh)
           nodeMeshes.push(mesh)
         }
+
+        // 根据包围盒自适应相机距离（确保整体居中且完整可见）
+        fitCameraToScene()
+      }
+
+      function fitCameraToScene() {
+        if (!layoutRef.current || layoutRef.current.nodes.length === 0) return
+        const l = layoutRef.current
+
+        let minX = Infinity, minY = Infinity, minZ = Infinity
+        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity
+        for (const node of l.nodes) {
+          minX = Math.min(minX, node.position.x)
+          minY = Math.min(minY, node.position.y)
+          minZ = Math.min(minZ, node.position.z)
+          maxX = Math.max(maxX, node.position.x)
+          maxY = Math.max(maxY, node.position.y)
+          maxZ = Math.max(maxZ, node.position.z)
+        }
+
+        const sizeX = maxX - minX
+        const sizeY = maxY - minY
+        const sizeZ = maxZ - minZ
+        const maxSize = Math.max(sizeX, sizeY, sizeZ, 100)
+
+        // 根据 FOV 计算合适的相机距离（留 30% 边距）
+        const fov = (camera.fov * Math.PI) / 180
+        const distance = (maxSize / 2 / Math.tan(fov / 2)) * 1.3
+
+        camera.position.set(0, 0, distance)
+        camera.lookAt(0, 0, 0)
+        camera.near = Math.max(0.1, distance / 100)
+        camera.far = distance * 4
+        camera.updateProjectionMatrix()
       }
 
       updateScene()
@@ -522,15 +654,17 @@ export function useNebulaRender({
         }
       })
 
-      // 动画循环
+      // 动画循环（有 OrbitControls 时由用户控制视角，无则自动旋转）
       const animate = () => {
         if (hiddenRef.current) {
           animFrameRef.current = requestAnimationFrame(animate)
           return
         }
 
-        // 缓慢旋转（尊重 prefers-reduced-motion）
-        if (!reducedMotionRef.current) {
+        if (controls) {
+          controls.update()
+        } else if (!reducedMotionRef.current) {
+          // 无 OrbitControls 时回退到自动旋转
           scene.rotation.y += 0.0005
         }
 
@@ -544,6 +678,7 @@ export function useNebulaRender({
       // 清理
       dispose = () => {
         cancelAnimationFrame(animFrameRef.current)
+        controls?.dispose()
         renderer.dispose()
         renderer.domElement.remove()
         scene.clear()

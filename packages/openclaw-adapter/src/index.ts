@@ -72,6 +72,29 @@ export {
 } from './intel-stream'
 export type { IntelStreamFilter } from './intel-stream'
 
+// Intel SSE Mock 事件发生器（仅开发/测试）
+export {
+  startIntelMockGenerator,
+  stopIntelMockGenerator,
+  isIntelMockRunning,
+} from './intel-mock-generator'
+
+// Tavily Web Search 适配器（全网真实搜索数据采集）
+export {
+  searchWeb,
+  searchWebBatch,
+  isTavilyAvailable,
+  classifyTavilyError,
+  clearTavilyCache,
+  getTavilyCacheStats,
+} from './web-search'
+export type {
+  TavilySearchOptions,
+  TavilySearchResult,
+  TavilySearchResultItem,
+  TavilyErrorInfo,
+} from './web-search'
+
 // 类型
 export type {
   OpenClawAdapterConfig,

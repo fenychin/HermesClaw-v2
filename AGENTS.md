@@ -481,3 +481,86 @@ Harness Runtime 至少由以下对象组成：
 - 脑中枢的所有数据必须通过独立的 `api/brain/*` 管道获取，不复用 `workspace.ts` 等会话专属接口。
 - `/brain` 页面中不得展示任何 `ExecutionEvent` 任务轨迹或 WebSocket 会话流，保障三域边界的只读演化属性。
 - 必须通过专门的自动化测试 `store-boundaries.test.ts` 进行集成守卫，检测违反 store 导入或 payload 携带受限字段的行为。
+
+---
+
+## 第九章：行业情报中心实现约定（2026-06-23 v3.42.00-dev）
+
+### 9.1 Agent 心跳调度器
+
+- **调度器服务**：`apps/web/src/lib/server/agent-runtime/heartbeat-scheduler.ts`
+- **调度模式**：基于 `setInterval` 的主动定时调度（替代被动 Cron 轮询），每 10s 检查一次各 Agent 的 `heartbeatIntervalSec`。
+- **首次执行**：启动时立即执行所有非 A4 Agent（A4 的 `heartbeatIntervalSec=0` 表示仅用户触发）。
+- **packId 注入**：调度器不再硬编码 `PACK_ID`，通过 `startHeartbeatScheduler(packId, enableMock)` 参数传入。调用方负责从上下文或 URL 参数派生 packId，禁止模块级常量的行业包硬编码（参见 CLAUDE.md §3.2）。
+- **Mock 解耦**：Mock SSE 事件发生器的启动不再由调度器隐式推断（基于 `NODE_ENV`），改为通过 `enableMock` 参数显式声明。调用方在开发/测试环境传入 `true`，生产环境传 `false`。
+- **心跳事件**：通过 `emitAgentHeartbeat()` 发射 `IntelAgentHeartbeat` SSE 事件。
+- **后端数据源**：9 个 Skill 均为 DB 驱动的真实数据计算（通过 Prisma 读取 `HarnessProposal`、`AuditLog`、`AgentLog`、`WorkflowRun`、`Connector` 等表）。
+
+### 9.2 开发环境 Mock 数据约定
+
+- **Mock 服务**：`packages/openclaw-adapter/src/intel-mock-generator.ts`
+- **触发时机**：仅当 `startHeartbeatScheduler(packId, enableMock=true)` 时触发。
+- **事件模拟**：`flowTick`（3s）、`signal`（15s）、`heartbeat`（10s）、`alert`（120s, 40%概率）。
+- **发射通道**：通过 `emitIntelEvent()` 标准通道发射，对 SSE 订阅者透明。
+- **三域归属**：Mock 发生器位于 `packages/openclaw-adapter/`（OpenClaw 层），仅负责模拟事件发射，不触及 Hermes 策略或业务逻辑。
+
+### 9.3 图谱渲染双轨架构
+
+- **3D 渲染**：Three.js + OrbitControls（桌面端默认），通过动态 `import("three")` 降低首帧 JS 体积。
+- **2D 降级**：D3 Canvas 自定义渲染器 `D3CanvasRenderer`，支持拖拽平移（window 级事件绑定）、滚轮缩放（光标居中）、点击高亮。
+- **降级触发**：FPS < 30、移动端、WebGL 不可用、Three.js 动态导入失败。
+- **Worker 布局**：`apps/web/src/workers/nebula-layout.worker.ts`，O(n²) 斥力 + O(e) 引力 + 中心引力 + 阻尼衰减迭代。
+- **居中策略**：Worker 内计算包围盒，平移簇中心至原点；Three.js 端根据包围盒自适应相机 `position.z` 距离（FOV 计算，留 30% 边距）。
+- **增量更新**：SSE `intel.topology.updated` 事件 → `GraphDiff` 格式 → 2s 批处理合并 → 请求 Worker 重新布局。
+- **性能约束**：最多 500 节点，超限截断；页面隐藏时暂停渲染循环；`prefers-reduced-motion` 媒体查询关闭自动旋转。
+- **公共 Hook**：`useContainerSize(containerRef)` 为公共 Hook（`apps/web/src/hooks/use-container-size.ts`），消除 `use-knowledge-graph` 与 `use-nebula-render` 中重复的 `ResizeObserver` 逻辑。
+
+### 9.4 Phase 2 真实数据接入（v3.42.04-dev）
+
+- **Tavily Web Search 适配器**：`packages/openclaw-adapter/src/web-search.ts`
+  - 提供 `searchWeb()` / `searchWebBatch()` / `isTavilyAvailable()` / `classifyTavilyError()`。
+  - 三域归属：OpenClaw 层，仅做外部 HTTP 封装与错误归一化；不做策略决策与 LLM 推理（属 Hermes / Industry Pack 职责）。
+  - API Key 通过 `TAVILY_API_KEY` 环境变量注入，禁止写入版本库。
+- **DeepSeek LLM 接入**：复用 `apps/web/src/lib/server/llm-provider.ts` 既有 `callDeepSeekJson()` / `callLlmText()`，5 Agent 的 Skill Executor **不允许**新建独立的 LLM HTTP 客户端。
+- **Skill 真实数据接入状态**：
+  - ✅ `skill-radar-score-compute` — Tavily 8 维度新闻搜索 + DeepSeek JSON 评分（Phase 2 首条 demo skill）
+  - 🚧 其余 8 个 skill 仍为 Phase 1 计算桩，待逐步迁移
+- **降级路径强制约定**：所有接入 Tavily / LLM 的 skill 必须实现 fallback 路径：
+  - Key 未配置 / 上游失败 / 超时 → 自动降级到 DB 统计模式，不允许抛出未捕获错误中断 Agent 心跳。
+  - 降级时输出对象必须显式标记 `mode: "db-fallback"`，便于前端区分数据可信度。
+  - 降级路径应记录 `logger.warn` / `logger.error` 用于运维定位，**禁止**写入 AuditLog 高风险日志（避免 Key 缺失这类配置问题污染审计链）。
+
+### 9.5 dev-only 验证端点
+
+- **路由**：`POST /api/intel/skill-test/[skillId]`
+- **用途**：手动触发任一 skill 查看其真实输出（含 envCheck 健康度），用于 Phase 2 接入完成后的端到端验证。
+- **安全约束**：路由头部强制检查 `process.env.NODE_ENV === "production"` 时拒绝返回 403。
+- **白名单**：路径前缀 `/api/intel/skill-test` 已加入 `middleware.ts` 的 `DEV_BYPASS_ROUTES`，仅开发环境免认证。
+- **禁止**：任何 dev-only 测试端点（路由模式如 `/api/*/test`、`/api/debug/*`）必须遵循同样的 NODE_ENV 强制门禁，禁止直接暴露在生产环境。
+
+---
+
+## 第十章：Monorepo 包构建与依赖更新约定（v3.42.04-dev）
+
+### 10.1 包导出变更必须重新构建
+
+- `packages/*/` 下的代码以 **预构建产物**形式被 `apps/web` 消费（package.json `exports` 指向 `dist/index.{mjs,js,d.ts}`）。
+- 在 `packages/<pkg>/src/` 中**新增、修改或重命名**任何 `export` 后，**必须**执行：
+
+  ```bash
+  pnpm -F @hermesclaw/<pkg> build
+  ```
+
+- 仅修改函数体内部逻辑（不改变导出签名）时，理论上也需要构建——但 dev 环境为减少摩擦，可临时容忍未构建状态（仅 dev 端有效，PR 提交前必须 build 一次）。
+- **CI 必须执行**：所有 PR 在 lint/test 之前先跑 `pnpm -r build` 确保所有 `dist/` 与 `src/` 同步。
+
+### 10.2 包构建后必须重启 dev server
+
+- `next dev`（含 Turbopack）会**缓存包模块解析结果**，仅修改 `dist/` 不会触发 HMR 重新解析 export 列表。
+- 在执行 `pnpm -F @hermesclaw/<pkg> build` 后，必须**重启** `pnpm dev`，否则 Turbopack 会持续报 `Export X doesn't exist in target module`。
+
+### 10.3 包消费方禁止跨越 dist 反向引用
+
+- `apps/web` 与其他 packages **只能** import `@hermesclaw/<pkg>`（走 package.json exports）。
+- **严禁**任何 `import "@hermesclaw/<pkg>/src/..."` 或相对路径 `../../packages/<pkg>/src/...` 跨包源码引用。
+- 仅允许 `packages/<pkg>` 内部子模块（同包内）通过相对路径互相引用。

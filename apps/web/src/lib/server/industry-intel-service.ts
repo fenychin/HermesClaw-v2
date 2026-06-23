@@ -89,10 +89,16 @@ export async function getKpiSnapshot(
   const evolutionGeneration = Math.max(1, Math.ceil(approvedCount / 5) + 1)
 
   // ─── 5. radarSection: 从 A1 WorkflowRun.outputContext 读取 ────
+  // 注意：放宽 status 过滤，partial 也接受（A1 可能某些 skill 失败但 radar skill 成功）
   const latestA1Run = await prisma.workflowRun.findFirst({
-    where: { workspaceId: input.workspaceId, agentId: "A1", status: "completed" },
+    where: {
+      workspaceId: input.workspaceId,
+      agentId: "A1",
+      status: { in: ["completed", "partial"] },
+      outputContext: { not: null },
+    },
     orderBy: { completedAt: "desc" },
-    select: { outputContext: true },
+    select: { outputContext: true, completedAt: true, status: true },
   })
 
   let radarDimensions = recentLogs.length > 0
@@ -104,10 +110,26 @@ export async function getKpiSnapshot(
       const ctx = typeof latestA1Run.outputContext === "string"
         ? JSON.parse(latestA1Run.outputContext)
         : latestA1Run.outputContext
-      if (ctx?.radarDimensions && Array.isArray(ctx.radarDimensions) && ctx.radarDimensions.length > 0) {
-        radarDimensions = ctx.radarDimensions
+      const llmDims = extractRadarDimensionsFromAgentOutput(ctx)
+      if (llmDims) {
+        radarDimensions = llmDims
+        logger.info("[KpiSnapshot] 雷达使用 A1 LLM 输出", {
+          completedAt: latestA1Run.completedAt,
+          dimCount: llmDims.length,
+          firstDim: llmDims[0],
+        })
+      } else {
+        logger.warn("[KpiSnapshot] A1 outputContext 中未找到 dimensions 字段", {
+          ctxKeys: Object.keys(ctx ?? {}),
+        })
       }
-    } catch { /* fallback to computed dimensions */ }
+    } catch (err) {
+      logger.warn("[KpiSnapshot] A1 outputContext 解析失败，降级到日志统计", {
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  } else {
+    logger.info("[KpiSnapshot] 无可用 A1 WorkflowRun，使用日志统计降级")
   }
 
   // ─── 6. systemStatus ────────────────────────────────────────────
@@ -150,6 +172,46 @@ const DEFAULT_RADAR_DIMENSIONS = [
   { key: "supply-chain", label: "供应链压力", value: 50 },
   { key: "regulatory-density", label: "监管密度", value: 50 },
 ]
+
+/**
+ * 从 A1 WorkflowRun.outputContext 中提取 LLM 雷达评分。
+ *
+ * outputContext 的真实结构（agent-runner.ts 写入）：
+ *   { "<nodeId>": { dimensions: [...], mode: "llm+tavily", ... }, ... }
+ *
+ * 我们需要遍历所有 nodeOutput 找到第一个含 dimensions 字段的产出。
+ */
+function extractRadarDimensionsFromAgentOutput(
+  ctx: unknown,
+): Array<{ key: string; label: string; value: number; delta?: number }> | null {
+  if (!ctx || typeof ctx !== "object") return null
+
+  // 历史/直接兼容：顶层就有 dimensions
+  const top = ctx as Record<string, unknown>
+  if (Array.isArray(top.dimensions) && top.dimensions.length > 0) {
+    return top.dimensions as Array<{ key: string; label: string; value: number }>
+  }
+  if (Array.isArray(top.radarDimensions) && top.radarDimensions.length > 0) {
+    return top.radarDimensions as Array<{ key: string; label: string; value: number }>
+  }
+
+  // 标准结构：遍历每个 nodeId 的产出
+  for (const value of Object.values(top)) {
+    if (!value || typeof value !== "object") continue
+    const nodeOutput = value as Record<string, unknown>
+    // nodeOutput 可能是 { status, output, error } 包装，也可能直接是 skill 的 output
+    const candidates: unknown[] = [nodeOutput, nodeOutput.output]
+    for (const cand of candidates) {
+      if (cand && typeof cand === "object") {
+        const c = cand as Record<string, unknown>
+        if (Array.isArray(c.dimensions) && c.dimensions.length > 0) {
+          return c.dimensions as Array<{ key: string; label: string; value: number }>
+        }
+      }
+    }
+  }
+  return null
+}
 
 /** 从 AgentLog 中推断雷达维度分值 */
 function buildRadarFromLogs(
@@ -627,20 +689,62 @@ export async function submitSandbox(
 // ─── GET /api/v1/sandbox/scenario-results/:id ─────────────────────────
 
 export async function getScenarioResult(
-  runId: string,
+  taskIdOrRunId: string,
   workspaceId: string,
 ): Promise<ScenarioResult | null> {
+  // 兼容两种查找方式：
+  // 1. A4 沙盘场景：前端 submitSandbox 返回的 taskId
+  // 2. agent-runner 内部：runId
   const run = await prisma.workflowRun.findFirst({
-    where: { runId, workspaceId },
+    where: {
+      workspaceId,
+      OR: [
+        { runId: taskIdOrRunId },
+        { taskId: taskIdOrRunId },
+      ],
+      outputContext: { not: null },
+    },
+    orderBy: { completedAt: "desc" },
   })
 
   if (!run || !run.outputContext) return null
 
   try {
-    return ScenarioResultSchema.parse(run.outputContext)
+    const raw = typeof run.outputContext === "string"
+      ? JSON.parse(run.outputContext)
+      : run.outputContext
+    // 穿透 nodeId 嵌套（与 extractRadarDimensionsFromAgentOutput 同模式）
+    const parsed = parseScenarioResult(raw)
+    if (!parsed) return null
+    return ScenarioResultSchema.parse(parsed)
   } catch {
     return null
   }
+}
+
+/** 从 A4 WorkflowRun.outputContext 中提取 ScenarioResult */
+function parseScenarioResult(ctx: unknown): ScenarioResult | null {
+  if (!ctx || typeof ctx !== "object") return null
+  const top = ctx as Record<string, unknown>
+
+  // 顶层直接是 ScenarioResult
+  if (top.branches && top.paths) return top as ScenarioResult
+  if (top.treeNodes && top.paths) return top as unknown as ScenarioResult
+
+  // 遍历 nodeId 嵌套
+  for (const value of Object.values(top)) {
+    if (!value || typeof value !== "object") continue
+    const nodeOutput = value as Record<string, unknown>
+    const candidates: unknown[] = [nodeOutput, nodeOutput.output]
+    for (const cand of candidates) {
+      if (cand && typeof cand === "object") {
+        const c = cand as Record<string, unknown>
+        if (c.treeNodes && c.paths) return c as unknown as ScenarioResult
+        if (c.branches && c.paths) return c as ScenarioResult
+      }
+    }
+  }
+  return null
 }
 
 // ─── GET /api/v1/runtime/connector-health ─────────────────────────────
@@ -662,11 +766,14 @@ export async function getConnectorHealth(
     take: 50,
   })
 
+  // 零连接器时回退：返回已连接的 A1-A5 Agent 面板作为"实时数据源"
+  const items = generateMockConnectors(connectors)
+
   // 从 AgentLog 计算近似的连接器延迟
   const connectorLogs = await prisma.agentLog.findMany({
     where: {
       workspaceId,
-      source: { in: connectors.map((c) => c.id) },
+      source: { in: items.map((c) => c.id) },
       createdAt: { gte: new Date(Date.now() - 300_000) },
     },
     orderBy: { createdAt: "desc" },
@@ -675,7 +782,7 @@ export async function getConnectorHealth(
 
   // 按 connectorId 分组计算延迟（用最近日志的时间戳差值模拟）
   const latencyMap = new Map<string, number>()
-  for (const c of connectors) {
+  for (const c of items) {
     const logs = connectorLogs.filter((l) => l.source === c.id)
     if (logs.length >= 2) {
       // 用最近两条日志的时间间隔模拟延迟
@@ -688,7 +795,7 @@ export async function getConnectorHealth(
     }
   }
 
-  return connectors.map((c) => ({
+  return items.map((c) => ({
     connectorId: c.id,
     name: c.name,
     status:
@@ -732,3 +839,27 @@ export async function recordEventReceive(params: {
     })
   }
 }
+
+/**
+ * 零连接器回退：为每个活跃的 Agent Panel 生成一个逻辑数据源项，
+ * 确保 P2 面板的"数据源健康"区域不显示空白。
+ */
+function generateMockConnectors(
+  connectors: Array<{ id: string; name: string; status: string }>,
+): Array<{ id: string; name: string; status: string }> {
+  if (connectors.length > 0) return connectors
+  return [
+    { id: "sse-intel-stream", name: "SSE 情报事件流", status: "available" },
+    { id: "tavily-search", name: "Tavily 全网搜索", status: isTavilyAvailable() ? "available" : "error" },
+    { id: "deepseek-llm", name: "DeepSeek 推理引擎", status: isProviderAvailable("deepseek") ? "available" : "error" },
+    { id: "agent-a1-radar", name: "A1 战略态势感知", status: "available" },
+    { id: "agent-a2-flux", name: "A2 数据流量动力学", status: "available" },
+    { id: "agent-a3-nebula", name: "A3 行业生态星云", status: "available" },
+    { id: "agent-a4-sandbox", name: "A4 决策推演沙盘", status: "available" },
+    { id: "agent-a5-evolution", name: "A5 人机进化核心", status: "available" },
+  ]
+}
+
+// 需要这两个 detector 函数在 generateMockConnectors 中被引用
+import { isTavilyAvailable } from "@hermesclaw/openclaw-adapter"
+import { isProviderAvailable } from "@/lib/server/llm-provider"

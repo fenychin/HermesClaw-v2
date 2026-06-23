@@ -54,6 +54,7 @@ export function Panel3NebulaCoreMap() {
   // 图谱数据 + Worker 布局
   const { nodes, edges, layout, isLoading, error } = useKnowledgeGraph({
     packId: activeIndustryId,
+    containerRef,
   })
 
   // 渲染引擎
