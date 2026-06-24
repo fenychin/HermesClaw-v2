@@ -6,7 +6,8 @@
  * - GET /api/v1/harness/evolution-proposals → 提案列表
  * - GET /api/v1/audit/latest-approval → 审批签名
  *
- * 监听 intel.evolution.proposal-created SSE 事件实现增量更新。
+ * PERF(v3.42.05): 不再自己创建 SSE 连接，通过 IntelStreamContext 订阅页面级共享流。
+ *
  * 所有审批动作只跳转审批中心，不允许直接批准。
  *
  * 治理边界：提案类型仅限 WorkflowTemplate / SkillBinding / EvalRuleSet / MemoryPolicy。
@@ -19,8 +20,7 @@ import {
   fetchEvolutionProposals,
   fetchLatestApproval,
 } from "@/services/api/industry-intel-api"
-import { useIntelStream } from "@/hooks/use-intel-stream"
-import { useIndustryIntelStore } from "@/stores/industry-intel-store"
+import { intelEventBus } from "@/contexts/intel-event-bus"
 
 // ─── 类型 ──────────────────────────────────────────────────────────────
 
@@ -107,14 +107,15 @@ export function useEvolutionProposals(): UseEvolutionProposalsReturn {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const activeIndustryId = useIndustryIntelStore((s) => s.activeIndustryId)
   const mountedRef = useRef(true)
 
-  // SSE 监听 proposal-created 事件
-  const { connected } = useIntelStream({
-    packId: activeIndustryId,
-    onTopologyUpdated: undefined, // P5 不需要 topology 事件
-  })
+  // PERF(v3.42.05): 独立订阅事件总线——只监听 proposal 事件
+  useEffect(() => intelEventBus.on("proposal", () => {
+    if (mountedRef.current) loadAllRef.current?.()
+  }), [])
+
+  // 用 ref 持有 loadAll 以避免 effect 依赖问题
+  const loadAllRef = useRef<(() => void) | null>(null)
 
   const loadAll = useCallback(async () => {
     setIsLoading(true)
@@ -172,6 +173,11 @@ export function useEvolutionProposals(): UseEvolutionProposalsReturn {
       if (mountedRef.current) setIsLoading(false)
     }
   }, [])
+
+  // 同步 loadAll 到 ref，供 SSE 回调使用
+  useEffect(() => {
+    loadAllRef.current = loadAll
+  }, [loadAll])
 
   // 初始加载 + 轮询（60s）
   useEffect(() => {

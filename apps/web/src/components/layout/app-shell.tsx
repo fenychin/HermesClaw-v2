@@ -1,15 +1,20 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import dynamic from "next/dynamic";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./TopBar";
 import { useAgentStore } from "@/stores/agent-store";
 import { useProjectStore } from "@/stores/project-store";
 import { useTradeStore } from "@/stores/trade-store";
 
-// PERF: SSE 连接逻辑懒加载 — 从 main-app.js 移除 useOpenClawStream (~5KB)
-const OpenClawStreamBridge = dynamic(() => import("./openclaw-stream-bridge").then(m => ({ default: m.OpenClawStreamBridge })), { ssr: false });
+import dynamic from "next/dynamic";
+
+// PERF(v3.42.05): 生产模式安全——next build 预编译所有路由，无冷编译延迟。
+// dev 模式仍禁用（避免 Turbopack 编译触发死亡螺旋）。
+const OpenClawStreamBridge =
+  process.env.NODE_ENV === "production"
+    ? dynamic(() => import("./openclaw-stream-bridge").then(m => ({ default: m.OpenClawStreamBridge })), { ssr: false })
+    : () => null;
 
 /** 工作台外壳：左侧侧边栏 + 右侧（TopBar + 主内容滚动区） */
 export function AppShell({ children }: { children: ReactNode }) {

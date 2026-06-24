@@ -187,11 +187,35 @@ export function subscribeIntelSSE(
   },
 ): AbortController {
   const controller = new AbortController()
-  const url = `${BASE}/stream/industry-intel?packId=${encodeURIComponent(packId)}`
+
+  // PERF(v3.42.05): 优先直连沙盒（绕过 Web 代理，消除对 Next.js 事件循环的占用）
+  const SANDBOX_URL = `http://localhost:3001/stream?packId=${encodeURIComponent(packId)}`
+  const FALLBACK_URL = `${BASE}/stream/industry-intel?packId=${encodeURIComponent(packId)}`
 
   void (async () => {
+    // 尝试沙盒直连，2s 超时
+    let res: Response | null = null
     try {
-      const res = await fetch(url, { signal: controller.signal })
+      const sandboxCtrl = new AbortController()
+      const timeout = setTimeout(() => sandboxCtrl.abort(), 2000)
+      res = await fetch(SANDBOX_URL, { signal: sandboxCtrl.signal })
+      clearTimeout(timeout)
+    } catch {
+      // 沙盒不可用，降级到 Web 代理
+    }
+
+    // 降级：通过 Web 代理连接
+    if (!res || !res.ok || !res.body) {
+      try {
+        res = await fetch(FALLBACK_URL, { signal: controller.signal })
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return
+        handlers.onError?.(err instanceof Error ? err : new Error(String(err)))
+        return
+      }
+    }
+
+    try {
       if (!res.ok || !res.body) {
         handlers.onError?.(new Error(`SSE 连接失败: ${res.status}`))
         return

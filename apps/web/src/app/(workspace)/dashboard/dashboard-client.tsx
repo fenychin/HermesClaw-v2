@@ -102,6 +102,30 @@ const PERIODS = [
   { value: "30d", label: "30 天" },
 ] as const;
 
+// KPI 定义提取到组件外部，确保稳定引用（避免每帧重建）
+// 注：KpiColumn props 类型期望可变数组，因此不加 as const
+const platformKpis = [
+  { key: "activeWorkspaces", label: "周活企业数", icon: Activity, desc: "近7天发生过工作流运行的租户数" },
+  { key: "avgDailyTasks", label: "日均任务数", icon: Activity, desc: "当前周期内每天运行的工作流平均数" },
+  { key: "installedPackCount", label: "Industry Pack 启用数", icon: Activity, desc: "当前工作空间已安装并启用的行业插件" },
+  { key: "proposalApprovalRate", label: "提案通过率", icon: Activity, desc: "近30天审批通过的提案占总审批的比率" },
+  { key: "rollbackRate", label: "配置回滚率", icon: Activity, desc: "近30天由于异常触发回滚的工作流占比" },
+];
+
+const executionKpis = [
+  { key: "taskCompletionRate", label: "任务完成率", icon: Activity, desc: "WorkflowRun 完成成功次数占比" },
+  { key: "connectorSuccessRate", label: "连接器成功率", icon: Activity, desc: "底层信件/物理交互发送的成功占比" },
+  { key: "avgEventLatencyMs", label: "系统响应延迟", icon: Activity, desc: "工作流的各节点平均运行总时长" },
+  { key: "humanInterventionRate", label: "人工介入率", icon: Activity, desc: "需人工介入审批的拦截次数占比" },
+  { key: "receiptCompletenessRate", label: "收据对账完整率", icon: Activity, desc: "底层完成且能完整返回对账回执的比例" },
+];
+
+const evolutionKpis = [
+  { key: "proposalAdoptionRate", label: "提案采纳率", icon: Activity, desc: "近30天自动演化生成的配置采纳度" },
+  { key: "canarySuccessRate", label: "灰度成功率", icon: Activity, desc: "近30天成功晋级激活的 Canary 灰度占比" },
+  { key: "avgMemoryHitRate", label: "记忆检索命中率", icon: Activity, desc: "评估报告生成的短期记忆命中占比" },
+];
+
 // ============================================================
 // KPI 卡片（memo 隔离，避免父组件 state 变更导致每张卡片重渲染）
 // ============================================================
@@ -229,36 +253,22 @@ export default function DashboardClient({
     );
   }
 
-  const m = dashboardData!;
+  const m = dashboardData;
+
+  if (!m?.platform) {
+    return (
+      <div className="p-6 h-[80vh] flex flex-col items-center justify-center gap-4">
+        <p className="text-hint text-sm">正在初始化数据库…</p>
+        <p className="text-xs text-zinc-600">首次连接 Neon PostgreSQL，请稍候刷新页面</p>
+      </div>
+    );
+  }
 
   const donutData = [
-    { name: "已完成", value: m.platform.workflowRunsByStatus.completed },
-    { name: "已失败", value: m.platform.workflowRunsByStatus.failed },
-    { name: "运行中", value: m.platform.workflowRunsByStatus.running },
-    { name: "已取消", value: m.platform.workflowRunsByStatus.cancelled },
-  ];
-
-  // KPI 定义（稳定引用，不随渲染重建）
-  const platformKpis = [
-    { key: "activeWorkspaces", label: "周活企业数", icon: Activity, desc: "近7天发生过工作流运行的租户数" },
-    { key: "avgDailyTasks", label: "日均任务数", icon: Activity, desc: "当前周期内每天运行的工作流平均数" },
-    { key: "installedPackCount", label: "Industry Pack 启用数", icon: Activity, desc: "当前工作空间已安装并启用的行业插件" },
-    { key: "proposalApprovalRate", label: "提案通过率", icon: Activity, desc: "近30天审批通过的提案占总审批的比率" },
-    { key: "rollbackRate", label: "配置回滚率", icon: Activity, desc: "近30天由于异常触发回滚的工作流占比" },
-  ];
-
-  const executionKpis = [
-    { key: "taskCompletionRate", label: "任务完成率", icon: Activity, desc: "WorkflowRun 完成成功次数占比" },
-    { key: "connectorSuccessRate", label: "连接器成功率", icon: Activity, desc: "底层信件/物理交互发送的成功占比" },
-    { key: "avgEventLatencyMs", label: "系统响应延迟", icon: Activity, desc: "工作流的各节点平均运行总时长" },
-    { key: "humanInterventionRate", label: "人工介入率", icon: Activity, desc: "需人工介入审批的拦截次数占比" },
-    { key: "receiptCompletenessRate", label: "收据对账完整率", icon: Activity, desc: "底层完成且能完整返回对账回执的比例" },
-  ];
-
-  const evolutionKpis = [
-    { key: "proposalAdoptionRate", label: "提案采纳率", icon: Activity, desc: "近30天自动演化生成的配置采纳度" },
-    { key: "canarySuccessRate", label: "灰度成功率", icon: Activity, desc: "近30天成功晋级激活的 Canary 灰度占比" },
-    { key: "avgMemoryHitRate", label: "记忆检索命中率", icon: Activity, desc: "评估报告生成的短期记忆命中占比" },
+    { name: "已完成", value: m.platform.workflowRunsByStatus?.completed ?? 0 },
+    { name: "已失败", value: m.platform.workflowRunsByStatus?.failed ?? 0 },
+    { name: "运行中", value: m.platform.workflowRunsByStatus?.running ?? 0 },
+    { name: "已取消", value: m.platform.workflowRunsByStatus?.cancelled ?? 0 },
   ];
 
   return (

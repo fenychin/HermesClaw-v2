@@ -6,9 +6,9 @@
  */
 "use client"
 
-import React, { useMemo, useEffect } from "react"
+import React, { useMemo, useEffect, useState } from "react"
 import { useIntelSnapshot } from "@/hooks/use-intel-snapshot"
-import { useIntelStream } from "@/hooks/use-intel-stream"
+import { intelEventBus } from "@/contexts/intel-event-bus"
 import { useIndustryIntelStore } from "@/stores/industry-intel-store"
 import { fetchConnectorHealth } from "@/services/api/industry-intel-api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -121,7 +121,11 @@ function ConnectorStatusBadge({ item }: { item: ConnectorHealthItem }) {
 export function Panel2DataFlux() {
   const activeIndustryId = useIndustryIntelStore((s) => s.activeIndustryId)
   const { snapshot, isLoading: snapshotLoading } = useIntelSnapshot({ packId: activeIndustryId })
-  const { flowTicks } = useIntelStream({ packId: activeIndustryId })
+  // PERF(v3.42.05): 独立订阅事件总线——只监听 flow.tick 事件
+  const [flowTicks, setFlowTicks] = useState<IntelFlowTick[]>([])
+  useEffect(() => intelEventBus.on("flow.tick", (e) => {
+    setFlowTicks((prev) => [...prev.slice(-299), e as IntelFlowTick])
+  }), [])
   const connectorHealth = useIndustryIntelStore((s) => s.connectorHealth)
   const setConnectorHealth = useIndustryIntelStore((s) => s.setConnectorHealth)
 

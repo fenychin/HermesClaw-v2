@@ -292,7 +292,9 @@ interface DashboardCacheEntry {
 }
 
 const overviewCache = new Map<string, DashboardCacheEntry>();
-const DASHBOARD_CACHE_TTL_MS = 30_000; // 30 秒
+// PERF(v3.42.05): TTL 从 30s 提升到 5min。BetterSqlite3 同步驱动下每次
+// dashboard 查询串行执行 ~15 条 SQL，阻塞事件循环 ~1-3 秒。延长缓存减少查询频率。
+const DASHBOARD_CACHE_TTL_MS = 300_000; // 5 分钟
 // 定时清理过期条目：每 5 分钟清理一次，防止内存泄漏
 let lastCacheCleanup = 0;
 const CACHE_CLEANUP_INTERVAL_MS = 300_000;

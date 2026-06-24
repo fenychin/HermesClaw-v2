@@ -22,8 +22,10 @@ export function Sidebar() {
   const mobileSidebarOpen = useUiStore((s) => s.mobileSidebarOpen);
   const setMobileSidebarOpen = useUiStore((s) => s.setMobileSidebarOpen);
 
-  // Zustand 全局状态
-  const { points, subscriptionPoints, plan } = useUser();
+  // Zustand 全局状态 —— 使用精准 selector，避免用户 store 任意字段变更触发整栏重渲染
+  const points = useUser((s) => s.points);
+  const subscriptionPoints = useUser((s) => s.subscriptionPoints);
+  const plan = useUser((s) => s.plan);
 
   // 积分计算进度百分比 (最高 100%)
   const totalPointsLimit = subscriptionPoints + 100;

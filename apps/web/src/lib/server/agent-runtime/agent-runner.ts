@@ -12,7 +12,7 @@
  * 三域原则：此模块为 apps/web 集成层，通过 SDK 加载 Industry Pack 资产，
  * 通过 hermes-kernel DAG 引擎执行，通过 openclaw-adapter 发射事件。
  */
-import { prisma } from "@/lib/prisma"
+import { prisma } from "../../prisma"
 import {
   loadIndustryManifest,
   loadIndustryWorkflowDag,
@@ -27,8 +27,8 @@ import type {
   DagContext,
   DagPrismaClient,
 } from "@hermesclaw/hermes-kernel/orchestration"
-import { logger } from "@/lib/logger"
-import { writeAgentLog } from "@/lib/server/agent-log"
+import { logger } from "../../logger"
+import { writeAgentLog } from "../agent-log"
 import {
   SKILL_EXEC_MAP,
   emitAgentHeartbeat,

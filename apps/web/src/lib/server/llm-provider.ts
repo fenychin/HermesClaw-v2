@@ -6,9 +6,9 @@
  *
  * ⚠️ 仅在服务端调用，切勿在客户端引入（包含 API Key）。
  */
-import anthropic from "@/lib/anthropic"
-import { parseJsonLoose } from "@/lib/server/harness-llm"
-import type { ModelProvider } from "@/types"
+import anthropic from "../anthropic"
+import { parseJsonLoose } from "./harness-llm"
+import type { ModelProvider } from "../../types/chat"
 
 // ---- 类型 ----
 

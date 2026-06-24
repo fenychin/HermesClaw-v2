@@ -22,7 +22,10 @@ export function WorkspaceSidebar() {
   const setMobileSidebarOpen = useUiStore((s) => s.setMobileSidebarOpen);
 
   const { mode, setMode } = useWorkspaceMode();
-  const { points, subscriptionPoints, plan } = useUser();
+  // 精准 selector，避免用户 store 任意字段变更触发整栏重渲染
+  const points = useUser((s) => s.points);
+  const subscriptionPoints = useUser((s) => s.subscriptionPoints);
+  const plan = useUser((s) => s.plan);
 
   const totalPointsLimit = subscriptionPoints + 100;
   const progressPercent = Math.min(100, Math.round((points / totalPointsLimit) * 100));

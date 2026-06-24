@@ -164,12 +164,20 @@ function readAssetFile(basePathWithoutExt: string): { parsed: any; ext: string }
 
 export function loadIndustryManifest(packId: string): IndustryManifest {
   assertSafePackId(packId)
-  
+
+  // PERF(v3.42.05): 进程级缓存 — 避免每次 Agent 心跳（A2 每 3s）都 readFileSync
+  // 阻塞 Node.js 事件循环，导致 SSE/API 全部卡死。
+  if (manifestCache.has(packId)) {
+    return manifestCache.get(packId)!
+  }
+
   try {
     const basePath = join(PACKS_DIR, packId, "manifest")
     const { parsed } = readAssetFile(basePath)
     const mapped = mapLegacyManifest(parsed)
     const manifest = IndustryManifestSchema.parse(mapped)
+
+    manifestCache.set(packId, manifest)
 
     // 通过 DI 回调通知主应用记录审计日志（不阻塞加载流程）
     // 三域原则：SDK 不直接依赖 @/lib/server/audit，由主应用注入 onAuditLog

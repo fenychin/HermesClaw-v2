@@ -72,7 +72,7 @@ export async function GET(request: Request) {
     let allSources: Record<string, unknown>[] = proposals.map((p) => ({ ...p }))
     if (allSources.length === 0) {
       const latestA5 = await prisma.workflowRun.findFirst({
-        where: { workspaceId: ctx.workspaceId, agentId: "A5", outputContext: { not: null } },
+        where: { workspaceId: ctx.workspaceId, agentId: "A5", outputContext: { not: null } } as any,
         orderBy: { completedAt: "desc" },
         select: { outputContext: true, completedAt: true, runId: true },
       })

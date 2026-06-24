@@ -1,5 +1,5 @@
 // HermesClaw-v2 数据库 Schema
-// —— 本地开发使用 SQLite，生产环境可切换 PostgreSQL
+// —— 生产环境使用 PostgreSQL，异步驱动不阻塞事件循环
 
 generator client {
   provider = "prisma-client"
@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 // ============================================================

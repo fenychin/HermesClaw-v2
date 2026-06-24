@@ -34,8 +34,8 @@ import {
   isTavilyAvailable,
   type TavilySearchResultItem,
 } from "@hermesclaw/openclaw-adapter"
-import { callDeepSeekJson, isProviderAvailable } from "@/lib/server/llm-provider"
-import { logger } from "@/lib/logger"
+import { callDeepSeekJson, isProviderAvailable } from "../llm-provider"
+import { logger } from "../../logger"
 import type { PrismaClient } from "@/generated/prisma-v2/client"
 import type { Prisma } from "@/generated/prisma-v2/client"
 

@@ -3,7 +3,9 @@
  *
  * 流程：
  * 1. 全量初始化：GET /api/v1/industry/knowledge-graph → Worker 布局 → 渲染
- * 2. 增量更新：监听 intel.topology.updated SSE → GraphDiff → 局部更新图谱
+ * 2. 增量更新：通过 IntelStreamContext 订阅 topology.updated 事件 → GraphDiff → 局部更新图谱
+ *
+ * PERF(v3.42.05): 不再自己创建 SSE 连接，通过 IntelStreamContext 订阅页面级共享流。
  *
  * 性能约束：最多 500 节点，超限自动截断。
  */
@@ -12,8 +14,8 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useContainerSize } from "@/hooks/use-container-size"
 import { fetchKnowledgeGraph } from "@/services/api/industry-intel-api"
-import { useIntelStream } from "@/hooks/use-intel-stream"
-import { useIndustryIntelStore } from "@/stores/industry-intel-store"
+import { intelEventBus } from "@/contexts/intel-event-bus"
+import type { IntelTopologyUpdated } from "@/types/industry-intel"
 import type {
   GraphNode,
   GraphEdge,
@@ -62,27 +64,22 @@ export function useKnowledgeGraph({
   const workerRef = useRef<Worker | null>(null)
   const layoutRequestedRef = useRef(false)
 
-  const activeIndustryId = useIndustryIntelStore((s) => s.activeIndustryId)
-
-  // SSE 流：获取 topology 更新
+  // PERF(v3.42.05): 独立订阅事件总线——只监听 topology 事件
   const topologyUpdatesRef = useRef<GraphDiff[]>([])
-  const { connected } = useIntelStream({
-    packId: activeIndustryId,
-    onTopologyUpdated: useCallback((event: unknown) => {
-      const e = event as { added?: GraphNode[]; removed?: string[]; updated?: GraphEdge[] }
-      const diff: GraphDiff = {
-        added: e.added ?? [],
-        removed: e.removed ?? [],
-        updated: e.updated ?? [],
-      }
-      topologyUpdatesRef.current.push(diff)
-      // 保持在最近 20 条
-      if (topologyUpdatesRef.current.length > 20) {
-        topologyUpdatesRef.current = topologyUpdatesRef.current.slice(-20)
-      }
-      setLastDiff(diff)
-    }, []),
-  })
+
+  useEffect(() => intelEventBus.on("topology", (event: unknown) => {
+    const e = event as unknown as { added?: GraphNode[]; removed?: string[]; updated?: GraphEdge[] }
+    const diff: GraphDiff = {
+      added: e.added ?? [],
+      removed: e.removed ?? [],
+      updated: e.updated ?? [],
+    }
+    topologyUpdatesRef.current.push(diff)
+    if (topologyUpdatesRef.current.length > 20) {
+      topologyUpdatesRef.current = topologyUpdatesRef.current.slice(-20)
+    }
+    setLastDiff(diff)
+  }), [])
 
   // 全量加载
   const loadFullGraph = useCallback(async () => {

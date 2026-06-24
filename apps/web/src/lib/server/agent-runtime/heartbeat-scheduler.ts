@@ -13,10 +13,10 @@
  *
  * 三域原则：此模块为 apps/web 集成层，负责 Prisma ↔ SDK ↔ AgentRunner 桥接。
  */
-import { prisma } from "@/lib/prisma"
+import { prisma } from "../../prisma"
 import { loadIndustryManifest } from "@hermesclaw/industry-pack-sdk"
 import type { IndustryManifest } from "@hermesclaw/event-contracts"
-import { logger } from "@/lib/logger"
+import { logger } from "../../logger"
 import { runAgent } from "./agent-runner"
 import { startIntelMockGenerator, isIntelMockRunning } from "@hermesclaw/openclaw-adapter"
 
@@ -123,6 +123,13 @@ export function startHeartbeatScheduler(
   packId = "industry-intelligence-v2",
   enableMock = false,
 ): void {
+  // PERF(v3.42.05): 调试开关 — 设 DISABLE_INTEL_AGENTS=true 彻底关闭 Agent 执行
+  // 用于隔离问题是数据管道还是渲染层导致的卡死
+  if (process.env.DISABLE_INTEL_AGENTS === "true") {
+    logger.info("[Scheduler] Agent 执行已禁用（DISABLE_INTEL_AGENTS=true），跳过启动")
+    return
+  }
+
   if (dispatchTimer) {
     logger.warn("[Scheduler] 调度器已在运行")
     return
@@ -131,8 +138,8 @@ export function startHeartbeatScheduler(
   activePackId = packId
   logger.info("[Scheduler] 启动 Agent 心跳调度", { packId, enableMock })
 
-  // 仅在调用方显式要求时启动 Mock
-  if (enableMock && !isIntelMockRunning()) {
+  // 仅在调用方显式要求时启动 Mock（除非 Agent 执行被禁用）
+  if (enableMock && !isIntelMockRunning() && process.env.DISABLE_INTEL_AGENTS !== "true") {
     try {
       startIntelMockGenerator()
     } catch (err) {

@@ -77,7 +77,9 @@ export default function RewardsPage() {
   // 1. React Query 拉取任务状态
   const { data: tasks, isLoading: tasksLoading } = useQuery<RewardTask[]>({
     queryKey: ["rewardTasks"],
-    queryFn: () => fetch("/api/rewards/tasks").then((res) => res.json())
+    queryFn: () => fetch("/api/rewards/tasks").then((res) => res.json()),
+    // 防御：API 可能返回非数组，确保始终为数组
+    select: (data) => (Array.isArray(data) ? data : []),
   });
 
   // 2. React Query 拉取邀请链接
@@ -127,13 +129,14 @@ export default function RewardsPage() {
   };
 
   // 计算积分总览与进度条
-  const totalTasks = tasks?.length || 10;
-  const completedTasks = tasks?.filter((t) => t.completed).length || 0;
+  const taskList = Array.isArray(tasks) ? tasks : [];
+  const totalTasks = taskList.length || 10;
+  const completedTasks = taskList.filter((t) => t.completed).length || 0;
   const taskProgressPercentage = parseFloat(((completedTasks / totalTasks) * 100).toFixed(0));
 
   // 获取特定任务的状态
   const getTaskStatus = (taskId: string) => {
-    return tasks?.find((t) => t.taskId === taskId) || { completed: false };
+    return taskList.find((t) => t.taskId === taskId) || { completed: false };
   };
 
   const discordStep1 = getTaskStatus("task_connect_discord");

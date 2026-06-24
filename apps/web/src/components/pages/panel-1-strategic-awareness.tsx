@@ -6,9 +6,9 @@
  */
 "use client"
 
-import React, { useMemo } from "react"
+import React, { useMemo, useState, useEffect } from "react"
 import { useIntelSnapshot } from "@/hooks/use-intel-snapshot"
-import { useIntelStream } from "@/hooks/use-intel-stream"
+import { intelEventBus } from "@/contexts/intel-event-bus"
 import { useIndustryIntelStore } from "@/stores/industry-intel-store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -165,7 +165,11 @@ function SignalItem({ signal }: { signal: IntelSignalDetected }) {
 export function Panel1StrategicAwareness() {
   const activeIndustryId = useIndustryIntelStore((s) => s.activeIndustryId)
   const { snapshot, isLoading } = useIntelSnapshot({ packId: activeIndustryId })
-  const { signals } = useIntelStream({ packId: activeIndustryId })
+  // PERF(v3.42.05): 独立订阅事件总线——只监听 signal 事件，不与 Panel2/P3 耦合
+  const [signals, setSignals] = useState<IntelSignalDetected[]>([])
+  useEffect(() => intelEventBus.on("signal", (e) => {
+    setSignals((prev) => [e as IntelSignalDetected, ...prev].slice(0, 50))
+  }), [])
 
   const radar = snapshot?.radarSection?.dimensions ?? PLACEHOLDER_RADAR
 

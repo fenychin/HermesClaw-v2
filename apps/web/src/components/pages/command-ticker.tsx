@@ -6,8 +6,8 @@
  */
 "use client"
 
-import React, { useMemo } from "react"
-import { useIntelStream } from "@/hooks/use-intel-stream"
+import React, { useMemo, useState, useEffect } from "react"
+import { intelEventBus } from "@/contexts/intel-event-bus"
 import { useIndustryIntelStore } from "@/stores/industry-intel-store"
 
 const MAX_TICKER_ITEMS = 10
@@ -28,8 +28,14 @@ function TickerLine({ text, timestamp }: { text: string; timestamp: string }) {
 }
 
 export function CommandTicker() {
-  const activeIndustryId = useIndustryIntelStore((s) => s.activeIndustryId)
-  const { flowTicks, signals } = useIntelStream({ packId: activeIndustryId })
+  // PERF(v3.42.05): 独立订阅事件总线——只收 flow.tick + signal
+  const [flowTicks, setFlowTicks] = useState<any[]>([])
+  const [signals, setSignals] = useState<any[]>([])
+  useEffect(() => {
+    const u1 = intelEventBus.on("flow.tick", (e) => setFlowTicks(p => [...p.slice(-299), e]))
+    const u2 = intelEventBus.on("signal", (e) => setSignals(p => [e, ...p].slice(0, 50)))
+    return () => { u1(); u2() }
+  }, [])
   const agentHeartbeats = useIndustryIntelStore((s) => s.agentHeartbeats)
   const alerts = useIndustryIntelStore((s) => s.alerts)
 

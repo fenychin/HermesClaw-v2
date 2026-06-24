@@ -13,9 +13,9 @@
  *
  * ⚠️ 仅在服务端（Route Handler / lib/server）调用，切勿在客户端引入。
  */
-import type { RiskLevel, HarnessMetrics } from "@/types"
-import type { LlmProvider } from "@/lib/server/llm-provider"
-import { callAnthropicStructured, callDeepSeekJson } from "@/lib/server/llm-provider"
+import type { RiskLevel, HarnessMetrics } from "../../types"
+import type { LlmProvider } from "./llm-provider"
+import { callAnthropicStructured, callDeepSeekJson } from "./llm-provider"
 
 /** AI 产出的 Harness 升级提案核心字段（写库前的草稿） */
 export interface HarnessProposalDraft {

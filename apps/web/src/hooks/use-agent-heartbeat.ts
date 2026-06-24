@@ -30,36 +30,37 @@ interface UseAgentHeartbeatReturn {
 
 export function useAgentHeartbeat(): UseAgentHeartbeatReturn {
   const heartbeats = useIndustryIntelStore((s) => s.agentHeartbeats)
-  const setAgentHeartbeats = useIndustryIntelStore((s) => s.setAgentHeartbeats)
-  const updateAgentHeartbeat = useIndustryIntelStore((s) => s.updateAgentHeartbeat)
 
   // 首次挂载时初始化默认心跳状态
   useEffect(() => {
+    const store = useIndustryIntelStore.getState()
     const initialized: Record<string, AgentHeartbeatState> = {}
     for (const agent of DEFAULT_AGENTS) {
-      initialized[agent.agentId] = heartbeats[agent.agentId] ?? agent
+      initialized[agent.agentId] = store.agentHeartbeats[agent.agentId] ?? agent
     }
-    if (Object.keys(heartbeats).length === 0) {
-      setAgentHeartbeats(initialized)
+    if (Object.keys(store.agentHeartbeats).length === 0) {
+      store.setAgentHeartbeats(initialized)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 定期检测离线 Agent（10s 检查一次）
+  // PERF(v3.42.05): 使用 getState() 避免 updateAgentHeartbeat 引用变化导致 interval 重建
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now()
+      const store = useIndustryIntelStore.getState()
       for (const agent of DEFAULT_AGENTS) {
-        const state = useIndustryIntelStore.getState().agentHeartbeats[agent.agentId]
+        const state = store.agentHeartbeats[agent.agentId]
         if (!state || state.heartbeatIntervalMs === 0) continue // user-initiated 的 Agent 不检查离线
         const lastAt = state.lastHeartbeatAt ? new Date(state.lastHeartbeatAt).getTime() : 0
         const timeoutMs = state.heartbeatIntervalMs * 3
         if (now - lastAt > timeoutMs && state.status === "online") {
-          updateAgentHeartbeat(agent.agentId, { status: "degraded" })
+          store.updateAgentHeartbeat(agent.agentId, { status: "degraded" })
         }
       }
     }, 10_000)
     return () => clearInterval(interval)
-  }, [updateAgentHeartbeat])
+  }, [])
 
   const agentList = useMemo(
     () => DEFAULT_AGENTS.map((def) => heartbeats[def.agentId] ?? def),

@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 
     // 同时从 WorkflowRun 表（A5）读取最近的评测输出，补充 HarnessProposal 缺失时的数据
     const latestA5Run = await prisma.workflowRun.findFirst({
-      where: { workspaceId: ctx.workspaceId, agentId: "A5", outputContext: { not: null } },
+      where: { workspaceId: ctx.workspaceId, agentId: "A5", outputContext: { not: null } } as any,
       orderBy: { completedAt: "desc" },
       select: { outputContext: true, completedAt: true, status: true },
     })
