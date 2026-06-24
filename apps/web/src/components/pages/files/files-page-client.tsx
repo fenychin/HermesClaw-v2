@@ -1027,7 +1027,7 @@ export function FilesPageClient() {
             />
           ) : viewMode === "table" ? (
             /* ===== 表格视图 ===== */
-            <div className="border-border rounded-2xl border overflow-hidden">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
