@@ -22,7 +22,7 @@ import { useIndustryIntelStore } from "@/stores/industry-intel-store"
 import { useAgentHeartbeat } from "@/hooks/use-agent-heartbeat"
 
 const DEFAULT_INDUSTRIES = [
-  { id: "industry-intelligence-v2", name: "跨行业情报中心", packId: "industry-intelligence-v2", isIntelCenter: true },
+  { id: "industry-intelligence-v2", name: "跨行业舆情", packId: "industry-intelligence-v2", isIntelCenter: true },
 ]
 
 export default function IndustryIntelligencePage() {
@@ -39,7 +39,7 @@ export default function IndustryIntelligencePage() {
   useAgentHeartbeat()
 
   return (
-    <div className="flex flex-col h-screen bg-zinc-950 text-zinc-300" role="main" aria-label="行业情报中心">
+    <div className="flex flex-col h-screen bg-zinc-950 text-zinc-300" role="main" aria-label="行业舆情">
       <IntelTopBar />
 
       <div className="flex-1 flex gap-2 px-4 py-3 overflow-hidden pb-8">

@@ -56,7 +56,7 @@ export const SidebarBrain = memo(function SidebarBrain({
       {/* 触发行 */}
       {collapsed ? (
         <Link
-          href="/brain/short-memory"
+          href="/brain/memory"
           className={cn(
             "w-full h-10 flex items-center justify-center rounded-xl transition-all duration-150",
             isActive
@@ -64,8 +64,8 @@ export const SidebarBrain = memo(function SidebarBrain({
               : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
           )}
           title="智慧大脑"
-          onPointerEnter={() => prewarm("/brain/short-memory")}
-          onFocus={() => prewarm("/brain/short-memory")}
+          onPointerEnter={() => prewarm("/brain/memory")}
+          onFocus={() => prewarm("/brain/memory")}
         >
           <Brain className={cn("size-[18px]", isActive && "text-[#6D5EF9]")} />
         </Link>

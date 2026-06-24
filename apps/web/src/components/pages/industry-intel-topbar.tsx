@@ -61,7 +61,7 @@ export function IntelTopBar() {
     <header
       className="flex items-center justify-between px-6 py-2.5 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur"
       role="banner"
-      aria-label="情报中心顶栏"
+      aria-label="舆情中心顶栏"
     >
       {/* 左侧：系统状态 + 威胁等级 */}
       <div className="flex items-center gap-4">

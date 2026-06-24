@@ -429,12 +429,21 @@ export async function openChatStream(
     return
   }
 
-  if (provider === "anthropic") {
-    await streamAnthropicShared({ model, system, messages, maxTokens, onDelta })
-    return
-  }
+  try {
+    if (provider === "anthropic") {
+      await streamAnthropicShared({ model, system, messages, maxTokens, onDelta })
+      return
+    }
 
-  await streamDeepSeekShared({ model, system, messages, maxTokens, onDelta })
+    await streamDeepSeekShared({ model, system, messages, maxTokens, onDelta })
+  } catch (err) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(`[openChatStream] 开发环境下上游调用失败，正在降级为 Mock 回显:`, err)
+      await streamMockShared({ provider, model, messages, onDelta })
+    } else {
+      throw err
+    }
+  }
 }
 
 // ---- DeepSeek 共享流式（SSE 透传） ----

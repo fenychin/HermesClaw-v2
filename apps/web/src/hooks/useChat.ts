@@ -69,10 +69,15 @@ export function useChat() {
 
   // 同步 count 的 flush 封装（含连续失败感知）
   const flush = useCallback(async () => {
+    const startCount = getPendingCount();
     const flushed = await flushPendingConversations();
-    if (flushed > 0) {
-      setPendingCount(getPendingCount());
-    } else if (getFlushFailures() >= 3) {
+    const endCount = getPendingCount();
+
+    if (startCount !== endCount) {
+      setPendingCount(endCount);
+    }
+
+    if (flushed === 0 && getFlushFailures() >= 3) {
       toast.error("历史对话同步失败", {
         description: "已积压多条对话未同步，请检查网络后刷新页面",
       });
@@ -115,12 +120,23 @@ export function useChat() {
           "user",
           userContent,
         );
-        await apiClient.addMessage(
-          conversationIdRef.current,
-          "assistant",
-          assistantContent,
-          traceObj,
-        );
+        try {
+          await apiClient.addMessage(
+            conversationIdRef.current,
+            "assistant",
+            assistantContent,
+            traceObj,
+          );
+        } catch (assistantErr) {
+          // 如果带 trace 保存消息失败，可能是因为 trace 数据在某些边界情况下不满足 Zod/数据库约束，
+          // 此时采取 Fail-safe 策略：剥离 trace 并重新尝试仅保存 AI 的核心文本回复，以避免用户数据丢失。
+          console.warn("[useChat] 带 trace 保存 assistant 消息失败，正在尝试无 trace 降级保存:", assistantErr);
+          await apiClient.addMessage(
+            conversationIdRef.current,
+            "assistant",
+            assistantContent,
+          );
+        }
         // 本次保存成功 → 尝试回放之前积压的失败对话 + 通知侧边栏/面板刷新
         flush().catch(() => {});
         window.dispatchEvent(new CustomEvent("conversation-saved"));

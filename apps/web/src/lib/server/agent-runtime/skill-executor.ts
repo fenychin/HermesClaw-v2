@@ -200,7 +200,7 @@ export async function execRadarScoreCompute(
     return summarizeSearchResults(dim.key, dim.label, result?.results ?? [])
   }).join("\n")
 
-  const systemPrompt = `你是 HermesClaw 行业情报中心的战略评分引擎。
+  const systemPrompt = `你是 HermesClaw 行业舆情的战略评分引擎。
 你的职责：基于过去 7 天的全网真实新闻与本地内部统计，输出 8 个维度的战略雷达评分 (0-100)。
 
 评分规则：

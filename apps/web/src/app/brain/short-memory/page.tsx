@@ -1,5 +1,5 @@
-import { MemoryView } from "../_components/memory-view";
+import { redirect } from "next/navigation";
 
 export default function ShortMemoryPage() {
-  return <MemoryView initialTab="short" />;
+  redirect("/brain/memory?tab=short");
 }

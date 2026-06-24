@@ -296,7 +296,13 @@ export async function executeChatStream(
       return;
     }
 
-    // 其他错误 → SSE 错误帧 + DONE
+    // 其他错误 → SSE 错误帧 + DONE 正常关闭，让前端在 UI 上能友好展示错误描述，避免流式通道崩溃
+    enqueue(
+      `data: ${JSON.stringify({ error: errMsg || "流式响应中断" })}\n\n`,
+    );
+    enqueue(deps.SSE_DONE);
+    controller.close();
+
     void deps.writeLog({
       source: "hermes-chat",
       taskName: "Hermes 对话",
@@ -304,7 +310,6 @@ export async function executeChatStream(
       duration: elapsed(),
       detail: errMsg || "流式响应中断",
     });
-    controller.error(err);
   }
 }
 

@@ -1,5 +1,5 @@
-import { MemoryView } from "../_components/memory-view";
+import { redirect } from "next/navigation";
 
 export default function MidMemoryPage() {
-  return <MemoryView initialTab="mid" />;
+  redirect("/brain/memory?tab=mid");
 }

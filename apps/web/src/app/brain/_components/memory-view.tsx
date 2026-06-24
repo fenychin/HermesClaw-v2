@@ -11,6 +11,7 @@ import {
   AlertCircle,
   RefreshCw,
   Loader2,
+  Search,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
@@ -21,6 +22,7 @@ import { SkeletonCard } from "@/components/common/skeleton-card";
 import { apiClient } from "@/lib/api-client";
 import type { Memory, MemoryType } from "@/types";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 const TIER_LABEL: Record<MemoryType, string> = {
   short: "短期记忆",
@@ -216,6 +218,7 @@ export function MemoryView({ initialTab }: MemoryViewProps) {
   const loadMemories = useMemoryStore((s) => s.loadMemories);
   const [batchLoading, setBatchLoading] = useState(false);
   const [batchMsg, setBatchMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     loadMemories();
@@ -225,6 +228,10 @@ export function MemoryView({ initialTab }: MemoryViewProps) {
     if (initialTab) setActiveTab(initialTab);
   }, [initialTab, setActiveTab]);
 
+  useEffect(() => {
+    setSearchQuery("");
+  }, [activeTab]);
+
   const memoriesByTab: Record<MemoryType, Memory[]> = useMemo(
     () => ({
       short: memories.filter((m) => m.type === "short"),
@@ -233,6 +240,26 @@ export function MemoryView({ initialTab }: MemoryViewProps) {
     }),
     [memories],
   );
+
+  const filteredMemoriesByTab: Record<MemoryType, Memory[]> = useMemo(() => {
+    const result: Record<MemoryType, Memory[]> = { short: [], mid: [], long: [] };
+    const query = searchQuery.trim().toLowerCase();
+
+    (Object.keys(memoriesByTab) as MemoryType[]).forEach((key) => {
+      const list = memoriesByTab[key];
+      if (!query) {
+        result[key] = list;
+      } else {
+        result[key] = list.filter(
+          (m) =>
+            m.summary.toLowerCase().includes(query) ||
+            (m.content && m.content.toLowerCase().includes(query)) ||
+            (m.tags && m.tags.some((t) => t.toLowerCase().includes(query)))
+        );
+      }
+    });
+    return result;
+  }, [memoriesByTab, searchQuery]);
 
   const tabs: { value: MemoryType; label: string; count: number }[] = useMemo(
     () => [
@@ -248,12 +275,8 @@ export function MemoryView({ initialTab }: MemoryViewProps) {
       <PageTransition>
         <div className="space-y-6">
           <PageHeader
-            title={initialTab ? TIER_LABEL[initialTab] : "记忆系统"}
-            description={
-              initialTab
-                ? TIER_DESC[initialTab]
-                : "短/中/长期三级记忆体系：实时会话 → 项目沉淀 → 企业知识"
-            }
+            title="记忆体"
+            description="短/中/长期三级记忆体系：实时会话 → 项目沉淀 → 企业知识"
           />
           <div className="grid grid-cols-2 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -270,12 +293,8 @@ export function MemoryView({ initialTab }: MemoryViewProps) {
       <PageTransition>
         <div className="space-y-6">
           <PageHeader
-            title={initialTab ? TIER_LABEL[initialTab] : "记忆系统"}
-            description={
-              initialTab
-                ? TIER_DESC[initialTab]
-                : "短/中/长期三级记忆体系：实时会话 → 项目沉淀 → 企业知识"
-            }
+            title="记忆体"
+            description="短/中/长期三级记忆体系：实时会话 → 项目沉淀 → 企业知识"
           />
           <div className="flex flex-col items-center justify-center py-20">
             <div className="bg-danger/10 mb-4 flex size-14 items-center justify-center rounded-2xl">
@@ -301,13 +320,27 @@ export function MemoryView({ initialTab }: MemoryViewProps) {
     <PageTransition>
       <div className="space-y-6">
         <PageHeader
-          title={initialTab ? TIER_LABEL[initialTab] : "记忆系统"}
-          description={
-            initialTab
-              ? TIER_DESC[initialTab]
-              : "短/中/长期三级记忆体系：实时会话 → 项目沉淀 → 企业知识"
-          }
+          title="记忆体"
+          description="短/中/长期三级记忆体系：实时会话 → 项目沉淀 → 企业知识"
         />
+
+        {/* 统一搜索过滤工具栏 */}
+        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-card/60 border border-border/80 p-4 rounded-2xl backdrop-blur-md">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder={`搜索${TIER_LABEL[activeTab]}、标签或内容...`}
+              className="pl-9 bg-background/50 border-border focus:border-[#6D5EF9]/50 text-xs h-9 rounded-xl"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2 items-center text-xs text-muted-foreground bg-accent/30 px-3 py-1.5 rounded-lg border border-border/30">
+            <Layers className="size-3.5 text-[#6D5EF9]" />
+            <span>当前区间共 {memoriesByTab[activeTab].length} 条记忆</span>
+          </div>
+        </div>
 
         <Tabs
           value={activeTab}
@@ -324,87 +357,98 @@ export function MemoryView({ initialTab }: MemoryViewProps) {
             ))}
           </TabsList>
 
-          {tabs.map((tab) => (
-            <TabsContent key={tab.value} value={tab.value} className="mt-4">
-              {memoriesByTab[tab.value].length === 0 ? (
-                <EmptyState
-                  icon={Layers}
-                  title={`暂无${TIER_LABEL[tab.value]}`}
-                  description="随对话积累，系统将自动汇总和沉淀对应记忆"
-                />
-              ) : (
-                <div className="space-y-3">
-                  {/* 短期记忆批量操作（PRD #10.6.1：可清理、可合并转入中期记忆） */}
-                  {tab.value === "short" && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          disabled={batchLoading}
-                          onClick={async () => {
-                            if (!confirm(`确认清理全部 ${memoriesByTab.short.length} 条短期记忆？此操作不可撤销。`)) return;
-                            setBatchLoading(true);
-                            setBatchMsg(null);
-                            const failed: string[] = [];
-                            const ids = memoriesByTab.short.map((m) => ({ id: m.id, summary: m.summary }));
-                            for (const { id, summary } of ids) {
-                              try { await apiClient.deleteMemory(id, true); }
-                              catch { failed.push(summary); }
-                            }
-                            await loadMemories();
-                            if (failed.length > 0) {
-                              setBatchMsg({ ok: false, text: `${failed.length} 条清理失败: ${failed.slice(0, 3).join("、")}${failed.length > 3 ? "…" : ""}` });
-                            }
-                            setBatchLoading(false);
-                          }}
-                          className="text-danger hover:bg-danger/10 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
-                        >
-                          {batchLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
-                          清理全部
-                        </button>
-                        <button
-                          type="button"
-                          disabled={batchLoading}
-                          onClick={async () => {
-                            if (!confirm(`确认将全部 ${memoriesByTab.short.length} 条短期记忆合并转入中期记忆？`)) return;
-                            setBatchLoading(true);
-                            setBatchMsg(null);
-                            const failed: string[] = [];
-                            const ids = memoriesByTab.short.map((m) => ({ id: m.id, summary: m.summary }));
-                            for (const { id, summary } of ids) {
-                              try { await apiClient.updateMemory(id, { type: "mid" }); }
-                              catch { failed.push(summary); }
-                            }
-                            await loadMemories();
-                            if (failed.length > 0) {
-                              setBatchMsg({ ok: false, text: `${failed.length} 条升级失败: ${failed.slice(0, 3).join("、")}${failed.length > 3 ? "…" : ""}` });
-                            }
-                            setBatchLoading(false);
-                          }}
-                          className="text-brand-blue hover:bg-brand-blue/10 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
-                        >
-                          {batchLoading ? <Loader2 className="size-3.5 animate-spin" /> : <ArrowUp className="size-3.5" />}
-                          合并转入中期记忆
-                        </button>
-                      </div>
-                      {batchMsg && (
-                        <div className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs ${batchMsg.ok ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
-                          <AlertCircle className="size-3.5 shrink-0" />
-                          <span>{batchMsg.text}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+          {tabs.map((tab) => {
+            const hasNoMemories = memoriesByTab[tab.value].length === 0;
+            const hasNoFilteredResults = filteredMemoriesByTab[tab.value].length === 0;
 
-                  <div className="grid grid-cols-2 gap-4">
-                    {memoriesByTab[tab.value].map((memory) => (
-                      <MemoryCard key={memory.id} memory={memory} />
-                    ))}
+            return (
+              <TabsContent key={tab.value} value={tab.value} className="mt-4">
+                {hasNoMemories ? (
+                  <EmptyState
+                    icon={Layers}
+                    title={`暂无${TIER_LABEL[tab.value]}`}
+                    description="随对话积累，系统将自动汇总和沉淀对应记忆"
+                  />
+                ) : hasNoFilteredResults ? (
+                  <EmptyState
+                    icon={Search}
+                    title="未找到匹配的记忆"
+                    description="请尝试调整搜索关键词"
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {/* 短期记忆批量操作（PRD #10.6.1：可清理、可合并转入中期记忆） */}
+                    {tab.value === "short" && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={batchLoading}
+                            onClick={async () => {
+                              if (!confirm(`确认清理全部 ${memoriesByTab.short.length} 条短期记忆？此操作不可撤销。`)) return;
+                              setBatchLoading(true);
+                              setBatchMsg(null);
+                              const failed: string[] = [];
+                              const ids = memoriesByTab.short.map((m) => ({ id: m.id, summary: m.summary }));
+                              for (const { id, summary } of ids) {
+                                try { await apiClient.deleteMemory(id, true); }
+                                catch { failed.push(summary); }
+                              }
+                              await loadMemories();
+                              if (failed.length > 0) {
+                                setBatchMsg({ ok: false, text: `${failed.length} 条清理失败: ${failed.slice(0, 3).join("、")}${failed.length > 3 ? "…" : ""}` });
+                              }
+                              setBatchLoading(false);
+                            }}
+                            className="text-danger hover:bg-danger/10 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
+                          >
+                            {batchLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                            清理全部
+                          </button>
+                          <button
+                            type="button"
+                            disabled={batchLoading}
+                            onClick={async () => {
+                              if (!confirm(`确认将全部 ${memoriesByTab.short.length} 条短期记忆合并转入中期记忆？`)) return;
+                              setBatchLoading(true);
+                              setBatchMsg(null);
+                              const failed: string[] = [];
+                              const ids = memoriesByTab.short.map((m) => ({ id: m.id, summary: m.summary }));
+                              for (const { id, summary } of ids) {
+                                try { await apiClient.updateMemory(id, { type: "mid" }); }
+                                catch { failed.push(summary); }
+                              }
+                              await loadMemories();
+                              if (failed.length > 0) {
+                                setBatchMsg({ ok: false, text: `${failed.length} 条升级失败: ${failed.slice(0, 3).join("、")}${failed.length > 3 ? "…" : ""}` });
+                              }
+                              setBatchLoading(false);
+                            }}
+                            className="text-brand-blue hover:bg-brand-blue/10 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
+                          >
+                            {batchLoading ? <Loader2 className="size-3.5 animate-spin" /> : <ArrowUp className="size-3.5" />}
+                            合并转入中期记忆
+                          </button>
+                        </div>
+                        {batchMsg && (
+                          <div className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs ${batchMsg.ok ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
+                            <AlertCircle className="size-3.5 shrink-0" />
+                            <span>{batchMsg.text}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {filteredMemoriesByTab[tab.value].map((memory) => (
+                        <MemoryCard key={memory.id} memory={memory} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </TabsContent>
-          ))}
+                )}
+              </TabsContent>
+            );
+          })}
         </Tabs>
       </div>
     </PageTransition>

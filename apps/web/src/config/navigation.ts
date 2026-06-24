@@ -10,9 +10,7 @@ import {
   Settings,
   Radar,
   // 智慧大脑二级图标
-  Zap,
   Database,
-  Archive,
   Puzzle,
   Plug,
   Mic,
@@ -50,9 +48,8 @@ export const mainNav: NavItem[] = [
   { href: "/workspace/chat", label: "新对话", icon: Sparkles, description: "快速发起需求、对话与任务的超级入口" },
   { href: "/brain/memory", label: "智慧大脑", icon: Brain, description: "记忆、技能与连接器的控制面中枢" },
   /* ——— 第二板块：行业 ——— */
-  { href: "/foreign-trade", label: "外贸", icon: Ship, description: "外贸行业工作台与专属工作流" },
-  { href: "/dashboard", label: "行业动态", icon: LayoutDashboard, description: "行业情报、询盘雷达与经营监测" },
-  { href: "/industry-intelligence", label: "行业情报中心", icon: Radar, description: "五板块实时情报中枢大屏" },
+  { href: "/foreign-trade", label: "工作台", icon: Ship, description: "行业工作台、专属工作流与动态大盘" },
+  { href: "/industry-intelligence", label: "行业舆情", icon: Radar, description: "五板块实时情报中枢大屏" },
   { href: "/projects", label: "空间", icon: FolderKanban, description: "面向客户 / 订单 / 市场的 AI 工作单元" },
   /* ——— 第三板块：资料库 ——— */
   { href: "/files", label: "文件", icon: FileText, description: "企业内容供给链与结构化解析" },
@@ -71,17 +68,16 @@ export const navSections: NavSection[] = [
   {
     label: "行业",
     items: [
-      mainNav[2], // 外贸
-      mainNav[3], // 动态大盘
-      mainNav[4], // 行业情报中心
-      mainNav[5], // 项目空间
+      mainNav[2], // 工作台
+      mainNav[3], // 行业舆情
+      mainNav[4], // 项目空间
     ],
   },
   {
     label: "资料库",
     items: [
-      mainNav[6], // 文件
-      mainNav[7], // 最近
+      mainNav[5], // 文件
+      mainNav[6], // 最近
     ],
   },
 ];
@@ -94,9 +90,7 @@ export const bottomNav: NavItem[] = [
 
 /** 智慧大脑二级导航（PRD 9.2） */
 export const brainNav: NavItem[] = [
-  { href: "/brain/short-memory", label: "短期记忆", icon: Zap, description: "实时会话上下文与临时任务状态，可清理、可合并" },
-  { href: "/brain/mid-memory", label: "中期记忆", icon: Database, description: "项目级与客户级沉淀、阶段性策略，可升级为长期记忆" },
-  { href: "/brain/long-memory", label: "长期记忆", icon: Archive, description: "企业 SOP、产品知识与组织级经验库" },
+  { href: "/brain/memory", label: "记忆体", icon: Database, description: "短/中/长期三级记忆体统一控制面" },
   { href: "/brain/skills", label: "技能 Skill", icon: Puzzle, description: "行业 / 岗位 / 自定义技能与版本管理" },
   { href: "/brain/connectors", label: "连接器 MCP", icon: Plug, description: "邮箱、CRM、ERP 等连接器授权" },
   { href: "/brain/voice", label: "语音库", icon: Mic, description: "品牌声音与多语种语音资产" },

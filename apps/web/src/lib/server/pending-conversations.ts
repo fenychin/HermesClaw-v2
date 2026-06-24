@@ -105,18 +105,33 @@ export async function flushPendingConversations(): Promise<number> {
           { role: "user", content: userContent },
           { role: "assistant", content: safeContent(entry.assistantContent) },
         ]);
-      } catch {
+      } catch (err: any) {
+        // 400 参数校验失败，说明数据格式有毒，绝对无法同步，直接丢弃（出队），防止卡死队列
+        if (err?.status === 400 || err?.message === "参数验证失败") {
+          console.warn("[pending-conversations] 检测到有毒积压数据 (400 校验失败)，执行丢弃以避免阻塞队列：", entry)
+          queue = queue.slice(1)
+          writeQueue(queue)
+          continue
+        }
+
+        // 403 权限阻断，说明当前操作者或工作区没有写入权限（例如切换为了只读工作区或未登录）
+        // 此时我们应该保留队列（break 退出），但不累加网络级别的 consecutiveFailures，避免因为权限切换导致网络错误弹窗疯狂报错
+        if (err?.status === 403) {
+          console.warn("[pending-conversations] 权限不足 (403)，暂停回放待切换权限后重试")
+          break
+        }
+
         // 仍失败（多半离线 / 服务端错误）→ 停止，保留队列待下次重试
-        consecutiveFailures++;
-        break;
+        consecutiveFailures++
+        break
       }
-      queue = queue.slice(1);
-      writeQueue(queue); // 成功一条即落盘，杜绝回放中途崩溃丢进度
-      flushed++;
-      consecutiveFailures = 0; // 至少成功一条即清零
+      queue = queue.slice(1)
+      writeQueue(queue) // 成功一条即落盘，杜绝回放中途崩溃丢进度
+      flushed++
+      consecutiveFailures = 0 // 至少成功一条即清零
     }
   } finally {
-    isFlushing = false;
+    isFlushing = false
   }
   return flushed;
 }

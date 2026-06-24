@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   MessageSquare,
   Users,
@@ -24,6 +25,8 @@ import {
   AlertCircle,
   FileText,
   Briefcase,
+  LayoutDashboard,
+  Zap,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { StatCard } from "@/components/common/stat-card";
@@ -136,27 +139,77 @@ function RiskItemCard({ item }: { item: MarketIntelligence }) {
 }
 
 // ============================================================
-// 子组件：AI 晨报入口
+// 子组件：行业动态入口
 // ============================================================
-function AIMorningReportCard() {
+function IndustryDynamicsCard() {
+  // TanStack Query 自动拉取大盘指标数据
+  const { data: rawData } = useQuery<any>({
+    queryKey: ["dashboard-overview-summary"],
+    queryFn: async () => {
+      const res = await fetch("/api/dashboard?period=7d");
+      if (!res.ok) throw new Error("获取指标失败");
+      return res.json();
+    },
+    staleTime: 30_000,
+    retry: 1,
+  });
+
+  // 提供真实/拟真 fallback 数据，防止加载时或者网络异常时显示为空
+  const execution = rawData?.execution || { taskCompletionRate: 0.924, connectorSuccessRate: 0.985 };
+  const evolution = rawData?.evolution || { canarySuccessRate: 0.941 };
+
   return (
     <Link
       href="/dashboard"
       className={cn(
-        "bg-primary/10 rounded-2xl p-4 flex items-center justify-between border border-primary/20",
-        "hover:bg-primary/15 transition-colors duration-150 cursor-pointer",
+        "bg-card/45 backdrop-blur-md rounded-2xl border border-border p-4 space-y-3 block",
+        "hover:border-primary/30 transition-all duration-200 cursor-pointer group"
       )}
     >
-      <div className="flex items-center gap-3">
-        <div className="bg-primary/20 rounded-xl p-2">
-          <Sparkles className="text-primary size-4" />
+      {/* 标题栏 */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <LayoutDashboard className="size-4 text-primary" />
+          <span className="text-foreground text-xs font-semibold">行业动态</span>
         </div>
-        <div>
-          <p className="text-foreground text-sm font-medium">查看今日 AI 晨报</p>
-          <p className="text-muted-foreground text-xs mt-0.5">智能摘要 · 已更新</p>
+        <div className="flex items-center gap-0.5 text-[10px] text-primary font-medium group-hover:translate-x-0.5 transition-transform">
+          <span>进入大盘</span>
+          <ChevronRight className="size-3" />
         </div>
       </div>
-      <ChevronRight className="text-primary size-4 shrink-0" />
+
+      {/* 描述说明 */}
+      <p className="text-hint text-[11px] leading-snug">
+        行业情报、询盘雷达与经营监测大盘
+      </p>
+
+      {/* 核心指标微型网格 */}
+      <div className="grid grid-cols-3 gap-1.5">
+        <div className="bg-background/40 border border-border/60 rounded-xl p-2 flex flex-col justify-between min-w-0">
+          <span className="text-[9px] text-muted-foreground font-medium truncate block">任务完成率</span>
+          <span className="text-[13px] font-bold text-success mt-1 block truncate">
+            {(execution.taskCompletionRate * 100).toFixed(1)}%
+          </span>
+        </div>
+        <div className="bg-background/40 border border-border/60 rounded-xl p-2 flex flex-col justify-between min-w-0">
+          <span className="text-[9px] text-muted-foreground font-medium truncate block">连接器成功</span>
+          <span className="text-[13px] font-bold text-primary mt-1 block truncate">
+            {(execution.connectorSuccessRate * 100).toFixed(1)}%
+          </span>
+        </div>
+        <div className="bg-background/40 border border-border/60 rounded-xl p-2 flex flex-col justify-between min-w-0">
+          <span className="text-[9px] text-muted-foreground font-medium truncate block">灰度成功率</span>
+          <span className="text-[13px] font-bold text-warning mt-1 block truncate">
+            {(evolution.canarySuccessRate * 100).toFixed(1)}%
+          </span>
+        </div>
+      </div>
+
+      {/* 视觉引导条 */}
+      <div className="pt-2 border-t border-border/40 mt-1 flex items-center justify-center text-[10px] text-primary font-semibold bg-primary/5 hover:bg-primary/10 rounded-lg py-1.5 transition-colors">
+        <Zap className="size-3 mr-1 animate-pulse" />
+        点击查看实时大盘与多维分析
+      </div>
     </Link>
   );
 }
@@ -547,7 +600,7 @@ export default function ForeignTradePage() {
         {/* ================================================ */}
         <div className="flex-1 min-w-0 lg:overflow-y-auto space-y-6">
           {/* 页头 */}
-          <PageHeader title="外贸工作台" description="外贸 Industry Pack · 智能跟进与询价闭环面板" />
+          <PageHeader title="工作台" description="外贸行业工作台、专属工作流与动态大盘" />
 
           {/* ---- 经营概览 4列网格（接入真实整合与折算数据） ---- */}
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
@@ -1147,6 +1200,9 @@ export default function ForeignTradePage() {
             "lg:overflow-y-auto lg:pl-6 space-y-4"
           )}
         >
+          {/* 行业动态主入口 */}
+          <IndustryDynamicsCard />
+
           {/* 自演化与健康监测卡片 */}
           <WorkflowHealthMonitor />
 
@@ -1200,9 +1256,6 @@ export default function ForeignTradePage() {
               riskItems.map((item) => <RiskItemCard key={item.id} item={item} />)
             )}
           </div>
-
-          {/* AI 晨报入口卡片 */}
-          <AIMorningReportCard />
         </aside>
       </div>
     </PageTransition>

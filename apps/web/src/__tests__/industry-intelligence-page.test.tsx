@@ -15,7 +15,7 @@ import userEvent from "@testing-library/user-event"
 const mockStoreState = {
   activeIndustryId: "industry-intelligence-v2",
   industryOptions: [
-    { id: "industry-intelligence-v2", name: "跨行业情报中心", packId: "industry-intelligence-v2", isIntelCenter: true },
+    { id: "industry-intelligence-v2", name: "跨行业舆情", packId: "industry-intelligence-v2", isIntelCenter: true },
   ],
   sseStatus: "disconnected" as const,
   agentHeartbeats: {} as Record<string, unknown>,
@@ -156,12 +156,12 @@ describe("IndustryIntelligencePage 渲染", () => {
       render(<IndustryIntelligencePage />)
     })
 
-    expect(screen.getByLabelText("行业情报中心")).toBeDefined()
-    expect(screen.getByLabelText("战略态势感知板块")).toBeDefined()
-    expect(screen.getByLabelText("数据流量动力学板块")).toBeDefined()
-    expect(screen.getByLabelText("行业生态星云板块")).toBeDefined()
-    expect(screen.getByLabelText("决策推演沙盘板块")).toBeDefined()
-    expect(screen.getByLabelText("人机进化核心板块")).toBeDefined()
+    expect(screen.getByLabelText("行业舆情")).toBeDefined()
+    expect(screen.getByLabelText("战略态势感知面板")).toBeDefined()
+    expect(screen.getByLabelText("数据流量与动力学面板")).toBeDefined()
+    expect(screen.getByLabelText("行业生态全景星云面板")).toBeDefined()
+    expect(screen.getByLabelText("决策推演沙盘面板")).toBeDefined()
+    expect(screen.getByLabelText("人机进化核心面板")).toBeDefined()
   })
 
   it("渲染顶栏：威胁等级 + Agent 心跳 + GEN-N", async () => {
@@ -169,7 +169,7 @@ describe("IndustryIntelligencePage 渲染", () => {
       render(<IndustryIntelligencePage />)
     })
 
-    expect(screen.getByLabelText("情报中心顶栏")).toBeDefined()
+    expect(screen.getByLabelText("舆情中心顶栏")).toBeDefined()
     expect(screen.getByLabelText("全局威胁等级: LOW")).toBeDefined()
     expect(screen.getByLabelText("Agent 心跳状态")).toBeDefined()
     expect(screen.getByLabelText("进化代数")).toBeDefined()
@@ -206,7 +206,7 @@ describe("SSE 事件驱动", () => {
     })
 
     // 页面应正常渲染
-    expect(screen.getByLabelText("行业情报中心")).toBeDefined()
+    expect(screen.getByLabelText("行业舆情")).toBeDefined()
   })
 
   it("收到 signal 后不崩溃", async () => {

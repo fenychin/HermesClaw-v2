@@ -51,7 +51,9 @@ async function apiFetch<T>(
     if (res.status === 409 && json.requiresConfirmation) {
       throw new ConfirmationRequiredError(json.error || "需要二次确认")
     }
-    throw new Error(json.error || `HTTP ${res.status}`)
+    const error = new Error(json.error || `HTTP ${res.status}`)
+    ;(error as any).status = res.status
+    throw error
   }
 
   return json.data as T
