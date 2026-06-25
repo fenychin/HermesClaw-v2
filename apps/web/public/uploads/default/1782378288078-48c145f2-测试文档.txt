@@ -1,0 +1,75 @@
+您可以直接复制这些内容，分别粘贴到对应的输入框中进行测试，顺便检验刚刚配置的 API Key 是否生效。
+
+一、 针对【结构化任务】面板的测试
+测试重点：体验重构后的高级质感 UI，以及置信度护栏（低于 0.7 提示人工复核）的展示效果。
+
+1. 🔍 询盘分析 (Inquiry Analysis)
+场景：收到一份来自中东的真实光伏产品询盘，信息较杂。 测试文本：
+
+text
+
+
+Hi, we are a wholesaler based in Dubai looking for solar inverters (5kW and 10kW hybrid). We need 500 units for our initial trial order. 
+Can you provide your best FOB price, lead time, and warranty terms? Also, do your products have CE and DEWA certifications? We have strict local compliance requirements. 
+By the way, do you accept 30% advance and 70% LC at sight? Looking forward to your prompt reply. 
+Regards, Ahmed. WhatsApp: +971-50-XXXXXXX
+
+
+2. 👤 客户画像 (Customer Persona)
+场景：业务员在展会后或者通过背调拿到了一些碎片化信息，需要构建客户画像。 测试文本：
+
+text
+
+
+公司名称：GreenTech Solutions LLC (阿联酋迪拜)
+联系人：Ahmed (采购经理)
+已知背景：公司主要向当地的商业建筑和市政工程供货。Ahmed非常看重交期和本地化认证（DEWA），价格敏感度中等，更看重供应商的稳定性和售后支持。他们之前一直在从德国和意大利进口，最近因为欧洲供应链紧张，现在希望寻找性价比更高的中国替代方案。老板是印度裔。
+
+
+3. ✉️ 开发信 (Cold Email)
+场景：根据上述客户画像，针对性地破冰。 测试文本：
+
+text
+
+
+目标客户：Ahmed, GreenTech Solutions (采购经理)
+我们的产品：高效太阳能逆变器（5kW/10kW，已获 CE & DEWA 认证）
+我们公司优势：10年新能源制造经验，已成功为中东地区30多个商用项目供货，在迪拜设有本地售后维保中心，试单最快15天交付。
+目的：介绍我们的产品优势，打消他对中国制造稳定性的顾虑，并邀请他下周安排一个简短的 WhatsApp 视频会议展示工厂。
+语气：专业、自信、贴近当地商务习惯。
+
+
+4. 📄 报价策略 (Quotation Strategy)
+场景：针对试单进行报价沙盘推演。 测试文本：
+
+text
+
+
+客户情况：迪拜中型批发商，首次合作，试单 500台 5kW 逆变器，对质量要求高。
+内部成本：出厂成本 150 USD/台，海运到 Jebel Ali 港口单台分摊成本约 10 USD。
+公司要求：底线利润率必须达到 15%。
+竞争对手：目前客户从德国进口的价格约为 240 USD。
+需求：请帮我制定一套报价策略。包含：首次试单的阶梯报价建议、针对 LC 70% 账期的财务风险对冲建议、以及谈判时的预留让步空间设计。
+(注：如果该任务的模型判定置信度较低，比如财务对冲策略拿不准，您刚好可以测试到我们新设计的黄色警示护栏和模糊化 UI 效果)
+
+
+二、 针对【主聊天框】高级指令的测试
+测试重点：验证全局输入框对微交互的响应，以及调用智能体 (@)、引用项目 (#) 和快捷技能 (/) 的融合效果。
+
+5. 综合调度编排（模拟复杂协作）
+测试文本：
+
+text
+
+
+@Sales-Agent @Tech-Agent
+关于 #迪拜光伏项目 ，客户 Ahmed 刚刚发来了新的需求变更：他们要求 10kW 的逆变器必须增加沙尘暴防护等级（达到 IP66），并且能在 55℃ 高温下满载运行不降额。
+请执行 /ft-spec-check 检查我们的现有型号是否满足条件。如果不满足，请评估定制成本和交期，并拟定一封正式回复邮件。
+6. 行业宏观洞察（压力测试长文本与思考过程）
+测试文本：
+
+text
+
+
+请帮我深度分析一下2026年中东地区（特别是阿联酋和沙特）工商业储能市场的最新关税政策和需求趋势。重点关注中国出口企业面临的准入门槛变化以及合规建议。
+您可以挑选几个感兴趣的 prompt 进行测试。如果您在测试过程中觉得 UI 的响应速度、动画连贯性或者排版有任何“不够惊艳”的地方，请随时告诉我，我来继续打磨！

@@ -338,12 +338,146 @@ export function useChat() {
     });
   }, []);
 
+  const sendWorkflowRun = useCallback(
+    async (agentId: string, input: string) => {
+      if (!input.trim() || isStreamingRef.current) return;
+
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: "user",
+        content: input.trim(),
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, userMessage]);
+      setIsStreaming(true);
+      setStreamingContent("正在规划任务...");
+      setError(null);
+      setCurrentTrace(null);
+
+      try {
+        const response = await fetch("/api/workflow-runs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            agentId,
+            input: input.trim(),
+            idempotencyKey: `idem-${crypto.randomUUID()}`,
+          }),
+        });
+
+        if (!response.ok) {
+          let serverMsg = `启动工作流失败 (${response.status})`;
+          try {
+            const errBody = await response.json();
+            if (errBody.error) serverMsg = errBody.error;
+          } catch {}
+          throw new Error(serverMsg);
+        }
+
+        const data = await response.json();
+        const resData = data.data;
+        if (!resData) throw new Error("启动工作流响应格式不正确");
+
+        if (resData.status === "pending_approval") {
+          setIsStreaming(false);
+          setStreamingContent("");
+          const assistantMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: `⚠️ 高危动作等待审批中...\n审批单号: ${resData.checkpointId}`,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, assistantMessage]);
+          void persistConversation(input.trim(), assistantMessage.content);
+          return;
+        }
+
+        const runId = resData.workflowRunId;
+        if (!runId) throw new Error("未获取到工作流运行 ID");
+
+        let completed = false;
+        let pollCount = 0;
+        const maxPolls = 180; // 3分钟
+
+        while (!completed && pollCount < maxPolls) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          pollCount++;
+
+          const statusRes = await fetch(`/api/workflow-runs/${runId}/status`);
+          if (!statusRes.ok) continue;
+
+          const statusData = await statusRes.json();
+          const statusResult = statusData.data;
+          if (!statusResult) continue;
+
+          const status = statusResult.status;
+          const progress = statusResult.progress;
+          const currentNodeId = statusResult.currentNodeId;
+
+          let displayMsg = `正在执行工作流 (ID: ${runId})...\n进度: ${progress}%\n`;
+          if (currentNodeId) {
+            displayMsg += `当前节点: ${currentNodeId}\n`;
+          }
+          if (statusResult.steps) {
+            const stepDetails = statusResult.steps
+              .map((s: any) => `- 节点 ${s.nodeId} (${s.nodeType}): ${s.status}`)
+              .join("\n");
+            displayMsg += `节点执行轨迹:\n${stepDetails}`;
+          }
+
+          setStreamingContent(displayMsg);
+
+          if (status === "completed" || status === "failed" || status === "cancelled") {
+            completed = true;
+            setIsStreaming(false);
+            setStreamingContent("");
+
+            let finalContent = `工作流执行完成 (ID: ${runId})\n`;
+            if (status === "failed") {
+              finalContent = `❌ 工作流执行失败: ${statusResult.errorMessage || "未知错误"}\n`;
+            } else if (status === "cancelled") {
+              finalContent = `⚠️ 工作流已被取消\n`;
+            }
+
+            if (statusResult.steps) {
+              const completedSteps = statusResult.steps.filter((s: any) => s.status === "completed");
+              if (completedSteps.length > 0) {
+                finalContent += `\n输出结果摘要:\n`;
+                completedSteps.forEach((s: any) => {
+                  if (s.outputData) {
+                    finalContent += `\n**节点 ${s.nodeId} 输出:**\n${typeof s.outputData === "object" ? JSON.stringify(s.outputData, null, 2) : s.outputData}\n`;
+                  }
+                });
+              }
+            }
+
+            const assistantMessage: Message = {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content: finalContent,
+              timestamp: new Date(),
+            };
+            setMessages((prev) => [...prev, assistantMessage]);
+            void persistConversation(input.trim(), finalContent);
+          }
+        }
+      } catch (err: any) {
+        setError(err.message || "工作流执行失败");
+        setIsStreaming(false);
+        setStreamingContent("");
+      }
+    },
+    [isStreamingRef, persistConversation]
+  );
+
   return {
     messages,
     isStreaming,
     streamingContent,
     error,
     sendMessage,
+    sendWorkflowRun,
     stopStreaming,
     clearMessages,
     loadConversation,

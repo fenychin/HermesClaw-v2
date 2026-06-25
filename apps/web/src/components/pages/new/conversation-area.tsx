@@ -452,6 +452,10 @@ interface AgentSpecCardProps {
     description: string;
     bindSkills: string[];
     bindConnectors: string[];
+    automationLevel?: string;
+    memoryPermission?: string;
+    canDo?: string[];
+    cannotDo?: string[];
   };
   requirement: string;
   onActivate: (spec: any, requirement: string) => Promise<void>;
@@ -486,7 +490,11 @@ function AgentSpecCard({ spec, requirement, onActivate }: AgentSpecCardProps) {
         role: spec.role,
         description: spec.description,
         bindSkills: selectedSkills,
-        bindConnectors: selectedConnectors
+        bindConnectors: selectedConnectors,
+        automationLevel: spec.automationLevel || "L2",
+        memoryPermission: spec.memoryPermission || "read",
+        canDo: spec.canDo || [],
+        cannotDo: spec.cannotDo || []
       }, requirement);
       setSuccess(true);
       toast.success(`智能体「${name}」已激活并就绪`);
@@ -531,6 +539,24 @@ function AgentSpecCard({ spec, requirement, onActivate }: AgentSpecCardProps) {
         <div className="text-[11px] leading-relaxed text-muted-foreground">
           主要职责：<span className="text-foreground/90">{spec.description}</span>
         </div>
+        <div className="flex flex-wrap gap-2 pt-1 border-t border-border/20 mt-1">
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
+            自动化等级: {spec.automationLevel || "L2"}
+          </span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+            记忆权限: {spec.memoryPermission || "read"}
+          </span>
+        </div>
+        {spec.canDo && spec.canDo.length > 0 && (
+          <div className="text-[10px] text-muted-foreground leading-relaxed mt-1">
+            <span className="text-foreground/75 font-semibold">允许任务:</span> {spec.canDo.join(", ")}
+          </div>
+        )}
+        {spec.cannotDo && spec.cannotDo.length > 0 && (
+          <div className="text-[10px] text-muted-foreground leading-relaxed">
+            <span className="text-red-400/80 font-semibold">禁用高危:</span> {spec.cannotDo.join(", ")}
+          </div>
+        )}
       </div>
 
       {/* 展开微调面板 */}

@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ChevronLeft, Zap } from "lucide-react";
+import { ChevronLeft, Zap, Bot } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -18,6 +19,7 @@ interface QuickWorkflowFormProps {
   cardKey: string;
   onSubmit: (prompt: string, systemPrompt?: string) => void;
   onBack: () => void;
+  onStartWizard?: (initialPrompt: string) => void;
 }
 
 type FieldType = 'textarea' | 'text' | 'select';
@@ -344,7 +346,7 @@ ${values.taskPrompt}
   },
 ];
 
-export function QuickWorkflowForm({ cardKey, onSubmit, onBack }: QuickWorkflowFormProps) {
+export function QuickWorkflowForm({ cardKey, onSubmit, onBack, onStartWizard }: QuickWorkflowFormProps) {
   const [values, setValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -409,7 +411,18 @@ export function QuickWorkflowForm({ cardKey, onSubmit, onBack }: QuickWorkflowFo
             {config.subtitle}
           </p>
         </div>
+
+        {cardKey === "call-agent" && (
+          <Link
+            href="/workspace/agents"
+            className="text-[11px] font-semibold text-white bg-primary hover:bg-primary/90 border border-primary/30 rounded-lg px-3 py-1.5 flex items-center gap-1.5 transition-all shadow-md shrink-0"
+          >
+            <Bot className="size-3.5" />
+            <span>智能体库</span>
+          </Link>
+        )}
       </div>
+
 
       {/* 表单字段渲染 */}
       <div className="space-y-4">

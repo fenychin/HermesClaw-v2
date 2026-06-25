@@ -91,7 +91,13 @@ const translations = {
 
 type LangType = "zh-CN" | "en-US" | "zh-TW";
 
-export function AccountMenu() {
+interface AccountMenuProps {
+  side?: "top" | "bottom";
+  align?: "start" | "center" | "end";
+  collapsed?: boolean;
+}
+
+export function AccountMenu({ side = "bottom", align = "end", collapsed = false }: AccountMenuProps) {
   const { data: session } = useSession();
   const router = useRouter();
   
@@ -349,13 +355,14 @@ export function AccountMenu() {
   };
 
   // 触发源组件 (使用 React.forwardRef 并透传 props 与 ref，确保 Base UI 注入的事件和定位 ref 能正确绑定到底层 button)
-  const MenuTriggerButton = React.forwardRef<HTMLButtonElement, React.ComponentPropsWithoutRef<"button">>(
-    (props, ref) => (
+  const MenuTriggerButton = React.forwardRef<HTMLButtonElement, React.ComponentPropsWithoutRef<"button"> & { collapsed?: boolean }>(
+    ({ collapsed, ...props }, ref) => (
       <button 
         ref={ref}
         {...props}
         className={cn(
-          "flex items-center gap-2 p-1.5 rounded-xl bg-[#111111] hover:bg-[#1F1F1F] transition-all duration-150 outline-none select-none max-w-[180px] cursor-pointer",
+          "flex items-center gap-2 p-1.5 rounded-xl bg-[#111111] hover:bg-[#1F1F1F] transition-all duration-150 outline-none select-none cursor-pointer",
+          collapsed ? "w-9 h-9 justify-center p-0" : "max-w-[180px] w-full",
           props.className
         )}
       >
@@ -370,14 +377,16 @@ export function AccountMenu() {
             <User className="size-3.5" />
           )}
         </div>
-        <div className="hidden sm:flex flex-col items-start text-left min-w-0 pr-1 select-none">
-          <span className="text-[#F5F5F5] text-xs font-semibold truncate w-full max-w-[110px]">
-            {session?.user?.name || userEmail.split("@")[0]}
-          </span>
-          <span className="text-[#B3B3B3] text-[9px] truncate w-full">
-            {planInfo.name}
-          </span>
-        </div>
+        {!collapsed && (
+          <div className="flex flex-col items-start text-left min-w-0 pr-1 select-none flex-1">
+            <span className="text-[#F5F5F5] text-xs font-semibold truncate w-full max-w-[110px]">
+              {session?.user?.name || userEmail.split("@")[0]}
+            </span>
+            <span className="text-[#B3B3B3] text-[9px] truncate w-full">
+              {planInfo.name}
+            </span>
+          </div>
+        )}
       </button>
     )
   );
@@ -390,7 +399,7 @@ export function AccountMenu() {
         setMenuOpen(open);
         if (!open) setActivePanel("main"); // 关闭时切回主视图
       }}>
-        <SheetTrigger render={<MenuTriggerButton />} />
+        <SheetTrigger render={<MenuTriggerButton collapsed={collapsed} />} />
         <SheetContent side="bottom" className="bg-[#111111] border-t border-[#262626] rounded-t-[16px] p-6 max-h-[90vh] overflow-y-auto">
           <SheetHeader className="sr-only">
             <SheetTitle>{t.title}</SheetTitle>
@@ -408,12 +417,12 @@ export function AccountMenu() {
       setMenuOpen(open);
       if (!open) setActivePanel("main"); // 关闭时切回主视图
     }}>
-      <PopoverTrigger render={<MenuTriggerButton />} />
+      <PopoverTrigger render={<MenuTriggerButton collapsed={collapsed} />} />
       <PopoverContent 
-        side="bottom" 
-        align="end" 
+        side={side} 
+        align={align} 
         sideOffset={6} 
-        className="w-[240px] bg-[#111111] border border-[#262626] rounded-[16px] p-4 shadow-xl z-50 origin-top-right transition-transform"
+        className="w-[240px] bg-[#111111] border border-[#262626] rounded-[16px] p-4 shadow-xl z-50 transition-transform"
       >
         {renderMenuContent(() => setMenuOpen(false))}
       </PopoverContent>

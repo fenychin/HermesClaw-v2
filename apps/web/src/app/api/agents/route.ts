@@ -3,7 +3,7 @@ import { stringifyJsonField } from "@/lib/api-utils"; import { withRBAC } from '
 import { ApiResponse } from '@/lib/server/api-response'
 import { AgentCreateSchema, validateBody } from "@/lib/server/validators"
 import { ForbiddenError, requireWritable } from "@/lib/workspace"
-import { serializeAgent } from "@/lib/server/agent-serializer"; import { writeAuditLog } from "@/lib/server/audit"
+import { serializeAgent } from "@/lib/server/agent-serializer"; import { createAuditEntry, updateAuditEntry, actorFromSession } from "@/lib/server/audit"
 
 export const GET = withRBAC(async (req: Request, ctx: any) => {
   try {
@@ -29,8 +29,48 @@ export const POST = withRBAC(async (req: Request, ctx: any) => {
     const parsed = validateBody(rawBody, AgentCreateSchema)
     if (parsed instanceof Response) return parsed; const body = parsed
     const agentId = crypto.randomUUID()
-    const [agent] = await prisma.$transaction([prisma.agent.create({ data: { id: agentId, workspaceId: ctx.workspaceId, name: body.name, role: body.role, description: body.description, status: body.status, source: body.source, category: stringifyJsonField(body.category), bindSkills: stringifyJsonField(body.bindSkills), bindConnectors: stringifyJsonField(body.bindConnectors), memoryPermission: body.memoryPermission, harnessVersion: body.harnessVersion, automationLevel: body.automationLevel, canDo: stringifyJsonField(body.canDo), cannotDo: stringifyJsonField(body.cannotDo), statsJson: stringifyJsonField(body.statsJson), lastActive: body.lastActive } })])
-    void writeAuditLog({ actor: "user", action: "create.agent", targetType: "agent", targetId: agentId, detail: `创建智能体: ${body.name}`, riskLevel: "medium", workspaceId: ctx.workspaceId })
-    return ApiResponse.ok({ agent: serializeAgent(agent as unknown as Record<string, unknown>) })
+    const actor = await actorFromSession()
+    
+    // 配置与边界变更二阶段审计：预记录 pending
+    const auditEntry = await createAuditEntry({
+      actor,
+      action: "agent.create",
+      targetType: "agent",
+      targetId: agentId,
+      detail: `创建智能体: ${body.name}`,
+      riskLevel: "medium",
+      workspaceId: ctx.workspaceId,
+      automationLevel: body.automationLevel as any,
+      triggeredBy: "user",
+      contextSnapshot: {
+        name: body.name,
+        role: body.role,
+        automationLevel: body.automationLevel,
+        bindSkills: body.bindSkills,
+        bindConnectors: body.bindConnectors
+      }
+    })
+
+    try {
+      const [agent] = await prisma.$transaction([prisma.agent.create({ data: { id: agentId, workspaceId: ctx.workspaceId, name: body.name, role: body.role, description: body.description, status: body.status, source: body.source, category: stringifyJsonField(body.category), bindSkills: stringifyJsonField(body.bindSkills), bindConnectors: stringifyJsonField(body.bindConnectors), memoryPermission: body.memoryPermission, harnessVersion: body.harnessVersion, automationLevel: body.automationLevel, canDo: stringifyJsonField(body.canDo), cannotDo: stringifyJsonField(body.cannotDo), statsJson: stringifyJsonField(body.statsJson), lastActive: body.lastActive } })])
+      
+      if (auditEntry.ok) {
+        await updateAuditEntry({
+          auditId: auditEntry.auditId,
+          status: "success",
+          detail: `成功创建智能体: ${body.name}`
+        })
+      }
+      return ApiResponse.ok({ agent: serializeAgent(agent as unknown as Record<string, unknown>) })
+    } catch (err: any) {
+      if (auditEntry.ok) {
+        await updateAuditEntry({
+          auditId: auditEntry.auditId,
+          status: "failed",
+          detail: `创建智能体失败: ${err instanceof Error ? err.message : "未知错误"}`
+        })
+      }
+      throw err
+    }
   } catch (error) { if (error instanceof ForbiddenError) return ApiResponse.apiError(error.message, 403, 'FORBIDDEN'); logger.error('POST /api/agents: 失败', { error: error instanceof Error ? error.message : '未知错误' }); return ApiResponse.apiError("服务器内部错误", 500) }
 }, 'MEMBER')

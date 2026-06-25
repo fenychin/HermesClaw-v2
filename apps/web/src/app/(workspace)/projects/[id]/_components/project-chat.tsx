@@ -58,14 +58,15 @@ function ProjectChatInner() {
     }
   }, [searchParams, loadConversation]);
 
-  const handleSend = useCallback(() => {
-    if (!input.trim() || isStreaming) return;
+  const handleSend = useCallback((finalPrompt?: string) => {
+    const activePrompt = typeof finalPrompt === "string" ? finalPrompt : input.trim();
+    if (!activePrompt || isStreaming) return;
     const apiModelId = getApiModelId();
 
     // 解析输入中的 @智能体、#项目、/命令（与 /new 页面一致）
-    const agentMentions = input.match(/@(\S+)/g)?.map((m: string) => m.slice(1)) ?? [];
-    const projectRefs = input.match(/#(\S+)/g)?.map((m: string) => m.slice(1)) ?? [];
-    const slashCommands = input.match(/\/ft-\S+/g) ?? [];
+    const agentMentions = activePrompt.match(/@(\S+)/g)?.map((m: string) => m.slice(1)) ?? [];
+    const projectRefs = activePrompt.match(/#(\S+)/g)?.map((m: string) => m.slice(1)) ?? [];
+    const slashCommands = activePrompt.match(/\/ft-\S+/g) ?? [];
 
     // 构建增强的 system prompt（合并命令、智能体上下文、项目引用）
     let enhancedSystemPrompt = pendingSystemPrompt;
@@ -88,7 +89,7 @@ function ProjectChatInner() {
         : projectCtx;
     }
 
-    sendMessage(input.trim(), enhancedSystemPrompt, apiModelId);
+    sendMessage(activePrompt, enhancedSystemPrompt, apiModelId);
     clearNewTopicInput();
   }, [input, isStreaming, sendMessage, pendingSystemPrompt, getApiModelId, clearNewTopicInput]);
 

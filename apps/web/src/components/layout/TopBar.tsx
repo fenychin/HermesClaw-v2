@@ -17,7 +17,6 @@ import {
 import { mainNav, bottomNav, brainNav } from "@/config/navigation";
 import { useUiStore, type Notification } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
-import { AccountMenu } from "@/components/layout/AccountMenu";
 
 // ============================================================
 // Mock 通知数据（模块级常量，不在渲染函数内）
@@ -345,7 +344,6 @@ export const TopBar = memo(function TopBar() {
       <div className="flex items-center gap-3">
         <CommandPaletteHint onClick={handleOpenCommandPalette} />
         <NotificationBell />
-        <AccountMenu />
       </div>
     </header>
   );

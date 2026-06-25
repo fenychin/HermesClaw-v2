@@ -195,6 +195,7 @@ export async function createApprovalCheckpoint(
     detail: input.actionSummary,
     riskLevel: RISK_LEVEL_MAP[input.riskLevel] || 'medium',
     workspaceId: input.workspaceId,
+    workflowRunId: input.workflowRunId ?? undefined,
     contextSnapshot: { checkpointId, riskLevel: input.riskLevel, actionType: input.actionSummary }
   });
 
@@ -258,6 +259,7 @@ export async function decideApprovalCheckpoint(
       detail: `审批超时失效，已拒绝该审批决策: ${checkpoint.actionSummary}`,
       riskLevel: RISK_LEVEL_MAP[checkpoint.riskLevel] || 'medium',
       workspaceId: checkpoint.workspaceId,
+      workflowRunId: checkpoint.workflowRunId ?? undefined,
     });
 
     throw new ApprovalExpiredError(checkpointId);
@@ -291,6 +293,7 @@ export async function decideApprovalCheckpoint(
       detail: `审批决策: [rejected]。${reason ? `拒绝原因: ${reason}。` : ''}审批摘要: ${checkpoint.actionSummary}`,
       riskLevel: RISK_LEVEL_MAP[checkpoint.riskLevel] || 'medium',
       workspaceId: checkpoint.workspaceId,
+      workflowRunId: checkpoint.workflowRunId ?? undefined,
       contextSnapshot: { checkpointId, decidedBy, reason }
     });
 
@@ -333,6 +336,7 @@ export async function decideApprovalCheckpoint(
         detail: `审批决策: [approved] (多人全票通过)。审批摘要: ${checkpoint.actionSummary}`,
         riskLevel: RISK_LEVEL_MAP[checkpoint.riskLevel] || 'medium',
         workspaceId: checkpoint.workspaceId,
+        workflowRunId: checkpoint.workflowRunId ?? undefined,
         contextSnapshot: { checkpointId, decidedBy, requiredSigners: requiredList, signedList: newSigned }
       });
 
@@ -370,6 +374,7 @@ export async function decideApprovalCheckpoint(
         detail: `审批人 ${decidedBy} 已签字同意，当前进度: [${newSigned.length}/${requiredList.length}]，等待其他人审批。`,
         riskLevel: RISK_LEVEL_MAP[checkpoint.riskLevel] || 'medium',
         workspaceId: checkpoint.workspaceId,
+        workflowRunId: checkpoint.workflowRunId ?? undefined,
         contextSnapshot: { checkpointId, decidedBy, requiredSigners: requiredList, signedList: newSigned }
       });
 
@@ -394,6 +399,7 @@ export async function decideApprovalCheckpoint(
       detail: `审批决策: [approved]。审批摘要: ${checkpoint.actionSummary}`,
       riskLevel: RISK_LEVEL_MAP[checkpoint.riskLevel] || 'medium',
       workspaceId: checkpoint.workspaceId,
+      workflowRunId: checkpoint.workflowRunId ?? undefined,
       contextSnapshot: { checkpointId, decidedBy }
     });
 
@@ -458,6 +464,7 @@ export async function expireStaleCheckpoints(
       detail: `超时未审批，自动失效拒绝: ${record.actionSummary}`,
       riskLevel: RISK_LEVEL_MAP[record.riskLevel] || 'medium',
       workspaceId: record.workspaceId,
+      workflowRunId: record.workflowRunId ?? undefined,
     });
   }
 

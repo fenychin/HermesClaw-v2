@@ -95,6 +95,7 @@ describe("parseIntentToTaskEnvelope", () => {
       detail: `用户意图解析成功: "帮我发送邮件给 user@example.com" -> 动作: "email.send"`,
       riskLevel: "medium",
       workspaceId: context.workspaceId,
+      workflowRunId: envelope.workflowRunId,
     });
   });
 

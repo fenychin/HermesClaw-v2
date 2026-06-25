@@ -66,6 +66,6 @@ export function createTaskEnvelope(
     taskId: uuid,
     idempotencyKey: `idem-${uuid}`,
     createdAt: params.createdAt || new Date(),
-    version: "1.0",
+    version: "1.0.0",
   } as any
 }

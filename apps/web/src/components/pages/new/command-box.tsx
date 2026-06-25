@@ -22,6 +22,7 @@ import {
   ChevronDown,
   Bot,
   Sparkles,
+  Plus,
 } from "lucide-react";
 import { useAgentStore } from "@/stores/agent-store";
 import { useProjectStore } from "@/stores/project-store";
@@ -52,11 +53,18 @@ const PROJECT_TYPE_LABEL: Record<string, string> = {
   "product-line": "产品线",
 };
 
+interface UploadedFile {
+  name: string;
+  url: string;
+  size: string;
+  content?: string;
+}
+
 interface CommandBoxProps {
   value: string;
   onChange: (value: string | ((prev: string) => string)) => void;
-  /** 发送回调（Enter 或发送按钮触发） */
-  onSubmit?: () => void;
+  /** 发送回调（Enter 或发送按钮触发，传出最终拼接附件后的 prompt） */
+  onSubmit?: (finalPrompt: string) => void;
   /** 停止流式输出回调 */
   onStop?: () => void;
   /** 是否正在流式接收中 */
@@ -107,6 +115,9 @@ export function CommandBox({
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [showAgentDrawer, setShowAgentDrawer] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // 已上传附件状态 (不展现在 textarea 内部，以 tag 形式在上方独立展现)
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
   // 语音权限提示（首次使用）
   const [voicePermissionDenied, setVoicePermissionDenied] = useState(false);
@@ -246,14 +257,30 @@ export function CommandBox({
     setProjectSearch("");
   };
 
+  // ---- 最终拼接并发送 ----
+  const handleSendPrompt = useCallback(() => {
+    if (!value.trim() || isStreaming) return;
+    let finalPrompt = value.trim();
+    if (uploadedFiles.length > 0) {
+      const filesContext = uploadedFiles.map(file => {
+        let text = `[📎 关联文件: ${file.name} (${file.size})](${file.url})`;
+        if (file.content) {
+          text += `\n\`\`\`\n${file.content}\n\`\`\``;
+        }
+        return text;
+      }).join("\n\n");
+      finalPrompt = `${finalPrompt}\n\n${filesContext}`;
+    }
+    onSubmit?.(finalPrompt);
+    setUploadedFiles([]); // 发送后清空已上传附件
+  }, [value, isStreaming, uploadedFiles, onSubmit]);
+
   // ---- 快捷键 ----
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Enter 发送（无 Shift 时）
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (value.trim() && !isStreaming) {
-        onSubmit?.();
-      }
+      handleSendPrompt();
     }
   };
 
@@ -301,32 +328,25 @@ export function CommandBox({
       toast.dismiss(toastId);
 
       const extracted = uploaded.extracted;
-      if (extracted?.ok && extracted.content) {
-        // 服务端已提取文本 → 直接附在消息中供 AI 分析
-        toast.success(`已上传并分析: ${fileName}`);
-        insertAtCursor(
-          `[📎 ${fileName} (${sizeMB}MB)](${uploaded.url})\n` +
-          `\`\`\`\n${extracted.content}\n\`\`\`\n`,
-        );
-      } else if (extracted && !extracted.ok) {
-        // 提取失败（如图片、扫描PDF等）→ 插入链接 + 说明
-        toast.success(`已上传: ${fileName}`);
-        insertAtCursor(
-          `[📎 ${fileName} (${sizeMB}MB)](${uploaded.url})\n` +
-          `> 注：${extracted.note || "此文件内容暂无法自动解析"}\n`,
-        );
-      } else {
-        // 无提取结果（旧版兼容）
-        toast.success(`已上传: ${fileName}`);
-        insertAtCursor(`[📎 ${fileName} (${sizeMB}MB)](${uploaded.url})`);
-      }
+      // 以 Tag 形式追加到状态中，不再污染 input textarea
+      setUploadedFiles(prev => [...prev, {
+        name: fileName,
+        url: uploaded.url,
+        size: `${sizeMB}MB`,
+        content: extracted?.ok && extracted.content ? extracted.content : undefined
+      }]);
+      toast.success(`已成功上传并关联知识库: ${fileName}`);
     } catch (err) {
       toast.dismiss(toastId);
       toast.error("文件上传失败", {
         description: err instanceof Error ? err.message : "请稍后重试",
       });
-      // 降级：仅附文件名（不阻断用户流程）
-      insertAtCursor(`[📎 ${fileName} (${sizeMB}MB)]`);
+      // 降级关联一个空 url
+      setUploadedFiles(prev => [...prev, {
+        name: fileName,
+        url: "#",
+        size: `${sizeMB}MB`
+      }]);
     }
     e.target.value = "";
   };
@@ -441,9 +461,10 @@ export function CommandBox({
 
   const filteredAgents = storeAgents.filter(
     (a) =>
-      !agentSearch ||
-      a.name.toLowerCase().includes(agentSearch.toLowerCase()) ||
-      a.role.includes(agentSearch),
+      a.status === "active" &&
+      (!agentSearch ||
+        a.name.toLowerCase().includes(agentSearch.toLowerCase()) ||
+        a.role.includes(agentSearch)),
   );
 
   const filteredProjects = storeProjects.filter(
@@ -476,6 +497,26 @@ export function CommandBox({
       </p>
 
       {/* 输入区 */}
+      {uploadedFiles.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2 px-1">
+          {uploadedFiles.map((file, idx) => (
+            <div key={idx} className="flex items-center gap-1.5 bg-accent/40 text-xs px-2.5 py-1 rounded-lg border border-border/40 text-foreground/80 max-w-xs shrink-0 select-none">
+              <Paperclip className="size-3 text-primary shrink-0" />
+              <span className="truncate max-w-[120px] font-medium">{file.name}</span>
+              <span className="text-[10px] text-muted-foreground shrink-0">({file.size})</span>
+              <button
+                type="button"
+                onClick={() => setUploadedFiles(prev => prev.filter((_, i) => i !== idx))}
+                className="text-muted-foreground hover:text-danger transition-colors ml-1 shrink-0"
+                title="移除文件"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <textarea
         ref={textareaRef}
         value={value}
@@ -506,7 +547,7 @@ export function CommandBox({
             className="text-hint hover:text-foreground hover:bg-accent rounded-lg p-1.5 transition-colors"
             title="上传附件"
           >
-            <Paperclip className="size-4" />
+            <Plus className="size-4" />
           </button>
           <input
             ref={fileInputRef}
@@ -516,203 +557,6 @@ export function CommandBox({
             aria-hidden="true"
           />
 
-
-
-          {/* Agent 库 */}
-          <div className="relative">
-            <button
-              ref={agentBtnRef}
-              type="button"
-              onClick={openAgentDropdown}
-              className={cn(
-                "rounded-lg p-1.5 transition-colors",
-                activeDropdown === "agent"
-                  ? "text-primary bg-primary/10"
-                  : "text-hint hover:text-foreground hover:bg-accent",
-              )}
-              title="Agent 库"
-            >
-              <Bot className="size-4" />
-            </button>
-
-            {/* 智能体下拉弹窗 */}
-            <AnimatePresence>
-              {activeDropdown === "agent" && (
-                <Popover>
-                  {/* 搜索框 */}
-                  <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
-                    <Search className="size-3.5 text-hint shrink-0" />
-                    <input
-                      autoFocus
-                      value={agentSearch}
-                      onChange={(e) => setAgentSearch(e.target.value)}
-                      placeholder="搜索智能体…"
-                      className="flex-1 bg-transparent text-sm text-foreground placeholder:text-hint outline-none"
-                    />
-                    {agentSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setAgentSearch("")}
-                        className="text-hint hover:text-foreground"
-                      >
-                        <X className="size-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* 列表 */}
-                  <div className="max-h-56 overflow-y-auto py-1">
-                    {agentLoading ? (
-                      <p className="text-hint text-xs text-center py-4 animate-pulse">
-                        加载中…
-                      </p>
-                    ) : agentError ? (
-                      <p className="text-danger text-xs text-center py-4">
-                        加载失败，请重试
-                      </p>
-                    ) : filteredAgents.length === 0 ? (
-                      <p className="text-hint text-xs text-center py-4">
-                        {storeAgents.length === 0 ? "暂无智能体" : "无匹配智能体"}
-                      </p>
-                    ) : (
-                      filteredAgents.map((agent) => (
-                        <button
-                          key={agent.id}
-                          type="button"
-                          onClick={() => selectAgent(agent)}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-accent transition-colors text-left"
-                        >
-                          {/* 状态圆点 */}
-                          <span
-                            className={cn(
-                              "size-2 rounded-full shrink-0",
-                              STATUS_DOT[agent.status] ?? "bg-hint",
-                            )}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-foreground text-sm font-medium truncate">
-                              {agent.name}
-                            </p>
-                            <p className="text-hint text-xs truncate">
-                              {agent.role}
-                            </p>
-                          </div>
-                          <span className="text-hint text-xs shrink-0">
-                            @
-                          </span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-
-                  {/* 管理入口 */}
-                  <div className="border-t border-border p-1 bg-accent/20">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveDropdown(null);
-                        setShowAgentDrawer(true);
-                      }}
-                      className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
-                    >
-                      <Bot className="size-3.5 text-[#6D5EF9]" />
-                      <span>管理智能体库 (Agent 库)</span>
-                    </button>
-                  </div>
-                </Popover>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* # 项目空间 */}
-          <div className="relative">
-            <button
-              ref={projectBtnRef}
-              type="button"
-              onClick={openProjectDropdown}
-              className={cn(
-                "rounded-lg p-1.5 transition-colors",
-                activeDropdown === "project"
-                  ? "text-primary bg-primary/10"
-                  : "text-hint hover:text-foreground hover:bg-accent",
-              )}
-              title="# 项目空间"
-            >
-              <Hash className="size-4" />
-            </button>
-
-            {/* 项目下拉弹窗 */}
-            <AnimatePresence>
-              {activeDropdown === "project" && (
-                <Popover>
-                  {/* 搜索框 */}
-                  <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
-                    <Search className="size-3.5 text-hint shrink-0" />
-                    <input
-                      autoFocus
-                      value={projectSearch}
-                      onChange={(e) => setProjectSearch(e.target.value)}
-                      placeholder="搜索项目…"
-                      className="flex-1 bg-transparent text-sm text-foreground placeholder:text-hint outline-none"
-                    />
-                    {projectSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setProjectSearch("")}
-                        className="text-hint hover:text-foreground"
-                      >
-                        <X className="size-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* 列表 */}
-                  <div className="max-h-56 overflow-y-auto py-1">
-                    {projectLoading ? (
-                      <p className="text-hint text-xs text-center py-4 animate-pulse">
-                        加载中…
-                      </p>
-                    ) : projectError ? (
-                      <p className="text-danger text-xs text-center py-4">
-                        加载失败，请重试
-                      </p>
-                    ) : filteredProjects.length === 0 ? (
-                      <p className="text-hint text-xs text-center py-4">
-                        {storeProjects.length === 0 ? "暂无项目" : "无匹配项目"}
-                      </p>
-                    ) : (
-                      filteredProjects.map((project) => (
-                        <button
-                          key={project.id}
-                          type="button"
-                          onClick={() => selectProject(project)}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-accent transition-colors text-left"
-                        >
-                          {/* 项目首字图标 */}
-                          <span className="size-7 rounded-md bg-accent flex items-center justify-center text-xs font-semibold text-muted-foreground shrink-0">
-                            {project.name.charAt(0)}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-foreground text-sm font-medium truncate">
-                              {project.name}
-                            </p>
-                            <p className="text-hint text-xs truncate">
-                              {PROJECT_TYPE_LABEL[project.type] ?? project.type}
-                              {" · "}
-                              {project.owner}
-                            </p>
-                          </div>
-                          <span className="text-hint text-xs shrink-0">
-                            #
-                          </span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </Popover>
-              )}
-            </AnimatePresence>
-          </div>
 
 
         </div>
@@ -749,7 +593,7 @@ export function CommandBox({
               size="icon"
               className="size-8 rounded-lg bg-primary hover:bg-primary/80 text-primary-foreground"
               disabled={!canSend}
-              onClick={() => onSubmit?.()}
+              onClick={handleSendPrompt}
               title="发送"
             >
               <ArrowUp className="size-4" />

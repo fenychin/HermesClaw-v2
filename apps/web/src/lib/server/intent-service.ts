@@ -143,6 +143,7 @@ export async function parseIntentToTaskEnvelope(
         detail: `用户意图解析成功: "${input}" -> 动作: "${taskEnvelopeData.actionType}"`,
         riskLevel: auditRiskLevel,
         workspaceId: context.workspaceId,
+        workflowRunId: workflowRunId,
       });
 
       step._pendingUpdate = {

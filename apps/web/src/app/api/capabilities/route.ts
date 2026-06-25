@@ -1,6 +1,7 @@
 import { ApiResponse } from '@/lib/server/api-response'; import { withRBAC } from '@/lib/server/api-handler'
 import { listCapabilities, registerCapability, InvalidVersionError, CapabilityAlreadyRegisteredError, CapabilityNotFoundError } from '@/lib/server/capability-registry'
 import type { WorkspaceContext } from '@/lib/workspace'; import { z } from 'zod'
+import { prisma } from "@/lib/prisma"
 
 const RegisterSchema = z.object({
   capabilityId: z.string(), capabilityType: z.enum(['skill', 'connector', 'workflow']), version: z.string(),
@@ -11,6 +12,24 @@ const RegisterSchema = z.object({
 export const GET = withRBAC(async (request: Request, ctx: WorkspaceContext) => {
   try {
     const { searchParams } = new URL(request.url)
+    const skillId = searchParams.get('skillId')
+    if (skillId) {
+      const record = await prisma.capabilityVersion.findFirst({
+        where: { capabilityId: skillId, workspaceId: ctx.workspaceId },
+        orderBy: { version: 'desc' }
+      })
+      if (!record) {
+        return ApiResponse.error(`Capability not found: ${skillId}`, 404)
+      }
+      return ApiResponse.ok({
+        capabilityId: record.capabilityId,
+        capabilityType: record.capabilityType,
+        version: record.version,
+        status: record.status,
+        healthStatus: record.healthStatus,
+      })
+    }
+
     const result = await listCapabilities(ctx.workspaceId, {
       capabilityType: (searchParams.get('type') as any) || undefined, status: (searchParams.get('status') as any) || undefined,
       healthStatus: (searchParams.get('healthStatus') as any) || undefined,

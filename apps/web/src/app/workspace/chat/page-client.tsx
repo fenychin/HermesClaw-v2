@@ -20,6 +20,7 @@ import { useUiStore } from "@/stores/ui-store";
 import { useAgentStore } from "@/stores/agent-store";
 import { ModelSelectorInline } from "@/components/workspace/ModelSelectorInline";
 import { useModelPreference } from "@/hooks/use-model-preference";
+import { toast } from "sonner";
 
 // 翻译用的能力常量映射
 const AVAILABLE_SKILLS = [
@@ -52,6 +53,15 @@ export default function NewTopicPage() {
   );
 }
 
+const CARD_KEY_TO_SKILL_ID: Record<string, string> = {
+  "analyze-inquiry": "inquiry-grade",
+  "cold-email": "dev-letter",
+  "quotation": "quote-gen",
+  "client-profile": "customer-profile",
+  "create-project": "project-space",
+  "call-agent": "agent-dispatch"
+};
+
 function NewTopicPageInner() {
   const {
     messages,
@@ -60,6 +70,7 @@ function NewTopicPageInner() {
     error,
     conversationId,
     sendMessage,
+    sendWorkflowRun,
     stopStreaming,
     clearMessages,
     loadConversation,
@@ -94,16 +105,50 @@ function NewTopicPageInner() {
   const [showQuickTask, setShowQuickTask] = useState(false);
   const [activeWorkflowKey, setActiveWorkflowKey] = useState<string | null>(null);
 
+  // 全局居中磨砂虚化提示弹窗状态（PRD 对齐，做明显提示）
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: "info" | "warning" | "error";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "warning",
+  });
+
+  const showAlert = useCallback((title: string, message: string, type: "info" | "warning" | "error" = "warning") => {
+    setAlertModal({
+      isOpen: true,
+      title,
+      message,
+      type,
+    });
+  }, []);
+
   const handleStartWizard = useCallback((prompt: string) => {
-    // 自动抓取当前输入内容，若为空则提供一个贴近外贸核算场景的默认需求描述
     const trimmed = prompt.trim();
-    const reqText = trimmed || "帮我自动分析入站询盘，计算FOB成本，然后自动生成开发信草稿";
+    if (!trimmed) {
+      showAlert(
+        "请输入智能体业务需求",
+        "请先在输入框中输入您想让智能体帮您完成的工作（例如：'帮我自动分析入站询盘并计算 FOB 成本'），然后再点击新建智能体。",
+        "warning"
+      );
+      requestAnimationFrame(() => {
+        const textarea = document.querySelector("textarea");
+        if (textarea) {
+          (textarea as HTMLTextAreaElement).focus();
+        }
+      });
+      return;
+    }
     
     // 自动清理会话并切换到对话状态
     clearMessages();
     
     // 构造用户端发送的消息
-    const userPrompt = `🤖 [智能体自进化] 申请创建专属智能体，核心业务需求为：\n"${reqText}"`;
+    const userPrompt = `🤖 [智能体自进化] 申请创建专属智能体，核心业务需求为：\n"${trimmed}"`;
     
     // 构造指令以让大模型按规范在聊天中流式输出规划并附带配置数据载荷
     const skillsListText = AVAILABLE_SKILLS.map(s => `- ${s.id} (${s.label})`).join("\n");
@@ -116,9 +161,13 @@ function NewTopicPageInner() {
 你的回复必须为 Markdown 格式，且包含以下结构：
 1. **【名称与角色推荐】**：根据需求，为新智能体取一个简短亮眼的名字（Name，如“开发信专家 Leon”），并定义其扮演角色（Role，如“多语种营销文案师”）和工作描述（Description）。
 2. **【能力绑定建议】**：分析系统支持的 Skills 和 Connectors 列表，给出最适合当前场景的组件绑定建议和合理理由。
-3. **【实操运行方案预览】**：针对该需求，现场进行一次模拟执行，为用户生成一份高保真且有代表性的业务方案样例（如 FOB 核算明细表，或一份外贸开发信模板）。
-4. **【数据载荷载入（核心关键）**】：你必须在你的输出正文的最尾端（不要有任何 markdown 块包裹，单独成行），输出一行隐藏的 HTML 数据载荷，其内容必须包含根据你规划得出的智能体完整配置 JSON。格式必须严格如下：
-   <!-- AGENT_SPEC_JSON: {"name": "推荐名称", "role": "推荐角色", "description": "推荐描述", "bindSkills": ["技能ID"], "bindConnectors": ["连接器ID"]} -->
+3. **【三域安全策略推荐（系统合规边界）**】：
+   - **自动化授权等级**：推荐合理的自动化授权等级（L1/L2/L3/L4）。默认推荐 L2。如果该智能体涉及物理写操作（如调用 email-connector 物理发信），必须建议选择 L3 级（自动执行低风险动作，高危写操作触发人工审批）；如果涉及只读分析，建议选择 L2 级（半自动，AI 生成，人类手动触发）。
+   - **记忆权限**：推荐 "read" (只读) 或 "read-write" (读写) 权限。
+   - **任务安全边界**：定义清晰的允许执行的动作列表（canDo，如：解析询盘、生成开发信草稿、核算 FOB 成本）和禁止执行的高危动作列表（cannotDo，如：向外部账户转账、私自更改价格模板、物理删除核心客户数据等）。
+4. **【实操运行方案预览】**：针对该需求，现场进行一次模拟执行，为用户生成一份高保真且有代表性的业务方案样例（如 FOB 核算明细表，或一份外贸开发信模板）。
+5. **【数据载荷载入（核心关键）**】：你必须在你的输出正文的最尾端（不要有任何 markdown 块包裹，单独成行），输出一行隐藏的 HTML 数据载荷，其内容必须包含根据你规划得出的智能体完整配置 JSON。格式必须严格如下：
+   <!-- AGENT_SPEC_JSON: {"name": "推荐名称", "role": "推荐角色", "description": "推荐描述", "bindSkills": ["技能ID"], "bindConnectors": ["连接器ID"], "automationLevel": "L2或L3", "memoryPermission": "read或read-write", "canDo": ["允许项1"], "cannotDo": ["禁用项1"]} -->
 
 系统支持的 Skills 技能列表：
 ${skillsListText}
@@ -133,7 +182,17 @@ ${connectorsListText}
   }, [clearMessages, sendMessage, getApiModelId]);
 
   const handleDirectActivateAgent = useCallback(async (
-    spec: { name: string; role: string; description: string; bindSkills: string[]; bindConnectors: string[] },
+    spec: { 
+      name: string; 
+      role: string; 
+      description: string; 
+      bindSkills: string[]; 
+      bindConnectors: string[];
+      automationLevel?: string;
+      memoryPermission?: string;
+      canDo?: string[];
+      cannotDo?: string[];
+    },
     requirement: string
   ) => {
     // 1. 调用 useAgentStore 创建智能体，保存至数据库中
@@ -146,10 +205,10 @@ ${connectorsListText}
       category: ["外贸定制"],
       bindSkills: spec.bindSkills,
       bindConnectors: spec.bindConnectors,
-      memoryPermission: "read" as const,
-      automationLevel: "L2" as const,
-      canDo: [],
-      cannotDo: [],
+      memoryPermission: (spec.memoryPermission || "read") as any,
+      automationLevel: (spec.automationLevel || "L2") as any,
+      canDo: spec.canDo || [],
+      cannotDo: spec.cannotDo || [],
       statsJson: {}
     };
 
@@ -174,6 +233,14 @@ ${connectorsListText}
         }).join("、")
       : "无外部通道";
 
+    const canDoText = spec.canDo && spec.canDo.length > 0
+      ? spec.canDo.map((c, i) => `${i + 1}. ${c}`).join("\n")
+      : "暂未定义允许职责";
+
+    const cannotDoText = spec.cannotDo && spec.cannotDo.length > 0
+      ? spec.cannotDo.map((c, i) => `${i + 1}. ${c}`).join("\n")
+      : "暂无严苛禁用限制";
+
     // 3. 在当前会话中“接棒”对话，自动发送指令触发新创建智能体的首次工作计划流式输出
     const prompt = `🎉 智能体「${spec.name}」已收藏并成功激活！请你正式接管后续对话，自我介绍并提供第一步实操工作计划。`;
 
@@ -181,11 +248,20 @@ ${connectorsListText}
 你当前的配置为：
 - 绑定的外贸技能模块：[${skillsText}]
 - 绑定的数据连接通道：[${connectorsText}]
+- 自动化授权等级：${spec.automationLevel || "L2"}
+- 记忆访问权限：${spec.memoryPermission || "read"}
+
+你必须严格遵守以下系统底层三域安全边界：
+【允许执行的任务 (canDo)】:
+${canDoText}
+
+【禁止执行的高危动作 (cannotDo)】:
+${cannotDoText}
 
 请你立即以该智能体的身份在对话中回复。内容必须包含：
 1. **【自述与角色定位】**：向用户热情地打个招呼，介绍你的职责和具备的专业外贸能力。
 2. **【首步行动计划】**：针对之前提出的业务需求：“${requirement}”，结合你绑定的技能（如 ${skillsText}），告诉用户为了完成这个任务，你将如何具体开展第一步工作（例如：需要用户提供什么询盘或产品数据），并承诺将以最高的效率协助。
-3. 表态已做好准备，等待用户的下一步指令。
+3. 表态已做好准备，并且重申你会始终遵守你的安全职责边界（canDo/cannotDo），等待用户的下一步指令。
 
 请直接以极度专业的商务外贸数字员工身份回复，文字流式输出，格式为 Markdown。`;
 
@@ -194,18 +270,107 @@ ${connectorsListText}
   }, [sendMessage, getApiModelId]);
 
   // 点击卡片时触发工作流表单
-  const handleWorkflowSelect = useCallback((cardKey: string) => {
+  const handleWorkflowSelect = useCallback(async (cardKey: string) => {
+    const skillId = CARD_KEY_TO_SKILL_ID[cardKey];
+    if (skillId) {
+      try {
+        const res = await fetch(`/api/capabilities?skillId=${skillId}`);
+        if (res.ok) {
+          const data = await res.json();
+          const cap = data.data;
+          if (cap) {
+            if (cap.status === "yanked" || cap.status === "degraded" || cap.healthStatus === "degraded" || cap.healthStatus === "unhealthy") {
+              showAlert(
+                "技能已下线或降级",
+                `技能「${cap.capabilityId}」已下线或降级，暂时无法执行！`,
+                "error"
+              );
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.error("检查能力健康度失败:", err);
+      }
+    }
     setActiveWorkflowKey(cardKey);
-  }, []);
+  }, [showAlert]);
 
-  // 工作流表单提交：直接调用 sendMessage
+  // 工作流表单提交：路由至工作流专用执行与状态轮询
   const handleWorkflowSubmit = useCallback(
-    (prompt: string, systemPrompt?: string) => {
+    async (prompt: string, systemPrompt?: string) => {
+      const cardKey = activeWorkflowKey;
+      if (cardKey) {
+        const skillId = CARD_KEY_TO_SKILL_ID[cardKey];
+        if (skillId) {
+          try {
+            const res = await fetch(`/api/capabilities?skillId=${skillId}`);
+            if (res.ok) {
+              const data = await res.json();
+              const cap = data.data;
+              if (cap && (cap.status === "yanked" || cap.status === "degraded" || cap.healthStatus === "degraded" || cap.healthStatus === "unhealthy")) {
+                showAlert(
+                  "技能已下线或降级",
+                  `技能「${cap.capabilityId}」已下线或降级，暂时无法执行！`,
+                  "error"
+                );
+                return;
+              }
+            }
+          } catch (err) {
+            console.error("检查能力健康度失败:", err);
+          }
+        }
+      }
+
+      const skillId = cardKey ? CARD_KEY_TO_SKILL_ID[cardKey] : undefined;
+      const agents = useAgentStore.getState().agents;
+      const actualSkillIdMap: Record<string, string> = {
+        "inquiry-grade": "ft-inquiry-grading",
+        "dev-letter": "ft-outreach-email",
+        "quote-gen": "ft-quote-generator",
+        "customer-profile": "ft-customer-profiling",
+        "project-space": "ft-project-space",
+        "agent-dispatch": "ft-outreach-email"
+      };
+      const actualSkillId = skillId ? actualSkillIdMap[skillId] : undefined;
+
+      // 查找绑定了该技能且 status 为 active 的 Agent
+      let targetAgent = agents.find(
+        (a) => a.status === "active" && JSON.parse(a.bindSkills || "[]").includes(actualSkillId)
+      );
+
+      if (!targetAgent && skillId) {
+        const roleKeywords: Record<string, string> = {
+          "inquiry-grade": "询盘",
+          "dev-letter": "开发信",
+          "quote-gen": "报价",
+          "customer-profile": "画像",
+          "project-space": "项目",
+          "agent-dispatch": "智能体"
+        };
+        const keyword = roleKeywords[skillId];
+        if (keyword) {
+          targetAgent = agents.find(
+            (a) => a.status === "active" && (a.role.includes(keyword) || a.name.includes(keyword))
+          );
+        }
+      }
+
+      if (!targetAgent) {
+        targetAgent = agents.find((a) => a.status === "active");
+      }
+
       const apiModelId = getApiModelId();
       setActiveWorkflowKey(null);
-      sendMessage(prompt, systemPrompt, apiModelId);
+
+      if (targetAgent) {
+        sendWorkflowRun(targetAgent.id, prompt);
+      } else {
+        sendMessage(prompt, systemPrompt, apiModelId);
+      }
     },
-    [sendMessage, getApiModelId],
+    [activeWorkflowKey, getApiModelId, sendMessage, sendWorkflowRun, showAlert]
   );
 
   // 返回卡片列表
@@ -213,14 +378,45 @@ ${connectorsListText}
     setActiveWorkflowKey(null);
   }, []);
 
-  const handleSend = useCallback(() => {
-    if (!input.trim() || isStreaming) return;
+  const handleSend = useCallback((finalPrompt?: string) => {
+    const activePrompt = typeof finalPrompt === "string" ? finalPrompt : input.trim();
+    if (!activePrompt || isStreaming) return;
     const apiModelId = getApiModelId();
 
+    const isWorkflowPrompt = activePrompt.startsWith("[触发工作流:") || activePrompt.startsWith("[触发指令:");
+    if (isWorkflowPrompt) {
+      const match = activePrompt.match(/·\s*([a-zA-Z0-9_-]+)\]/);
+      const skillId = match ? match[1] : undefined;
+
+      const agents = useAgentStore.getState().agents;
+      const actualSkillIdMap: Record<string, string> = {
+        "inquiry-grade": "ft-inquiry-grading",
+        "dev-letter": "ft-outreach-email",
+        "quote-gen": "ft-quote-generator",
+        "customer-profile": "ft-customer-profiling",
+        "project-space": "ft-project-space",
+        "agent-dispatch": "ft-outreach-email"
+      };
+      const actualSkillId = skillId ? actualSkillIdMap[skillId] : undefined;
+
+      let targetAgent = agents.find(
+        (a) => a.status === "active" && JSON.parse(a.bindSkills || "[]").includes(actualSkillId)
+      );
+      if (!targetAgent) {
+        targetAgent = agents.find((a) => a.status === "active");
+      }
+
+      if (targetAgent) {
+        sendWorkflowRun(targetAgent.id, activePrompt);
+        clearNewTopicInput();
+        return;
+      }
+    }
+
     // 解析输入中的 @智能体、#项目、/命令
-    const agentMentions = input.match(/@(\S+)/g)?.map((m: string) => m.slice(1)) ?? [];
-    const projectRefs = input.match(/#(\S+)/g)?.map((m: string) => m.slice(1)) ?? [];
-    const slashCommands = input.match(/\/ft-\S+/g) ?? [];
+    const agentMentions = activePrompt.match(/@(\S+)/g)?.map((m: string) => m.slice(1)) ?? [];
+    const projectRefs = activePrompt.match(/#(\S+)/g)?.map((m: string) => m.slice(1)) ?? [];
+    const slashCommands = activePrompt.match(/\/ft-\S+/g) ?? [];
 
     // 构建增强的 system prompt（合并命令、智能体上下文）
     let enhancedSystemPrompt = pendingSystemPrompt;
@@ -243,9 +439,9 @@ ${connectorsListText}
         : projectCtx;
     }
 
-    sendMessage(input.trim(), enhancedSystemPrompt, apiModelId);
+    sendMessage(activePrompt, enhancedSystemPrompt, apiModelId);
     clearNewTopicInput();
-  }, [input, isStreaming, sendMessage, pendingSystemPrompt, getApiModelId, clearNewTopicInput]);
+  }, [input, isStreaming, sendMessage, sendWorkflowRun, pendingSystemPrompt, getApiModelId, clearNewTopicInput]);
 
   const handleQuickActionSelect = useCallback(
     (prompt: string, systemPrompt?: string) => {
@@ -348,6 +544,7 @@ ${connectorsListText}
                           cardKey={activeWorkflowKey}
                           onSubmit={handleWorkflowSubmit}
                           onBack={handleWorkflowBack}
+                          onStartWizard={handleStartWizard}
                         />
                       </motion.div>
                     ) : (
@@ -381,6 +578,69 @@ ${connectorsListText}
           <RecentPanel />
         </aside>
       </div>
+
+      <AnimatePresence>
+        {alertModal.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* 背景虚化遮罩 */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md will-change-opacity"
+            />
+            {/* 弹窗主体 */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.25 }}
+              className="relative w-full max-w-md bg-card border border-border/80 rounded-2xl p-6 shadow-2xl z-10 flex flex-col gap-4 overflow-hidden will-change-transform"
+            >
+              {/* 光晕背景装饰 */}
+              <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 rounded-full blur-2xl pointer-events-none" />
+
+              <div className="flex items-start gap-4">
+                <div className={cn(
+                  "size-10 rounded-xl flex items-center justify-center shrink-0 shadow-inner",
+                  alertModal.type === "error" 
+                    ? "bg-danger/10 text-danger" 
+                    : "bg-warning/10 text-warning"
+                )}>
+                  {alertModal.type === "error" ? (
+                    <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  ) : (
+                    <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
+                </div>
+                <div className="flex-1 space-y-1">
+                  <h3 className="text-base font-semibold text-foreground leading-none">
+                    {alertModal.title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed mt-2.5">
+                    {alertModal.message}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-2">
+                <Button
+                  onClick={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
+                  className="rounded-xl px-5"
+                >
+                  我知道了
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </PageTransition>
   );
 }

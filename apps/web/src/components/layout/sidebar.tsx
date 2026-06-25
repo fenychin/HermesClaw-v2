@@ -14,6 +14,7 @@ import { SidebarRecent } from "./sidebar-recent";
 import { SidebarBrain } from "./sidebar-brain";
 import { cn } from "@/lib/utils";
 import { prewarmWorkspaceRoute } from "@/lib/workspace-route-prewarm";
+import { AccountMenu } from "./AccountMenu";
 
 /** 左侧固定侧边栏：品牌区 + 主导航 + 可展开最近 + 左下角固定设置 */
 export function Sidebar() {
@@ -173,60 +174,10 @@ export function Sidebar() {
           );
         })()}
 
-        {/* 2. 升级套餐卡片 (展开态为卡片，折叠态为图标) */}
-        {!sidebarCollapsed ? (
-          <div className="bg-[#171717] border border-[#262626] rounded-xl p-3 my-2 mx-1 select-none">
-            <div className="flex justify-between items-center text-xs font-semibold mb-2">
-              <span className="flex items-center gap-1 text-[#F5F5F5]">
-                <Sparkles className="size-3.5 text-[#6D5EF9] fill-[#6D5EF9]" />
-                {plan === "pro" ? "专业套餐" : plan === "enterprise" ? "企业套餐" : "免费套餐"}
-              </span>
-              <span className="text-[#B3B3B3]">
-                <strong className="text-[#F5F5F5] font-bold">{points}</strong> 积分
-              </span>
-            </div>
-            {/* 积分条 */}
-            <div className="w-full h-1 bg-[#262626] rounded-full overflow-hidden mb-3">
-              <div 
-                className="h-full bg-[#6D5EF9] rounded-full transition-all duration-300"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-            {/* 升级大按钮 */}
-            <Link
-              href="/billing/plans"
-              className="w-full h-9 bg-[#1F1F1F] text-[#F5F5F5] border border-[#262626] hover:bg-[#2A2A2A] hover:border-[#333333] transition-all rounded-[10px] text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <ArrowUpCircle className="size-4 text-[#6D5EF9]" />
-              <span>升级套餐</span>
-            </Link>
-          </div>
-        ) : (
-          <SidebarNavItem
-            item={{
-              href: "/billing/plans",
-              label: "升级套餐",
-              icon: ArrowUpCircle,
-              description: "升级您的套餐计划"
-            }}
-            collapsed={true}
-            isActive={isActive("/billing/plans")}
-          />
-        )}
-
-        {/* 3. ⚙️ 设置 */}
-        {(() => {
-          const settingsItem = bottomNav.find((item) => item.href === "/settings");
-          if (!settingsItem) return null;
-          return (
-            <SidebarNavItem
-              key={settingsItem.href}
-              item={settingsItem}
-              collapsed={sidebarCollapsed}
-              isActive={isActive(settingsItem.href)}
-            />
-          );
-        })()}
+        {/* 2. 账号菜单向上展开 (替代原有的设置与升级套餐卡片，避免功能重复) */}
+        <div className="pt-2 px-1">
+          <AccountMenu side="top" align="start" collapsed={sidebarCollapsed} />
+        </div>
       </div>
     </div>
   );
