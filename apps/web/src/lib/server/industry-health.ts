@@ -113,13 +113,13 @@ export async function getIndustryHealthData(
     calculateWorkflowHealth(recentRuns)
 
   // 4. 获取最近的节点运行状态与失败原因统计
-  const runIds = recentRuns.map((r) => r.id)
-  const nodeRuns = await deps.prisma.workflowNodeRun.findMany({
+  const runIds = recentRuns.map((r) => r.runId)
+  const nodeRuns = await deps.prisma.stepRun.findMany({
     where: {
       workspaceId,
       runId: { in: runIds },
     },
-    orderBy: { finishedAt: "desc" },
+    orderBy: { completedAt: "desc" },
     take: 50,
   })
 

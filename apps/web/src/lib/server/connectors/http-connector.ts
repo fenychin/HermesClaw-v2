@@ -24,6 +24,34 @@ export async function executeHttpConnector(
   // 1. 强校验 ConnectorLease 契约
   ConnectorLeaseSchema.parse(lease);
 
+  // 1.5 高危租约校验（AGENTS.md §3.5 高危租约校验约定）
+  if (lease.leaseId.startsWith('acp-')) {
+    const { prisma } = await import("@/lib/prisma");
+    const checkpoint = await prisma.approvalCheckpoint.findUnique({
+      where: { checkpointId: lease.leaseId }
+    });
+    if (!checkpoint || checkpoint.decision !== 'approved') {
+      throw new Error(`[http-connector] ConnectorLease token is invalid or expired: ${lease.leaseId}`);
+    }
+    if (checkpoint.expiresAt.getTime() < Date.now()) {
+      throw new Error(`[http-connector] ConnectorLease token is invalid or expired: ${lease.leaseId}`);
+    }
+    if (checkpoint.workspaceId !== lease.workspaceId) {
+      throw new Error(`[http-connector] ConnectorLease does not match workspace: ${lease.leaseId}`);
+    }
+    // 写入对账审计日志
+    await writeAuditLog({
+      actor: lease.runtimeId || 'system',
+      action: 'approval.verified',
+      targetType: 'approval',
+      targetId: lease.leaseId,
+      detail: `Verified and consumed approval checkpoint token ${lease.leaseId} for HTTP Connector POST execution.`,
+      riskLevel: 'low',
+      workspaceId: lease.workspaceId,
+      workflowRunId: workflowRunId
+    });
+  }
+
   // 2. 提取输入参数
   // TD-SPRINT-C-001: 移除 httpbin 兜底；IM/消息类通道请改用 executeOpenClawGateway()
   const url = input.url as string;

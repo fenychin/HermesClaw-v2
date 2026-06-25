@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { Play, CheckCircle2, AlertCircle, ChevronDown, Loader2, RefreshCw } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Play, CheckCircle2, AlertCircle, ChevronDown, Loader2, RefreshCw, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MarkdownRenderer } from "@/components/common/markdown-renderer";
 import { InputField } from "@/components/common/input-field";
+import { toast } from "sonner";
 import type {
   Workflow,
   WorkflowRunStatus,
@@ -48,6 +49,10 @@ function RunStatusBadge({ status }: { status: WorkflowRunStatus }) {
     running: {
       label: "运行中",
       className: "bg-primary/15 text-primary",
+    },
+    waiting: {
+      label: "暂停等待人工",
+      className: "bg-warning/15 text-warning border border-warning/20 font-semibold animate-pulse",
     },
     completed: {
       label: "已完成",
@@ -208,6 +213,7 @@ export function WorkflowExecutor({
   // 执行状态
   const [isExecuting, setIsExecuting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [checkpointId, setCheckpointId] = useState<string | null>(null)
 
   // 临时授权的缺失状态
   const [missingGrant, setMissingGrant] = useState<{
@@ -220,6 +226,100 @@ export function WorkflowExecutor({
   const [approver2, setApprover2] = useState("")
   const [grantSubmitting, setGrantSubmitting] = useState(false)
   const [grantError, setGrantError] = useState<string | null>(null)
+
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // 清除定时器
+  const stopPolling = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+  }
+
+  useEffect(() => {
+    return () => stopPolling()
+  }, [])
+
+  // 轮询工作流最新状态
+  const startPolling = (runId: string) => {
+    stopPolling()
+    setIsExecuting(true)
+    setError(null)
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/workflow-runs/${runId}/status`)
+        if (!res.ok) throw new Error("获取运行状态失败")
+        const json = await res.json()
+        if (json.success) {
+          const statusData = json.data
+          const status = statusData.status
+
+          setRunResult({
+            runId,
+            status,
+            output: null
+          })
+
+          // 将 steps 数组映射为 NodeResult
+          if (statusData.steps && Array.isArray(statusData.steps)) {
+            const mappedNodes: NodeResult[] = dagNodes.map((node) => {
+              const matchedStep = statusData.steps.find((s: any) => s.nodeId === node.id)
+              let nodeStatus: NodeResult["status"] = "skipped"
+              let nodeOutput: any = null
+
+              if (matchedStep) {
+                if (matchedStep.status === "completed") {
+                  nodeStatus = "completed"
+                  nodeOutput = matchedStep.outputData
+                } else if (matchedStep.status === "failed") {
+                  nodeStatus = "failed"
+                  nodeOutput = { error: matchedStep.errorMessage || "步骤执行失败" }
+                } else if (matchedStep.status === "skipped") {
+                  nodeStatus = "skipped"
+                }
+              }
+
+              return {
+                nodeId: node.id,
+                nodeName: node.name,
+                status: nodeStatus,
+                output: nodeOutput,
+              }
+            })
+            // 只展示已经产生结果（已完成或已失败）的节点
+            setNodeResults(mappedNodes.filter(n => n.status === "completed" || n.status === "failed"))
+          }
+
+          if (status === "completed") {
+            stopPolling()
+            setIsExecuting(false)
+            onRun()
+            toast.success("工作流执行已顺利完成！")
+          } else if (status === "failed") {
+            stopPolling()
+            setIsExecuting(false)
+            setError(statusData.errorMessage || "工作流执行失败")
+          } else if (status === "cancelled") {
+            stopPolling()
+            setIsExecuting(false)
+            setError("工作流已被取消")
+          } else if (status === "waiting") {
+            stopPolling()
+            setIsExecuting(false)
+            setCheckpointId(statusData.checkpointId)
+            toast.info("工作流进入等待审批状态，请在界面处理")
+          }
+        }
+      } catch (err) {
+        console.error("轮询工作流状态异常:", err)
+      }
+    }
+
+    poll()
+    pollIntervalRef.current = setInterval(poll, 3000)
+  }
 
   // 收集所有步骤的 inputs（展平）
   const allInputs = workflow.steps.flatMap((step) =>
@@ -239,11 +339,10 @@ export function WorkflowExecutor({
     setInputValues((prev) => ({ ...prev, [key]: value }))
   }
 
-  // 构建 workfow run 输入（将步骤输入扁平化为 variables）
+  // 构建 variables 输入
   const buildWorkflowInput = (): Record<string, unknown> => {
     const vars: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(inputValues)) {
-      // 跳过空值
       if (value.trim().length > 0) {
         vars[key] = value
       }
@@ -259,21 +358,21 @@ export function WorkflowExecutor({
     setError(null)
     setRunResult(null)
     setNodeResults([])
-
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 60_000) // 60s 超时
+    setCheckpointId(null)
 
     try {
       const input = buildWorkflowInput()
-      const res = await fetch(`/api/workflows/${workflow.id}/run`, {
+      // 修复 404 URL 问题，改用正统 /api/workflows/run 端点
+      const res = await fetch("/api/workflows/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input }),
-        signal: controller.signal,
+        body: JSON.stringify({
+          workflowId: workflow.id,
+          inputs: input
+        }),
       })
 
-      // 安全解析 JSON：非 JSON 响应时取原始文本作为错误消息
-      let json: { success?: boolean; error?: string; code?: string; data?: RunResult; details?: any }
+      let json: { success?: boolean; error?: string; code?: string; data?: { runId: string; status: string }; details?: any }
       try {
         json = await res.json()
       } catch {
@@ -290,52 +389,30 @@ export function WorkflowExecutor({
         throw new Error(json.error ?? "工作流执行失败")
       }
 
-      const result: RunResult = json.data!
-      setRunResult(result)
+      const runId = json.data?.runId
+      if (!runId) throw new Error("未获取到运行实例 ID")
 
-      // 将 DAG 节点输出映射为用户可见的节点结果卡片
-      if (result.output && typeof result.output === "object") {
-        const nodes: NodeResult[] = dagNodes.map((node) => {
-          const nodeOutput = (result.output as Record<string, unknown>)[node.id]
-          let status: NodeResult["status"] = "skipped"
-          if (nodeOutput) {
-            status = "completed"
-          }
-          return {
-            nodeId: node.id,
-            nodeName: node.name,
-            status,
-            output: nodeOutput ?? null,
-          }
-        })
-        setNodeResults(nodes)
-      }
-
-      // 通知父组件状态变更
-      onRun()
+      // 开启异步状态轮询
+      startPolling(runId)
     } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
-        setError("工作流执行超时，请稍后查看运行状态或重试")
-      } else {
-        setError(err instanceof Error ? err.message : "执行异常")
-      }
-    } finally {
-      clearTimeout(timeoutId)
+      setError(err instanceof Error ? err.message : "执行异常")
       setIsExecuting(false)
     }
   }
 
   // 重置执行
   const handleReset = () => {
+    stopPolling()
     setRunResult(null)
     setNodeResults([])
     setError(null)
+    setCheckpointId(null)
   }
 
-  // 已运行完成
   const isCompleted = runResult?.status === "completed"
+  const isWaiting = runResult?.status === "waiting"
   const currentStatus: WorkflowRunStatus =
-    isExecuting ? "running" : isCompleted ? "completed" : error ? "failed" : runStatus
+    isExecuting ? "running" : isWaiting ? "waiting" : isCompleted ? "completed" : error ? "failed" : runStatus
 
   // 按步骤分组渲染输入区
   const groupedInputs = new Map<string, typeof allInputs>()
@@ -397,7 +474,7 @@ export function WorkflowExecutor({
       {/* ---- 主内容区 ---- */}
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
         {/* 空闲态：显示输入表单 */}
-        {runStatus === "idle" && !isExecuting && !runResult && (
+        {currentStatus === "idle" && !isExecuting && !runResult && (
           <>
             {/* 工作流描述 */}
             {workflow.description && (
@@ -453,6 +530,65 @@ export function WorkflowExecutor({
           </div>
         )}
 
+        {/* 等待人工审批态 (human-in-loop) */}
+        {currentStatus === "waiting" && checkpointId && (
+          <div className="bg-warning/10 border border-warning/30 rounded-2xl p-5 flex flex-col items-center justify-center text-center space-y-4 shadow-sm">
+            <div className="bg-warning/20 border border-warning/35 rounded-full p-3 animate-pulse">
+              <Clock className="size-6 text-warning" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-foreground text-sm font-bold">暂停等待人工审批</p>
+              <p className="text-hint text-xs">当前工作流节点需要业务人员审查并批准后才能继续执行后续操作。</p>
+            </div>
+            <div className="flex gap-3 justify-center pt-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  const toastId = toast.loading("正在提交拒绝决策...")
+                  try {
+                    const res = await fetch(`/api/approvals/${checkpointId}/decide`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ decision: "rejected", comment: "普通工作流节点拒绝" }),
+                    })
+                    const resData = await res.json()
+                    if (!res.ok || !resData.success) throw new Error(resData.error || "提交决策失败")
+                    toast.success("拒绝成功，工作流已终止", { id: toastId })
+                    handleReset()
+                  } catch (err: any) {
+                    toast.error(`拒绝失败: ${err.message}`, { id: toastId })
+                  }
+                }}
+                className="bg-danger/10 hover:bg-danger/20 text-danger border border-danger/25 font-semibold px-4 py-2 rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                拒绝
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const toastId = toast.loading("正在提交批准决策...")
+                  try {
+                    const res = await fetch(`/api/approvals/${checkpointId}/decide`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ decision: "approved", comment: "普通工作流节点批准" }),
+                    })
+                    const resData = await res.json()
+                    if (!res.ok || !resData.success) throw new Error(resData.error || "提交决策失败")
+                    toast.success("审批通过！工作流将恢复继续执行", { id: toastId })
+                    if (runResult) startPolling(runResult.runId)
+                  } catch (err: any) {
+                    toast.error(`审批失败: ${err.message}`, { id: toastId })
+                  }
+                }}
+                className="bg-primary hover:bg-primary/95 text-white font-semibold px-4 py-2 rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                批准并继续
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* 错误态 */}
         {error && (
           <div className="flex flex-col items-center justify-center py-12">
@@ -466,20 +602,17 @@ export function WorkflowExecutor({
               onClick={handleReset}
               className="mt-4 bg-primary/10 text-primary px-4 py-2 rounded-xl text-xs font-medium hover:bg-primary/20 transition-colors"
             >
-              重试
+              重置
             </button>
           </div>
         )}
 
-        {/* 完成态：显示每个节点的结果 */}
-        {isCompleted && nodeResults.length > 0 && (
+        {/* 已运行节点结果展示（运行中/等待审批/已完成均可呈现当前进度轨迹） */}
+        {(isExecuting || currentStatus === "waiting" || isCompleted) && nodeResults.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-4">
               <CheckCircle2 className="size-4 text-success" />
-              <span className="text-foreground text-sm font-medium">执行完成</span>
-              <span className="text-hint text-xs">
-                · 运行 ID：{runResult?.runId.slice(0, 8)}...
-              </span>
+              <span className="text-foreground text-sm font-medium">节点执行轨迹</span>
             </div>
             {nodeResults.map((nr) => (
               <NodeResultCard key={nr.nodeId} nodeResult={nr} />
@@ -487,7 +620,7 @@ export function WorkflowExecutor({
           </div>
         )}
 
-        {/* 完成但无节点输出（后端可能只返回了空 output） */}
+        {/* 完成但无节点输出（后端只返回了空 output） */}
         {isCompleted && nodeResults.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12">
             <div className="bg-success/10 rounded-2xl p-4 mb-4">
@@ -572,7 +705,7 @@ export function WorkflowExecutor({
               {missingGrant.riskLevel === "high" && (
                 <div>
                   <label className="text-foreground text-xs font-semibold block mb-1.5">
-                    二级联合审批人签字 (姓名/邮箱) <span className="text-danger">*</span>
+                     二级联合审批人签字 (姓名/邮箱) <span className="text-danger">*</span>
                   </label>
                   <input
                     type="text"

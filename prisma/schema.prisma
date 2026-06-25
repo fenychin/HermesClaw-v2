@@ -237,6 +237,7 @@ model Project {
   @@index([status])
   @@index([type])
   @@index([workspaceId, createdAt])
+  @@index([workspaceId, status])
 }
 
 // ============================================================
@@ -492,6 +493,7 @@ model Inquiry {
   @@index([workspaceId])
   @@index([workspaceId, createdAt])
   @@index([workspaceId, priority])
+  @@index([workspaceId, replied, receivedAt])
 }
 
 // ============================================================
@@ -694,6 +696,7 @@ model WorkflowRun {
   @@index([workflowId, status])
   @@index([workflowId, workspaceId, createdAt(sort: Desc)])
   @@index([workspaceId, createdAt])
+  @@index([workspaceId, startedAt])
 }
 
 // 单节点运行记录（与 AuditLog/AgentLog 互补，承载结构化 IO）

@@ -124,7 +124,9 @@ export function Panel2DataFlux() {
   // PERF(v3.42.05): 独立订阅事件总线——只监听 flow.tick 事件
   const [flowTicks, setFlowTicks] = useState<IntelFlowTick[]>([])
   useEffect(() => intelEventBus.on("flow.tick", (e) => {
-    setFlowTicks((prev) => [...prev.slice(-299), e as IntelFlowTick])
+    React.startTransition(() => {
+      setFlowTicks((prev) => [...prev.slice(-299), e as IntelFlowTick])
+    })
   }), [])
   const connectorHealth = useIndustryIntelStore((s) => s.connectorHealth)
   const setConnectorHealth = useIndustryIntelStore((s) => s.setConnectorHealth)

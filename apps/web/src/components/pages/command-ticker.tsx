@@ -32,7 +32,11 @@ export function CommandTicker() {
   const [flowTicks, setFlowTicks] = useState<any[]>([])
   const [signals, setSignals] = useState<any[]>([])
   useEffect(() => {
-    const u1 = intelEventBus.on("flow.tick", (e) => setFlowTicks(p => [...p.slice(-299), e]))
+    const u1 = intelEventBus.on("flow.tick", (e) => {
+      React.startTransition(() => {
+        setFlowTicks(p => [...p.slice(-299), e])
+      })
+    })
     const u2 = intelEventBus.on("signal", (e) => setSignals(p => [e, ...p].slice(0, 50)))
     return () => { u1(); u2() }
   }, [])

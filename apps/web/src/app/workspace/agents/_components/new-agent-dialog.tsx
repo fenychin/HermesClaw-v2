@@ -533,7 +533,15 @@ export function NewAgentDialog() {
                       <button
                         key={level}
                         type="button"
-                        onClick={() => update("automationLevel", level)}
+                        onClick={() => {
+                          if (level === "L3" || level === "L4") {
+                            const msg = level === "L4"
+                              ? "【安全警告】L4 级代表完全自主。除严重系统异常外，HermesClaw 将不再对该智能体发起的任何物理写操作（如发信、扣款、调用外部连接器等）进行人工拦截或审批门禁拦截。\n\n您确定要为该智能体授予 L4 级最高自动化权限吗？"
+                              : "【安全提示】L3 级为高风险自动化授权。在执行物理写操作前，如果动作风险评定为高危，HermesClaw 将会创建人工审批检查点拦截该动作。\n\n您确定要选择 L3 级吗？";
+                            if (!window.confirm(msg)) return;
+                          }
+                          update("automationLevel", level);
+                        }}
                         className={cn(
                           "border rounded-lg p-3 text-left transition-all",
                           isSel

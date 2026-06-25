@@ -138,6 +138,10 @@ export async function GET(request: Request): Promise<Response> {
       totalDurationMs,
     })
 
+    // AGENTS.md §3.5 维护清理约定：Cron 执行结果写入 maintenance.<task>.completed 审计
+    const { writeAuditLog } = await import("@/lib/server/audit")
+    void writeAuditLog({ actor: 'system', action: 'maintenance.intel-heartbeat.completed', targetType: 'cron', targetId: 'intel-heartbeat', detail: `Intel heartbeat done. Dispatched: ${dispatched.length}, Results: ${results.length}, Duration: ${totalDurationMs}ms`, riskLevel: 'low', workspaceId: 'system' })
+
     return NextResponse.json({
       success: true,
       data: {
@@ -150,6 +154,9 @@ export async function GET(request: Request): Promise<Response> {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     logger.error("[intel-heartbeat] Cron 执行失败", { error: message })
+    // AGENTS.md §3.5 维护清理约定：Cron 执行结果写入 maintenance.<task>.failed 审计
+    const { writeAuditLog: wFail } = await import("@/lib/server/audit")
+    void wFail({ actor: 'system', action: 'maintenance.intel-heartbeat.failed', targetType: 'cron', targetId: 'intel-heartbeat', detail: `Intel heartbeat failed: ${message}`, riskLevel: 'medium', workspaceId: 'system' })
     return NextResponse.json(
       {
         success: false,

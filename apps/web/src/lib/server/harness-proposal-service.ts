@@ -14,7 +14,7 @@ export function serializeProposal(p: any) {
     problemStatement: p.problemStatement, evidence: p.evidence ?? [],
     proposedChange: p.proposedChange, requiresHumanApproval: p.requiresHumanApproval,
     estimatedImpact: p.estimatedImpact, affectedAgents: p.affectedAgents ?? [],
-    rollbackPlan: p.rollbackPlan, status: p.status,
+    rollbackPlan: p.rollbackPlan, status: p.status === "rolled_back" ? "rolled-back" : p.status,
     reviewedBy: p.reviewedBy ?? null, reviewedAt: p.reviewedAt ? p.reviewedAt.toISOString() : null,
     previousSnapshot: p.previousSnapshot ?? null,
     createdAt: p.createdAt.toISOString(), updatedAt: p.updatedAt.toISOString(), version: "1.0.0",

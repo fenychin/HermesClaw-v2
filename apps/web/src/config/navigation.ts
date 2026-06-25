@@ -16,6 +16,7 @@ import {
   Mic,
   ImageIcon,
   Video,
+  PackageOpen,
   // 设置子导航图标
   ShieldCheck,
   Users,
@@ -93,6 +94,7 @@ export const brainNav: NavItem[] = [
   { href: "/brain/memory", label: "记忆体", icon: Database, description: "短/中/长期三级记忆体统一控制面" },
   { href: "/brain/skills", label: "技能 Skill", icon: Puzzle, description: "行业 / 岗位 / 自定义技能与版本管理" },
   { href: "/brain/connectors", label: "连接器 MCP", icon: Plug, description: "邮箱、CRM、ERP 等连接器授权" },
+  { href: "/brain/industry-packs", label: "行业包管理", icon: PackageOpen, description: "安装、激活与卸载 Industry Pack 行业插件" },
   { href: "/brain/voice", label: "语音库", icon: Mic, description: "品牌声音与多语种语音资产" },
   { href: "/brain/images", label: "图像", icon: ImageIcon, description: "产品图、营销与品牌素材" },
   { href: "/brain/videos", label: "视频", icon: Video, description: "讲解、产品与数字人口播素材" },

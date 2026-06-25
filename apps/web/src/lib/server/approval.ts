@@ -294,6 +294,12 @@ export async function decideApprovalCheckpoint(
       contextSnapshot: { checkpointId, decidedBy, reason }
     });
 
+    // 联动工作流恢复执行：如果有关联的工作流运行，则拒绝并取消
+    if (updatedRecord.workflowRunId) {
+      const { resumeWorkflowRun } = await import('./workflow/runtime-engine')
+      await resumeWorkflowRun(updatedRecord.workflowRunId, checkpoint.workspaceId, false, decidedBy)
+    }
+
     return mapDbToCheckpoint(updatedRecord);
   }
 
@@ -329,6 +335,12 @@ export async function decideApprovalCheckpoint(
         workspaceId: checkpoint.workspaceId,
         contextSnapshot: { checkpointId, decidedBy, requiredSigners: requiredList, signedList: newSigned }
       });
+
+      // 联动工作流恢复执行：如果是工作流审批，批准并恢复运行
+      if (updatedRecord.workflowRunId) {
+        const { resumeWorkflowRun } = await import('./workflow/runtime-engine')
+        await resumeWorkflowRun(updatedRecord.workflowRunId, checkpoint.workspaceId, true, decidedBy)
+      }
 
       // 触发快照与 canary 灰度
       if (updatedRecord.proposalId) {
@@ -384,6 +396,12 @@ export async function decideApprovalCheckpoint(
       workspaceId: checkpoint.workspaceId,
       contextSnapshot: { checkpointId, decidedBy }
     });
+
+    // 联动工作流恢复执行：如果是工作流审批，批准并恢复运行
+    if (updatedRecord.workflowRunId) {
+      const { resumeWorkflowRun } = await import('./workflow/runtime-engine')
+      await resumeWorkflowRun(updatedRecord.workflowRunId, checkpoint.workspaceId, true, decidedBy)
+    }
 
     // 触发快照与 canary 灰度
     if (updatedRecord.proposalId) {

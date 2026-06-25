@@ -14,8 +14,11 @@ export async function GET(request: Request) {
     const status = searchParams.get("status"); if (status) where.status = status
     const targetType = searchParams.get("targetType"); if (targetType) where.targetType = targetType
     const riskLevel = searchParams.get("riskLevel"); if (riskLevel) where.riskLevel = riskLevel
+    // AGENTS.md §3.5 四层日志链顶层关联约定：支持按 workflowRunId 精确关联查询
+    const workflowRunId = searchParams.get("workflowRunId"); if (workflowRunId) where.workflowRunId = workflowRunId
     const query = searchParams.get("query"); if (query) where.OR = [{ actor: { contains: query } }, { action: { contains: query } }, { targetType: { contains: query } }, { detail: { contains: query } }]
     const [logs, total] = await prisma.$transaction([prisma.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * limit, take: limit }), prisma.auditLog.count({ where })])
     return successResponse({ logs: logs.map(serializeAuditLog), total, page, limit })
   } catch (error) { logger.error('GET /api/audit: 失败'); return errorResponse("服务器内部错误") }
 }
+

@@ -7,10 +7,13 @@ import { Toaster } from "@/components/ui/sonner";
 import { WorkspaceOverlays } from "@/components/layout/workspace-overlays";
 import dynamic from "next/dynamic";
 
-const OpenClawStreamBridge = dynamic(
-  () => import("@/components/layout/openclaw-stream-bridge").then(m => ({ default: m.OpenClawStreamBridge })),
-  { ssr: false }
-);
+const OpenClawStreamBridge =
+  process.env.NODE_ENV === "production"
+    ? dynamic(
+        () => import("@/components/layout/openclaw-stream-bridge").then(m => ({ default: m.OpenClawStreamBridge })),
+        { ssr: false }
+      )
+    : () => null;
 
 export type WorkspaceMode = "session" | "config";
 

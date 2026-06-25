@@ -823,6 +823,21 @@ export async function resumeWorkflowRun(
   })
 
   if (!waitingStep) {
+    if (!approved) {
+      // 容错机制：如果没有找到 waiting 状态的步骤且是被拒绝，直接取消整个工作流即可
+      await cancelWorkflowRun(runId, workspaceId, resumedBy, activeDeps)
+      await activeWriteAuditLog({
+        actor: resumedBy,
+        action: 'workflow.run.rejected',
+        targetType: 'workflow',
+        targetId: run.workflowId,
+        detail: `Workflow run ${runId} rejected by human approval (no waiting step)`,
+        riskLevel: 'medium',
+        workspaceId,
+        workflowRunId: runId
+      })
+      return await prisma.workflowRun.findUnique({ where: { runId } })
+    }
     throw new Error(`No waiting step found for workflow run: ${runId}`)
   }
 

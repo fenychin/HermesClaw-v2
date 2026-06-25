@@ -4,10 +4,10 @@
  */
 
 /** 工作流步骤状态 */
-export type WorkflowStepStatus = 'pending' | 'running' | 'completed' | 'failed'
+export type WorkflowStepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'waiting'
 
 /** 工作流整体运行状态 */
-export type WorkflowRunStatus = 'idle' | 'running' | 'completed' | 'failed'
+export type WorkflowRunStatus = 'idle' | 'running' | 'completed' | 'failed' | 'waiting'
 
 /** 步骤输入控件类型 */
 export type WorkflowInputType = 'text' | 'textarea' | 'select' | 'file'

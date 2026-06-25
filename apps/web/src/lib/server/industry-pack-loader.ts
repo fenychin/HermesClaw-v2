@@ -504,7 +504,7 @@ export async function uninstallPack(
 
   const auditResult = await activeCreateAuditEntry({
     actor: uninstalledBy || 'system',
-    action: 'pack.uninstalled',
+    action: 'pack.uninstall.started',
     targetType: 'pack',
     targetId: packId,
     riskLevel: 'medium',

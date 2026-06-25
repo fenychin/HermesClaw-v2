@@ -80,6 +80,9 @@ export async function GET(request: Request) {
       }
     }
 
+    // AGENTS.md §3.5 维护清理约定：Cron 执行结果写入 maintenance.<task>.completed 审计
+    const { writeAuditLog: wAudit } = await import('@/lib/server/audit')
+    void wAudit({ actor: 'system', action: 'maintenance.evaluation.completed', targetType: 'cron', targetId: 'evaluation', detail: `Harness evaluation completed. Workspaces: ${workspaces.length}, Proposals: ${totalProposals}, Anomalies: ${totalAnomalies}`, riskLevel: 'low', workspaceId: 'system' })
     return NextResponse.json({
       success: true,
       workspacesProcessed: workspaces.length,
@@ -97,6 +100,9 @@ export async function GET(request: Request) {
       errorStack: error instanceof Error ? error.stack : undefined,
     })
     const msg = error instanceof Error ? error.message : '未知错误'
+    // AGENTS.md §3.5 维护清理约定：Cron 执行结果写入 maintenance.<task>.failed 审计
+    const { writeAuditLog: wAuditFail } = await import('@/lib/server/audit')
+    void wAuditFail({ actor: 'system', action: 'maintenance.evaluation.failed', targetType: 'cron', targetId: 'evaluation', detail: `Harness evaluation failed: ${msg}`, riskLevel: 'medium', workspaceId: 'system' })
     return NextResponse.json(
       { success: false, error: { code: 'CRON_EVALUATION_FAILED', message: msg } },
       { status: 200 },

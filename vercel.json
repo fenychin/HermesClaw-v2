@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/intel-heartbeat",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/expire-approvals",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

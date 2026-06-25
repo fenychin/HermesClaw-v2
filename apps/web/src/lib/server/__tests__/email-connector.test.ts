@@ -20,9 +20,13 @@ const mockCount = vi.fn()
 const mockTransaction = vi.fn()
 const mockWriteAuditLog = vi.fn()
 const mockApprovalFindUnique = vi.fn()
+const mockCreateAuditEntry = vi.fn().mockResolvedValue({ auditId: "mock-audit-id" })
+const mockUpdateAuditEntry = vi.fn().mockResolvedValue({})
 
 vi.mock("@/lib/server/audit", () => ({
   writeAuditLog: (...args: any[]) => mockWriteAuditLog(...args),
+  createAuditEntry: (...args: any[]) => mockCreateAuditEntry(...args),
+  updateAuditEntry: (...args: any[]) => mockUpdateAuditEntry(...args),
   actorFromSession: () => Promise.resolve("system"),
 }))
 

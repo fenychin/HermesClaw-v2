@@ -21,14 +21,14 @@ describe("getIndustryHealthData — 行业包健康度查询通用化", () => {
       },
     ]);
 
-    const mockWorkflowNodeRunFindMany = vi.fn().mockResolvedValue([]);
+    const mockStepRunFindMany = vi.fn().mockResolvedValue([]);
     const mockEvolutionLogFindMany = vi.fn().mockResolvedValue([]);
     const mockAuditLogFindMany = vi.fn().mockResolvedValue([]);
 
     const mockPrisma = {
       workflow: { findMany: mockWorkflowFindMany },
       workflowRun: { findMany: mockWorkflowRunFindMany },
-      workflowNodeRun: { findMany: mockWorkflowNodeRunFindMany },
+      stepRun: { findMany: mockStepRunFindMany },
       evolutionLog: { findMany: mockEvolutionLogFindMany },
       auditLog: { findMany: mockAuditLogFindMany },
     } as any;
@@ -70,7 +70,7 @@ describe("getIndustryHealthData — 行业包健康度查询通用化", () => {
     const mockPrisma = {
       workflow: { findMany: mockWorkflowFindMany },
       workflowRun: { findMany: vi.fn().mockResolvedValue([]) },
-      workflowNodeRun: { findMany: vi.fn().mockResolvedValue([]) },
+      stepRun: { findMany: vi.fn().mockResolvedValue([]) },
       evolutionLog: { findMany: vi.fn().mockResolvedValue([]) },
       auditLog: { findMany: vi.fn().mockResolvedValue([]) },
     } as any;

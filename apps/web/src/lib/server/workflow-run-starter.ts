@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma"
 import { dispatchEnvelope, executeWorkflowRun } from "@/lib/server/workflow/runtime-engine"
 import { parseIntentToTaskEnvelope } from "@/lib/server/intent-service"
 import { validateTaskAutomationLevel } from "@/lib/server/guardrail"
-import { createApprovalCheckpoint } from "@/lib/server/approval"
+import { createApprovalCheckpoint, HIGH_RISK_ACTION_APPROVAL_EXPIRY_MS } from "@/lib/server/approval"
 import crypto from "crypto"
 
 const idempotencyMap = new Map<string, { taskId?: string; workflowRunId?: string; checkpointId?: string; status: 'running' | 'pending_approval'; timestamp: number }>()
@@ -36,7 +36,7 @@ export async function startAgentWorkflowRun(opts: { agentId: string; input: any;
     if (err.name === 'GuardrailViolationError' || err.message?.includes('安全护栏拦截')) {
       const checkpoint = await prisma.approvalCheckpoint.findFirst({ where: { workflowRunId: envelope.workflowRunId, decision: 'pending' }, orderBy: { createdAt: 'desc' } })
       const checkpointId = checkpoint?.id || `acp-${envelope.workflowRunId}`
-      if (!checkpoint) try { await createApprovalCheckpoint({ taskId: envelope.taskId, workflowRunId: envelope.workflowRunId, workspaceId: envelope.workspaceId, triggerReason: 'risk.level.high', riskLevel: envelope.riskLevel, automationLevel: envelope.automationLevel ?? 'L3', actionSummary: `高危动作等待审批：${envelope.actionType}`, inputSnapshot: envelope.input ?? {}, policySnapshotVersion: envelope.policySnapshotVersion ?? '1.0.0', expiresAt: new Date(Date.now() + 86400000), creator: opts.userId || 'system' }) } catch {}
+      if (!checkpoint) try { await createApprovalCheckpoint({ taskId: envelope.taskId, workflowRunId: envelope.workflowRunId, workspaceId: envelope.workspaceId, triggerReason: 'risk.level.high', riskLevel: envelope.riskLevel, automationLevel: envelope.automationLevel ?? 'L3', actionSummary: `高危动作等待审批：${envelope.actionType}`, inputSnapshot: envelope.input ?? {}, policySnapshotVersion: envelope.policySnapshotVersion ?? '1.0.0', expiresAt: new Date(Date.now() + HIGH_RISK_ACTION_APPROVAL_EXPIRY_MS), creator: opts.userId || 'system' }) } catch {}
       if (opts.idempotencyKey) idempotencyMap.set(opts.idempotencyKey, { taskId: envelope.taskId, checkpointId, status: 'pending_approval', timestamp: Date.now() })
       return { status: 'pending_approval', checkpointId, taskId: envelope.taskId }
     }

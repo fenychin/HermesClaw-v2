@@ -101,14 +101,14 @@ ${stats.knowledgeGaps.map(g => `  * [${g.resolved ? "已解决" : "待补充"}] 
       problemStatement = `系统存在一定的人工干预修正，失败率为 ${(errorRate * 100).toFixed(1)}%`
       estimatedImpact = "提高工具参数匹配精度，预计人工修正率下降 50%"
       proposalRiskLevel = "medium"
-      automationLevel = "L3"
+      automationLevel = "L2"
     } else {
       targetComponent = "上下文供给"
       proposedChangeText = "MemoryPolicy 调整：压缩策略门禁优化，提前进行上下文摘要"
       problemStatement = "检测到长周期会话中的上下文冗余，需要优化记忆存储分配"
       estimatedImpact = "减少 Token 消耗，提高推理上下文响应速度"
       proposalRiskLevel = "low"
-      automationLevel = "L3"
+      automationLevel = "L2"
     }
   }
 
@@ -182,7 +182,7 @@ ${stats.knowledgeGaps.map(g => `  * [${g.resolved ? "已解决" : "待补充"}] 
     estimatedImpact: created.estimatedImpact,
     affectedAgents: JSON.parse(created.affectedAgents as string) as string[],
     rollbackPlan: created.rollbackPlan,
-    status: created.status as unknown as HarnessProposal["status"],
+    status: (created.status === "rolled_back" ? "rolled-back" : created.status) as unknown as HarnessProposal["status"],
     reviewedBy: created.reviewedBy,
     reviewedAt: created.reviewedAt ? new Date(created.reviewedAt) : null,
     previousSnapshot: typeof created.previousSnapshot === "string"
@@ -195,7 +195,7 @@ ${stats.knowledgeGaps.map(g => `  * [${g.resolved ? "已解决" : "待补充"}] 
 
   // 在 generateProposal 返回前追加（使用动态 import 防止循环依赖）
   if (proposal.proposedChange && (proposal.proposedChange.riskLevel === 'high' || proposal.proposedChange.riskLevel === 'critical')) {
-    const { createApprovalCheckpoint } = await import('./approval')
+    const { createApprovalCheckpoint, PROPOSAL_APPROVAL_EXPIRY_MS } = await import('./approval')
     await createApprovalCheckpoint({
       proposalId: proposal.id,
       workspaceId: proposal.workspaceId,
@@ -205,7 +205,7 @@ ${stats.knowledgeGaps.map(g => `  * [${g.resolved ? "已解决" : "待补充"}] 
       actionSummary: `自动进化提案待审批：${proposal.proposedChange.description ?? proposal.id}`,
       inputSnapshot: proposal as unknown as Record<string, unknown>,
       policySnapshotVersion: snapshot.agentId || 'unknown',
-      expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000),  // 72 小时有效期
+      expiresAt: new Date(Date.now() + PROPOSAL_APPROVAL_EXPIRY_MS),
     })
   }
 

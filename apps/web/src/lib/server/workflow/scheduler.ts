@@ -13,8 +13,7 @@ import { writeAuditLog, actorFromSession } from "@/lib/server/audit"
 import type { AuditRiskLevel } from "@/types"
 import { writeAgentLog } from "@/lib/server/agent-log"
 import { hermesClient } from "@/lib/server/adapters/hermes"
-// LEGACY ENGINE ROUTE: Operating on WorkflowNodeRun table.
-import { runWorkflow as runLocalWorkflow } from "@/lib/server/workflow/dag-runner"
+import { startWorkflowRun, executeWorkflowRun } from "@/lib/server/workflow/runtime-engine"
 import { TypedTaskInputSchema } from "@hermesclaw/event-contracts"
 import { isCriticalActionType } from "@/lib/server/check-automation-gate"
 import { TRADE_CRITICAL_ACTION_TYPES } from "@foreign-trade/policy/critical-actions"
@@ -170,24 +169,35 @@ export class WorkflowSchedulerService {
         throw new HermesApiError(`Hermes 执行工作流失败：${message}`)
       }
     } else {
-      // 本地 DAG 引擎执行
-      // 本地执行器 dag-runner 会在其生命周期钩子中自动处理节点级 AuditLog 和 AgentLog
+      // 本地新引擎异步执行
       try {
         const localInputs = {
           ...inputs,
           ...(agentId ? { agentId } : {}),
           ...(projectId ? { projectId } : {}),
         }
-        // LEGACY ROUTE: Using deprecated local workflow runner.
-        const result = await runLocalWorkflow(workflowId, localInputs)
+        const runRecord = await startWorkflowRun({
+          workflowId,
+          workspaceId,
+          inputContext: localInputs,
+          triggeredBy: projectId ? `project-${projectId}` : "system",
+          triggerType: agentId ? "agent-dispatch" : "manual",
+          agentId,
+        })
+
+        // 异步后台执行新引擎
+        executeWorkflowRun(runRecord.runId, workspaceId).catch((err) => {
+          logger.error(`[WorkflowScheduler] 异步执行工作流异常`, { runId: runRecord.runId, error: err.message })
+        })
+
         return {
-          runId: result.runId,
-          status: result.status,
-          output: result.output,
+          runId: runRecord.runId,
+          status: runRecord.status,
+          output: {},
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "未知错误"
-        logger.error(`[WorkflowScheduler] 本地 DAG 引擎执行工作流失败`, {
+        logger.error(`[WorkflowScheduler] 本地工作流启动失败`, {
           workflowId,
           error: message,
         })
@@ -196,4 +206,3 @@ export class WorkflowSchedulerService {
     }
   }
 }
-

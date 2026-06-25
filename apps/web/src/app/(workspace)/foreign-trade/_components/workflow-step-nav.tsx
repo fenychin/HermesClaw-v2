@@ -16,6 +16,8 @@ function getDotClass(status: WorkflowStepStatus): string {
       return "bg-success";
     case "running":
       return "bg-primary animate-pulse";
+    case "waiting":
+      return "bg-warning animate-pulse ring-2 ring-warning/30";
     case "failed":
       return "bg-danger";
     case "pending":
@@ -31,6 +33,8 @@ function getStatusLabel(status: WorkflowStepStatus): string {
       return "已完成";
     case "running":
       return "执行中";
+    case "waiting":
+      return "暂停等待人工";
     case "failed":
       return "执行失败";
     case "pending":
@@ -46,6 +50,8 @@ function getStatusTextClass(status: WorkflowStepStatus): string {
       return "text-success";
     case "running":
       return "text-primary";
+    case "waiting":
+      return "text-warning font-medium";
     case "failed":
       return "text-danger";
     case "pending":

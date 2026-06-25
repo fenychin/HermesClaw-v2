@@ -283,6 +283,8 @@ export const apiClient = {
           targetType?: string
           riskLevel?: string
           query?: string
+          /** AGENTS.md §3.5 四层日志链顶层关联约定：按工作流运行 ID 关联查询 */
+          workflowRunId?: string
         },
   ) => {
     let queryStr = ""

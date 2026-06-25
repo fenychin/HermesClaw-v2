@@ -547,6 +547,16 @@ export async function sendEmail(
   // 2. 若为高风险批量发送，校验 leaseToken
   if (input.to.length > 10) {
     if (!input.leaseToken) {
+      await activeWriteAuditLog({
+        actor: input.agentId || 'system',
+        action: 'email.failed',
+        targetType: 'email',
+        targetId: sendId,
+        detail: 'Rejected batch email sending: Missing required leaseToken.',
+        riskLevel: 'high',
+        workspaceId: input.workspaceId,
+        workflowRunId: input.workflowRunId
+      })
       throw new LeaseTokenValidationError('Batch sending requires a valid ConnectorLease leaseToken')
     }
     if (input.leaseToken.startsWith('lease-')) {
@@ -557,12 +567,42 @@ export async function sendEmail(
         where: { checkpointId: input.leaseToken }
       })
       if (!checkpoint || checkpoint.decision !== 'approved') {
+        await activeWriteAuditLog({
+          actor: input.agentId || 'system',
+          action: 'email.failed',
+          targetType: 'email',
+          targetId: sendId,
+          detail: `Rejected batch email sending: Checkpoint ${input.leaseToken} not found or not approved.`,
+          riskLevel: 'high',
+          workspaceId: input.workspaceId,
+          workflowRunId: input.workflowRunId
+        })
         throw new LeaseTokenValidationError('ConnectorLease token is invalid or expired')
       }
       if (checkpoint.expiresAt.getTime() < Date.now()) {
+        await activeWriteAuditLog({
+          actor: input.agentId || 'system',
+          action: 'email.failed',
+          targetType: 'email',
+          targetId: sendId,
+          detail: `Rejected batch email sending: Checkpoint ${input.leaseToken} has expired.`,
+          riskLevel: 'high',
+          workspaceId: input.workspaceId,
+          workflowRunId: input.workflowRunId
+        })
         throw new LeaseTokenValidationError('ConnectorLease token is invalid or expired')
       }
       if (checkpoint.workspaceId !== input.workspaceId) {
+        await activeWriteAuditLog({
+          actor: input.agentId || 'system',
+          action: 'email.failed',
+          targetType: 'email',
+          targetId: sendId,
+          detail: `Rejected batch email sending: Checkpoint ${input.leaseToken} workspace mismatch.`,
+          riskLevel: 'high',
+          workspaceId: input.workspaceId,
+          workflowRunId: input.workflowRunId
+        })
         throw new LeaseTokenValidationError('ConnectorLease does not match connector or workspace')
       }
       // 写入审计对账日志 (AGENTS.md §3.5)
@@ -577,6 +617,16 @@ export async function sendEmail(
         workflowRunId: input.workflowRunId
       })
     } else {
+      await activeWriteAuditLog({
+        actor: input.agentId || 'system',
+        action: 'email.failed',
+        targetType: 'email',
+        targetId: sendId,
+        detail: 'Rejected batch email sending: Invalid leaseToken format.',
+        riskLevel: 'high',
+        workspaceId: input.workspaceId,
+        workflowRunId: input.workflowRunId
+      })
       throw new LeaseTokenValidationError('ConnectorLease token is invalid or expired')
     }
   }

@@ -455,6 +455,15 @@ Harness Runtime 至少由以下对象组成：
   3. 在 `.gitignore` 中追加全局数据库文件（如 `*.db.bak-*` 等）忽略策略。
   4. 建议所有团队成员与部署环境轮换此前泄露的用户凭据，避免使用包含该 Hash 的旧密码。
 
+### 6.5 审批防线与跨人防御（2026-06-25 v3.42.06-dev）
+- 普通成员（`MEMBER`）进行人工决策操作时，必须强限制其只能操作本人所发起的审批检查点工单。
+- API 层在处理决定时，应主动比对 `requestedBy`（通过检索 `approval.requested` 审计日志的 actor 获得）与当前的登录用户 ID，如果两者不一致则直接予以拦截并返回 `403 Forbidden`。仅 `ADMIN` 与 `OWNER` 豁免此规则。
+- 审计日志查询该发起人时，必须带上租户 `workspaceId` 条件做精确隔离过滤，防止多租户场景下数据越权。
+
+### 6.6 物理写连接器租约回校验（2026-06-25 v3.42.06-dev）
+- 执行面的所有物理写操作连接器（如 `http-connector.ts`、`email-connector.ts`），当接收到以 `acp-` 开头的 `leaseToken` 时，必须在调用发送网络 IO 前，通过数据库物理反向查验 `ApprovalCheckpoint` 的 `decision` 状态是否为 `approved` 且仍处于有效期内。
+- 查验成功后须立刻生成 `approval.verified` 对账审计日志，校验不通过必须立即以 `LeaseTokenValidationError` 拦截并阻断，实现“审批-租约-物理执行”的物理安全可追溯链条。
+
 ---
 
 ## 第七章：与上游项目的兼容性
