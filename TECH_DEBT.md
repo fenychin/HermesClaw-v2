@@ -43,14 +43,14 @@
 - **验证**：`prisma validate` ✅ / `tsc --noEmit` (apps/web + hermes-kernel) ✅ / dev.db 升级后保留原成员行。
 - **修复完成日期**：2026-06-18
 
-### TD-2026-06-18-005 — User.image 字段缺失（从 TD-002 拆分）
+### TD-2026-06-18-005 — User.image 字段缺失（从 TD-002 拆分） ✅ RESOLVED (2026-06-24, v3.27)
 
 - **位置**：`prisma/schema.prisma#User`
 - **类型**：数据模型 / 字段缺失
 - **风险**：低（前端展示头像降级为占位符即可，不影响成员管理）
-- **背景**：原 TD-002 提到前端期望 `user.image`，但 next-auth User 模型未含此列；
-  本仓库 v3.20 修复 TD-002 时仅覆盖 WorkspaceMember 侧，User 模型按当前任务约束不动。
-- **修复计划日期**：2026-07-01（与 next-auth 升级 / 用户头像上传通道一并处理）
+- **背景**：原 TD-002 提到前端期望 `user.image`，但 next-auth User 模型已含此列；
+  本仓库 v3.27 确认该字段已经在 schema.prisma 中补齐。
+- **修复完成日期**：2026-06-24
 
 ### TD-2026-06-17-003 — Report 模型缺 title / createdBy 字段 ✅ RESOLVED (2026-06-18, v3.21)
 

@@ -2,7 +2,7 @@
 import fs from 'fs'
 import path from 'path'
 import { prisma } from "@/lib/prisma"
-import { writeAuditLog } from "./audit"
+import { writeAuditLog, createAuditEntry, updateAuditEntry } from "./audit"
 import {
   registerCapability,
   deprecateCapability,
@@ -57,6 +57,8 @@ export class PackCoreVersionIncompatibleError extends Error {
 export interface PackLoaderDeps {
   prisma?: typeof prisma
   writeAuditLog?: typeof writeAuditLog
+  createAuditEntry?: typeof createAuditEntry
+  updateAuditEntry?: typeof updateAuditEntry
   getSystemVersion?: () => string
   registerCapability?: typeof registerCapability
   deprecateCapability?: typeof deprecateCapability
@@ -179,92 +181,106 @@ export async function installPack(
     })
   }
 
-  // 2. 检查是否已存在该版本的安装记录
-  const existing = await activePrisma.industryPackInstallation.findFirst({
-    where: {
-      workspaceId,
-      packId: manifest.packId,
-      packVersion: manifest.packVersion,
-      status: 'installed'
-    }
-  })
-  if (existing) {
-    throw new PackAlreadyInstalledError(manifest.packId, manifest.packVersion)
-  }
-
-  // 3. 校验 Harness Core Version 核心版本兼容性
   const sysVer = activeGetSystemVersion()
-  if (manifest.minHarnessCoreVersion && compareSemver(sysVer, manifest.minHarnessCoreVersion) < 0) {
-    throw new PackCoreVersionIncompatibleError(manifest.packId, sysVer, manifest.minHarnessCoreVersion)
-  }
 
-  // 3b. 校验 Industry Pack 兼容性声明（CLAUDE.md §6.3）
-  const compatResult = validateIndustryPackCompatibility(manifest.packId, sysVer, sysVer)
-  if (!compatResult.passed) {
-    await activeWriteAuditLog({
-      actor: installedBy || 'system',
-      action: 'pack.install.compatibility_failed',
-      targetType: 'pack',
-      targetId: manifest.packId,
-      detail: `兼容性校验失败: ${compatResult.failures.join('; ')}`,
-      riskLevel: 'medium',
-      workspaceId
-    })
-    throw new PackCoreVersionIncompatibleError(
-      manifest.packId,
-      sysVer,
-      `compatibility check failed: ${compatResult.failures.join('; ')}`
-    )
-  }
-
-  // 4. 解析并校验前置依赖项
-  if (manifest.dependencies) {
-    for (const dep of manifest.dependencies) {
-      if (dep.required) {
-        const visited = new Set<string>([manifest.packId])
-        await verifyDependencyResolved(
-          dep.packId,
-          dep.version,
-          workspaceId,
-          1,
-          visited,
-          activePrisma
-        )
-      }
+  const getApiVersion = (field: any) => {
+    if (typeof field === 'object' && field !== null) {
+      return `${field.min || ''}-${field.max || ''}`.trim() || '1.0.0'
     }
+    return String(field || manifest.minHarnessCoreVersion || '1.0.0')
   }
 
-  // 5. 创建安装追踪记录 (installing)
-  const installationId = `ins-${crypto.randomUUID()}`
-  const logRecord = await activePrisma.industryPackInstallation.create({
-    data: {
-      installationId,
-      workspaceId,
-      packId: manifest.packId,
-      packName: manifest.packName,
-      packVersion: manifest.packVersion,
-      status: 'installing',
-      installedCapabilities: '[]',
-      resolvedDependencies: JSON.stringify(manifest.dependencies || []),
-      manifest: manifest as any,
-      installedBy: installedBy || 'system'
-    }
-  })
+  const compHermes = getApiVersion((manifest as any).compatibleHermesApi)
+  const compRuntime = getApiVersion((manifest as any).compatibleRuntimeApi)
 
-  // 6. 写入审计日志
-  await activeWriteAuditLog({
+  // 6. 预记录审计日志
+  const activeCreateAuditEntry = deps?.createAuditEntry || createAuditEntry
+  const activeUpdateAuditEntry = deps?.updateAuditEntry || updateAuditEntry
+
+  const auditResult = await activeCreateAuditEntry({
     actor: installedBy || 'system',
     action: 'pack.install.started',
     targetType: 'pack',
     targetId: manifest.packId,
-    detail: `Started installation of pack ${manifest.packId}@${manifest.packVersion}`,
     riskLevel: 'low',
-    workspaceId
+    workspaceId,
+    contextSnapshot: {
+      packId: manifest.packId,
+      packVersion: manifest.packVersion,
+      compatibleHermesApi: compHermes,
+      compatibleRuntimeApi: compRuntime,
+      systemVersion: sysVer
+    }
   })
+  const auditId = auditResult.auditId
 
+  let logRecordId: string | undefined = undefined
   const registeredCapIds: Array<{ id: string; version: string }> = []
 
   try {
+    // 2. 检查是否已存在该版本的安装记录
+    const existing = await activePrisma.industryPackInstallation.findFirst({
+      where: {
+        workspaceId,
+        packId: manifest.packId,
+        packVersion: manifest.packVersion,
+        status: 'installed'
+      }
+    })
+    if (existing) {
+      throw new PackAlreadyInstalledError(manifest.packId, manifest.packVersion)
+    }
+
+    // 3. 校验 Harness Core Version 核心版本兼容性
+    if (manifest.minHarnessCoreVersion && compareSemver(sysVer, manifest.minHarnessCoreVersion) < 0) {
+      throw new PackCoreVersionIncompatibleError(manifest.packId, sysVer, manifest.minHarnessCoreVersion)
+    }
+
+    // 3b. 校验 Industry Pack 兼容性声明（CLAUDE.md §6.3）
+    const compatResult = validateIndustryPackCompatibility(manifest.packId, sysVer, sysVer)
+    if (!compatResult.passed) {
+      throw new PackCoreVersionIncompatibleError(
+        manifest.packId,
+        sysVer,
+        `compatibility check failed: ${compatResult.failures.join('; ')}`
+      )
+    }
+
+    // 4. 解析并校验前置依赖项
+    if (manifest.dependencies) {
+      for (const dep of manifest.dependencies) {
+        if (dep.required) {
+          const visited = new Set<string>([manifest.packId])
+          await verifyDependencyResolved(
+            dep.packId,
+            dep.version,
+            workspaceId,
+            1,
+            visited,
+            activePrisma
+          )
+        }
+      }
+    }
+
+    // 5. 创建安装追踪记录 (installing)
+    const installationId = `ins-${crypto.randomUUID()}`
+    const logRecord = await activePrisma.industryPackInstallation.create({
+      data: {
+        installationId,
+        workspaceId,
+        packId: manifest.packId,
+        packName: manifest.packName,
+        packVersion: manifest.packVersion,
+        status: 'installing',
+        installedCapabilities: '[]',
+        resolvedDependencies: JSON.stringify(manifest.dependencies || []),
+        manifest: manifest as any,
+        installedBy: installedBy || 'system'
+      }
+    })
+    logRecordId = logRecord.id
+
     // 7. 遍历能力组件，写入对应底层表，并注册能力
     for (const entry of manifest.capabilities) {
       // 7a. 写入各自实体表
@@ -390,7 +406,7 @@ export async function installPack(
     // 8. 标记安装成功
     const capList = registeredCapIds.map(c => `${c.id}@${c.version}`)
     const updated = await activePrisma.industryPackInstallation.update({
-      where: { id: logRecord.id },
+      where: { id: logRecordId },
       data: {
         status: 'installed',
         installedCapabilities: JSON.stringify(capList),
@@ -398,15 +414,11 @@ export async function installPack(
       }
     })
 
-    // 9. 写入审计日志
-    await activeWriteAuditLog({
-      actor: installedBy || 'system',
-      action: 'pack.installed',
-      targetType: 'pack',
-      targetId: manifest.packId,
-      detail: `Successfully installed pack ${manifest.packId}@${manifest.packVersion} with ${capList.length} capabilities.`,
-      riskLevel: 'low',
-      workspaceId
+    // 9. 更新审计日志状态为 success
+    await activeUpdateAuditEntry({
+      auditId,
+      status: 'success',
+      detail: `Successfully installed pack ${manifest.packId}@${manifest.packVersion} with ${capList.length} capabilities.`
     })
 
     return updated
@@ -428,24 +440,25 @@ export async function installPack(
       }
     }
 
-    // 更新状态为 failed
-    await activePrisma.industryPackInstallation.update({
-      where: { id: logRecord.id },
-      data: {
-        status: 'failed',
-        errorMessage: error instanceof Error ? error.message : 'Unknown error occurred during component setup'
+    if (logRecordId) {
+      try {
+        await activePrisma.industryPackInstallation.update({
+          where: { id: logRecordId },
+          data: {
+            status: 'failed',
+            errorMessage: error instanceof Error ? error.message : 'Unknown error occurred during component setup'
+          }
+        })
+      } catch (dbErr) {
+        console.error(`[installPack Rollback] Failed to update installation status:`, dbErr)
       }
-    })
+    }
 
-    // 写入失败审计日志
-    await activeWriteAuditLog({
-      actor: installedBy || 'system',
-      action: 'pack.install.failed',
-      targetType: 'pack',
-      targetId: manifest.packId,
-      detail: `Installation failed for pack ${manifest.packId}. Error: ${error.message || 'Unknown error'}`,
-      riskLevel: 'medium',
-      workspaceId
+    // 更新审计日志状态为 failed
+    await activeUpdateAuditEntry({
+      auditId,
+      status: 'failed',
+      detail: `Installation failed for pack ${manifest.packId}. Error: ${error.message || 'Unknown error'}`
     })
 
     throw error
@@ -485,7 +498,24 @@ export async function uninstallPack(
     data: { status: 'uninstalling' }
   })
 
-  // 3. 对已安装的能力逐一执行 deprecate
+  // 3. 预记录审计日志
+  const activeCreateAuditEntry = deps?.createAuditEntry || createAuditEntry
+  const activeUpdateAuditEntry = deps?.updateAuditEntry || updateAuditEntry
+
+  const auditResult = await activeCreateAuditEntry({
+    actor: uninstalledBy || 'system',
+    action: 'pack.uninstalled',
+    targetType: 'pack',
+    targetId: packId,
+    riskLevel: 'medium',
+    workspaceId,
+    contextSnapshot: {
+      packId,
+      packVersion
+    }
+  })
+
+  // 4. 对已安装的能力逐一执行 deprecate
   let capList: string[] = []
   try {
     capList = JSON.parse(inst.installedCapabilities)
@@ -493,14 +523,14 @@ export async function uninstallPack(
     capList = []
   }
 
-  for (const capStr of capList) {
-    // capStr 格式为 "id@version"
-    const atIdx = capStr.lastIndexOf('@')
-    if (atIdx === -1) continue
-    const capId = capStr.substring(0, atIdx)
-    const capVer = capStr.substring(atIdx + 1)
+  try {
+    for (const capStr of capList) {
+      // capStr 格式为 "id@version"
+      const atIdx = capStr.lastIndexOf('@')
+      if (atIdx === -1) continue
+      const capId = capStr.substring(0, atIdx)
+      const capVer = capStr.substring(atIdx + 1)
 
-    try {
       await activeDeprecateCapability(
         capId,
         capVer,
@@ -508,33 +538,41 @@ export async function uninstallPack(
         uninstalledBy || 'system',
         { prisma: activePrisma, writeAuditLog: activeWriteAuditLog }
       )
-    } catch (err) {
-      console.error(`[uninstallPack] Failed to deprecate ${capStr}:`, err)
     }
+
+    // 5. 更新状态为 uninstalled
+    const updated = await activePrisma.industryPackInstallation.update({
+      where: { id: inst.id },
+      data: {
+        status: 'uninstalled',
+        uninstalledAt: new Date(),
+        uninstalledBy: uninstalledBy || 'system'
+      }
+    })
+
+    // 6. 更新审计日志状态为 success
+    await activeUpdateAuditEntry({
+      auditId: auditResult.auditId,
+      status: 'success',
+      detail: `Successfully uninstalled pack ${packId}@${packVersion}. All ${capList.length} capabilities are deprecated.`
+    })
+
+    return updated
+  } catch (error: any) {
+    // 卸载失败，回滚状态并记录失败审计
+    await activePrisma.industryPackInstallation.update({
+      where: { id: inst.id },
+      data: { status: 'installed' }
+    })
+
+    await activeUpdateAuditEntry({
+      auditId: auditResult.auditId,
+      status: 'failed',
+      detail: `Uninstall failed for pack ${packId}. Error: ${error.message || 'Unknown error'}`
+    })
+
+    throw error
   }
-
-  // 4. 更新状态为 uninstalled
-  const updated = await activePrisma.industryPackInstallation.update({
-    where: { id: inst.id },
-    data: {
-      status: 'uninstalled',
-      uninstalledAt: new Date(),
-      uninstalledBy: uninstalledBy || 'system'
-    }
-  })
-
-  // 5. 写入审计日志
-  await activeWriteAuditLog({
-    actor: uninstalledBy || 'system',
-    action: 'pack.uninstalled',
-    targetType: 'pack',
-    targetId: packId,
-    detail: `Successfully uninstalled pack ${packId}@${packVersion}. All ${capList.length} capabilities are deprecated.`,
-    riskLevel: 'medium',
-    workspaceId
-  })
-
-  return updated
 }
 
 /**

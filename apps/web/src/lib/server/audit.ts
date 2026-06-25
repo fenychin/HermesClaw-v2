@@ -56,6 +56,8 @@ export interface WriteAuditLogInput {
   workspaceId: string
   /** 执行时的关键上下文快照 */
   contextSnapshot?: Record<string, unknown>
+  /** 关联的工作流运行 ID */
+  workflowRunId?: string
 }
 
 // ==============================
@@ -77,6 +79,8 @@ export interface CreateAuditEntryInput {
   automationLevel?: AutomationLevel
   /** 触发来源 */
   triggeredBy?: TriggeredBy
+  /** 关联的工作流运行 ID */
+  workflowRunId?: string
 }
 
 /** createAuditEntry() 返回值 */
@@ -136,6 +140,7 @@ export async function writeAuditLog(input: WriteAuditLogInput): Promise<void> {
         workspaceId: input.workspaceId,
         status: "success", // 旧接口无预记录概念，直接标记 success
         contextSnapshot: input.contextSnapshot ? (input.contextSnapshot as any) : null,
+        workflowRunId: input.workflowRunId ?? null,
       },
     })
   } catch (error) {
@@ -202,6 +207,7 @@ export async function createAuditEntry(
         automationLevel: input.automationLevel ?? null,
         triggeredBy: input.triggeredBy ?? "user",
         status: "pending",
+        workflowRunId: input.workflowRunId ?? null,
       },
     })
     return { auditId: record.id, ok: true }

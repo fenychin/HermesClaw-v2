@@ -8,6 +8,17 @@ import { prisma } from "@/lib/prisma"
 import { writeAuditLog } from "@/lib/server/audit"
 import { randomUUID } from 'crypto'
 import { topoSortFlat } from './utils/topo-sort'
+import {
+  ToolGrantMissingException,
+  GuardrailError,
+  GuardrailViolationError
+} from "@/lib/server/exceptions"
+
+function resolveEngineDeps(deps?: RuntimeEngineDeps) {
+  const activeDeps = deps || defaultDeps
+  const activeWriteAuditLog = activeDeps.writeAuditLog || writeAuditLog
+  return { activeDeps, activeWriteAuditLog }
+}
 
 // 1. 顶层常量
 export const RUNTIME_ENGINE_VERSION = '1.0'
@@ -89,6 +100,61 @@ export interface RuntimeEngineDeps {
   requestHumanApproval?: (stepId: string, context: Record<string, unknown>) => Promise<boolean>
 }
 
+// 默认依赖配置，用于生产运行时环境
+export const defaultDeps: RuntimeEngineDeps = {
+  writeAuditLog,
+  callAgent: async (agentId, input, opts) => {
+    const { executeAgentAction } = await import('@/lib/server/agent-execute-service')
+    const action = (input.instruction as string) || (input.action as string) || ''
+    const result = await executeAgentAction({
+      agentId,
+      workspaceId: opts?.workspaceId || '',
+      action,
+    })
+    return result as Record<string, unknown>
+  },
+  callCapability: async (capabilityId, input, opts) => {
+    const isSkill = await prisma.skill.findUnique({ where: { id: capabilityId } })
+    if (isSkill) {
+      const { executeSkillNode } = await import('./skill-executor')
+      const node = { id: 'temp-node', config: { skillId: capabilityId } }
+      const ctx = { workspaceId: opts?.workspaceId || 'default', industryId: (input.industryId as string) }
+      const result = await executeSkillNode(node as any, ctx as any)
+      if (result.status === 'failed') {
+        throw new Error(result.error || 'Skill execution failed')
+      }
+      return result.output || {}
+    } else {
+      if (capabilityId === 'built-in.email') {
+        const { sendEmail } = await import('../connectors/email-connector')
+        const emailInput = {
+          connectorId: capabilityId,
+          workspaceId: opts?.workspaceId || 'default',
+          from: (input.from as any),
+          to: (input.to as any),
+          cc: (input.cc as any),
+          subject: (input.subject as string) || '',
+          bodyHtml: (input.bodyHtml as string) || '',
+          bodyText: (input.bodyText as string),
+          attachments: (input.attachments as any),
+          templateId: (input.templateId as string),
+          templateVariables: (input.templateVariables as any),
+          agentId: (input.agentId as string),
+          taskId: (input.taskId as string),
+          leaseToken: (input.leaseToken as string),
+          injectUnsubscribeLink: (input.injectUnsubscribeLink as boolean),
+          unsubscribeUrl: (input.unsubscribeUrl as string),
+          workflowRunId: (input.workflowRunId as string),
+        }
+        const result = await sendEmail(emailInput)
+        return result as any
+      } else {
+        throw new Error(`Capability not found: ${capabilityId}`)
+      }
+    }
+  }
+}
+
 // 内部辅助函数：处理失败工作流状态与审计
 async function failWorkflowRunAndAudit(
   runId: string,
@@ -121,7 +187,8 @@ async function failWorkflowRunAndAudit(
       detail: `Workflow run ${runId} failed: ${errorMessage}`,
       riskLevel: 'high',
       workspaceId,
-      contextSnapshot: { runId, errorCode, failedStepId }
+      contextSnapshot: { runId, errorCode, failedStepId },
+      workflowRunId: runId
     })
   } catch (auditErr) {
     console.error(`[runtime-engine] CRITICAL: failed to write AuditLog for workflow run error`, auditErr)
@@ -142,7 +209,7 @@ export async function startWorkflowRun(
   },
   deps?: RuntimeEngineDeps
 ): Promise<any> {
-  const activeWriteAuditLog = deps?.writeAuditLog || writeAuditLog
+  const { activeDeps, activeWriteAuditLog } = resolveEngineDeps(deps)
 
   // 0. 幂等查重：检查是否已存在该 taskId 的运行记录
   const taskId = (input as any).taskId || (input.inputContext?.taskId as string)
@@ -263,7 +330,8 @@ export async function startWorkflowRun(
     detail: `Workflow run ${runId} started`,
     riskLevel: 'low',
     workspaceId: input.workspaceId,
-    contextSnapshot: { runId, workflowId: input.workflowId, triggeredBy: input.triggeredBy || 'system' }
+    contextSnapshot: { runId, workflowId: input.workflowId, triggeredBy: input.triggeredBy || 'system' },
+    workflowRunId: runId
   })
 
   return updatedRun
@@ -278,7 +346,7 @@ export async function executeWorkflowRun(
   workspaceId: string,
   deps?: RuntimeEngineDeps
 ): Promise<any> {
-  const activeWriteAuditLog = deps?.writeAuditLog || writeAuditLog
+  const { activeDeps, activeWriteAuditLog } = resolveEngineDeps(deps)
 
   // 1. 读取 WorkflowRun
   const run = await prisma.workflowRun.findUnique({
@@ -358,7 +426,7 @@ export async function executeWorkflowRun(
             }
           }
           try {
-            const output = await executeStep(step.stepId, currentInput, deps)
+            const output = await executeStep(step.stepId, currentInput, activeDeps)
             // 更新本节点的数据
             currentInput = { ...currentInput, ...output }
           } catch (err) {
@@ -393,24 +461,25 @@ export async function executeWorkflowRun(
               }
               return {
                 stepId: step.stepId,
-                output: await executeStep(step.stepId, stepInput, deps)
+                output: await executeStep(step.stepId, stepInput, activeDeps)
               }
             })
           )
 
           // 收集执行结果。若有步骤失败，抛出错误中止循环
           let hasFailure = false
-          let failMessage = ''
+          const failMessages: string[] = []
           for (const res of results) {
             if (res.status === 'rejected') {
               hasFailure = true
-              failMessage = res.reason?.message || 'Parallel step execution failed'
+              failMessages.push(res.reason?.message || 'Parallel step execution failed')
             } else {
               currentInput = { ...currentInput, ...res.value.output }
             }
           }
 
           if (hasFailure) {
+            const failMessage = failMessages.join('; ')
             await failWorkflowRunAndAudit(
               runId,
               run.workflowId,
@@ -461,7 +530,8 @@ export async function executeWorkflowRun(
         detail: `Workflow run ${runId} completed. Total steps: ${finalSteps.length}, Success: ${successCount}, Skipped: ${skippedCount}`,
         riskLevel: 'low',
         workspaceId,
-        contextSnapshot: { runId, durationMs, stepCount: finalSteps.length }
+        contextSnapshot: { runId, durationMs, stepCount: finalSteps.length },
+        workflowRunId: runId
       })
 
       return finalRun
@@ -487,7 +557,7 @@ export async function executeStep(
   inputData: Record<string, unknown>,
   deps?: RuntimeEngineDeps
 ): Promise<Record<string, unknown>> {
-  const activeWriteAuditLog = deps?.writeAuditLog || writeAuditLog
+  const { activeDeps, activeWriteAuditLog } = resolveEngineDeps(deps)
 
   // 1. 获取 StepRun
   const step = await prisma.stepRun.findUnique({
@@ -535,26 +605,26 @@ export async function executeStep(
               inputContext: inputData,
               createdBy: 'workflow-runtime',
             }, {
-              writeAuditLog: deps!.writeAuditLog,
+              writeAuditLog: activeDeps.writeAuditLog,
               callSubAgent: async (agentId, instruction, data, opts) => {
-                if (!deps!.callAgent) throw new Error('callAgent not configured')
-                return deps!.callAgent(agentId, { instruction, ...data }, opts)
+                if (!activeDeps.callAgent) throw new Error('callAgent not configured')
+                return activeDeps.callAgent(agentId, { instruction, ...data }, opts)
               },
             })
             output = (session.mergedOutput as Record<string, unknown>) || {}
           } else {
-            if (!deps?.callAgent) throw new Error('callAgent not configured')
-            output = await deps.callAgent(step.agentId!, inputData, {
+            if (!activeDeps.callAgent) throw new Error('callAgent not configured')
+            output = await activeDeps.callAgent(step.agentId!, inputData, {
               workspaceId: step.workspaceId
             })
           }
         } else if (step.nodeType === 'skill-call' || step.nodeType === 'connector-call') {
-          if (!deps?.callCapability) throw new Error('callCapability not configured')
-          output = await deps.callCapability(step.capabilityId!, inputData, {
+          if (!activeDeps.callCapability) throw new Error('callCapability not configured')
+          output = await activeDeps.callCapability(step.capabilityId!, inputData, {
             workspaceId: step.workspaceId
           })
         } else if (step.nodeType === 'condition') {
-          if (!deps?.evaluateCondition) {
+          if (!activeDeps.evaluateCondition) {
             // 内置条件匹配
             const config = (inputData.conditionConfig || {}) as any
             const varName = config.variable
@@ -564,7 +634,7 @@ export async function executeStep(
             output = { result: matched }
           } else {
             const config = (inputData.conditionConfig || {}) as any
-            const matched = deps.evaluateCondition(config.expression || '', inputData)
+            const matched = activeDeps.evaluateCondition(config.expression || '', inputData)
             output = { result: matched }
           }
 
@@ -582,7 +652,7 @@ export async function executeStep(
           }
         } else if (step.nodeType === 'human-approval') {
           // 人工介入
-          if (!deps?.requestHumanApproval) {
+          if (!activeDeps.requestHumanApproval) {
             // 默认暂停并等待
             await prisma.stepRun.update({
               where: { stepId },
@@ -591,7 +661,7 @@ export async function executeStep(
             // 抛出暂停信号让 executeWorkflowRun 知晓
             throw new Error('Approval pending')
           } else {
-            const approved = await deps.requestHumanApproval(stepId, inputData)
+            const approved = await activeDeps.requestHumanApproval(stepId, inputData)
             output = { approved }
             if (!approved) {
               // 拒绝则直接终止
@@ -623,7 +693,8 @@ export async function executeStep(
               targetId: step.nodeId,
               detail: `Delay time truncated to 30s for step ${step.nodeId}`,
               riskLevel: 'low',
-              workspaceId: step.workspaceId
+              workspaceId: step.workspaceId,
+              workflowRunId: step.runId
             })
           }
           await sleep(delayMs)
@@ -650,6 +721,9 @@ export async function executeStep(
 
         const isFastFail = err instanceof Error && (
           err.message === 'Human approval rejected' ||
+          err instanceof ToolGrantMissingException ||
+          err instanceof GuardrailError ||
+          err instanceof GuardrailViolationError ||
           err.name.includes('Grant') ||
           err.name.includes('Policy')
         )
@@ -688,7 +762,8 @@ export async function executeStep(
               detail: `Step ${step.nodeId} failed: ${errorMessage}`,
               riskLevel: 'high',
               workspaceId: step.workspaceId,
-              contextSnapshot: { stepId, errorCode }
+              contextSnapshot: { stepId, errorCode },
+              workflowRunId: step.runId
             })
           } catch (auditErr) {
             console.error(`[runtime-engine] CRITICAL: failed to write AuditLog for step error`, auditErr)
@@ -733,7 +808,7 @@ export async function resumeWorkflowRun(
   resumedBy: string,
   deps?: RuntimeEngineDeps
 ): Promise<any> {
-  const activeWriteAuditLog = deps?.writeAuditLog || writeAuditLog
+  const { activeDeps, activeWriteAuditLog } = resolveEngineDeps(deps)
 
   const run = await prisma.workflowRun.findUnique({
     where: { runId }
@@ -773,10 +848,11 @@ export async function resumeWorkflowRun(
       targetId: run.workflowId,
       detail: `Workflow run ${runId} resumed with approval`,
       riskLevel: 'low',
-      workspaceId
+      workspaceId,
+      workflowRunId: runId
     })
     // 异步触发继续执行
-    executeWorkflowRun(runId, workspaceId, deps).catch(() => {})
+    executeWorkflowRun(runId, workspaceId, activeDeps).catch(() => {})
   } else {
     // 审批拒绝，取消工作流
     await prisma.stepRun.update({
@@ -788,7 +864,7 @@ export async function resumeWorkflowRun(
         completedAt: new Date()
       }
     })
-    await cancelWorkflowRun(runId, workspaceId, resumedBy, deps)
+    await cancelWorkflowRun(runId, workspaceId, resumedBy, activeDeps)
     await activeWriteAuditLog({
       actor: resumedBy,
       action: 'workflow.run.rejected',
@@ -796,7 +872,8 @@ export async function resumeWorkflowRun(
       targetId: run.workflowId,
       detail: `Workflow run ${runId} rejected by human approval`,
       riskLevel: 'medium',
-      workspaceId
+      workspaceId,
+      workflowRunId: runId
     })
   }
 
@@ -810,7 +887,8 @@ export async function cancelWorkflowRun(
   cancelledBy: string,
   deps?: RuntimeEngineDeps
 ): Promise<any> {
-  const activeWriteAuditLog = deps?.writeAuditLog || writeAuditLog
+  const activeDeps = deps || defaultDeps
+  const activeWriteAuditLog = activeDeps.writeAuditLog || writeAuditLog
 
   const run = await prisma.workflowRun.findUnique({
     where: { runId }
@@ -847,7 +925,8 @@ export async function cancelWorkflowRun(
     targetId: run.workflowId,
     detail: `Workflow run ${runId} cancelled`,
     riskLevel: 'low',
-    workspaceId
+    workspaceId,
+    workflowRunId: runId
   })
 
   return updatedRun
@@ -933,6 +1012,27 @@ export async function dispatchEnvelope(
   deps?: RuntimeEngineDeps,
 ): Promise<{ run: any; envelopeTaskId: string }> {
   const { envelope, ...runInput } = input
+
+  const { activeWriteAuditLog } = resolveEngineDeps(deps)
+
+  const rawRisk = envelope.riskLevel as string
+  const auditRiskLevel: any = rawRisk === 'critical' ? 'high' : (['low', 'medium', 'high'].includes(rawRisk) ? rawRisk : 'low')
+
+  await activeWriteAuditLog({
+    actor: envelope.agentId || 'system',
+    action: 'workflow.run.dispatched',
+    targetType: 'workflow',
+    targetId: runInput.workflowId,
+    detail: `Dispatching TaskEnvelope (taskId: ${envelope.taskId}) to Workflow (workflowId: ${runInput.workflowId})`,
+    riskLevel: auditRiskLevel,
+    workspaceId: runInput.workspaceId,
+    workflowRunId: envelope.taskId,
+    contextSnapshot: {
+      envelope,
+      mode: runInput.mode,
+      triggeredBy: runInput.triggeredBy
+    }
+  })
 
   // 1. Start the workflow run — envelope.taskId is the idempotency key
   const run = await startWorkflowRun(

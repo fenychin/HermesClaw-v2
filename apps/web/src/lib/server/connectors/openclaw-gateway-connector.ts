@@ -10,6 +10,7 @@ import { ConnectorLeaseSchema, type ConnectorLease } from "@hermesclaw/event-con
 import { writeAuditLog } from "@/lib/server/audit"
 import { actorFromSession } from "@/lib/server/audit"
 import type { AuditRiskLevel } from "@/types"
+import { storeReceipt } from "../receipt-store"
 
 // ─── Channel type union ────────────────────────────────────────────────────
 export type OpenClawChannel =
@@ -86,10 +87,10 @@ export async function executeOpenClawGateway(
     detail: `OpenClaw Gateway dispatching via channel=${input.channel} to=${input.to}`,
     riskLevel: auditRiskLevel,
     workspaceId: lease.workspaceId,
+    workflowRunId,
     contextSnapshot: {
       channel: input.channel,
       endpoint,
-      workflowRunId,
       idempotencyKey,
     },
   })
@@ -173,6 +174,26 @@ export async function executeOpenClawGateway(
       "OpenClaw channel message dispatched. Compensation: use OpenClaw message recall API " +
       `with idempotencyKey=${idempotencyKey} if message must be retracted.`,
     version: "1.0.0",
+  }
+
+  // 6.5 存入数据库 (P0 四层日志链贯通)
+  try {
+    await storeReceipt({
+      receiptId: receipt.receiptId,
+      taskId: receipt.taskId,
+      workflowRunId: receipt.workflowRunId,
+      connectorId: receipt.connectorId,
+      idempotencyKey: receipt.idempotencyKey,
+      outcome: receipt.outcome,
+      executedAt: receipt.executedAt,
+      response: receipt.response,
+      errorCode: receipt.errorCode,
+      compensationStrategy: receipt.compensationStrategy,
+      version: receipt.version,
+      workspaceId: lease.workspaceId
+    })
+  } catch (storeErr) {
+    console.error("[openclaw-gateway-connector] ActionReceipt 存库失败：", storeErr)
   }
 
   return ActionReceiptSchema.parse(receipt)

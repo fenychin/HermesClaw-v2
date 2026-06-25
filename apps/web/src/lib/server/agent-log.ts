@@ -23,6 +23,8 @@ export interface WriteAgentLogInput {
   detail?: string
   /** 风险等级（AGENTS.md §4.4 闭环反馈 / §4.7 自动化授权）：low | medium | high */
   riskLevel?: string
+  /** 关联的工作流运行 ID */
+  workflowRunId?: string | null
 }
 
 /**
@@ -40,6 +42,7 @@ export async function writeAgentLog(input: WriteAgentLogInput): Promise<void> {
         duration: input.duration,
         detail: input.detail ?? null,
         riskLevel: input.riskLevel ?? null,
+        workflowRunId: input.workflowRunId ?? null,
       },
     })
   } catch (error) {

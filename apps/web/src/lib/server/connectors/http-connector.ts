@@ -4,6 +4,7 @@ import { ConnectorLeaseSchema, type ConnectorLease } from "@hermesclaw/event-con
 import { writeAuditLog } from "@/lib/server/audit"
 import { actorFromSession } from "@/lib/server/audit"
 import type { AuditRiskLevel } from "@/types"
+import { storeReceipt } from "../receipt-store"
 
 /**
  * 执行真实的 HTTP POST 交互，并返回 ActionReceipt。
@@ -47,6 +48,7 @@ export async function executeHttpConnector(
     detail: `HTTP Connector executing POST request to URL: ${url}`,
     riskLevel: auditRiskLevel,
     workspaceId: lease.workspaceId,
+    workflowRunId,
   });
 
   // 4. 执行真实 HTTP POST 交互
@@ -103,6 +105,26 @@ export async function executeHttpConnector(
     compensationStrategy: "This action performed an HTTP POST. Compensation: Send a reversing DELETE request or perform manual verification via target transaction logs.",
     version: "1.0.0",
   };
+
+  // 5.5 存入数据库 (P0 四层日志链贯通)
+  try {
+    await storeReceipt({
+      receiptId: receipt.receiptId,
+      taskId: receipt.taskId,
+      workflowRunId: receipt.workflowRunId,
+      connectorId: receipt.connectorId,
+      idempotencyKey: receipt.idempotencyKey,
+      outcome: receipt.outcome,
+      executedAt: receipt.executedAt,
+      response: receipt.response,
+      errorCode: receipt.errorCode,
+      compensationStrategy: receipt.compensationStrategy,
+      version: receipt.version,
+      workspaceId: lease.workspaceId
+    })
+  } catch (storeErr) {
+    console.error("[http-connector] ActionReceipt 存库失败：", storeErr)
+  }
 
   // 6. 强校验 ActionReceipt 并返回
   return ActionReceiptSchema.parse(receipt);

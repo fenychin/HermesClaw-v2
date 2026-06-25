@@ -1,9 +1,9 @@
 # AGENTS.md — HermesClaw-v3 项目最高规则文档
 
-> 版本: v3.27.00-dev  
+> 版本: V3.42.06-dev  
 > 项目: HermesClaw  
 > 状态: 生效中  
-> 最后更新: 2026-06-18
+> 最后更新: 2026-06-25
 
 ---
 
@@ -242,8 +242,12 @@ Hermes 与 OpenClaw 必须通过标准契约通信，不得以内联函数或私
   - **Fail-safe 强制约定**：所有 Trace 埋点操作必须通过 `withTraceStep(trace, config, fn)` 高阶函数调用，禁止在业务代码中直接调用 `addTraceStep` / `completeTraceStep`。`withTraceStep` 内部保证：
     (a) trace 代码异常只写 console.warn，绝不向外抛出（不阻断主链路）；
     (b) 业务 fn 抛出异常时，步骤状态自动置为 `error`（不卡 running）；
-    (c) 业务 fn 正常返回时，步骤状态自动置为 `passed` 或回调中声明的状态。
+    (c) 业务 fn 正常返回时，步骤状态自动置为 `passed` 或回调中声明的状态.
     违反此约定（直接调用底层函数）的 PR 不允许合并。
+  - **四层日志链顶层关联约定（2026-06-25 v3.28.00-dev）**：为了在海量高危审计日志中保证物理索引性能与证据完整性，`workflowRunId` 必须作为 `writeAuditLog` 及 `createAuditEntry` 的**顶层字段**直接进行参数传递和库字段映射，严禁仅将其隐藏在 `contextSnapshot` JSON 字典中，从而防范多租户证据关联断链。
+  - **连接器预执行审计约定（2026-06-25 v3.28.00-dev）**：所有物理写操作连接器（如 HTTP Connector、Gateway、Email Connector 等）在实际发起 IO 发送前，必须预先向系统注册 `connector.execute` 预审计事件，且该审计的顶层字段必须强制关联 `workflowRunId`。
+  - **配置与边界变更两阶段审计（2026-06-25 v3.28.00-dev）**：凡是更改系统级治理边界的操作（包括自动化等级变更 `automation.level.change`、行业包生命周期安装激活卸载 `pack.install.*` 等），必须严格采用二阶段审计模式：操作前以 `pending` 状态通过 `createAuditEntry` 预记录审计条目；操作结束（成功或失败拦截）后通过 `updateAuditEntry` 填入操作结果，更新审计为 `success` 或 `failed`，使整个生命周期全轨迹可追溯。
+  - **Canary 评估唯一阈值源（2026-06-25 v3.28.00-dev）**：Canary 升级与回滚评估所需的全部指标阈值（如成功率/错误率），必须全部统一继承或推导自 `@hermesclaw/hermes-kernel` 导出的 `DEFAULT_CANARY_THRESHOLDS` 对象，严禁在 apps 业务侧或定时任务 Cron 中私自硬编码。
 
 ---
 

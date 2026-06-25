@@ -3,14 +3,15 @@ import crypto from "crypto"
 import { writeAuditLog } from "@/lib/server/audit"
 import type { Prisma } from "@/generated/prisma-v2/client"
 import { logger } from "@/lib/logger"
+import { DEFAULT_CANARY_THRESHOLDS } from "@hermesclaw/hermes-kernel"
 
 // ==============================
 // 顶层常量定义
 // ==============================
 
-export const CANARY_PROMOTE_ERROR_RATE_THRESHOLD = 0.05   // 错误率 < 5% 可晋级
-export const CANARY_PROMOTE_SUCCESS_RATE_THRESHOLD = 0.90  // 成功率 > 90% 可晋级
-export const CANARY_ROLLBACK_ERROR_RATE_THRESHOLD = 0.20   // 错误率 > 20% 触发自动回滚
+export const CANARY_PROMOTE_SUCCESS_RATE_THRESHOLD = DEFAULT_CANARY_THRESHOLDS.workflowSuccessRate + 0.10
+export const CANARY_PROMOTE_ERROR_RATE_THRESHOLD = (1 - DEFAULT_CANARY_THRESHOLDS.workflowSuccessRate) / 4
+export const CANARY_ROLLBACK_ERROR_RATE_THRESHOLD = 1 - DEFAULT_CANARY_THRESHOLDS.workflowSuccessRate
 export const DEFAULT_OBSERVATION_WINDOW_MS = 24 * 60 * 60 * 1000  // 默认 24 小时 (86400000ms)
 export const DEFAULT_TRAFFIC_PERCENT = 10  // 默认 10% 灰度流量
 

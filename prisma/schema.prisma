@@ -179,6 +179,7 @@ model AgentLog {
   // 风险等级（AGENTS.md §4.4 闭环反馈 / §4.7 自动化授权）：low | medium | high
   // Skill 节点执行时由 automationLevel 映射填充
   riskLevel   String?
+  workflowRunId String?
   createdAt   DateTime  @default(now())
   archivedAt  DateTime?
 
@@ -188,6 +189,7 @@ model AgentLog {
   @@index([createdAt])
   // v3.0 性能优化（CLAUDE.md §11.3 L2）：最常用复合查询 workspaceId+agentId+createdAt
   @@index([workspaceId, agentId, createdAt])
+  @@index([workflowRunId])
 }
 
 // ============================================================
@@ -459,6 +461,7 @@ model AuditLog {
   automationLevel String? // L1 | L2 | L3 | L4（§4.7 自动化授权等级）
   triggeredBy     String    @default("user") // user | system | cron
   status          String    @default("pending") // pending | success | failed（预记录模式）
+  workflowRunId   String?
   createdAt       DateTime  @default(now())
 
   @@index([workspaceId])
@@ -466,6 +469,7 @@ model AuditLog {
   @@index([automationLevel])
   @@index([workspaceId, action, createdAt])
   @@index([workspaceId, createdAt])
+  @@index([workflowRunId])
 }
 
 // ============================================================

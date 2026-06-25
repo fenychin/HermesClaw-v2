@@ -81,6 +81,7 @@ export interface SendEmailInput {
   templateVariables?: Record<string, string>  // 模板变量
   agentId?: string
   taskId?: string
+  workflowRunId?: string     // 关联的工作流运行 ID
   leaseToken?: string        // ConnectorLease token（高风险批量发送时必传）
   injectUnsubscribeLink?: boolean  // 营销邮件注入退订链接
   unsubscribeUrl?: string
@@ -216,6 +217,39 @@ export async function initializeEmailConnector(
 }
 
 /**
+ * 注入退订链接
+ */
+export function injectUnsubscribeBlock(
+  html: string,
+  text: string,
+  url: string
+): { html: string; text: string } {
+  let renderedHtml = html
+  let renderedText = text
+
+  // 注入 HTML
+  if (renderedHtml.includes(EMAIL_UNSUBSCRIBE_FOOTER_PLACEHOLDER)) {
+    renderedHtml = renderedHtml.replace(new RegExp(EMAIL_UNSUBSCRIBE_FOOTER_PLACEHOLDER, 'g'), url)
+  } else {
+    const footerHtml = `<div><hr/><p style="font-size:12px;color:#999;">If you wish to unsubscribe, please click <a href="${url}">here</a>.</p></div>`
+    if (renderedHtml.includes('</body>')) {
+      renderedHtml = renderedHtml.replace('</body>', `${footerHtml}</body>`)
+    } else {
+      renderedHtml += footerHtml
+    }
+  }
+
+  // 注入 Text
+  if (renderedText.includes(EMAIL_UNSUBSCRIBE_FOOTER_PLACEHOLDER)) {
+    renderedText = renderedText.replace(new RegExp(EMAIL_UNSUBSCRIBE_FOOTER_PLACEHOLDER, 'g'), url)
+  } else {
+    renderedText += `\n\nIf you wish to unsubscribe, please click here: ${url}`
+  }
+
+  return { html: renderedHtml, text: renderedText }
+}
+
+/**
  * 渲染邮件模板（简单 Mustache 风格）
  */
 export async function renderEmailTemplate(
@@ -285,24 +319,9 @@ export async function renderEmailTemplate(
   // 4. 注入退订链接
   const unsubUrl = options?.unsubscribeUrl || 'https://example.com/unsubscribe'
   if (options?.injectUnsubscribeLink) {
-    // 注入 HTML
-    if (renderedHtml.includes(EMAIL_UNSUBSCRIBE_FOOTER_PLACEHOLDER)) {
-      renderedHtml = renderedHtml.replace(new RegExp(EMAIL_UNSUBSCRIBE_FOOTER_PLACEHOLDER, 'g'), unsubUrl)
-    } else {
-      const footerHtml = `<div><hr/><p style="font-size:12px;color:#999;">If you wish to unsubscribe, please click <a href="${unsubUrl}">here</a>.</p></div>`
-      if (renderedHtml.includes('</body>')) {
-        renderedHtml = renderedHtml.replace('</body>', `${footerHtml}</body>`)
-      } else {
-        renderedHtml += footerHtml
-      }
-    }
-
-    // 注入 Text
-    if (renderedText.includes(EMAIL_UNSUBSCRIBE_FOOTER_PLACEHOLDER)) {
-      renderedText = renderedText.replace(new RegExp(EMAIL_UNSUBSCRIBE_FOOTER_PLACEHOLDER, 'g'), unsubUrl)
-    } else {
-      renderedText += `\n\nIf you wish to unsubscribe, please click here: ${unsubUrl}`
-    }
+    const injected = injectUnsubscribeBlock(renderedHtml, renderedText, unsubUrl)
+    renderedHtml = injected.html
+    renderedText = injected.text
   }
 
   return {
@@ -476,6 +495,50 @@ export async function sendEmail(
   const start = Date.now()
   const sendId = `snd-${crypto.randomUUID()}`
 
+  const storeEmailReceipt = async (isSuccess: boolean, lat: number, msgId?: string, err?: any) => {
+    const receipt = {
+      receiptId: `rcpt-${sendId}`,
+      taskId: input.taskId || `task-mail-${sendId}`,
+      workflowRunId: input.workflowRunId || `wf-mail-${sendId}`,
+      connectorId: input.connectorId,
+      idempotencyKey: input.taskId || sendId,
+      outcome: isSuccess ? ("success" as const) : ("failure" as const),
+      executedAt: new Date().toISOString(),
+      response: {
+        sendId,
+        messageId: msgId ?? '',
+        latencyMs: lat,
+      },
+      errorCode: isSuccess
+        ? undefined
+        : (err instanceof RateLimitExceededError
+          ? 'RATE_LIMIT_EXCEEDED'
+          : (err instanceof Error ? err.name : (typeof err === 'string' ? err : 'SMTP_SEND_FAILED'))),
+      compensationStrategy: 'manual/none',
+      version: '1.0.0',
+    }
+
+    try {
+      const { storeReceipt } = await import("../receipt-store")
+      await storeReceipt({
+        receiptId: receipt.receiptId,
+        taskId: receipt.taskId,
+        workflowRunId: receipt.workflowRunId,
+        connectorId: receipt.connectorId,
+        idempotencyKey: receipt.idempotencyKey,
+        outcome: receipt.outcome,
+        executedAt: receipt.executedAt,
+        response: receipt.response,
+        errorCode: receipt.errorCode,
+        compensationStrategy: receipt.compensationStrategy,
+        version: receipt.version,
+        workspaceId: input.workspaceId,
+      })
+    } catch (storeErr) {
+      console.error("[email-connector] ActionReceipt 存库失败：", storeErr)
+    }
+  }
+
   // 1. 校验 to 收件人限制
   if (input.to.length > EMAIL_MAX_TO_RECIPIENTS) {
     throw new Error(`Recipient count exceeds limit of ${EMAIL_MAX_TO_RECIPIENTS}`)
@@ -541,22 +604,9 @@ export async function sendEmail(
       // 未使用模板，若有 injectUnsubscribeLink，也需要注入退订
       const unsubUrl = input.unsubscribeUrl || 'https://example.com/unsubscribe'
       if (input.injectUnsubscribeLink) {
-        if (finalHtml.includes(EMAIL_UNSUBSCRIBE_FOOTER_PLACEHOLDER)) {
-          finalHtml = finalHtml.replace(new RegExp(EMAIL_UNSUBSCRIBE_FOOTER_PLACEHOLDER, 'g'), unsubUrl)
-        } else {
-          const footerHtml = `<div><hr/><p style="font-size:12px;color:#999;">If you wish to unsubscribe, please click <a href="${unsubUrl}">here</a>.</p></div>`
-          if (finalHtml.includes('</body>')) {
-            finalHtml = finalHtml.replace('</body>', `${footerHtml}</body>`)
-          } else {
-            finalHtml += footerHtml
-          }
-        }
-
-        if (finalText.includes(EMAIL_UNSUBSCRIBE_FOOTER_PLACEHOLDER)) {
-          finalText = finalText.replace(new RegExp(EMAIL_UNSUBSCRIBE_FOOTER_PLACEHOLDER, 'g'), unsubUrl)
-        } else {
-          finalText += `\n\nIf you wish to unsubscribe, please click here: ${unsubUrl}`
-        }
+        const injected = injectUnsubscribeBlock(finalHtml, finalText, unsubUrl)
+        finalHtml = injected.html
+        finalText = injected.text
       }
     }
 
@@ -714,6 +764,7 @@ export async function sendEmail(
         workspaceId: input.workspaceId
       })
 
+      await storeEmailReceipt(true, latencyMs, messageId)
       return {
         sendId,
         status: 'sent',
@@ -755,6 +806,7 @@ export async function sendEmail(
         workspaceId: input.workspaceId
       })
 
+      await storeEmailReceipt(false, latencyMs, undefined, lastError)
       return {
         sendId,
         status: 'failed',
@@ -767,6 +819,7 @@ export async function sendEmail(
 
   } catch (error) {
     const latencyMs = Date.now() - start
+    await storeEmailReceipt(false, latencyMs, undefined, error)
     // 捕获可能从 checkRateLimit 抛出的 RateLimitExceededError 或者其它配置错误
     return {
       sendId,
