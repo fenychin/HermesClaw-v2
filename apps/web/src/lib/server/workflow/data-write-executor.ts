@@ -127,6 +127,7 @@ export async function executeDataWriteNode(
     workspaceId: ctx.workspaceId ?? 'default',
     automationLevel: 'L2',
     triggeredBy: 'system',
+    workflowRunId: ctx.runId,
     contextSnapshot: {
       nodeId: node.id,
       sourceNode,

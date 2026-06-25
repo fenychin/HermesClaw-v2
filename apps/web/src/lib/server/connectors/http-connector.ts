@@ -1,7 +1,7 @@
 import crypto from "crypto"
 import { ActionReceiptSchema, type ActionReceipt } from "@hermesclaw/event-contracts"
 import { ConnectorLeaseSchema, type ConnectorLease } from "@hermesclaw/event-contracts"
-import { writeAuditLog } from "@/lib/server/audit"
+import { writeAuditLog, createAuditEntry, updateAuditEntry } from "@/lib/server/audit"
 import { actorFromSession } from "@/lib/server/audit"
 import type { AuditRiskLevel } from "@/types"
 import { storeReceipt } from "../receipt-store"
@@ -35,12 +35,12 @@ export async function executeHttpConnector(
   }
   const body = (input.body as Record<string, unknown>) || {};
 
-  // 3. 记录审计日志
+  // 3. 预执行审计（AGENTS.md §3.5 连接器预执行审计约定）
   const actor = await actorFromSession();
   const auditRiskLevel: AuditRiskLevel =
     lease.maxRiskLevel === "critical" ? "high" : (lease.maxRiskLevel as AuditRiskLevel);
 
-  await writeAuditLog({
+  const connectorAudit = await createAuditEntry({
     actor,
     action: "connector.execute",
     targetType: "connector",
@@ -89,6 +89,15 @@ export async function executeHttpConnector(
       message: "Failed to connect to the target host",
     };
   }
+
+  // 4.5 更新预执行审计状态（AGENTS.md §3.5 连接器预执行审计约定）
+  await updateAuditEntry({
+    auditId: connectorAudit.auditId,
+    status: outcome === "success" ? "success" : "failed",
+    detail: outcome === "success"
+      ? `HTTP POST to ${url} completed successfully`
+      : `HTTP POST to ${url} failed: ${errorCode}`
+  });
 
   // 5. 组装 ActionReceipt
   const receipt: ActionReceipt = {

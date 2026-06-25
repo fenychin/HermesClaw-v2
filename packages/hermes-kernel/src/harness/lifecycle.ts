@@ -26,13 +26,33 @@ export interface CanaryMetrics {
 }
 
 export interface CanaryThresholds {
+  /** 工作流成功率基线（用于 shouldPromoteCanary 判定） */
   workflowSuccessRate: number;
+  /** 连接器成功率基线（用于 shouldPromoteCanary 判定） */
   connectorSuccessRate: number;
+  /** 晋级所需最低成功率 (successRate > promotionSuccessRate) */
+  promotionSuccessRate: number;
+  /** 晋级所需最高错误率 (errorRate < promotionErrorRate) */
+  promotionErrorRate: number;
+  /** 自动中止/回滚的错误率红线 (errorRate > abortErrorRate → 紧急中止) */
+  abortErrorRate: number;
+  /** 默认观察窗口时长 (ms)，默认 24h */
+  observationWindowMs: number;
 }
 
+/**
+ * Canary 评估唯一阈值源（AGENTS.md §3.5 Canary 唯一阈值源约定）
+ *
+ * 所有 Canary 晋级/回滚/中止的阈值必须统一派生自此对象。
+ * 严禁在 apps/ 业务侧或 Cron 定时任务中私自硬编码任何数值。
+ */
 export const DEFAULT_CANARY_THRESHOLDS: CanaryThresholds = {
   workflowSuccessRate: 0.8,
   connectorSuccessRate: 0.85,
+  promotionSuccessRate: 0.90,
+  promotionErrorRate: 0.05,
+  abortErrorRate: 0.20,
+  observationWindowMs: 24 * 60 * 60 * 1000, // 86400000 ms
 };
 
 // ==============================

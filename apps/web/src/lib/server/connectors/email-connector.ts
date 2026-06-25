@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/prisma"
-import { writeAuditLog } from "@/lib/server/audit"
+import { writeAuditLog, createAuditEntry, updateAuditEntry } from "@/lib/server/audit"
 import { registerCapability, recordCapabilityUsage } from "../capability-registry"
 import type { Prisma, EmailSendLog } from "@/generated/prisma-v2/client"
 import crypto from "crypto"
@@ -573,7 +573,8 @@ export async function sendEmail(
         targetId: input.leaseToken,
         detail: `Verified and consumed approval checkpoint token ${input.leaseToken} for batch email sending.`,
         riskLevel: 'low',
-        workspaceId: input.workspaceId
+        workspaceId: input.workspaceId,
+        workflowRunId: input.workflowRunId
       })
     } else {
       throw new LeaseTokenValidationError('ConnectorLease token is invalid or expired')
@@ -646,7 +647,8 @@ export async function sendEmail(
         targetId: sendId,
         detail: `Email send failed: Rate limit exceeded for connector ${input.connectorId}.`,
         riskLevel: 'medium',
-        workspaceId: input.workspaceId
+        workspaceId: input.workspaceId,
+        workflowRunId: input.workflowRunId
       })
 
       throw new RateLimitExceededError(input.connectorId, rateCheck.remaining)
@@ -695,7 +697,20 @@ export async function sendEmail(
       }
     })
 
-    // 8. SMTP 发送及退避重试循环
+    // 8. 预执行审计（AGENTS.md §3.5 连接器预执行审计约定）
+    //    在 net.socket.write() 发送前必须预先注册 connector.execute 预审计事件
+    const connectorAudit = await createAuditEntry({
+      actor: input.agentId || 'system',
+      action: 'connector.execute',
+      targetType: 'connector',
+      targetId: input.connectorId,
+      detail: `Email connector executing SMTP send to ${input.to.length} recipient(s)`,
+      riskLevel: input.to.length > 10 ? 'high' : 'medium',
+      workspaceId: input.workspaceId,
+      workflowRunId: input.workflowRunId
+    })
+
+    // 9. SMTP 发送及退避重试循环
     let retryCount = 0
     let success = false
     let messageId = ''
@@ -730,7 +745,7 @@ export async function sendEmail(
     const latencyMs = Date.now() - start
 
     if (success) {
-      // 9. 更新成功日志
+      // 10. 更新成功日志
       await activePrisma.emailSendLog.update({
         where: { id: logRecord.id },
         data: {
@@ -740,7 +755,14 @@ export async function sendEmail(
         }
       })
 
-      // 10. 调用 recordCapabilityUsage (遥测)
+      // 11. 更新预执行审计为 success（AGENTS.md §3.5 连接器预执行审计约定）
+      await updateAuditEntry({
+        auditId: connectorAudit.auditId,
+        status: 'success',
+        detail: `Email sent successfully to ${input.to.map(t => t.address).join(', ')}. MessageId: ${messageId}`
+      })
+
+      // 12. 调用 recordCapabilityUsage (遥测)
       // 永远不 throw，fire-and-forget
       recordCapabilityUsage({
         capabilityId: EMAIL_CONNECTOR_CAPABILITY_ID,
@@ -753,7 +775,7 @@ export async function sendEmail(
         latencyMs
       }, { prisma: activePrisma }).catch(err => console.error('[sendEmail] telemetry failed:', err))
 
-      // 11. 写入 AuditLog
+      // 13. 写入 AuditLog
       await activeWriteAuditLog({
         actor: input.agentId || 'system',
         action: 'email.sent',
@@ -761,7 +783,8 @@ export async function sendEmail(
         targetId: sendId,
         detail: `Email sent successfully to ${input.to.map(t => t.address).join(', ')}. Subject: ${finalSubject}`,
         riskLevel: 'low',
-        workspaceId: input.workspaceId
+        workspaceId: input.workspaceId,
+        workflowRunId: input.workflowRunId
       })
 
       await storeEmailReceipt(true, latencyMs, messageId)
@@ -784,6 +807,13 @@ export async function sendEmail(
         }
       })
 
+      // 更新预执行审计为 failed（AGENTS.md §3.5 连接器预执行审计约定）
+      await updateAuditEntry({
+        auditId: connectorAudit.auditId,
+        status: 'failed',
+        detail: `Email send failed after ${retryCount} attempts. Error: ${lastError?.message || 'SMTP fail'}`
+      })
+
       recordCapabilityUsage({
         capabilityId: EMAIL_CONNECTOR_CAPABILITY_ID,
         capabilityType: 'connector',
@@ -803,7 +833,8 @@ export async function sendEmail(
         targetId: sendId,
         detail: `Email send failed after ${retryCount} attempts. Error: ${lastError?.message || 'SMTP fail'}`,
         riskLevel: 'medium',
-        workspaceId: input.workspaceId
+        workspaceId: input.workspaceId,
+        workflowRunId: input.workflowRunId
       })
 
       await storeEmailReceipt(false, latencyMs, undefined, lastError)

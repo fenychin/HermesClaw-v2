@@ -7,13 +7,22 @@ import { DEFAULT_CANARY_THRESHOLDS } from "@hermesclaw/hermes-kernel"
 
 // ==============================
 // 顶层常量定义
+//
+// AGENTS.md §3.5 Canary 唯一阈值源约定：
+//   所有阈值从 @hermesclaw/hermes-kernel 的 DEFAULT_CANARY_THRESHOLDS 统一派生，
+//   严禁在 apps/ 层面私自硬编码任何数值。
 // ==============================
 
-export const CANARY_PROMOTE_SUCCESS_RATE_THRESHOLD = DEFAULT_CANARY_THRESHOLDS.workflowSuccessRate + 0.10
-export const CANARY_PROMOTE_ERROR_RATE_THRESHOLD = (1 - DEFAULT_CANARY_THRESHOLDS.workflowSuccessRate) / 4
-export const CANARY_ROLLBACK_ERROR_RATE_THRESHOLD = 1 - DEFAULT_CANARY_THRESHOLDS.workflowSuccessRate
-export const DEFAULT_OBSERVATION_WINDOW_MS = 24 * 60 * 60 * 1000  // 默认 24 小时 (86400000ms)
-export const DEFAULT_TRAFFIC_PERCENT = 10  // 默认 10% 灰度流量
+/** 晋级成功率阈值 */
+export const CANARY_PROMOTE_SUCCESS_RATE_THRESHOLD = DEFAULT_CANARY_THRESHOLDS.promotionSuccessRate
+/** 晋级错误率阈值 */
+export const CANARY_PROMOTE_ERROR_RATE_THRESHOLD = DEFAULT_CANARY_THRESHOLDS.promotionErrorRate
+/** 自动回滚错误率红线 */
+export const CANARY_ROLLBACK_ERROR_RATE_THRESHOLD = DEFAULT_CANARY_THRESHOLDS.abortErrorRate
+/** 默认观察窗口 */
+export const DEFAULT_OBSERVATION_WINDOW_MS = DEFAULT_CANARY_THRESHOLDS.observationWindowMs
+/** 默认灰度流量百分比 */
+export const DEFAULT_TRAFFIC_PERCENT = 10
 
 // ==============================
 // 错误类型定义
