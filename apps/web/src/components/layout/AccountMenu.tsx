@@ -360,9 +360,10 @@ export function AccountMenu({ side = "bottom", align = "end", collapsed = false 
       <button 
         ref={ref}
         {...props}
+        title={collapsed ? (session?.user?.name || userEmail.split("@")[0] || "账户") : undefined}
         className={cn(
-          "flex items-center gap-2 p-1.5 rounded-xl bg-[#111111] hover:bg-[#1F1F1F] transition-all duration-150 outline-none select-none cursor-pointer",
-          collapsed ? "w-9 h-9 justify-center p-0" : "max-w-[180px] w-full",
+          "flex items-center rounded-xl bg-[#111111] hover:bg-[#1F1F1F] transition-all duration-150 outline-none select-none cursor-pointer",
+          collapsed ? "w-9 h-9 gap-0 justify-center p-0" : "max-w-[180px] w-full gap-2",
           props.className
         )}
       >

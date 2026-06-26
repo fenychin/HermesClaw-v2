@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
+import { TopBar } from "@/components/layout/TopBar";
 import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
@@ -13,7 +14,8 @@ export default function BrainLayout({ children }: { children: ReactNode }) {
     <div className="bg-background flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto p-8">{children}</main>
+        <TopBar />
+        <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
       <Toaster richColors closeButton position="bottom-right" />
     </div>

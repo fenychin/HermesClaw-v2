@@ -77,6 +77,8 @@ interface CommandBoxProps {
   onStartWizard?: (initialPrompt: string) => void;
   /** 动态输入框 Placeholder */
   placeholder?: string;
+  /** 头部右侧额外渲染的元素（如模式标签） */
+  headerExtra?: React.ReactNode;
 }
 
 /**
@@ -94,6 +96,7 @@ export function CommandBox({
   focusKey,
   onStartWizard,
   placeholder,
+  headerExtra,
 }: CommandBoxProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -582,9 +585,12 @@ export function CommandBox({
       </AnimatePresence>
 
       {/* 顶部提示行 */}
-      <p className="text-muted-foreground text-sm mb-2 select-none">
-        今天要完成什么？
-      </p>
+      <div className="flex items-center justify-between mb-2 select-none">
+        <p className="text-muted-foreground text-sm">
+          今天要完成什么？
+        </p>
+        {headerExtra}
+      </div>
 
       {/* 输入区 */}
       {uploadedFiles.length > 0 && (

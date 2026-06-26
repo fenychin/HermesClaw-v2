@@ -103,6 +103,17 @@ const ALL_NAV = [...mainNav, ...bottomNav];
 function useBreadcrumb() {
   const pathname = usePathname();
 
+  // 优先匹配更具体的智慧大脑二级页面（如智能体、记忆体等）
+  const brainItem = brainNav.find(
+    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+  );
+  if (brainItem) {
+    return [
+      { label: "智慧大脑", href: "/brain/memory" },
+      { label: brainItem.label, href: brainItem.href },
+    ];
+  }
+
   // 精确匹配主导航（含底部导航）
   const mainItem = ALL_NAV.find(
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
@@ -111,22 +122,9 @@ function useBreadcrumb() {
     return [{ label: mainItem.label, href: mainItem.href }];
   }
 
-  // 智慧大脑二级
-  const brainItem = brainNav.find(
-    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
-  );
-  if (brainItem) {
-    return [
-      { label: "智慧大脑", href: "/brain" },
-      { label: brainItem.label, href: brainItem.href },
-    ];
-  }
-
   // 兜底
   return [{ label: "工作台", href: "/" }];
 }
-
-// ============================================================
 // 子组件 1：Breadcrumb
 // 唯一订阅源：useBreadcrumb()（内含 usePathname()）
 // 路由切换时只有此组件重渲染，其余子组件不受影响
@@ -138,7 +136,7 @@ const Breadcrumb = memo(function Breadcrumb() {
   return (
     <nav className="flex items-center gap-1.5 text-sm">
       {breadcrumb.map((crumb, i) => (
-        <span key={crumb.href} className="flex items-center gap-1.5">
+        <span key={`${crumb.href}-${i}`} className="flex items-center gap-1.5">
           {i > 0 && (
             <ChevronRight className="text-hint size-3.5 shrink-0" />
           )}

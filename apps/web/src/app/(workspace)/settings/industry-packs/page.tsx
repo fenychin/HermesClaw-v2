@@ -555,13 +555,13 @@ export default function IndustryPacksPage() {
 
   return (
     <PageTransition>
-      <div className="p-6 max-w-5xl mx-auto space-y-6 pb-12">
+      <div className="p-6 max-w-7xl mx-auto space-y-6 pb-12">
         <PageHeader
-          title="行业包管理"
+          title="行业包"
           description="安装、激活与卸载 Industry Pack，每个行业包包含能力组件、工作流模板与连接器映射"
           breadcrumb={[
-            { label: "系统设置", href: "/settings" },
-            { label: "行业包管理" },
+            { label: "智慧大脑", href: "/brain/memory" },
+            { label: "行业包" },
           ]}
           actions={
             <button

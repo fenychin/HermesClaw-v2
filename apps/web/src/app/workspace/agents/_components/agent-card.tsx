@@ -289,13 +289,13 @@ export const AgentCard = memo(function AgentCard({
       )}
     >
       {/* 顶部：头像 + 基础信息 + 状态 */}
-      <div className="flex justify-between items-start">
-        <div className="flex items-center gap-3">
+      <div className="flex justify-between items-start gap-4">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="relative flex-shrink-0">
             <div
               className={cn(
                 "w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-bold",
-                "bg-primary/20 text-primary",
+                "bg-accent text-accent-foreground",
               )}
             >
               {initial}
@@ -329,7 +329,7 @@ export const AgentCard = memo(function AgentCard({
               )}
               <AutomationLevelBadge level={automationLevel} />
             </div>
-            <span className="text-muted-foreground text-xs mt-0.5">{role}</span>
+            <span className="text-muted-foreground text-xs mt-0.5 truncate">{role}</span>
           </div>
         </div>
 
@@ -347,7 +347,7 @@ export const AgentCard = memo(function AgentCard({
         {tags.map((tag) => (
           <span
             key={tag}
-            className="bg-primary/10 text-primary rounded-lg px-2 py-0.5 text-xs"
+            className="bg-muted/50 text-muted-foreground rounded-lg px-2 py-0.5 text-xs"
           >
             {tag}
           </span>

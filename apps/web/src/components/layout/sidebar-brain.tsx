@@ -106,6 +106,7 @@ export const SidebarBrain = memo(function SidebarBrain({
             {brainNav.map((child) => {
               const ChildIcon = child.icon;
               const isChildActive = pathname === child.href || pathname.startsWith(`${child.href}/`);
+              const isAgents = child.href === "/workspace/agents";
               return (
                 <Link
                   key={child.href}
@@ -113,19 +114,26 @@ export const SidebarBrain = memo(function SidebarBrain({
                   onPointerEnter={() => prewarm(child.href)}
                   onFocus={() => prewarm(child.href)}
                   className={cn(
-                    "flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-colors",
+                    "flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-colors relative group/item",
                     isChildActive
                       ? "bg-accent/80 text-foreground font-semibold"
                       : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+                    isAgents && !isChildActive && "text-foreground/90 font-medium"
                   )}
                 >
                   <ChildIcon
                     className={cn(
-                      "size-3.5 shrink-0",
-                      isChildActive ? "text-[#6D5EF9]" : "text-muted-foreground",
+                      "size-3.5 shrink-0 transition-transform duration-200 group-hover/item:scale-110",
+                      isChildActive || isAgents ? "text-[#6D5EF9]" : "text-muted-foreground",
+                      isAgents && "animate-pulse"
                     )}
                   />
                   <span className="truncate flex-1 text-left">{child.label}</span>
+                  {isAgents && (
+                    <span className="text-[9px] font-semibold text-primary bg-primary/10 border border-primary/20 rounded px-1.5 py-0.2 scale-90 origin-right select-none shadow-sm shadow-primary/5">
+                      CORE
+                    </span>
+                  )}
                 </Link>
               );
             })}

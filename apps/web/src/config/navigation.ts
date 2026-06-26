@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Users,
   Gift,
+  Bot,
 } from "lucide-react";
 
 /** 单个导航项 */
@@ -91,6 +92,7 @@ export const bottomNav: NavItem[] = [
 
 /** 智慧大脑二级导航（PRD 9.2） */
 export const brainNav: NavItem[] = [
+  { href: "/workspace/agents", label: "智能体", icon: Bot, description: "自演化数字员工与智能体库" },
   { href: "/brain/memory", label: "记忆体", icon: Database, description: "短/中/长期三级记忆体统一控制面" },
   { href: "/brain/skills", label: "技能 Skill", icon: Puzzle, description: "行业 / 岗位 / 自定义技能与版本管理" },
   { href: "/brain/connectors", label: "连接器 MCP", icon: Plug, description: "邮箱、CRM、ERP 等连接器授权" },

@@ -175,12 +175,12 @@ export default function SkillsPage() {
 
   return (
     <PageTransition>
-      <div className="space-y-6">
+      <div className="w-full max-w-7xl mx-auto py-6 px-6 space-y-6">
         <PageHeader
           title="技能库"
           description="行业 / 岗位 / 自定义技能，版本化、可测试、可绑定至智能体"
+          breadcrumb={[{ label: "智慧大脑", href: "/brain/memory" }, { label: "技能 Skill" }]}
         />
-        {/* 搜索栏 + 来源 Tab + 创建入口 */}
         <div className="flex items-center gap-4">
           {/* 搜索 */}
           <div className="relative flex-1 max-w-sm">

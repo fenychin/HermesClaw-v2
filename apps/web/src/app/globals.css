@@ -24,7 +24,7 @@
   --secondary: #202024;            /* 次级按钮 */
   --secondary-foreground: #c4c4c6;
   --muted: #18181b;
-  --muted-foreground: #a1a1aa;     /* 二级文字 */
+  --muted-foreground: #52525b;     /* 二级文字 */
   --accent: #24242a;               /* hover 背景 */
   --accent-foreground: #c4c4c6;
   --destructive: #ff6b6b;          /* 风险色 */
@@ -59,7 +59,7 @@
   --sidebar-ring: #7c5cff;
 
   /* —— HermesClaw 自定义品牌色（shadcn 无对应语义 token）—— */
-  --hint: #71717a;                 /* 弱提示文字 */
+  --hint: #52525b;                 /* 弱提示文字 */
   --brand: #7c5cff;                /* 品牌主色（别名） */
   --brand-primary: #7c5cff;        /* 品牌主色（全局命令面板/Toast 引用） */
   --brand-blue: #4da3ff;           /* 品牌辅助蓝 */

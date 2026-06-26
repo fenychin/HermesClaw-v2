@@ -32,14 +32,14 @@ export const SidebarNavItem = memo(function SidebarNavItem({
   return (
     <Link
       href={item.href}
-      title={item.description ?? item.label}
+      title={collapsed ? item.label : (item.description ?? item.label)}
       onPointerEnter={prewarm}
       onFocus={prewarm}
       className={cn(
-        "flex items-center gap-3 rounded-xl px-3 h-10 text-sm font-medium transition-all duration-150",
+        "flex items-center rounded-xl px-3 h-10 text-sm font-medium transition-all duration-150",
         "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
         isActive && "bg-accent text-foreground",
-        collapsed && "justify-center px-0",
+        collapsed ? "gap-0 justify-center px-0" : "gap-3",
       )}
     >
       <Icon className="size-[18px] shrink-0" />

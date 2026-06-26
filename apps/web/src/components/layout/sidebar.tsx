@@ -58,15 +58,23 @@ export function Sidebar() {
     const set = new Set<string>();
     [...mainNav, ...bottomNav].forEach((item) => {
       if (item.href === "/workspace/chat") {
-        if (pathname.startsWith("/workspace/")) {
+        if (pathname.startsWith("/workspace/") && !pathname.startsWith("/workspace/agents")) {
           set.add(item.href);
         }
       } else if (item.href === "/brain/memory") {
-        if (pathname.startsWith("/brain/")) {
+        if (
+          pathname.startsWith("/brain/") ||
+          pathname.startsWith("/workspace/agents") ||
+          pathname.startsWith("/settings/industry-packs")
+        ) {
           set.add(item.href);
         }
       } else if (item.href === "/files") {
         if (pathname === "/files" || pathname.startsWith("/files/") || pathname.startsWith("/knowledge/")) {
+          set.add(item.href);
+        }
+      } else if (item.href === "/settings") {
+        if (pathname.startsWith("/settings") && !pathname.startsWith("/settings/industry-packs")) {
           set.add(item.href);
         }
       } else if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
@@ -190,7 +198,7 @@ export function Sidebar() {
         })()}
 
         {/* 2. 账号菜单向上展开 (替代原有的设置与升级套餐卡片，避免功能重复) */}
-        <div className="pt-2 px-1">
+        <div className={cn("pt-2", sidebarCollapsed ? "px-0" : "px-1")}>
           <AccountMenu side="top" align="start" collapsed={sidebarCollapsed} />
         </div>
       </div>

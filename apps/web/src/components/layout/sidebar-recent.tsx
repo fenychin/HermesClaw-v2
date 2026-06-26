@@ -54,87 +54,97 @@ export const SidebarRecent = memo(function SidebarRecent({
   }, []);
 
   return (
-    <div>
-      {/* 触发行：图标 + 文字 + 下拉箭头 */}
-      <button
-        type="button"
-        onClick={toggleExpanded}
-        className={cn(
-          "w-full flex items-center gap-3 rounded-xl px-3 h-10 text-sm font-medium transition-all duration-150",
-          "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-          isActive && "bg-accent text-foreground",
-          collapsed && "justify-center px-0",
-        )}
-        title={collapsed ? "最近" : undefined}
-      >
-        <Clock className="size-[18px] shrink-0" />
-        <span
+    <div className="w-full">
+      {collapsed ? (
+        /* 折叠态：独立居中图标链接，避免隐藏 span 干扰布局 */
+        <Link
+          href="/recent"
           className={cn(
-            "truncate flex-1 text-left transition-all duration-150 ease-in-out inline-block",
-            collapsed ? "opacity-0 w-0" : "opacity-100 w-auto",
+            "w-full h-10 flex items-center justify-center rounded-xl transition-all duration-150",
+            isActive
+              ? "bg-accent text-foreground"
+              : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
           )}
+          title="最近"
         >
-          最近
-        </span>
-        <span
-          className={cn(
-            "shrink-0 overflow-hidden transition-all duration-150 ease-out",
-            collapsed ? "opacity-0 w-0" : "opacity-100 w-auto",
-            effectiveExpanded && "rotate-180",
-          )}
-        >
-          <ChevronDown className="size-3.5" />
-        </span>
-      </button>
+          <Clock className="size-[18px] shrink-0" />
+        </Link>
+      ) : (
+        <>
+          {/* 展开态触发行 */}
+          <button
+            type="button"
+            onClick={toggleExpanded}
+            className={cn(
+              "w-full flex items-center gap-3 rounded-xl px-3 h-10 text-sm font-medium transition-all duration-150 select-none cursor-pointer",
+              "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+              isActive && "bg-accent text-foreground",
+            )}
+          >
+            <Clock className="size-[18px] shrink-0" />
+            <span className="truncate flex-1 text-left">最近</span>
+            <span
+              className={cn(
+                "shrink-0 flex items-center justify-center text-muted-foreground/60 transition-transform duration-150 ease-out",
+                effectiveExpanded && "rotate-180",
+              )}
+            >
+              <ChevronDown className="size-3.5" />
+            </span>
+          </button>
 
-      {/* 展开区域（仅非折叠态可展开） */}
-      <div
-        className={cn(
-          "grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out",
-          effectiveExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
-        )}
-      >
-        <div className="min-h-0">
-          <div className="mt-1 ml-1 space-y-0.5 pr-2">
-            {recentRecords.map((record) => {
-              const linkHref = `/new?load=${record.id}`;
-              return (
-                <Link
-                  key={record.id}
-                  href={linkHref}
-                  prefetch={false}
-                  className={cn(
-                    "flex items-center gap-2 px-2 py-1.5 rounded-md",
-                    "hover:bg-sidebar-accent transition-colors",
-                  )}
-                >
-                  <span className="text-sidebar-foreground text-xs truncate flex-1">
-                    {record.title}
-                  </span>
-                  <RelativeTime
-                    value={record.timestamp}
-                    className="text-hint text-[10px] shrink-0"
-                  />
-                </Link>
-              );
-            })}
+          {/* 可折叠内容区 */}
+          <div
+            className={cn(
+              "grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out",
+              effectiveExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+            )}
+          >
+            <div className="min-h-0">
+              <div className="mt-1 ml-1 space-y-0.5 pr-2">
+                {recentRecords.map((record) => {
+                  const linkHref = `/new?load=${record.id}`;
+                  return (
+                    <Link
+                      key={record.id}
+                      href={linkHref}
+                      prefetch={false}
+                      className={cn(
+                        "flex items-center gap-2 px-2 py-1.5 rounded-md",
+                        "hover:bg-sidebar-accent transition-colors",
+                      )}
+                    >
+                      <span className="text-sidebar-foreground text-xs truncate flex-1">
+                        {record.title}
+                      </span>
+                      <RelativeTime
+                        value={record.timestamp}
+                        className="text-hint text-[10px] shrink-0"
+                      />
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
 
-            {/* 查看全部 */}
+          {/* 查看全部：展开态始终可见，移出折叠 grid */}
+          {effectiveExpanded && (
             <Link
               href="/recent"
               prefetch={false}
               className={cn(
-                "flex items-center justify-center gap-1 py-1.5 mt-1",
+                "flex items-center justify-center gap-1 px-3 py-1.5 mt-0.5 rounded-xl",
                 "text-hint hover:text-sidebar-foreground text-[11px]",
-                "hover:bg-sidebar-accent rounded-md transition-colors",
+                "hover:bg-accent/50 transition-colors",
               )}
             >
               <span>查看全部</span>
               <ArrowRight className="size-3" />
             </Link>
-          </div>
-        </div>
-      </div>
+          )}
+        </>
+      )}
     </div>
   );
 });

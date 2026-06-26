@@ -55,7 +55,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium shrink-0 whitespace-nowrap",
         /* 运行中：绿色背景 + 脉冲绿点 */
         status === "running" && "bg-success/10 text-success",
         /* 空闲：灰色 */

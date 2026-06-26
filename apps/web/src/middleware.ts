@@ -16,7 +16,7 @@ const SKIP_PREFIXES = [
   "/_next/",
   "/static/",
   "/favicon.ico",
-  "/api/auth/",
+  "/api/auth",
   "/api/health",
 ];
 

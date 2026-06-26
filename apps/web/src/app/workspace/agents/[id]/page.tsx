@@ -81,10 +81,10 @@ const LEVEL_ICON: Record<string, React.ComponentType<{ className?: string }>> = 
   L1: Zap, L2: CheckCircle2, L3: AlertTriangle, L4: Shield,
 };
 const LEVEL_COLOR_MAP: Record<string, { color: string; bgClass: string; textClass: string; borderClass: string }> = {
-  L1: { color: "success", bgClass: "bg-success/10", textClass: "text-success", borderClass: "border-success/20" },
-  L2: { color: "brand-blue", bgClass: "bg-brand-blue/10", textClass: "text-brand-blue", borderClass: "border-brand-blue/20" },
-  L3: { color: "warning", bgClass: "bg-warning/10", textClass: "text-warning", borderClass: "border-warning/20" },
-  L4: { color: "danger", bgClass: "bg-danger/10", textClass: "text-danger", borderClass: "border-danger/20" },
+  L1: { color: "muted", bgClass: "bg-muted/50", textClass: "text-muted-foreground", borderClass: "border-border" },
+  L2: { color: "muted", bgClass: "bg-muted/50", textClass: "text-muted-foreground", borderClass: "border-border" },
+  L3: { color: "muted", bgClass: "bg-muted/50", textClass: "text-muted-foreground", borderClass: "border-border" },
+  L4: { color: "muted", bgClass: "bg-muted/50", textClass: "text-muted-foreground", borderClass: "border-border" },
 };
 const LEVEL_EXAMPLES: Record<string, string> = {
   L1: "询盘分拣、资料整理、日程提醒等无副作用的读操作与分类任务",
@@ -348,7 +348,7 @@ export default function AgentDetailPage() {
   if (agentLoading) {
     return (
       <PageTransition>
-        <div className="p-6 space-y-6">
+        <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
           <div className="bg-card border border-border rounded-2xl p-5">
             <div className="flex items-center gap-4">
               <div className="size-15 shrink-0 rounded-full animate-pulse bg-accent" />
@@ -380,7 +380,7 @@ export default function AgentDetailPage() {
   if (agentError || !agent) {
     return (
       <PageTransition>
-        <div className="p-6 flex items-center justify-center min-h-[60vh]">
+        <div className="w-full max-w-7xl mx-auto p-6 flex items-center justify-center min-h-[60vh]">
           <EmptyState
             icon={AlertTriangle}
             title="智能体不存在"
@@ -407,7 +407,7 @@ export default function AgentDetailPage() {
 
   return (
     <PageTransition>
-      <div className="p-6 space-y-6">
+      <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
         {/* mock 数据提示 */}
         {isMock && (
           <div className="border-brand-blue/20 bg-brand-blue/5 flex items-center gap-2 rounded-xl border px-4 py-2.5">
@@ -423,8 +423,8 @@ export default function AgentDetailPage() {
           <div className="flex items-start gap-4">
             <div
               className={cn(
-                "flex size-15 shrink-0 items-center justify-center rounded-full bg-linear-to-br text-xl font-bold text-white",
-                getGradient(agent.id),
+                "flex size-15 shrink-0 items-center justify-center rounded-2xl text-xl font-bold",
+                "bg-accent text-accent-foreground",
               )}
             >
               {initial}

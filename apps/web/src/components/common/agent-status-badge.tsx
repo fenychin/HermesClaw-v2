@@ -94,7 +94,7 @@ export function AgentStatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
+        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium shrink-0 whitespace-nowrap",
         colorClass === "text-warning" && "bg-warning/10",
         colorClass === "text-success" && "bg-success/10",
         colorClass === "text-danger" && "bg-danger/10",
@@ -137,7 +137,7 @@ export function AgentSSERawStatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
+        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium shrink-0 whitespace-nowrap",
         colorClass === "text-warning" && "bg-warning/10",
         colorClass === "text-success" && "bg-success/10",
         colorClass === "text-danger" && "bg-danger/10",
@@ -164,25 +164,25 @@ export const AUTOMATION_LEVEL_META: Record<
   L1: {
     label: "全自动执行",
     short: "L1",
-    className: "bg-success/10 text-success border-success/20",
+    className: "bg-muted/50 text-muted-foreground border-border",
     desc: "无需审批，直接执行",
   },
   L2: {
     label: "建议执行",
     short: "L2",
-    className: "bg-brand-blue/10 text-brand-blue border-brand-blue/20",
+    className: "bg-muted/50 text-muted-foreground border-border",
     desc: "可自动执行，系统留痕可审查",
   },
   L3: {
     label: "需人工确认",
     short: "L3",
-    className: "bg-warning/10 text-warning border-warning/20",
+    className: "bg-muted/50 text-muted-foreground border-border",
     desc: "高风险操作需人工二次确认",
   },
   L4: {
     label: "绝对禁止自动",
     short: "L4",
-    className: "bg-danger/10 text-danger border-danger/20",
+    className: "bg-muted/50 text-muted-foreground border-border",
     desc: "永不自动执行，须人工发起",
   },
 };

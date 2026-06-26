@@ -726,46 +726,6 @@ ${cannotDoText}
           >
             <>
               <div className="w-full max-w-2xl mx-auto">
-                {/* 行业属性提醒标记 (CommandBox右上角) */}
-                <div className="w-full flex justify-between items-center mb-1.5 px-1 select-none">
-                  <div>{/* 左侧可留空以撑开 */}</div>
-                  <AnimatePresence mode="wait">
-                    {activePacks.length === 0 ? (
-                      <motion.div
-                        key="global-mode"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="inline-flex items-center rounded-full bg-muted/40 border border-border/50 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 select-none"
-                      >
-                        通用模式
-                      </motion.div>
-                    ) : activePacks.length === 1 ? (
-                      <motion.div
-                        key="industry-mode"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="inline-flex items-center rounded-full bg-muted/40 border border-border/50 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 select-none"
-                      >
-                        {(activePacks[0].packName || '外贸').replace(/行业包$|包$|行业$/, "")}模式
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="conflict-mode"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="inline-flex items-center rounded-full bg-muted/40 border border-border/50 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 select-none cursor-pointer hover:bg-muted/60 transition-colors"
-                        onClick={() => router.push('/settings/industry-packs')}
-                        title="点击去暂停冲突行业包"
-                      >
-                        行业冲突
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
                 {/* Onboarding 横幅 */}
                 {!hasMessages && hasNoPacks && (
                   <div className="w-full mb-4 p-3.5 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-between text-xs text-foreground select-none">
@@ -791,6 +751,43 @@ ${cannotDoText}
                   error={error}
                   placeholder={placeholderText}
                   onStartWizard={!hasMessages ? handleStartWizard : undefined}
+                  headerExtra={
+                    <AnimatePresence mode="wait">
+                      {activePacks.length === 0 ? (
+                        <motion.div
+                          key="global-mode"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="inline-flex items-center rounded-full bg-muted/40 border border-border/50 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 select-none"
+                        >
+                          通用模式
+                        </motion.div>
+                      ) : activePacks.length === 1 ? (
+                        <motion.div
+                          key="industry-mode"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="inline-flex items-center rounded-full bg-muted/40 border border-border/50 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 select-none"
+                        >
+                          {(activePacks[0].packName || '外贸').replace(/行业包$|包$|行业$/, "")}模式
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="conflict-mode"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="inline-flex items-center rounded-full bg-muted/40 border border-border/50 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 select-none cursor-pointer hover:bg-muted/60 transition-colors"
+                          onClick={() => router.push('/settings/industry-packs')}
+                          title="点击去暂停冲突行业包"
+                        >
+                          行业冲突
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  }
                 />
               </div>
 
