@@ -49,6 +49,11 @@ export function ConnectorCard({
               <span className="bg-accent text-muted-foreground shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">
                 {CATEGORY_LABEL[connector.category]}
               </span>
+              {connector.packId && (
+                <span className="bg-brand/10 text-brand shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium">
+                  {connector.packId}
+                </span>
+              )}
               
               {/* 授权范围小标签 */}
               {connector.authScope && (

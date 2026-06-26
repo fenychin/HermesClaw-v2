@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import {
   Puzzle,
   Circle,
@@ -21,18 +22,7 @@ import { apiClient } from "@/lib/api-client";
 import type { Skill, SkillSource } from "@/types";
 import { cn } from "@/lib/utils";
 
-/** 技能分类定义 */
-interface SkillCategory {
-  key: string;
-  label: string;
-  sourceFilter: SkillSource[];
-}
 
-const CATEGORIES: SkillCategory[] = [
-  { key: "trade", label: "外贸技能", sourceFilter: ["builtin"] },
-  { key: "general", label: "通用技能", sourceFilter: ["industry-template"] },
-  { key: "custom", label: "自定义技能", sourceFilter: ["custom"] },
-];
 
 /** 来源中文 */
 const SOURCE_LABEL: Record<SkillSource, string> = {
@@ -141,8 +131,8 @@ function SkillDetail({ skill }: { skill: Skill }) {
       {/* 标题行 */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1.5">
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-foreground text-lg font-semibold">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-foreground text-lg font-semibold mr-1.5">
               {skill.name}
             </h2>
             <AutomationLevelBadge level={skill.automationLevel} />
@@ -152,14 +142,49 @@ function SkillDetail({ skill }: { skill: Skill }) {
             <span className="bg-accent text-muted-foreground rounded-md px-2 py-0.5 text-[10px]">
               {SOURCE_LABEL[skill.source]}
             </span>
+            {skill.source === "industry-template" && (
+              <>
+                <span className="bg-accent/60 text-muted-foreground rounded-md px-2 py-0.5 text-[10px]">
+                  来源包: {(skill as any).packId || "foreign-trade"}
+                </span>
+                {(() => {
+                  const health = (skill as any).healthStatus || "healthy";
+                  if (health === "healthy") {
+                    return <span className="inline-flex items-center gap-1 rounded-full border border-success/20 bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">已验证</span>;
+                  } else if (health === "degraded") {
+                    return <span className="inline-flex items-center gap-1 rounded-full border border-warning/20 bg-warning/10 px-2 py-0.5 text-[10px] font-semibold text-warning">性能下降</span>;
+                  } else {
+                    return <span className="inline-flex items-center gap-1 rounded-full border border-danger/20 bg-danger/10 px-2 py-0.5 text-[10px] font-semibold text-danger">不可用</span>;
+                  }
+                })()}
+              </>
+            )}
             <StatusBadge
               status={skill.status === "active" ? "running" : skill.status === "inactive" ? "idle" : "paused"}
             />
           </div>
         </div>
 
-        {/* 启用/停用开关 */}
+        {/* 启用/停用开关与自定义操作 */}
         <div className="flex shrink-0 items-center gap-2">
+          {skill.source === "custom" && (
+            <div className="flex gap-2 mr-2">
+              <button
+                type="button"
+                onClick={() => alert("编辑自建技能功能已就绪（Phase 2 MVP 占位）")}
+                className="text-xs border border-border hover:bg-accent rounded-lg px-2.5 py-1.5 transition-colors font-medium text-muted-foreground hover:text-foreground"
+              >
+                编辑
+              </button>
+              <button
+                type="button"
+                onClick={() => alert("删除自建技能功能已就绪（Phase 2 MVP 占位）")}
+                className="text-xs border border-danger/20 text-danger hover:bg-danger/5 rounded-lg px-2.5 py-1.5 transition-colors font-medium"
+              >
+                删除
+              </button>
+            </div>
+          )}
           <span className="text-muted-foreground text-xs">
             {skill.status === "active" ? "已启用" : "已停用"}
           </span>
@@ -298,6 +323,17 @@ function SkillDetail({ skill }: { skill: Skill }) {
           </div>
         )}
       </div>
+
+      {skill.source === "industry-template" && (
+        <div className="pt-4 border-t border-border flex justify-end">
+          <Link
+            href="/settings/industry-packs"
+            className="text-brand hover:underline text-xs flex items-center gap-1 font-medium"
+          >
+            管理行业包 →
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
@@ -333,25 +369,24 @@ export default function SkillsPage() {
 
       {/* 双栏布局 */}
       <div className="flex gap-6">
-        {/* 左侧：分类树 + 技能列表 */}
-        <div className="w-64 shrink-0 space-y-4">
-          {CATEGORIES.map((cat) => {
-            const catSkills = skills.filter((s) =>
-              cat.sourceFilter.includes(s.source)
-            );
-            if (catSkills.length === 0) return null;
-
-            return (
-              <div key={cat.key}>
-                <div className="text-muted-foreground mb-1.5 flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-wide">
-                  <ChevronRight className="size-3" />
-                  {cat.label}
-                  <span className="text-hint ml-auto text-[10px]">
-                    {catSkills.length}
-                  </span>
-                </div>
+        {/* 左侧：双分区列表 */}
+        <div className="w-64 shrink-0 space-y-6">
+          {/* Section A: 内置与自建技能 */}
+          <div className="space-y-3">
+            <div className="text-muted-foreground px-1 text-[10px] font-bold uppercase tracking-wider border-b border-border/40 pb-1.5 flex items-center justify-between">
+              <span>系统内置 & 自建技能</span>
+              <span className="text-hint font-mono text-[9px]">
+                {skills.filter(s => s.source === "builtin" || s.source === "custom").length}
+              </span>
+            </div>
+            {(() => {
+              const secASkills = skills.filter(s => s.source === "builtin" || s.source === "custom");
+              if (secASkills.length === 0) {
+                return <div className="text-hint text-[11px] px-1 py-1 italic">暂无内置或自建技能</div>;
+              }
+              return (
                 <div className="space-y-0.5">
-                  {catSkills.map((skill) => (
+                  {secASkills.map((skill) => (
                     <SkillListItem
                       key={skill.id}
                       skill={skill}
@@ -360,9 +395,37 @@ export default function SkillsPage() {
                     />
                   ))}
                 </div>
-              </div>
-            );
-          })}
+              );
+            })()}
+          </div>
+
+          {/* Section B: 外部安装技能 */}
+          <div className="space-y-3">
+            <div className="text-muted-foreground px-1 text-[10px] font-bold uppercase tracking-wider border-b border-border/40 pb-1.5 flex items-center justify-between">
+              <span>外部安装技能</span>
+              <span className="text-hint font-mono text-[9px]">
+                {skills.filter(s => s.source === "industry-template").length}
+              </span>
+            </div>
+            {(() => {
+              const secBSkills = skills.filter(s => s.source === "industry-template");
+              if (secBSkills.length === 0) {
+                return <div className="text-hint text-[11px] px-1 py-1 italic">暂无外部安装技能</div>;
+              }
+              return (
+                <div className="space-y-0.5">
+                  {secBSkills.map((skill) => (
+                    <SkillListItem
+                      key={skill.id}
+                      skill={skill}
+                      isActive={effectiveId === skill.id}
+                      onClick={() => setSelectedId(skill.id)}
+                    />
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
         </div>
 
         {/* 右侧：技能详情 */}

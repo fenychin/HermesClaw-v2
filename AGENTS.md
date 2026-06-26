@@ -494,6 +494,7 @@ Harness Runtime 至少由以下对象组成：
 - 脑中枢的所有数据必须通过独立的 `api/brain/*` 管道获取，不复用 `workspace.ts` 等会话专属接口。
 - `/brain` 页面中不得展示任何 `ExecutionEvent` 任务轨迹或 WebSocket 会话流，保障三域边界的只读演化属性。
 - 必须通过专门的自动化测试 `store-boundaries.test.ts` 进行集成守卫，检测违反 store 导入或 payload 携带受限字段的行为。
+- **备注**：语音、图像、视频已迁至 `/knowledge/media/`，Brain 边界保持纯 Harness 治理（记忆体/技能/连接器）。
 
 ---
 

@@ -19,4 +19,5 @@ export interface Connector {
   failureCount?: number
   authScope?: 'readonly' | 'readwrite'
   configStatus?: 'connected' | 'error' | 'pending_config'
+  packId?: string
 }

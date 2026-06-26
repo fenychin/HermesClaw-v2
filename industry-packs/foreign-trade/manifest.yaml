@@ -3,12 +3,16 @@
 packId: foreign-trade
 id: foreign-trade
 name: 外贸行业包
-version: 1.0.0
+version: 1.1.0
 industry: foreign-trade
 description: 外贸行业数字化协同操作系统行业包，提供外贸专属智能体模板及询盘跟进工作流。
 author: HermesClaw Team
-compatibleHermesApi: ">=0.12.0"
-compatibleRuntimeApi: ">=0.12.0"
+compatibleHermesApi:
+  min: "0.12.0"
+  max: "4.0.0"
+compatibleRuntimeApi:
+  min: "0.12.0"
+  max: "4.0.0"
 directories:
   agents: true
   workflows: true
@@ -68,4 +72,14 @@ status: active
 createdAt: "2026-06-15T00:00:00Z"
 updatedAt: "2026-06-18T00:00:00Z"
 version_field: "1.0.0"
-migrationRules: []
+migrationRules:
+  - fromVersion: "0.9.0"
+    toVersion: "1.0.0"
+    description: "初始化外贸行业包"
+    breaking: false
+    rollbackStrategy: "无需回滚"
+  - fromVersion: "1.0.0"
+    toVersion: "1.1.0"
+    description: "升级外贸行业包能力组件至 v1.1.0，增加自进化报价及多语言跟进"
+    breaking: false
+    rollbackStrategy: "自动弃用旧版本注册记录"

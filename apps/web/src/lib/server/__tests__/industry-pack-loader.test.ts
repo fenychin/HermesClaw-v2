@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import {
   installPack,
   uninstallPack,
+  activatePack,
   satisfiesSemver,
   PackManifestInvalidError,
   PackAlreadyInstalledError,
@@ -14,6 +15,10 @@ import { validateManifest } from "@hermesclaw/event-contracts"
 import { CapabilityAlreadyRegisteredError } from "../capability-registry"
 import { prisma } from "@/lib/prisma"
 
+vi.mock("@hermesclaw/industry-pack-sdk", () => ({
+  validateIndustryPackCompatibility: vi.fn().mockReturnValue({ passed: true }),
+}))
+
 vi.mock("../capability-registry", () => {
   class CapabilityAlreadyRegisteredError extends Error {
     constructor(capabilityId: string, version: string) {
@@ -24,13 +29,20 @@ vi.mock("../capability-registry", () => {
   return {
     CapabilityAlreadyRegisteredError,
     registerCapability: vi.fn(),
-    deprecateCapability: vi.fn()
+    deprecateCapability: vi.fn(),
+    reactivateCapability: vi.fn()
   }
 })
+
+
+const mockCreateAuditEntry = vi.fn().mockResolvedValue({ auditId: "audit-1", ok: true })
+const mockUpdateAuditEntry = vi.fn().mockResolvedValue(undefined)
 
 vi.mock("../audit", () => ({
   writeAuditLog: (...args: any[]) => mockWriteAuditLog(...args),
   actorFromSession: () => Promise.resolve("system"),
+  createAuditEntry: (...args: any[]) => mockCreateAuditEntry(...args),
+  updateAuditEntry: (...args: any[]) => mockUpdateAuditEntry(...args),
 }))
 
 // Mock prisma methods
@@ -40,6 +52,7 @@ const mockCreate = vi.fn()
 const mockUpdate = vi.fn()
 const mockCount = vi.fn()
 const mockFindUnique = vi.fn()
+const mockUpdateMany = vi.fn().mockResolvedValue({ count: 1 })
 
 vi.mock("@/lib/prisma", () => {
   const mockPrisma = {
@@ -49,6 +62,7 @@ vi.mock("@/lib/prisma", () => {
       create: (...args: any[]) => mockCreate(...args),
       update: (...args: any[]) => mockUpdate(...args),
       count: (...args: any[]) => mockCount(...args),
+      updateMany: (...args: any[]) => mockUpdateMany(...args),
     },
     skill: {
       findUnique: (...args: any[]) => mockFindUnique(...args),
@@ -75,6 +89,7 @@ vi.mock("@/lib/prisma", () => {
 const mockWriteAuditLog = vi.fn()
 const mockRegisterCapability = vi.fn()
 const mockDeprecateCapability = vi.fn()
+const mockReactivateCapability = vi.fn()
 const mockGetSystemVersion = vi.fn().mockReturnValue("1.0.0")
 
 const testDeps = {
@@ -82,7 +97,8 @@ const testDeps = {
   writeAuditLog: mockWriteAuditLog,
   getSystemVersion: mockGetSystemVersion,
   registerCapability: mockRegisterCapability,
-  deprecateCapability: mockDeprecateCapability
+  deprecateCapability: mockDeprecateCapability,
+  reactivateCapability: mockReactivateCapability
 }
 
 const validManifest = {
@@ -194,9 +210,15 @@ describe("Industry Pack Loader Service Tests", () => {
           })
         })
       )
-      expect(mockWriteAuditLog).toHaveBeenCalledWith(
+      expect(mockCreateAuditEntry).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: "pack.installed"
+          action: "pack.install.started"
+        })
+      )
+      expect(mockUpdateAuditEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          auditId: "audit-1",
+          status: "success"
         })
       )
     })
@@ -262,9 +284,9 @@ describe("Industry Pack Loader Service Tests", () => {
         "Database drop"
       )
 
-      // 验证是否调用了回滚（回滚了 skill-1）
+      // 验证是否调用了回滚（回滚了 ws-1:skill-1）
       expect(mockDeprecateCapability).toHaveBeenCalledWith(
-        "skill-1",
+        "ws-1:skill-1",
         "1.0.0",
         expect.any(String),
         "admin",
@@ -302,7 +324,7 @@ describe("Industry Pack Loader Service Tests", () => {
       expect(mockWriteAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({
           action: "pack.install.warning",
-          targetId: "skill-1"
+          targetId: "ws-1:skill-1"
         })
       )
     })
@@ -349,6 +371,43 @@ describe("Industry Pack Loader Service Tests", () => {
       mockFindFirst.mockResolvedValueOnce(null)
 
       await expect(uninstallPack("test-pack", "1.0.0", "ws-1", "admin", testDeps)).rejects.toThrow(
+        PackInstallationNotFoundError
+      )
+    })
+  })
+
+  describe("activatePack", () => {
+    it("activatePack 成功启用，状态从 paused 恢复为 installed，能力被 reactivate", async () => {
+      mockFindFirst.mockResolvedValueOnce({
+        id: "inst-1",
+        packId: "test-pack",
+        packVersion: "1.0.0",
+        status: "paused",
+        installedCapabilities: JSON.stringify(["skill-1@1.0.0"])
+      })
+
+      const result = await activatePack("test-pack", "ws-1", "admin", testDeps)
+
+      expect(result).toBeDefined()
+      expect(mockReactivateCapability).toHaveBeenCalledWith(
+        "skill-1",
+        "1.0.0",
+        "admin",
+        expect.any(Object)
+      )
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: "installed"
+          })
+        })
+      )
+    })
+
+    it("activatePack 找不到处于 paused 状态的安装记录时抛出 PackInstallationNotFoundError", async () => {
+      mockFindFirst.mockResolvedValueOnce(null)
+
+      await expect(activatePack("test-pack", "ws-1", "admin", testDeps)).rejects.toThrow(
         PackInstallationNotFoundError
       )
     })

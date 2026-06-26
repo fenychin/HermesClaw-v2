@@ -13,6 +13,8 @@ vi.mock("@/lib/auth", () => ({
 vi.mock("@/lib/server/audit", () => ({
   writeAuditLog: vi.fn(() => Promise.resolve()),
   actorFromSession: vi.fn(() => Promise.resolve("system")),
+  createAuditEntry: vi.fn().mockResolvedValue({ auditId: "audit-123", ok: true }),
+  updateAuditEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ---- Mock fetch 防止测试中产生跨网物理调用 ----

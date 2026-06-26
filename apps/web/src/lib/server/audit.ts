@@ -129,6 +129,10 @@ export async function actorFromSession(): Promise<string> {
  */
 export async function writeAuditLog(input: WriteAuditLogInput): Promise<void> {
   try {
+    const rawSnap = input.contextSnapshot ? { ...(input.contextSnapshot as any) } : {}
+    if (input.workflowRunId && !rawSnap.workflowRunId) {
+      rawSnap.workflowRunId = input.workflowRunId
+    }
     await prisma.auditLog.create({
       data: {
         actor: input.actor,
@@ -139,7 +143,7 @@ export async function writeAuditLog(input: WriteAuditLogInput): Promise<void> {
         riskLevel: input.riskLevel ?? null,
         workspaceId: input.workspaceId,
         status: "success", // 旧接口无预记录概念，直接标记 success
-        contextSnapshot: input.contextSnapshot ? (input.contextSnapshot as any) : null,
+        contextSnapshot: Object.keys(rawSnap).length > 0 ? rawSnap : null,
         workflowRunId: input.workflowRunId ?? null,
       },
     })
@@ -194,6 +198,10 @@ export async function createAuditEntry(
   input: CreateAuditEntryInput,
 ): Promise<CreateAuditEntryResult> {
   try {
+    const rawSnap = input.contextSnapshot ? { ...(input.contextSnapshot as any) } : {}
+    if (input.workflowRunId && !rawSnap.workflowRunId) {
+      rawSnap.workflowRunId = input.workflowRunId
+    }
     const record = await prisma.auditLog.create({
       data: {
         actor: input.actor,
@@ -203,7 +211,7 @@ export async function createAuditEntry(
         detail: input.detail ?? null,
         riskLevel: input.riskLevel ?? null,
         workspaceId: input.workspaceId,
-        contextSnapshot: (input.contextSnapshot ?? undefined) as Prisma.InputJsonValue,
+        contextSnapshot: Object.keys(rawSnap).length > 0 ? rawSnap : null,
         automationLevel: input.automationLevel ?? null,
         triggeredBy: input.triggeredBy ?? "user",
         status: "pending",

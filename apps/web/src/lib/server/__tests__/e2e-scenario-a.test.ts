@@ -39,9 +39,12 @@ vi.mock("@/lib/server/audit", async (importOriginal) => {
         currentTaskId = args.targetId
       }
       
-      // Capture the current runId from workflow startup
+      // Capture the current runId from workflow startup or dispatch
       if (args.action === "workflow.run.started") {
         currentWorkflowRunId = args.contextSnapshot?.runId || ""
+      } else if (args.action === "workflow.run.dispatched") {
+        const rawRunId = args.contextSnapshot?.envelope?.workflowRunId || ""
+        currentWorkflowRunId = rawRunId ? (rawRunId.startsWith("run-") ? rawRunId : `run-${rawRunId}`) : ""
       }
       
       // Augment the contextSnapshot for alignment and traceability

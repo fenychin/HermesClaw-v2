@@ -519,4 +519,28 @@ ${longMemories.map(m => `ID: ${m.id}\nSummary: ${m.summary}\nContent: ${m.conten
 
     return result;
   }
+
+  // 分页列表
+  static async listMemories(workspaceId: string, type: 'short' | 'mid' | 'long', page = 1, pageSize = 20) {
+    return prisma.memory.findMany({
+      where: { workspaceId, type, status: { not: 'deprecated' } },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: { revisions: { orderBy: { createdAt: 'desc' }, take: 1 } }
+    })
+  }
+
+  // 软删除（中/长期）
+  static async softDeleteMemory(id: string, workspaceId: string) {
+    return prisma.memory.update({
+      where: { id, workspaceId },
+      data: { status: 'deprecated' }
+    })
+  }
+
+  // 物理删除（短期专用）
+  static async hardDeleteMemory(id: string, workspaceId: string) {
+    return prisma.memory.delete({ where: { id, workspaceId } })
+  }
 }

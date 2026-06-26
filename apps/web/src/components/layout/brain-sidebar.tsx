@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Brain, Database, LineChart, FileJson, Puzzle, Plug, ChevronLeft } from "lucide-react";
+import { Brain, Database, LineChart, FileJson, Puzzle, Plug, ChevronLeft, PackageOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const brainNavItems = [
@@ -11,6 +11,7 @@ const brainNavItems = [
   { href: "/brain/kpi", label: "KPI指标", icon: LineChart },
   { href: "/brain/skills", label: "技能库", icon: Puzzle },
   { href: "/brain/connectors", label: "连接器", icon: Plug },
+  { href: "/settings/industry-packs", label: "行业包", icon: PackageOpen },
 ];
 
 export function BrainSidebar() {

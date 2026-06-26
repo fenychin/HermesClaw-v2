@@ -16,7 +16,7 @@ import { PageTransition } from "@/components/common/PageTransition";
 import { ConnectorCard } from "@/components/common/connector-card";
 import { StatusBadge } from "@/components/common/status-badge";
 import { useAgentStore } from "@/stores/agent-store";
-import { useConnectorStore } from "@/stores/connector-store";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Connector, ConnectorCategory } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -247,17 +247,61 @@ export default function ConnectorsPage() {
   const [drawerConnector, setDrawerConnector] = useState<Connector | null>(null);
 
   const loadAgents = useAgentStore((s) => s.loadAgents);
-  const connectors = useConnectorStore((s) => s.connectors);
-  const loadConnectors = useConnectorStore((s) => s.loadConnectors);
-  const setStatus = useConnectorStore((s) => s.setStatus);
   useEffect(() => {
     loadAgents();
-    loadConnectors();
-  }, [loadAgents, loadConnectors]);
+  }, [loadAgents]);
+
+  const queryClient = useQueryClient();
+
+  const { data: connectorsData, isLoading } = useQuery({
+    queryKey: ["brain-connectors"],
+    queryFn: () => fetch("/api/brain/connectors").then(r => r.json())
+  });
+
+  const connectors = connectorsData?.data?.connectors || [];
+
+  const mutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await fetch("/api/brain/connectors", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status }),
+      });
+      if (!res.ok) throw new Error("Failed to update status");
+      return res.json();
+    },
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["brain-connectors"] });
+      const previousData = queryClient.getQueryData(["brain-connectors"]);
+      
+      queryClient.setQueryData(["brain-connectors"], (old: any) => {
+        if (!old || !old.data) return old;
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            connectors: old.data.connectors.map((c: any) =>
+              c.id === id ? { ...c, status } : c
+            )
+          }
+        };
+      });
+
+      return { previousData };
+    },
+    onError: (err, variables, context: any) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(["brain-connectors"], context.previousData);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["brain-connectors"] });
+    }
+  });
 
   // 连接/断开后同步本地 Drawer 选中态，保持按钮即时反馈
   const handleToggle = (id: string, next: "connected" | "available") => {
-    setStatus(id, next);
+    mutation.mutate({ id, status: next });
     setDrawerConnector((prev) =>
       prev && prev.id === id ? { ...prev, status: next } : prev,
     );

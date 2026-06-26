@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { WorkflowSchedulerService } from "../scheduler"
 import { hermesClient } from "@/lib/server/adapters/hermes"
-import { runWorkflow as runLocalWorkflow } from "@/lib/server/workflow/dag-runner"
+import { executeWorkflowRun } from "@/lib/server/workflow/runtime-engine"
 import { prisma } from "@/lib/prisma"
 
 // Mock dependencies
@@ -32,8 +32,12 @@ vi.mock("@/lib/server/adapters/hermes", () => ({
   },
 }))
 
-vi.mock("@/lib/server/workflow/dag-runner", () => ({
-  runWorkflow: vi.fn().mockResolvedValue({
+vi.mock("@/lib/server/workflow/runtime-engine", () => ({
+  startWorkflowRun: vi.fn().mockResolvedValue({
+    runId: "local-run-id",
+    status: "completed",
+  }),
+  executeWorkflowRun: vi.fn().mockResolvedValue({
     runId: "local-run-id",
     status: "completed",
     output: { result: "local-ok" },
@@ -74,7 +78,7 @@ describe("WorkflowSchedulerService 统一调度路由测试", () => {
     })
     expect(result.runId).toBe("hermes-exec-id")
     expect(result.status).toBe("running")
-    expect(runLocalWorkflow).not.toHaveBeenCalled()
+    expect(executeWorkflowRun).not.toHaveBeenCalled()
   })
 
   it("当 WORKFLOW_ROUTING_MODE 环境变量配置为 local 时，直接走本地 DAG 执行器", async () => {
@@ -86,7 +90,7 @@ describe("WorkflowSchedulerService 统一调度路由测试", () => {
       workspaceId: "ws-1",
     })
 
-    expect(runLocalWorkflow).toHaveBeenCalledWith("wf-1", { foo: "bar" })
+    expect(executeWorkflowRun).toHaveBeenCalledWith("local-run-id", "ws-1")
     expect(result.runId).toBe("local-run-id")
     expect(hermesClient.runWorkflow).not.toHaveBeenCalled()
   })
@@ -112,7 +116,7 @@ describe("WorkflowSchedulerService 统一调度路由测试", () => {
     })
     expect(hermesClient.runWorkflow).toHaveBeenCalled()
     expect(result.runId).toBe("hermes-exec-id")
-    expect(runLocalWorkflow).not.toHaveBeenCalled()
+    expect(executeWorkflowRun).not.toHaveBeenCalled()
   })
 
   it("当无全局环境变量，且 WorkspaceSettings 配置为 local 时，应使用本地 DAG 执行器", async () => {
@@ -134,7 +138,7 @@ describe("WorkflowSchedulerService 统一调度路由测试", () => {
     expect(prisma.workspaceSettings.findUnique).toHaveBeenCalledWith({
       where: { workspaceId: "ws-1" },
     })
-    expect(runLocalWorkflow).toHaveBeenCalled()
+    expect(executeWorkflowRun).toHaveBeenCalled()
     expect(result.runId).toBe("local-run-id")
     expect(hermesClient.runWorkflow).not.toHaveBeenCalled()
   })
@@ -148,7 +152,7 @@ describe("WorkflowSchedulerService 统一调度路由测试", () => {
       workspaceId: "ws-1",
     })
 
-    expect(runLocalWorkflow).toHaveBeenCalled()
+    expect(executeWorkflowRun).toHaveBeenCalled()
     expect(result.runId).toBe("local-run-id")
   })
 })

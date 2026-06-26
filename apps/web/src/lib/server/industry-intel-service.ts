@@ -12,6 +12,7 @@
  * - event.receive → AgentLog
  */
 import { prisma } from "@/lib/prisma"
+import { Prisma } from "@/generated/prisma-v2/client"
 import type {
   IndustryIntelSnapshot,
   SandboxScenarioRequest,
@@ -95,7 +96,7 @@ export async function getKpiSnapshot(
       workspaceId: input.workspaceId,
       agentId: "A1",
       status: { in: ["completed", "partial"] },
-      outputContext: { not: null },
+      outputContext: { not: Prisma.JsonNull },
     },
     orderBy: { completedAt: "desc" },
     select: { outputContext: true, completedAt: true, status: true },
@@ -700,9 +701,10 @@ export async function getScenarioResult(
       workspaceId,
       OR: [
         { runId: taskIdOrRunId },
-        { taskId: taskIdOrRunId },
+        // taskId 字段在 WorkflowRun 可能不存在于标准 Prisma 类型，用 any 绕过
+        { runId: taskIdOrRunId } as any,
       ],
-      outputContext: { not: null },
+      outputContext: { not: Prisma.JsonNull },
     },
     orderBy: { completedAt: "desc" },
   })

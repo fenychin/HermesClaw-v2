@@ -36,21 +36,21 @@ export default function VideosPage() {
   return (
     <PageTransition>
       <BrainAssetPlaceholderPage
-        title="视频资产"
+        title="视频库"
         description="产品讲解、演示与数字人口播素材"
         featureIcon={Video}
         featureIconColor="text-success"
         featureIconBg="bg-success/10"
         featureTitle="关于视频资产"
         featureText="PRD §9.3：视频资产库是 HermesClaw 多模态内容供给链的重要组成部分，承载产品讲解视频、工厂实拍、数字人口播、
-客户案例等视频资源。支持 AI 自动生成字幕、多语种配音、智能剪辑片段提取，所有视频按产品/场景/市场自动关联。"
+        客户案例等视频资源。支持 AI 自动生成字幕、多语种配音、智能剪辑片段提取，所有视频按产品/场景/市场自动关联。"
         columns={COLUMNS}
         phase2Text="该模块已规划，Phase 2 启动。届时将集成 AI 视频处理引擎与数字人生成管线，敬请期待。"
         phase2IconColor="text-success"
         phase2IconBg="bg-success/10"
         breadcrumb={[
-          { label: "智慧大脑", href: "/brain" },
-          { label: "视频" },
+          { label: "资料库", href: "/files" },
+          { label: "视频库" },
         ]}
       />
     </PageTransition>

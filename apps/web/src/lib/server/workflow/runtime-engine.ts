@@ -206,6 +206,7 @@ export async function startWorkflowRun(
     triggerType?: 'manual' | 'scheduled' | 'event' | 'agent-dispatch'
     agentId?: string
     sessionId?: string
+    workflowRunId?: string
   },
   deps?: RuntimeEngineDeps
 ): Promise<any> {
@@ -256,7 +257,10 @@ export async function startWorkflowRun(
   // 计算拓扑排序
   const sortedNodes = topoSortFlat(nodes, edges)
 
-  const runId = `run-${randomUUID()}`
+  let runId = input.workflowRunId || (input.inputContext?.workflowRunId as string) || `run-${randomUUID()}`
+  if (!runId.startsWith('run-')) {
+    runId = `run-${runId}`
+  }
 
   // 3. 创建 WorkflowRun 记录
   const run = await prisma.workflowRun.create({
@@ -1058,9 +1062,11 @@ export async function dispatchEnvelope(
       mode: runInput.mode,
       triggeredBy: runInput.triggeredBy,
       triggerType: 'agent-dispatch',
+      workflowRunId: (envelope.workflowRunId as string | undefined) ?? undefined,
       // Pass clean, typed inputContext — no more `as any`
       inputContext: {
         taskId: envelope.taskId,
+        workflowRunId: envelope.workflowRunId,
         actionType: envelope.actionType ?? 'unknown',
         riskLevel: envelope.riskLevel ?? 'low',
         automationLevel: envelope.automationLevel ?? 'L2',

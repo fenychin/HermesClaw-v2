@@ -15,8 +15,18 @@ const idempotencyMap = new Map<string, { taskId?: string; workflowRunId?: string
 export class StartWorkflowRunError extends Error {
   constructor(public readonly httpStatus: number, message: string, public readonly code?: string) { super(message); this.name = "StartWorkflowRunError" }
 }
-
-export async function startAgentWorkflowRun(opts: { agentId: string; input: any; idempotencyKey?: string; workspaceId: string; userId?: string }) {
+export async function startAgentWorkflowRun(opts: {
+  agentId: string
+  input: any
+  idempotencyKey?: string
+  workspaceId: string
+  userId?: string
+  taskId?: string
+  actionType?: string
+  automationLevel?: string
+  riskLevel?: string
+  version?: string
+}) {
   for (const [key, val] of idempotencyMap.entries()) if (Date.now() - val.timestamp > 600000) idempotencyMap.delete(key)
   if (opts.idempotencyKey) {
     const cached = idempotencyMap.get(opts.idempotencyKey)
@@ -26,10 +36,35 @@ export async function startAgentWorkflowRun(opts: { agentId: string; input: any;
   if (!agent) throw new StartWorkflowRunError(404, "Agent not found", "NOT_FOUND")
   if (agent.status === 'rolled-back') throw new StartWorkflowRunError(409, "Agent 不可用 (rolled-back)", "AGENT_ROLLED_BACK")
 
-  const hasHighRisk = /发送|发信|邮件|email|删除|delete|修改|更新|update|高危|high/i.test(opts.input)
-  let riskLevel: any = agent.automationLevel === 'L4' ? 'critical' : agent.automationLevel === 'L3' ? (hasHighRisk ? 'high' : 'medium') : (hasHighRisk ? 'high' : 'low')
-  const automationLevel = (agent.automationLevel || 'L2') as 'L1' | 'L2' | 'L3' | 'L4'
-  const envelope = await parseIntentToTaskEnvelope(opts.input, { workspaceId: opts.workspaceId, agentId: opts.agentId, industryId: agent.industryId || 'default', automationLevel, riskLevel })
+  let envelope: any
+  if (opts.actionType) {
+    const taskId = opts.taskId || `task-${crypto.randomUUID()}`
+    const workflowRunId = `run-${crypto.randomUUID()}`
+    const idempotencyKey = opts.idempotencyKey || `idem-${crypto.randomUUID()}`
+    const automationLevel = (opts.automationLevel || agent.automationLevel || "L1") as any
+    const riskLevel = (opts.riskLevel || "low") as any
+
+    envelope = {
+      taskId,
+      workflowRunId,
+      workspaceId: opts.workspaceId,
+      industryId: agent.industryId || "foreign-trade",
+      agentId: agent.id,
+      actionType: opts.actionType,
+      input: opts.input,
+      automationLevel,
+      riskLevel,
+      idempotencyKey,
+      callbackTarget: "workflow-callback",
+      policySnapshotVersion: "1.0.0",
+      version: opts.version || "1.0",
+    }
+  } else {
+    const hasHighRisk = typeof opts.input === "string" ? /发送|发信|邮件|email|删除|delete|修改|更新|update|高危|high/i.test(opts.input) : false
+    let riskLevel: any = agent.automationLevel === 'L4' ? 'critical' : agent.automationLevel === 'L3' ? (hasHighRisk ? 'high' : 'medium') : (hasHighRisk ? 'high' : 'low')
+    const automationLevel = (agent.automationLevel || 'L2') as 'L1' | 'L2' | 'L3' | 'L4'
+    envelope = await parseIntentToTaskEnvelope(opts.input, { workspaceId: opts.workspaceId, agentId: opts.agentId, industryId: agent.industryId || 'default', automationLevel, riskLevel })
+  }
 
   try { await validateTaskAutomationLevel(envelope, opts.userId || 'system') }
   catch (err: any) {

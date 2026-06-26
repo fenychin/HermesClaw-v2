@@ -12,6 +12,7 @@ import { useUser } from "@/hooks/use-user";
 import { SidebarNavItem } from "./sidebar-nav-item";
 import { SidebarRecent } from "./sidebar-recent";
 import { SidebarBrain } from "./sidebar-brain";
+import { SidebarKnowledge } from "./sidebar-knowledge";
 import { cn } from "@/lib/utils";
 import { prewarmWorkspaceRoute } from "@/lib/workspace-route-prewarm";
 import { AccountMenu } from "./AccountMenu";
@@ -62,6 +63,10 @@ export function Sidebar() {
         }
       } else if (item.href === "/brain/memory") {
         if (pathname.startsWith("/brain/")) {
+          set.add(item.href);
+        }
+      } else if (item.href === "/files") {
+        if (pathname === "/files" || pathname.startsWith("/files/") || pathname.startsWith("/knowledge/")) {
           set.add(item.href);
         }
       } else if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
@@ -141,6 +146,16 @@ export function Sidebar() {
           if (item.href === "/brain/memory") {
             return (
               <SidebarBrain
+                key={item.href}
+                collapsed={sidebarCollapsed}
+                isActive={isActive(item.href)}
+              />
+            );
+          }
+          // "资料库"使用下拉折叠面板（SidebarKnowledge）
+          if (item.href === "/files") {
+            return (
+              <SidebarKnowledge
                 key={item.href}
                 collapsed={sidebarCollapsed}
                 isActive={isActive(item.href)}

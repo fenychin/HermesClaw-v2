@@ -15,7 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const created = await prisma.conversationMessage.create({ data: { id: messageId, workspaceId: ctx.workspaceId, conversationId, role: body.role, content: body.content } })
       await prisma.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } }); return created
     })
-    if (body.trace) try { await prisma.reasoningTrace.create({ data: { traceId: body.trace.traceId, conversationId, messageId, workspaceId: ctx.workspaceId, steps: body.trace.steps, totalDurationMs: body.trace.totalDurationMs || null } }) } catch (traceErr) { logger.warn(`[messages] 保存 reasoningTrace 失败 (非致命错误):`, traceErr) }
+    if (body.trace) try { await prisma.reasoningTrace.create({ data: { traceId: body.trace.traceId, conversationId, messageId, workspaceId: ctx.workspaceId, steps: body.trace.steps, totalDurationMs: body.trace.totalDurationMs || null } }) } catch (traceErr) { logger.warn(`[messages] 保存 reasoningTrace 失败 (非致命错误):`, { error: traceErr instanceof Error ? traceErr.message : String(traceErr) }) }
     return successResponse({ message }, 201)
   } catch (error) { if (error instanceof ForbiddenError) return errorResponse(error.message, 403); logger.error('POST /api/conversations/[id]/messages: 失败', { error: error instanceof Error ? error.message : error }); return errorResponse("服务器内部错误") }
 }

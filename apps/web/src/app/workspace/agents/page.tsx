@@ -4,6 +4,12 @@ import type { AgentData } from "./page-client";
 
 // 服务端数据映射（与 page-client.tsx 中 toAgentData 逻辑一致）
 function serverToAgentData(raw: any): AgentData {
+  let category: string[] = [];
+  try {
+    category = typeof raw.category === 'string' 
+      ? JSON.parse(raw.category || "[]") 
+      : (Array.isArray(raw.category) ? raw.category : []);
+  } catch {}
   return {
     id: raw.id,
     name: raw.name,
@@ -16,8 +22,9 @@ function serverToAgentData(raw: any): AgentData {
           : "idle",
     tags: Array.isArray(raw.tags) ? raw.tags : [],
     taskCount: raw.taskCount || 0,
-    isBuiltIn: raw.source === "builtin",
+    isBuiltIn: raw.source === "builtin" || raw.source === "pack", // 核心修复：外贸专属包含包安装的智能体
     automationLevel: raw.automationLevel ?? "L2",
+    category,
   };
 }
 

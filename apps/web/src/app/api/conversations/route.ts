@@ -44,7 +44,7 @@ export async function POST(request: Request) {
           try {
             await prisma.reasoningTrace.create({ data: { traceId: m.trace.traceId, conversationId, messageId: m.id, workspaceId: ctx.workspaceId, steps: m.trace.steps, totalDurationMs: m.trace.totalDurationMs || null } })
           } catch (traceErr) {
-            logger.warn(`[conversations] 保存 reasoningTrace 失败 (非致命错误):`, traceErr)
+            logger.warn(`[conversations] 保存 reasoningTrace 失败 (非致命错误):`, { error: traceErr instanceof Error ? traceErr.message : String(traceErr) })
           }
         }
       }

@@ -624,3 +624,74 @@ export async function listCapabilities(
     total
   }
 }
+
+/**
+ * 将某版本能力重新恢复为 active 状态
+ */
+export async function reactivateCapability(
+  capabilityId: string,
+  version: string,
+  activatedBy: string,
+  deps?: RegistryDeps
+): Promise<CapabilityRegistration> {
+  const activePrisma = deps?.prisma || prisma
+  const activeWriteAuditLog = deps?.writeAuditLog || writeAuditLog
+
+  const record = await activePrisma.capabilityVersion.findUnique({
+    where: {
+      capabilityId_version: {
+        capabilityId,
+        version
+      }
+    }
+  })
+
+  if (!record) {
+    throw new CapabilityNotFoundError(capabilityId, version)
+  }
+
+  const updated = await activePrisma.capabilityVersion.update({
+    where: { id: record.id },
+    data: {
+      status: 'active',
+      deprecatedAt: null,
+      deprecatedBy: null,
+      deprecationReason: null
+    }
+  })
+
+  await activeWriteAuditLog({
+    actor: activatedBy,
+    action: 'capability.reactivated',
+    targetType: 'capability',
+    targetId: capabilityId,
+    detail: `Reactivated capability ${capabilityId}@${version}.`,
+    riskLevel: 'medium',
+    workspaceId: record.workspaceId
+  })
+
+  return {
+    capabilityId: updated.capabilityId,
+    capabilityType: updated.capabilityType as CapabilityType,
+    version: updated.version,
+    workspaceId: updated.workspaceId,
+    displayName: updated.displayName,
+    description: updated.description,
+    inputSchema: updated.inputSchema as Record<string, unknown>,
+    outputSchema: updated.outputSchema as Record<string, unknown>,
+    tags: JSON.parse(updated.tags),
+    status: updated.status as CapabilityStatus,
+    healthStatus: updated.healthStatus as HealthStatus,
+    successCount: updated.successCount,
+    failureCount: updated.failureCount,
+    avgLatencyMs: updated.avgLatencyMs,
+    lastHealthCheckAt: updated.lastHealthCheckAt || undefined,
+    changelog: updated.changelog,
+    publishedAt: updated.publishedAt,
+    publishedBy: updated.publishedBy,
+    deprecatedAt: updated.deprecatedAt || undefined,
+    deprecatedBy: updated.deprecatedBy || undefined,
+    deprecationReason: updated.deprecationReason || undefined
+  }
+}
+

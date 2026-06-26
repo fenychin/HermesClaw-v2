@@ -360,7 +360,7 @@ export const AgentCard = memo(function AgentCard({
           已完成 {taskCount} 项任务
         </div>
         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          <Link href={`/agents/${id}`}>
+          <Link href={`/workspace/agents/${id}`}>
             <Button
               variant="outline"
               size="sm"
@@ -369,7 +369,7 @@ export const AgentCard = memo(function AgentCard({
               详情
             </Button>
           </Link>
-          <Link href={`/new?agent=${id}`}>
+          <Link href={`/workspace/chat?agent=${id}`}>
             <Button
               size="sm"
               className="bg-primary text-primary-foreground hover:bg-primary/90 h-8 text-xs"

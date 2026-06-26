@@ -50,7 +50,7 @@ export default function VoicePage() {
         phase2IconColor="text-brand"
         phase2IconBg="bg-brand/10"
         breadcrumb={[
-          { label: "智慧大脑", href: "/brain" },
+          { label: "资料库", href: "/files" },
           { label: "语音库" },
         ]}
       />

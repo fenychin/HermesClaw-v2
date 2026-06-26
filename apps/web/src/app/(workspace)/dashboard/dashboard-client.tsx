@@ -17,6 +17,7 @@ import dynamic from "next/dynamic";
 import { PageHeader } from "@/components/common/page-header";
 import { PageTransition } from "@/components/common/PageTransition";
 import { cn } from "@/lib/utils";
+import { PackUpgradeModal } from "@/components/common/pack-upgrade-modal";
 
 // 动态懒加载 Recharts 图表，防止 SSR 报错并提升性能
 const TaskLineChart = dynamic(() => import("./_components/task-line-chart"), {
@@ -198,6 +199,18 @@ export default function DashboardClient({
   const router = useRouter();
   const [period, setPeriod] = useState(initialPeriod);
 
+  // 查询已安装包，用于多开检测
+  const { data: installedPacksData } = useQuery<any[]>({
+    queryKey: ["installed-packs"],
+    queryFn: async () => {
+      const res = await fetch("/api/industry-packs");
+      const json = await res.json();
+      return json.packs || json.data?.packs || [];
+    }
+  });
+
+  const activePacks = (installedPacksData || []).filter((p: any) => p.status === "installed");
+
   // ── P2 修复：使用 TanStack Query 替代原始 fetch ──
   //   staleTime: 30s（与后端缓存对齐）→ 页面切换不重复请求
   //   refetchInterval: 60s（降低轮询频率）→ 减少后端压力
@@ -274,6 +287,25 @@ export default function DashboardClient({
   return (
     <PageTransition>
       <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <PackUpgradeModal />
+
+        {/* 多个行业包同时激活的冲突阻断 Banner 警告 */}
+        {activePacks.length > 1 && (
+          <div className="w-full p-4 border border-destructive/20 bg-destructive/10 rounded-2xl flex items-center justify-between text-sm text-destructive backdrop-blur-sm shadow-sm select-none animate-pulse">
+            <div className="flex items-center gap-2.5">
+              <span>⚠️</span>
+              <span className="font-semibold">
+                系统警告：检测到您同时启用了多个行业包（如：外贸包等），这可能会导致智能员工的职责和执行决策产生混乱。请暂停停用无关的行业包以防止数据交叉污染！
+              </span>
+            </div>
+            <button
+              onClick={() => router.push('/settings/industry-packs')}
+              className="text-xs font-bold underline hover:opacity-80 shrink-0 ml-4"
+            >
+              立即停用 →
+            </button>
+          </div>
+        )}
         {/* 顶部标题与 Period 切换 */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-3">
           <PageHeader

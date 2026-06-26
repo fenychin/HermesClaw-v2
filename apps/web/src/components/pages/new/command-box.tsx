@@ -75,6 +75,8 @@ interface CommandBoxProps {
   focusKey?: number;
   /** 触发智能体引导向导回调 */
   onStartWizard?: (initialPrompt: string) => void;
+  /** 动态输入框 Placeholder */
+  placeholder?: string;
 }
 
 /**
@@ -91,6 +93,7 @@ export function CommandBox({
   error = null,
   focusKey,
   onStartWizard,
+  placeholder,
 }: CommandBoxProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -243,9 +246,55 @@ export function CommandBox({
     });
   };
 
+  // ---- 监听输入框变化 ----
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    onChange(val);
+
+    const selectionStart = e.target.selectionStart;
+    const beforeCursor = val.slice(0, selectionStart);
+    const match = beforeCursor.match(/@(\S*)$/);
+    if (match) {
+      setActiveDropdown("agent");
+      setAgentSearch(match[1] || "");
+      if (storeAgents.length === 0 && !agentLoading) {
+        loadAgents();
+      }
+    } else {
+      if (activeDropdown === "agent") {
+        setActiveDropdown(null);
+      }
+    }
+  };
+
+  // ---- 点击 AtSign 按钮 ----
+  const handleAtClick = () => {
+    insertAtCursor("@");
+    setActiveDropdown("agent");
+    if (storeAgents.length === 0 && !agentLoading) {
+      loadAgents();
+    }
+  };
+
   // ---- 选择智能体 ----
   const selectAgent = (agent: Agent) => {
-    insertAtCursor(`@${agent.name}`);
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const before = value.slice(0, start);
+    const after = value.slice(start);
+    const lastAtIdx = before.lastIndexOf("@");
+    if (lastAtIdx !== -1) {
+      const newValue = `${before.slice(0, lastAtIdx)}@${agent.name} ${after}`;
+      onChange(newValue);
+      requestAnimationFrame(() => {
+        el.focus();
+        const pos = lastAtIdx + agent.name.length + 2;
+        el.setSelectionRange(pos, pos);
+      });
+    } else {
+      insertAtCursor(`@${agent.name}`);
+    }
     setActiveDropdown(null);
     setAgentSearch("");
   };
@@ -461,7 +510,7 @@ export function CommandBox({
 
   const filteredAgents = storeAgents.filter(
     (a) =>
-      a.status === "active" &&
+      (a.status === "running" || a.status === "idle") &&
       (!agentSearch ||
         a.name.toLowerCase().includes(agentSearch.toLowerCase()) ||
         a.role.includes(agentSearch)),
@@ -491,6 +540,47 @@ export function CommandBox({
         ringClass,
       )}
     >
+      {/* Popover 下拉菜单 */}
+      <AnimatePresence>
+        {activeDropdown === "agent" && (
+          <Popover>
+            <div className="p-2 border-b border-border bg-muted/20">
+              <input
+                type="text"
+                value={agentSearch}
+                onChange={(e) => setAgentSearch(e.target.value)}
+                placeholder="搜索智能体..."
+                className="w-full bg-background border border-border rounded px-2 py-1 text-xs outline-none text-foreground"
+                autoFocus
+              />
+            </div>
+            <div className="max-h-60 overflow-y-auto p-1">
+              {agentLoading ? (
+                <div className="text-xs text-muted-foreground p-3 text-center">加载中...</div>
+              ) : filteredAgents.length === 0 ? (
+                <div className="text-xs text-muted-foreground p-3 text-center">未找到智能体</div>
+              ) : (
+                filteredAgents.map((agent) => (
+                  <button
+                    key={agent.id}
+                    onClick={() => selectAgent(agent)}
+                    className="w-full flex items-center justify-between p-2 hover:bg-accent rounded-lg text-left text-xs transition-colors"
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium text-foreground">{agent.name}</span>
+                      <span className="text-[10px] text-muted-foreground">{agent.role}</span>
+                    </div>
+                    <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded font-medium">
+                      {agent.industryId === "foreign-trade" ? "外贸" : "自定义"}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          </Popover>
+        )}
+      </AnimatePresence>
+
       {/* 顶部提示行 */}
       <p className="text-muted-foreground text-sm mb-2 select-none">
         今天要完成什么？
@@ -520,11 +610,11 @@ export function CommandBox({
       <textarea
         ref={textareaRef}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={handleTextareaChange}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         onKeyDown={handleKeyDown}
-        placeholder="输入需求、粘贴询盘、@调用智能体…"
+        placeholder={placeholder || "输入需求、粘贴询盘、@调用智能体…"}
         rows={1}
         readOnly={isStreaming}
         className={cn(
@@ -556,6 +646,19 @@ export function CommandBox({
             className="hidden"
             aria-hidden="true"
           />
+
+          {/* 调用智能体 */}
+          <button
+            type="button"
+            onClick={handleAtClick}
+            className={cn(
+              "text-hint hover:text-foreground hover:bg-accent rounded-lg p-1.5 transition-colors",
+              activeDropdown === "agent" && "text-primary bg-primary/10"
+            )}
+            title="调用智能体"
+          >
+            <AtSign className="size-4" />
+          </button>
 
 
 

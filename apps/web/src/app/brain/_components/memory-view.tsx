@@ -12,17 +12,27 @@ import {
   RefreshCw,
   Loader2,
   Search,
+  Edit2,
+  Calendar,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { PageTransition } from "@/components/common/PageTransition";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useMemoryStore } from "@/stores/memory-store";
 import { SkeletonCard } from "@/components/common/skeleton-card";
-import { apiClient } from "@/lib/api-client";
 import type { Memory, MemoryType } from "@/types";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 const TIER_LABEL: Record<MemoryType, string> = {
   short: "短期记忆",
@@ -51,9 +61,16 @@ function formatTime(iso: string): string {
   return `${month}月${day}日 ${hour}:${minute}`;
 }
 
-function MemoryCard({ memory }: { memory: Memory }) {
-  const { archiveMemory, freezeMemory, upgradeMemory } = useMemoryStore();
+interface MemoryCardProps {
+  memory: Memory;
+  onEdit: (m: Memory) => void;
+  onViewRevisions: (m: Memory) => void;
+  onDelete: (id: string) => void;
+  onUpgrade: (id: string, type: "mid" | "long") => void;
+  onFreeze: (id: string, frozen: boolean) => void;
+}
 
+function MemoryCard({ memory, onEdit, onViewRevisions, onDelete, onUpgrade, onFreeze }: MemoryCardProps) {
   const displayTime = useMemo(() => {
     if (memory.updatedAt && memory.updatedAt !== memory.createdAt) {
       return `更新于: ${formatTime(memory.updatedAt)}`;
@@ -64,13 +81,13 @@ function MemoryCard({ memory }: { memory: Memory }) {
   const friendlySource = useMemo(() => {
     if (memory.relatedAgent) return `智能体: ${memory.relatedAgent}`;
     if (memory.relatedProject) return `项目: ${memory.relatedProject}`;
-    if (memory.source === "manual") return "人工录入 SOP";
+    if (memory.source === "manual" || memory.source === "user") return "人工录入 SOP";
     if (memory.source === "system") return "自演化引擎";
     return memory.source === "auto" ? "工作流捕获" : memory.source;
   }, [memory]);
 
   return (
-    <div className="bg-card border-border rounded-xl border p-4 flex flex-col justify-between min-h-[160px]">
+    <div className="bg-card border-border rounded-xl border p-4 flex flex-col justify-between min-h-[160px] text-left">
       <div>
         <div className="mb-2 flex items-center gap-2">
           <span className="text-muted-foreground shrink-0 text-xs">
@@ -96,11 +113,17 @@ function MemoryCard({ memory }: { memory: Memory }) {
           {memory.frozen && <Lock className="text-brand size-3.5 shrink-0" />}
         </div>
 
-        <p className="text-foreground mb-3 line-clamp-3 text-sm leading-relaxed">
+        <p className="text-foreground mb-3 line-clamp-3 text-sm leading-relaxed font-medium">
           {memory.summary}
         </p>
 
-        {memory.tags.length > 0 && (
+        {memory.content && memory.type !== "short" && (
+          <p className="text-muted-foreground mb-3 line-clamp-2 text-xs leading-relaxed">
+            {memory.content}
+          </p>
+        )}
+
+        {memory.tags && memory.tags.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-1.5">
             {memory.tags.map((tag) => (
               <span
@@ -114,21 +137,21 @@ function MemoryCard({ memory }: { memory: Memory }) {
         )}
       </div>
 
-      <div className="border-border flex items-center gap-1 border-t pt-2.5 mt-2">
+      <div className="border-border flex items-center gap-1 border-t pt-2.5 mt-2 flex-wrap">
         {/* 短期记忆可以一键提升为中期或长期 */}
         {memory.type === "short" && (
           <>
             <button
               type="button"
-              onClick={() => upgradeMemory(memory.id, "mid")}
-              className="text-brand-blue hover:bg-brand-blue/10 inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors"
+              onClick={() => onUpgrade(memory.id, "mid")}
+              className="text-brand hover:bg-brand/10 inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors"
             >
               <ArrowUp className="size-3" />
               升至中期
             </button>
             <button
               type="button"
-              onClick={() => upgradeMemory(memory.id, "long")}
+              onClick={() => onUpgrade(memory.id, "long")}
               className="text-brand hover:bg-brand/10 inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors"
             >
               <ArrowUp className="size-3" />
@@ -139,32 +162,41 @@ function MemoryCard({ memory }: { memory: Memory }) {
         
         {/* 中期记忆可以一键提升为长期 */}
         {memory.type === "mid" && (
+          <>
+            <button
+              type="button"
+              onClick={() => onUpgrade(memory.id, "long")}
+              className="text-brand hover:bg-brand/10 inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors"
+            >
+              <ArrowUp className="size-3" />
+              升至长期
+            </button>
+            <button
+              type="button"
+              onClick={() => onEdit(memory)}
+              className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors"
+            >
+              <Edit2 className="size-3" />
+              编辑
+            </button>
+          </>
+        )}
+
+        {/* 长期记忆可以查看历史版本 */}
+        {memory.type === "long" && (
           <button
             type="button"
-            onClick={() => upgradeMemory(memory.id, "long")}
-            className="text-brand hover:bg-brand/10 inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors"
+            onClick={() => onViewRevisions(memory)}
+            className="text-brand hover:bg-brand/10 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors"
           >
-            <ArrowUp className="size-3" />
-            升至长期
+            <Calendar className="size-3" />
+            修订历史
           </button>
         )}
 
         <button
           type="button"
-          onClick={() => {
-            if (confirm(`确认归档记忆「${memory.summary}」？`)) {
-              archiveMemory(memory.id, true).catch(() => {});
-            }
-          }}
-          className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors"
-        >
-          <Archive className="size-3" />
-          归档
-        </button>
-
-        <button
-          type="button"
-          onClick={() => freezeMemory(memory.id, !memory.frozen)}
+          onClick={() => onFreeze(memory.id, !memory.frozen)}
           className={cn(
             "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors",
             memory.frozen
@@ -189,12 +221,8 @@ function MemoryCard({ memory }: { memory: Memory }) {
         
         <button
           type="button"
-          onClick={() => {
-            if (confirm(`确认删除记忆「${memory.summary}」？此操作不可撤销。`)) {
-              archiveMemory(memory.id, true).catch(() => {});
-            }
-          }}
-          className="text-danger hover:bg-danger/10 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors"
+          onClick={() => onDelete(memory.id)}
+          className="text-danger hover:bg-danger/10 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors font-medium"
         >
           <Trash2 className="size-3" />
           删除
@@ -205,70 +233,146 @@ function MemoryCard({ memory }: { memory: Memory }) {
 }
 
 interface MemoryViewProps {
-  /** 进入页面时默认激活的 tab；不传则沿用 store 当前值 */
   initialTab?: MemoryType;
 }
 
 export function MemoryView({ initialTab }: MemoryViewProps) {
-  const activeTab = useMemoryStore((s) => s.activeTab);
-  const setActiveTab = useMemoryStore((s) => s.setActiveTab);
-  const memories = useMemoryStore((s) => s.memories);
-  const loading = useMemoryStore((s) => s.loading);
-  const error = useMemoryStore((s) => s.error);
-  const loadMemories = useMemoryStore((s) => s.loadMemories);
-  const [batchLoading, setBatchLoading] = useState(false);
-  const [batchMsg, setBatchMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<MemoryType>(initialTab || "short");
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingMemory, setEditingMemory] = useState<Memory | null>(null);
+  const [viewingMemory, setViewingMemory] = useState<Memory | null>(null);
 
-  useEffect(() => {
-    loadMemories();
-  }, [loadMemories]);
+  // 编辑表单 State
+  const [editSummary, setEditSummary] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [editTags, setEditTags] = useState("");
 
-  useEffect(() => {
-    if (initialTab) setActiveTab(initialTab);
-  }, [initialTab, setActiveTab]);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    setSearchQuery("");
-  }, [activeTab]);
+  const { data: memoriesData, isLoading: loading, error, refetch: loadMemories } = useQuery({
+    queryKey: ["brain-memories", activeTab],
+    queryFn: async () => {
+      const res = await fetch(`/api/brain/memory?type=${activeTab}`);
+      if (!res.ok) throw new Error("加载记忆列表失败");
+      return res.json();
+    }
+  });
 
-  const memoriesByTab: Record<MemoryType, Memory[]> = useMemo(
-    () => ({
-      short: memories.filter((m) => m.type === "short"),
-      mid: memories.filter((m) => m.type === "mid"),
-      long: memories.filter((m) => m.type === "long"),
-    }),
-    [memories],
-  );
+  const memories = memoriesData?.data?.memories || [];
 
-  const filteredMemoriesByTab: Record<MemoryType, Memory[]> = useMemo(() => {
-    const result: Record<MemoryType, Memory[]> = { short: [], mid: [], long: [] };
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/brain/memory?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("删除失败");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["brain-memories"] });
+    }
+  });
+
+  const upgradeMutation = useMutation({
+    mutationFn: async ({ id, type }: { id: string; type: "mid" | "long" }) => {
+      const res = await fetch(`/api/brain/memory?id=${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type })
+      });
+      if (!res.ok) throw new Error("升格失败");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["brain-memories"] });
+    }
+  });
+
+  const freezeMutation = useMutation({
+    mutationFn: async ({ id, frozen }: { id: string; frozen: boolean }) => {
+      const res = await fetch(`/api/brain/memory?id=${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ frozen })
+      });
+      if (!res.ok) throw new Error("操作失败");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["brain-memories"] });
+    }
+  });
+
+  const editMutation = useMutation({
+    mutationFn: async ({ id, summary, content, tags }: { id: string; summary: string; content: string; tags: string[] }) => {
+      const res = await fetch(`/api/brain/memory?id=${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ summary, content, tags, reason: "用户在控制台手动编辑" })
+      });
+      if (!res.ok) throw new Error("保存失败");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["brain-memories"] });
+      setEditingMemory(null);
+    }
+  });
+
+  const filtered = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
+    if (!query) return memories;
+    return memories.filter(
+      (m: any) =>
+        m.summary.toLowerCase().includes(query) ||
+        (m.content && m.content.toLowerCase().includes(query)) ||
+        (m.tags && m.tags.some((t: string) => t.toLowerCase().includes(query)))
+    );
+  }, [memories, searchQuery]);
 
-    (Object.keys(memoriesByTab) as MemoryType[]).forEach((key) => {
-      const list = memoriesByTab[key];
-      if (!query) {
-        result[key] = list;
-      } else {
-        result[key] = list.filter(
-          (m) =>
-            m.summary.toLowerCase().includes(query) ||
-            (m.content && m.content.toLowerCase().includes(query)) ||
-            (m.tags && m.tags.some((t) => t.toLowerCase().includes(query)))
-        );
-      }
+  const handleEdit = (memory: Memory) => {
+    setEditingMemory(memory);
+    setEditSummary(memory.summary);
+    setEditContent(memory.content || "");
+    setEditTags(memory.tags ? memory.tags.join(", ") : "");
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingMemory) return;
+    const tagsArr = editTags
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+    editMutation.mutate({
+      id: editingMemory.id,
+      summary: editSummary,
+      content: editContent,
+      tags: tagsArr
     });
-    return result;
-  }, [memoriesByTab, searchQuery]);
+  };
 
-  const tabs: { value: MemoryType; label: string; count: number }[] = useMemo(
-    () => [
-      { value: "short", label: "短期记忆", count: memoriesByTab.short.length },
-      { value: "mid", label: "中期记忆", count: memoriesByTab.mid.length },
-      { value: "long", label: "长期记忆", count: memoriesByTab.long.length },
-    ],
-    [memoriesByTab],
-  );
+  const handleDelete = (id: string) => {
+    if (confirm("确认删除该条记忆吗？此操作不可恢复。")) {
+      deleteMutation.mutate(id);
+    }
+  };
+
+  const handleUpgrade = (id: string, type: "mid" | "long") => {
+    upgradeMutation.mutate({ id, type });
+  };
+
+  const handleFreeze = (id: string, frozen: boolean) => {
+    freezeMutation.mutate({ id, frozen });
+  };
+
+  const handleBatchClear = async () => {
+    if (!confirm(`确认清理全部短期记忆？此操作不可撤销。`)) return;
+    const shortMemories = memories.filter((m: any) => m.type === "short");
+    try {
+      await Promise.all(shortMemories.map((m: any) => fetch(`/api/brain/memory?id=${m.id}`, { method: "DELETE" })));
+      queryClient.invalidateQueries({ queryKey: ["brain-memories", "short"] });
+    } catch {
+      alert("批量清理中存在部分错误");
+    }
+  };
 
   if (loading && memories.length === 0) {
     return (
@@ -301,10 +405,10 @@ export function MemoryView({ initialTab }: MemoryViewProps) {
               <AlertCircle className="text-danger size-7" />
             </div>
             <p className="text-foreground text-lg font-semibold">加载失败</p>
-            <p className="text-muted-foreground mt-1 text-sm">{error}</p>
+            <p className="text-muted-foreground mt-1 text-sm">{String(error)}</p>
             <button
               type="button"
-              onClick={loadMemories}
+              onClick={() => loadMemories()}
               className="bg-brand hover:bg-brand/90 mt-4 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium text-white transition-colors"
             >
               <RefreshCw className="size-4" />
@@ -338,7 +442,7 @@ export function MemoryView({ initialTab }: MemoryViewProps) {
           </div>
           <div className="flex gap-2 items-center text-xs text-muted-foreground bg-accent/30 px-3 py-1.5 rounded-lg border border-border/30">
             <Layers className="size-3.5 text-[#6D5EF9]" />
-            <span>当前区间共 {memoriesByTab[activeTab].length} 条记忆</span>
+            <span>当前区间共 {memories.length} 条记忆</span>
           </div>
         </div>
 
@@ -347,109 +451,149 @@ export function MemoryView({ initialTab }: MemoryViewProps) {
           onValueChange={(v) => setActiveTab(v as MemoryType)}
         >
           <TabsList>
-            {tabs.map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value}>
-                {tab.label}
-                <span className="bg-accent text-muted-foreground ml-1.5 rounded-full px-2 py-0.5 text-[10px]">
-                  {tab.count}
-                </span>
-              </TabsTrigger>
-            ))}
+            <TabsTrigger value="short">
+              短期记忆
+              <span className="bg-accent text-muted-foreground ml-1.5 rounded-full px-2 py-0.5 text-[10px]">
+                {activeTab === "short" ? memories.length : "..."}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value="mid">
+              中期记忆
+              <span className="bg-accent text-muted-foreground ml-1.5 rounded-full px-2 py-0.5 text-[10px]">
+                {activeTab === "mid" ? memories.length : "..."}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value="long">
+              长期记忆
+              <span className="bg-accent text-muted-foreground ml-1.5 rounded-full px-2 py-0.5 text-[10px]">
+                {activeTab === "long" ? memories.length : "..."}
+              </span>
+            </TabsTrigger>
           </TabsList>
 
-          {tabs.map((tab) => {
-            const hasNoMemories = memoriesByTab[tab.value].length === 0;
-            const hasNoFilteredResults = filteredMemoriesByTab[tab.value].length === 0;
-
-            return (
-              <TabsContent key={tab.value} value={tab.value} className="mt-4">
-                {hasNoMemories ? (
-                  <EmptyState
-                    icon={Layers}
-                    title={`暂无${TIER_LABEL[tab.value]}`}
-                    description="随对话积累，系统将自动汇总和沉淀对应记忆"
-                  />
-                ) : hasNoFilteredResults ? (
-                  <EmptyState
-                    icon={Search}
-                    title="未找到匹配的记忆"
-                    description="请尝试调整搜索关键词"
-                  />
-                ) : (
-                  <div className="space-y-3">
-                    {/* 短期记忆批量操作（PRD #10.6.1：可清理、可合并转入中期记忆） */}
-                    {tab.value === "short" && (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            disabled={batchLoading}
-                            onClick={async () => {
-                              if (!confirm(`确认清理全部 ${memoriesByTab.short.length} 条短期记忆？此操作不可撤销。`)) return;
-                              setBatchLoading(true);
-                              setBatchMsg(null);
-                              const failed: string[] = [];
-                              const ids = memoriesByTab.short.map((m) => ({ id: m.id, summary: m.summary }));
-                              for (const { id, summary } of ids) {
-                                try { await apiClient.deleteMemory(id, true); }
-                                catch { failed.push(summary); }
-                              }
-                              await loadMemories();
-                              if (failed.length > 0) {
-                                setBatchMsg({ ok: false, text: `${failed.length} 条清理失败: ${failed.slice(0, 3).join("、")}${failed.length > 3 ? "…" : ""}` });
-                              }
-                              setBatchLoading(false);
-                            }}
-                            className="text-danger hover:bg-danger/10 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
-                          >
-                            {batchLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
-                            清理全部
-                          </button>
-                          <button
-                            type="button"
-                            disabled={batchLoading}
-                            onClick={async () => {
-                              if (!confirm(`确认将全部 ${memoriesByTab.short.length} 条短期记忆合并转入中期记忆？`)) return;
-                              setBatchLoading(true);
-                              setBatchMsg(null);
-                              const failed: string[] = [];
-                              const ids = memoriesByTab.short.map((m) => ({ id: m.id, summary: m.summary }));
-                              for (const { id, summary } of ids) {
-                                try { await apiClient.updateMemory(id, { type: "mid" }); }
-                                catch { failed.push(summary); }
-                              }
-                              await loadMemories();
-                              if (failed.length > 0) {
-                                setBatchMsg({ ok: false, text: `${failed.length} 条升级失败: ${failed.slice(0, 3).join("、")}${failed.length > 3 ? "…" : ""}` });
-                              }
-                              setBatchLoading(false);
-                            }}
-                            className="text-brand-blue hover:bg-brand-blue/10 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
-                          >
-                            {batchLoading ? <Loader2 className="size-3.5 animate-spin" /> : <ArrowUp className="size-3.5" />}
-                            合并转入中期记忆
-                          </button>
-                        </div>
-                        {batchMsg && (
-                          <div className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs ${batchMsg.ok ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
-                            <AlertCircle className="size-3.5 shrink-0" />
-                            <span>{batchMsg.text}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4">
-                      {filteredMemoriesByTab[tab.value].map((memory) => (
-                        <MemoryCard key={memory.id} memory={memory} />
-                      ))}
-                    </div>
+          <TabsContent value={activeTab} className="mt-4">
+            {memories.length === 0 ? (
+              <EmptyState
+                icon={Layers}
+                title={`暂无${TIER_LABEL[activeTab]}`}
+                description="随对话积累，系统将自动汇总和沉淀对应记忆"
+              />
+            ) : filtered.length === 0 ? (
+              <EmptyState
+                icon={Search}
+                title="未找到匹配的记忆"
+                description="请尝试调整搜索关键词"
+              />
+            ) : (
+              <div className="space-y-3">
+                {activeTab === "short" && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <button
+                      type="button"
+                      onClick={handleBatchClear}
+                      className="text-danger hover:bg-danger/10 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
+                    >
+                      <Trash2 className="size-3.5" />
+                      清理全部短期记忆
+                    </button>
                   </div>
                 )}
-              </TabsContent>
-            );
-          })}
+
+                <div className="grid grid-cols-2 gap-4">
+                  {filtered.map((memory: Memory) => (
+                    <MemoryCard
+                      key={memory.id}
+                      memory={memory}
+                      onEdit={handleEdit}
+                      onViewRevisions={setViewingMemory}
+                      onDelete={handleDelete}
+                      onUpgrade={handleUpgrade}
+                      onFreeze={handleFreeze}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </TabsContent>
         </Tabs>
+
+        {/* 中期记忆编辑 Dialog */}
+        {editingMemory && (
+          <Dialog open={!!editingMemory} onOpenChange={(open) => !open && setEditingMemory(null)}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>编辑中期记忆</DialogTitle>
+                <DialogDescription>修改记忆的内容和标签，KCL 机制将自动追踪本次修改的修订快照。</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-1 text-left">
+                  <label className="text-xs font-semibold text-muted-foreground">精炼摘要 (Summary)</label>
+                  <Input
+                    value={editSummary}
+                    onChange={(e) => setEditSummary(e.target.value)}
+                    placeholder="请输入摘要"
+                  />
+                </div>
+                <div className="space-y-1 text-left">
+                  <label className="text-xs font-semibold text-muted-foreground">具体内容 (Content)</label>
+                  <textarea
+                    className="w-full bg-background border border-border rounded-xl p-2 text-xs h-24 outline-none focus:border-brand"
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    placeholder="请输入详细内容"
+                  />
+                </div>
+                <div className="space-y-1 text-left">
+                  <label className="text-xs font-semibold text-muted-foreground">标签 (Tags，英文逗号分隔)</label>
+                  <Input
+                    value={editTags}
+                    onChange={(e) => setEditTags(e.target.value)}
+                    placeholder="例如: customer, discount"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingMemory(null)}>取消</Button>
+                <Button onClick={handleSaveEdit}>保存</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* 长期记忆修订历史 Dialog */}
+        {viewingMemory && (
+          <Dialog open={!!viewingMemory} onOpenChange={(open) => !open && setViewingMemory(null)}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>修订演化历史</DialogTitle>
+                <DialogDescription>查看本条长期记忆的版本修订历史 (KCL 溯源链)</DialogDescription>
+              </DialogHeader>
+              <div className="max-h-[300px] overflow-y-auto space-y-4 py-4 pr-1 text-left">
+                {(viewingMemory as any).revisions && (viewingMemory as any).revisions.length > 0 ? (
+                  (viewingMemory as any).revisions.map((rev: any, index: number) => (
+                    <div key={rev.id} className="border-l-2 border-brand pl-3 py-1 space-y-1.5 relative">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-brand">v{rev.version}</span>
+                        <span className="text-[10px] text-muted-foreground">{formatTime(rev.createdAt)}</span>
+                      </div>
+                      <p className="text-xs font-semibold text-foreground">{rev.summary}</p>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">{rev.content}</p>
+                      <div className="text-[9px] text-hint flex gap-3">
+                        <span>修订人: {rev.editedBy}</span>
+                        <span>原因: {rev.reason}</span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-xs text-muted-foreground py-4">暂无历史版本记录</p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button onClick={() => setViewingMemory(null)}>关闭</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     </PageTransition>
   );

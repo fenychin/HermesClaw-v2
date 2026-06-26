@@ -94,15 +94,21 @@ export const brainNav: NavItem[] = [
   { href: "/brain/memory", label: "记忆体", icon: Database, description: "短/中/长期三级记忆体统一控制面" },
   { href: "/brain/skills", label: "技能 Skill", icon: Puzzle, description: "行业 / 岗位 / 自定义技能与版本管理" },
   { href: "/brain/connectors", label: "连接器 MCP", icon: Plug, description: "邮箱、CRM、ERP 等连接器授权" },
-  { href: "/brain/industry-packs", label: "行业包管理", icon: PackageOpen, description: "安装、激活与卸载 Industry Pack 行业插件" },
-  { href: "/brain/voice", label: "语音库", icon: Mic, description: "品牌声音与多语种语音资产" },
-  { href: "/brain/images", label: "图像", icon: ImageIcon, description: "产品图、营销与品牌素材" },
-  { href: "/brain/videos", label: "视频", icon: Video, description: "讲解、产品与数字人口播素材" },
+  { href: "/settings/industry-packs", label: "行业包", icon: PackageOpen, description: "安装、激活与卸载 Industry Pack 行业插件" },
+];
+
+/** 资料库二级导航 */
+export const knowledgeNav: NavItem[] = [
+  { href: "/files", label: "文件中心", icon: FileText, description: "企业内容供给链与结构化解析" },
+  { href: "/knowledge/media/voice", label: "语音库", icon: Mic, description: "品牌声音与多语种语音资产" },
+  { href: "/knowledge/media/image", label: "图像库", icon: ImageIcon, description: "产品图、营销与品牌素材" },
+  { href: "/knowledge/media/video", label: "视频库", icon: Video, description: "讲解、产品与数字人口播素材" },
 ];
 
 /** 设置子导航（PRD 10.9：Harness 审批独立页面入口） */
 export const settingsNav: NavItem[] = [
   { href: "/settings/team", label: "团队与权限", icon: Users, description: "成员、角色与访问控制" },
   { href: "/settings/harness", label: "Harness 审批", icon: ShieldCheck, description: "动态 Harness 升级提案审批中心" },
+  { href: "/settings/industry-packs", label: "行业包管理", icon: PackageOpen, description: "安装、激活与卸载 Industry Pack 行业插件" },
 ];
 

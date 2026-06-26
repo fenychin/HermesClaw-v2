@@ -1,9 +1,9 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState, useMemo, useRef } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, Plus, Sparkles, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { PageTransition } from "@/components/common/PageTransition";
@@ -13,7 +13,6 @@ import { QuickWorkflowForm } from "@/components/pages/new/quick-workflow-form";
 import { QuickTaskPanel } from "@/components/pages/new/quick-task-panel";
 import { ConversationArea } from "@/components/pages/new/conversation-area";
 import { SuggestionPanel } from "@/components/pages/new/suggestion-panel";
-import { RecentPanel } from "@/components/pages/new/recent-panel";
 import { useChat } from "@/hooks/useChat";
 import { SELECTABLE_MODELS } from "@/config/models";
 import { useUiStore } from "@/stores/ui-store";
@@ -21,6 +20,9 @@ import { useAgentStore } from "@/stores/agent-store";
 import { ModelSelectorInline } from "@/components/workspace/ModelSelectorInline";
 import { useModelPreference } from "@/hooks/use-model-preference";
 import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import QuickActionCustomizer from "@/components/chat/quick-action-customizer";
+import Link from "next/link";
 
 // 翻译用的能力常量映射
 const AVAILABLE_SKILLS = [
@@ -54,15 +56,20 @@ export default function NewTopicPage() {
 }
 
 const CARD_KEY_TO_SKILL_ID: Record<string, string> = {
-  "analyze-inquiry": "inquiry-grade",
-  "cold-email": "dev-letter",
-  "quotation": "quote-gen",
-  "client-profile": "customer-profile",
-  "create-project": "project-space",
-  "call-agent": "agent-dispatch"
+  "inquiry-grade": "inquiry-grade",
+  "dev-letter": "dev-letter",
+  "quote-gen": "quote-gen",
+  "customer-profile": "customer-profile",
+  "project-space": "project-space",
+  "agent-dispatch": "agent-dispatch"
 };
 
 function NewTopicPageInner() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const processedAgentQueryRef = useRef<string | null>(null);
+
   const {
     messages,
     isStreaming,
@@ -90,8 +97,98 @@ function NewTopicPageInner() {
     storeSetModelId,
   );
 
+  const handleMentionAgent = useCallback(
+    (agentName: string) => {
+      setInput((prev: string) => {
+        const trimmed = prev.trimEnd();
+        const mentionStr = `@${agentName}`;
+        if (trimmed.includes(mentionStr)) {
+          // 如果输入框正好就是该提及，或者已在该提及结尾，避免重复提及
+          if (trimmed === mentionStr || trimmed.endsWith(` ${mentionStr}`)) {
+            return prev;
+          }
+        }
+        return trimmed ? `${trimmed} ${mentionStr} ` : `${mentionStr} `;
+      });
+    },
+    [setInput],
+  );
+
+  // 快捷卡片动态加载
+  const { data: quickActionsData, isLoading: quickActionsLoading } = useQuery({
+    queryKey: ["quick-actions"],
+    queryFn: async () => {
+      const res = await fetch("/api/brain/quick-actions");
+      const data = await res.json();
+      return data.data;
+    }
+  });
+
+  // 查询已安装包，用于行业属性提醒及多开检测
+  const { data: installedPacksData } = useQuery<any[]>({
+    queryKey: ["installed-packs"],
+    queryFn: async () => {
+      const res = await fetch("/api/industry-packs");
+      const json = await res.json();
+      return json.packs || json.data?.packs || [];
+    }
+  });
+
+  const activePacks = useMemo(() => {
+    return (installedPacksData || []).filter((p: any) => p.status === "installed");
+  }, [installedPacksData]);
+
+  const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("all");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("active_pack_id");
+      if (cached) setActiveTab(cached);
+    }
+  }, []);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("active_pack_id", tab);
+    }
+  };
+
+  // 场景 Tab 计算
+  const availablePacks = useMemo(() => {
+    const packs = new Set<string>();
+    quickActionsData?.allAvailable?.forEach((a: any) => {
+      if (a.packId) packs.add(a.packId);
+    });
+    return Array.from(packs);
+  }, [quickActionsData?.allAvailable]);
+
+  // 按场景/行业包过滤卡片
+  const filteredQuickActions = useMemo(() => {
+    const actions = quickActionsData?.quickActions || [];
+    if (activeTab === "all") return actions;
+    return actions.filter((a: any) => a.packId === activeTab);
+  }, [quickActionsData?.quickActions, activeTab]);
+
+  // 判断是否无行业包已安装
+  const hasNoPacks = useMemo(() => {
+    return activePacks.length === 0;
+  }, [activePacks]);
+
+  // 动态输入框 Placeholder
+  const placeholderText = useMemo(() => {
+    if (quickActionsData?.allAvailable && quickActionsData.allAvailable.length > 0) {
+      const firstPack = quickActionsData.allAvailable[0];
+      if (firstPack.packId === "foreign-trade") {
+        return "粘贴外贸询盘邮件，或直接输入指令进行询盘分析、开发信写作...";
+      }
+      return `输入需求以运行 ${firstPack.packId} 行业的专属指令...`;
+    }
+    return "输入需求、粘贴询盘、@调用智能体…";
+  }, [quickActionsData?.allAvailable]);
+
   // 从 /recent 点击跳转时通过 ?load=conversationId 自动加载历史对话
-  const searchParams = useSearchParams();
   useEffect(() => {
     const loadId = searchParams.get("load");
     if (loadId) {
@@ -99,10 +196,35 @@ function NewTopicPageInner() {
     }
   }, [searchParams, loadConversation]);
 
-  const hasMessages = messages.length > 0;
+  // 从智能体库点击“对话”跳转过来时，根据 ?agent=agentId 预填 @提及 智能体
+  useEffect(() => {
+    const agentId = searchParams.get("agent");
+    if (agentId) {
+      if (processedAgentQueryRef.current !== agentId) {
+        processedAgentQueryRef.current = agentId;
+        const agents = useAgentStore.getState().agents;
+        const cached = agents.find((a) => a.id === agentId);
+        if (cached) {
+          handleMentionAgent(cached.name);
+        } else {
+          // 后台获取特定智能体名称进行提及
+          fetch(`/api/agents/${agentId}`)
+            .then((res) => res.json())
+            .then((json) => {
+              const agentData = json.agent || json.data?.agent;
+              if (agentData?.name) {
+                handleMentionAgent(agentData.name);
+              }
+            })
+            .catch((err) => console.error("根据 id 加载提及智能体失败:", err));
+        }
+      }
+    } else {
+      processedAgentQueryRef.current = null;
+    }
+  }, [searchParams, handleMentionAgent]);
 
-  // 快捷任务面板折叠态（仅空态展示）
-  const [showQuickTask, setShowQuickTask] = useState(false);
+  const hasMessages = messages.length > 0;
   const [activeWorkflowKey, setActiveWorkflowKey] = useState<string | null>(null);
 
   // 全局居中磨砂虚化提示弹窗状态（PRD 对齐，做明显提示）
@@ -164,7 +286,7 @@ function NewTopicPageInner() {
 3. **【三域安全策略推荐（系统合规边界）**】：
    - **自动化授权等级**：推荐合理的自动化授权等级（L1/L2/L3/L4）。默认推荐 L2。如果该智能体涉及物理写操作（如调用 email-connector 物理发信），必须建议选择 L3 级（自动执行低风险动作，高危写操作触发人工审批）；如果涉及只读分析，建议选择 L2 级（半自动，AI 生成，人类手动触发）。
    - **记忆权限**：推荐 "read" (只读) 或 "read-write" (读写) 权限。
-   - **任务安全边界**：定义清晰的允许执行的动作列表（canDo，如：解析询盘、生成开发信草稿、核算 FOB 成本）和禁止执行的高危动作列表（cannotDo，如：向外部账户转账、私自更改价格模板、物理删除核心客户数据等）。
+   - **任务安全边界**：定义清晰的允许执行的动作列表（canDo，如：解析询盘、生成开发信草稿、核算 FOB 成本） and 禁止执行的高危动作列表（cannotDo，如：向外部账户转账、私自更改价格模板、物理删除核心客户数据等）。
 4. **【实操运行方案预览】**：针对该需求，现场进行一次模拟执行，为用户生成一份高保真且有代表性的业务方案样例（如 FOB 核算明细表，或一份外贸开发信模板）。
 5. **【数据载荷载入（核心关键）**】：你必须在你的输出正文的最尾端（不要有任何 markdown 块包裹，单独成行），输出一行隐藏的 HTML 数据载荷，其内容必须包含根据你规划得出的智能体完整配置 JSON。格式必须严格如下：
    <!-- AGENT_SPEC_JSON: {"name": "推荐名称", "role": "推荐角色", "description": "推荐描述", "bindSkills": ["技能ID"], "bindConnectors": ["连接器ID"], "automationLevel": "L2或L3", "memoryPermission": "read或read-write", "canDo": ["允许项1"], "cannotDo": ["禁用项1"]} -->
@@ -179,7 +301,7 @@ ${connectorsListText}
 
     const apiModelId = getApiModelId();
     sendMessage(userPrompt, systemPrompt, apiModelId);
-  }, [clearMessages, sendMessage, getApiModelId]);
+  }, [clearMessages, sendMessage, getApiModelId, showAlert]);
 
   const handleDirectActivateAgent = useCallback(async (
     spec: { 
@@ -298,33 +420,31 @@ ${cannotDoText}
 
   // 工作流表单提交：路由至工作流专用执行与状态轮询
   const handleWorkflowSubmit = useCallback(
-    async (prompt: string, systemPrompt?: string) => {
+    async (prompt: string, systemPrompt?: string, formValues?: Record<string, string>) => {
       const cardKey = activeWorkflowKey;
-      if (cardKey) {
-        const skillId = CARD_KEY_TO_SKILL_ID[cardKey];
-        if (skillId) {
-          try {
-            const res = await fetch(`/api/capabilities?skillId=${skillId}`);
-            if (res.ok) {
-              const data = await res.json();
-              const cap = data.data;
-              if (cap && (cap.status === "yanked" || cap.status === "degraded" || cap.healthStatus === "degraded" || cap.healthStatus === "unhealthy")) {
-                showAlert(
-                  "技能已下线或降级",
-                  `技能「${cap.capabilityId}」已下线或降级，暂时无法执行！`,
-                  "error"
-                );
-                return;
-              }
+      if (!cardKey) return;
+
+      const skillId = CARD_KEY_TO_SKILL_ID[cardKey];
+      if (skillId) {
+        try {
+          const res = await fetch(`/api/capabilities?skillId=${skillId}`);
+          if (res.ok) {
+            const data = await res.json();
+            const cap = data.data;
+            if (cap && (cap.status === "yanked" || cap.status === "degraded" || cap.healthStatus === "degraded" || cap.healthStatus === "unhealthy")) {
+              showAlert(
+                "技能已下线或降级",
+                `技能「${cap.capabilityId}」已下线或降级，暂时无法执行！`,
+                "error"
+              );
+              return;
             }
-          } catch (err) {
-            console.error("检查能力健康度失败:", err);
           }
+        } catch (err) {
+          console.error("检查能力健康度失败:", err);
         }
       }
 
-      const skillId = cardKey ? CARD_KEY_TO_SKILL_ID[cardKey] : undefined;
-      const agents = useAgentStore.getState().agents;
       const actualSkillIdMap: Record<string, string> = {
         "inquiry-grade": "ft-inquiry-grading",
         "dev-letter": "ft-outreach-email",
@@ -333,14 +453,16 @@ ${cannotDoText}
         "project-space": "ft-project-space",
         "agent-dispatch": "ft-outreach-email"
       };
-      const actualSkillId = skillId ? actualSkillIdMap[skillId] : undefined;
+      const actualSkillId = actualSkillIdMap[skillId] || skillId;
 
-      // 查找绑定了该技能且 status 为 active 的 Agent
+      const agents = useAgentStore.getState().agents;
+      // 查找绑定了该技能且 status 为可用（active/running/idle）的 Agent
       let targetAgent = agents.find(
-        (a) => a.status === "active" && JSON.parse(a.bindSkills || "[]").includes(actualSkillId)
+        (a) => (a.status === "running" || a.status === "idle") &&
+          (Array.isArray(a.bindSkills) ? a.bindSkills : (JSON.parse((a.bindSkills as unknown as string) || "[]") as string[])).includes(actualSkillId ?? '')
       );
 
-      if (!targetAgent && skillId) {
+      if (!targetAgent) {
         const roleKeywords: Record<string, string> = {
           "inquiry-grade": "询盘",
           "dev-letter": "开发信",
@@ -352,25 +474,67 @@ ${cannotDoText}
         const keyword = roleKeywords[skillId];
         if (keyword) {
           targetAgent = agents.find(
-            (a) => a.status === "active" && (a.role.includes(keyword) || a.name.includes(keyword))
+            (a) => (a.status === "running" || a.status === "idle") && (a.role.includes(keyword) || a.name.includes(keyword))
           );
         }
       }
 
       if (!targetAgent) {
-        targetAgent = agents.find((a) => a.status === "active");
+        targetAgent = agents.find((a) => a.status === "running" || a.status === "idle");
       }
 
-      const apiModelId = getApiModelId();
-      setActiveWorkflowKey(null);
+      if (!targetAgent) {
+        showAlert("未找到可用智能体", "请先在智能体管理中创建并激活智能体。", "error");
+        return;
+      }
 
-      if (targetAgent) {
-        sendWorkflowRun(targetAgent.id, prompt);
-      } else {
-        sendMessage(prompt, systemPrompt, apiModelId);
+      const toastId = toast.loading("正在启动工作流...");
+      const taskId = `task-${crypto.randomUUID()}`;
+      const idempotencyKey = `idem-${targetAgent.id}-${cardKey}-${Date.now()}`;
+
+      try {
+        const res = await fetch("/api/workflow-runs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            agentId: targetAgent.id,
+            input: formValues || {},
+            taskId,
+            actionType: cardKey,
+            automationLevel: targetAgent.automationLevel || "L1",
+            riskLevel: "low",
+            idempotencyKey,
+            version: "1.0"
+          })
+        });
+
+        const json = await res.json();
+        toast.dismiss(toastId);
+
+        if (json.success && json.data) {
+          const runResult = json.data;
+          if (runResult.status === "pending_approval") {
+            toast.warning("触发高危动作门禁拦截，已生成人工审批单");
+            const runId = runResult.checkpointId.replace("acp-", "");
+            router.push(`/workspace/runs/${runId}`);
+          } else if (runResult.workflowRunId) {
+            toast.success("工作流启动成功，开始物理执行");
+            router.push(`/workspace/runs/${runResult.workflowRunId}`);
+          } else {
+            toast.error("启动失败，未获取到有效工作流 ID");
+          }
+        } else {
+          showAlert("启动失败", json.message || "后端接口拒绝了本次启动请求", "error");
+        }
+      } catch (err) {
+        toast.dismiss(toastId);
+        console.error("物理启动工作流网络失败:", err);
+        toast.error("网络异常，启动失败");
+      } finally {
+        setActiveWorkflowKey(null);
       }
     },
-    [activeWorkflowKey, getApiModelId, sendMessage, sendWorkflowRun, showAlert]
+    [activeWorkflowKey, router, showAlert]
   );
 
   // 返回卡片列表
@@ -400,10 +564,11 @@ ${cannotDoText}
       const actualSkillId = skillId ? actualSkillIdMap[skillId] : undefined;
 
       let targetAgent = agents.find(
-        (a) => a.status === "active" && JSON.parse(a.bindSkills || "[]").includes(actualSkillId)
+        (a) => (a.status === "running" || a.status === "idle") &&
+          (Array.isArray(a.bindSkills) ? a.bindSkills : (JSON.parse((a.bindSkills as unknown as string) || "[]") as string[])).includes(actualSkillId ?? '')
       );
       if (!targetAgent) {
-        targetAgent = agents.find((a) => a.status === "active");
+        targetAgent = agents.find((a) => a.status === "running" || a.status === "idle");
       }
 
       if (targetAgent) {
@@ -451,19 +616,56 @@ ${cannotDoText}
     [setInput, setPendingSystemPrompt],
   );
 
-  const handleSuggestionSelect = useCallback((text: string) => {
-    setInput(text);
-  }, [setInput]);
+  // AI 建议直接物理启动工作流并重定向
+  const handleSuggestionSelect = useCallback(async (text: string) => {
+    const agents = useAgentStore.getState().agents;
+    const targetAgent = agents.find((a) => a.status === "running" || a.status === "idle");
+    if (!targetAgent) {
+      showAlert("未找到激活智能体", "无法执行建议，请先激活一位数字员工", "error");
+      return;
+    }
 
-  const handleMentionAgent = useCallback(
-    (agentName: string) => {
-      setInput((prev: string) => {
-        const trimmed = prev.trimEnd();
-        return trimmed ? `${trimmed} @${agentName} ` : `@${agentName} `;
+    const toastId = toast.loading("正在执行 AI 建议工作流...");
+    const taskId = `task-${crypto.randomUUID()}`;
+    const idempotencyKey = `idem-sugg-${targetAgent.id}-${Date.now()}`;
+
+    try {
+      const res = await fetch("/api/workflow-runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agentId: targetAgent.id,
+          input: text,
+          taskId,
+          idempotencyKey,
+          version: "1.0"
+        })
       });
-    },
-    [setInput],
-  );
+
+      const json = await res.json();
+      toast.dismiss(toastId);
+
+      if (json.success && json.data) {
+        const runResult = json.data;
+        if (runResult.status === "pending_approval") {
+          toast.warning("触发高危保护门禁，已转为人工审批");
+          const runId = runResult.checkpointId.replace("acp-", "");
+          router.push(`/workspace/runs/${runId}`);
+        } else if (runResult.workflowRunId) {
+          toast.success("AI 建议已启动");
+          router.push(`/workspace/runs/${runResult.workflowRunId}`);
+        } else {
+          toast.error("执行失败，没有生成有效工作流 ID");
+        }
+      } else {
+        toast.error(json.message || "后端接口拒绝了此次物理执行请求");
+      }
+    } catch (err) {
+      toast.dismiss(toastId);
+      console.error("执行建议网络异常:", err);
+      toast.error("网络异常，无法执行建议");
+    }
+  }, [router, showAlert]);
 
   return (
     <PageTransition>
@@ -517,6 +719,62 @@ ${cannotDoText}
           >
             <>
               <div className="w-full max-w-2xl mx-auto">
+                {/* 行业属性提醒标记 (CommandBox右上角) */}
+                <div className="w-full flex justify-between items-center mb-1.5 px-1 select-none">
+                  <div>{/* 左侧可留空以撑开 */}</div>
+                  <AnimatePresence mode="wait">
+                    {activePacks.length === 0 ? (
+                      <motion.div
+                        key="global-mode"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="inline-flex items-center rounded-full bg-muted/40 border border-border/50 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 select-none"
+                      >
+                        通用模型
+                      </motion.div>
+                    ) : activePacks.length === 1 ? (
+                      <motion.div
+                        key="industry-mode"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="inline-flex items-center rounded-full bg-muted/40 border border-border/50 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 select-none"
+                      >
+                        {(activePacks[0].packName || '外贸').replace(/行业包$|包$|行业$/, "")}模式
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="conflict-mode"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="inline-flex items-center rounded-full bg-muted/40 border border-border/50 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 select-none cursor-pointer hover:bg-muted/60 transition-colors"
+                        onClick={() => router.push('/settings/industry-packs')}
+                        title="点击去暂停冲突行业包"
+                      >
+                        行业冲突
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                {/* Onboarding 横幅 */}
+                {!hasMessages && hasNoPacks && (
+                  <div className="w-full mb-4 p-3.5 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-between text-xs text-foreground select-none">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="size-4 text-primary animate-pulse" />
+                      <span>选择你的行业，获得专属工作流和智能体</span>
+                    </div>
+                    <Link
+                      href="/settings/industry-packs"
+                      className="text-primary hover:underline font-semibold"
+                    >
+                      去配置行业包 →
+                    </Link>
+                  </div>
+                )}
+
                 <CommandBox
                   value={input}
                   onChange={setInput}
@@ -524,6 +782,7 @@ ${cannotDoText}
                   onStop={stopStreaming}
                   isStreaming={isStreaming}
                   error={error}
+                  placeholder={placeholderText}
                   onStartWizard={!hasMessages ? handleStartWizard : undefined}
                 />
               </div>
@@ -554,8 +813,58 @@ ${cannotDoText}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -12, scale: 0.96 }}
                         transition={{ duration: 0.2 }}
+                        className="space-y-3"
                       >
+                        {/* 场景 Tabs (如果已安装行业包个数 > 1) */}
+                        {availablePacks.length > 1 && (
+                          <div className="flex items-center gap-1.5 border-b border-border/40 pb-2 overflow-x-auto">
+                            <button
+                              type="button"
+                              onClick={() => handleTabChange("all")}
+                              className={cn(
+                                "px-2.5 py-1 text-xs rounded-full font-medium transition-colors",
+                                activeTab === "all"
+                                  ? "bg-primary text-primary-foreground"
+                                  : "text-muted-foreground hover:bg-muted"
+                              )}
+                            >
+                              全部场景
+                            </button>
+                            {availablePacks.map((packId) => (
+                              <button
+                                key={packId}
+                                type="button"
+                                onClick={() => handleTabChange(packId)}
+                                className={cn(
+                                  "px-2.5 py-1 text-xs rounded-full font-medium transition-colors truncate max-w-[120px]",
+                                  activeTab === packId
+                                    ? "bg-primary text-primary-foreground"
+                                    : "text-muted-foreground hover:bg-muted"
+                                )}
+                              >
+                                {packId === "foreign-trade" ? "外贸场景" : packId}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 常用卡片标题与自定义按钮 */}
+                        {!hasNoPacks && (
+                          <div className="flex items-center justify-between text-xs text-muted-foreground font-medium px-1">
+                            <span>常用快捷入口</span>
+                            <button
+                              type="button"
+                              onClick={() => setIsCustomizerOpen(true)}
+                              className="hover:text-primary transition-colors cursor-pointer"
+                            >
+                              自定义
+                            </button>
+                          </div>
+                        )}
+
                         <QuickCards
+                          actions={filteredQuickActions}
+                          loading={quickActionsLoading}
                           onSelect={handleQuickActionSelect}
                           onWorkflowSelect={handleWorkflowSelect}
                         />
@@ -573,12 +882,21 @@ ${cannotDoText}
             onSelectSuggestion={handleSuggestionSelect}
             onMentionAgent={handleMentionAgent}
           />
-          {/* 分隔线 */}
-          <div className="border-t border-border my-3" />
-          <RecentPanel />
         </aside>
       </div>
 
+      {/* 快捷卡片自定义抽屉 */}
+      <QuickActionCustomizer
+        isOpen={isCustomizerOpen}
+        onOpenChange={setIsCustomizerOpen}
+        allAvailable={quickActionsData?.allAvailable || []}
+        currentOrder={quickActionsData?.quickActions?.map((a: any) => a.id) || []}
+        onSaveSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["quick-actions"] });
+        }}
+      />
+
+      {/* 全局居中磨砂虚化提示弹窗 */}
       <AnimatePresence>
         {alertModal.isOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

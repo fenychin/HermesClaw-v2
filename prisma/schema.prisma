@@ -313,6 +313,7 @@ model Connector {
   rateLimit        Int       @default(100) // 每小时最大发送数
   rateLimitUsed    Int       @default(0) // 当前小时已使用量
   rateLimitResetAt DateTime? // 速率限制重置时间
+  packId           String? // 关联的行业包ID
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -1312,6 +1313,7 @@ model UserPreference {
   language            String   @default("zh-CN")
   defaultWorkspaceId  String?
   notificationSettings String  @default("{}") // JSON
+  quickActionOrder    String   @default("[]") // JSON array for customized quick actions order
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 }
@@ -1341,7 +1343,7 @@ model IndustryPackInstallation {
 
   // 安装状态
   status String @default("installing")
-  // 'installing' | 'installed' | 'failed' | 'uninstalling' | 'uninstalled'
+  // 'installing' | 'installed' | 'failed' | 'uninstalling' | 'uninstalled' | 'paused' | 'deprecated'
 
   // 安装内容记录（安装了哪些能力）
   installedCapabilities String @default("[]") // JSON 数组，CapabilityVersion.id 列表

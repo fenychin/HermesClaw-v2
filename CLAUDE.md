@@ -100,6 +100,7 @@ Hermes Core / OpenClaw Runtime 已按以下顺序完成拆分：
 3. ✅ `packages/openclaw-adapter`（来源：旧 `src/lib/server/adapters/openclaw/`）
 4. ✅ `packages/industry-pack-sdk`（来源：旧 `src/lib/industry-pack-sdk/`）
 5. ✅ `apps/web/`（来源：旧 `src/app/` + `src/lib/server/` 集成层）
+6. ✅ Brain Module Phase 2（智慧大脑模块全量修复与迁移）完成日期：2026-06-26
 
 当前目录结构已稳定为 monorepo：
 

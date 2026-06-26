@@ -17,7 +17,7 @@ import { TRADE_AGENT_PROMPTS } from "@/lib/system-prompts";
 
 interface QuickWorkflowFormProps {
   cardKey: string;
-  onSubmit: (prompt: string, systemPrompt?: string) => void;
+  onSubmit: (prompt: string, systemPrompt?: string, values?: Record<string, string>) => void;
   onBack: () => void;
   onStartWizard?: (initialPrompt: string) => void;
 }
@@ -46,7 +46,7 @@ interface WorkflowConfig {
 
 const WORKFLOW_CONFIGS: ReadonlyArray<WorkflowConfig> = [
   {
-    key: "analyze-inquiry",
+    key: "inquiry-grade",
     title: "分析询盘",
     subtitle: "外贸深度询盘评级与意向分析工作流 · inquiry-grade",
     systemPromptKey: "inquiryAnalysis",
@@ -93,7 +93,7 @@ ${values.inquiryText}
 <客户公司>${values.clientCompany || '未指定'}</客户公司>`,
   },
   {
-    key: "cold-email",
+    key: "dev-letter",
     title: "生成开发信",
     subtitle: "外贸高响应率开发信生成技能 · dev-letter",
     systemPromptKey: "developmentLetter",
@@ -155,7 +155,7 @@ ${values.inquiryText}
 <语气风格>${values.tone}</语气风格>`,
   },
   {
-    key: "quotation",
+    key: "quote-gen",
     title: "创建报价单",
     subtitle: "报价策略与定价体系分析工作流 · quote-gen",
     systemPromptKey: "quotation",
@@ -207,7 +207,7 @@ ${values.inquiryText}
 <付款条件>${values.paymentTerms || '待定'}</付款条件>`,
   },
   {
-    key: "client-profile",
+    key: "customer-profile",
     title: "客户画像",
     subtitle: "企业背景穿透与决策链分析工作流 · customer-profile",
     systemPromptKey: "customerProfile",
@@ -252,7 +252,7 @@ ${values.inquiryText}
 <所在国家>${values.region || '未指定'}</所在国家`,
   },
   {
-    key: "create-project",
+    key: "project-space",
     title: "创建项目空间",
     subtitle: "独立客户订单与交付管理空间建立",
     skillTag: "#project-space",
@@ -303,7 +303,7 @@ ${values.inquiryText}
 <阶段重点>${values.keyFocus || '常规订单跟进'}</阶段重点>`,
   },
   {
-    key: "call-agent",
+    key: "agent-dispatch",
     title: "调用智能体",
     subtitle: "协同多智能体编排任务",
     skillTag: "#agent-dispatch",
@@ -348,9 +348,31 @@ ${values.taskPrompt}
 
 export function QuickWorkflowForm({ cardKey, onSubmit, onBack, onStartWizard }: QuickWorkflowFormProps) {
   const [values, setValues] = useState<Record<string, string>>({});
+  const [dynamicAgents, setDynamicAgents] = useState<string[]>([]);
 
   useEffect(() => {
     setValues({});
+  }, [cardKey]);
+
+  useEffect(() => {
+    if (cardKey === "agent-dispatch") {
+      fetch("/api/agents")
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.success && Array.isArray(json.data?.agents)) {
+            const list = json.data.agents
+              .filter((a: any) => a.status === "active" || a.status === "running" || a.status === "idle")
+              .map((a: any) => {
+                const roleName = a.role || "智能助手";
+                return `@${a.name}（${roleName}）`;
+              });
+            if (list.length > 0) {
+              setDynamicAgents(list);
+            }
+          }
+        })
+        .catch((err) => console.error("[QuickWorkflowForm] 加载智能体失败:", err));
+    }
   }, [cardKey]);
 
   const config = useMemo(() => {
@@ -378,7 +400,7 @@ export function QuickWorkflowForm({ cardKey, onSubmit, onBack, onStartWizard }: 
     const systemPrompt = config.systemPromptKey
       ? TRADE_AGENT_PROMPTS[config.systemPromptKey]
       : undefined;
-    onSubmit(prompt, systemPrompt);
+    onSubmit(prompt, systemPrompt, values);
   };
 
   return (
@@ -412,7 +434,7 @@ export function QuickWorkflowForm({ cardKey, onSubmit, onBack, onStartWizard }: 
           </p>
         </div>
 
-        {cardKey === "call-agent" && (
+        {cardKey === "agent-dispatch" && (
           <Link
             href="/workspace/agents"
             className="text-[11px] font-semibold text-white bg-primary hover:bg-primary/90 border border-primary/30 rounded-lg px-3 py-1.5 flex items-center gap-1.5 transition-all shadow-md shrink-0"
@@ -422,7 +444,6 @@ export function QuickWorkflowForm({ cardKey, onSubmit, onBack, onStartWizard }: 
           </Link>
         )}
       </div>
-
 
       {/* 表单字段渲染 */}
       <div className="space-y-4">
@@ -464,7 +485,7 @@ export function QuickWorkflowForm({ cardKey, onSubmit, onBack, onStartWizard }: 
                 </SelectTrigger>
                 <SelectContent className="z-50 bg-popover border border-border rounded-lg shadow-md p-1 min-w-[var(--anchor-width)]">
                   <SelectList className="flex flex-col gap-0.5 max-h-60 overflow-auto">
-                    {field.options?.map((opt) => (
+                    {(field.key === "targetAgent" && dynamicAgents.length > 0 ? dynamicAgents : field.options)?.map((opt) => (
                       <SelectItem key={opt} value={opt} className="relative flex w-full cursor-pointer select-none items-center rounded-md py-1.5 pl-2 pr-7 text-xs hover:bg-accent outline-none">
                         {opt}
                       </SelectItem>

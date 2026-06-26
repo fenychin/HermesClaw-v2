@@ -36,21 +36,21 @@ export default function ImagesPage() {
   return (
     <PageTransition>
       <BrainAssetPlaceholderPage
-        title="图像资产"
+        title="图像库"
         description="产品图、营销与品牌素材管理"
         featureIcon={ImageIcon}
         featureIconColor="text-brand-blue"
         featureIconBg="bg-brand-blue/10"
         featureTitle="关于图像资产"
         featureText="PRD §9.3：图像资产库是 HermesClaw 视觉内容供给链的核心，承载产品白底图、场景图、证书、营销 banner、社媒素材等
-图像资源。支持 OCR 文字识别、自动标签分类、AI 背景去除与智能裁剪，所有素材可按产品 SKU、场景、市场自动关联。"
+        图像资源。支持 OCR 文字识别、自动标签分类、AI 背景去除与智能裁剪，所有素材可按产品 SKU、场景、市场自动关联。"
         columns={COLUMNS}
         phase2Text="该模块已规划，Phase 2 启动。届时将集成 AI 图像处理引擎与自动标签系统，敬请期待。"
         phase2IconColor="text-brand-blue"
         phase2IconBg="bg-brand-blue/10"
         breadcrumb={[
-          { label: "智慧大脑", href: "/brain" },
-          { label: "图像" },
+          { label: "资料库", href: "/files" },
+          { label: "图像库" },
         ]}
       />
     </PageTransition>

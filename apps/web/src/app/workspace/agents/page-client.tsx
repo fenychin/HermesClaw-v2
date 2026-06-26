@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
@@ -20,6 +20,7 @@ export interface AgentData {
   taskCount: number;
   isBuiltIn: boolean;
   automationLevel?: string;
+  category?: string[];
 }
 
 /** 骨架屏 —— 8 张卡片占位 */
@@ -74,8 +75,9 @@ function toAgentData(api: any): AgentData {
           : "idle",
     tags: api.tags || [],
     taskCount: api.taskCount || 0,
-    isBuiltIn: api.source === "builtin",
+    isBuiltIn: api.source === "builtin" || api.source === "pack",
     automationLevel: api.automationLevel ?? "L2",
+    category: Array.isArray(api.category) ? api.category : [],
   };
 }
 
@@ -91,6 +93,9 @@ export default function AgentsPage({
 
   // 当前展开的智能体 ID
   const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
+
+  // 二级分类过滤
+  const [activeSubFilter, setActiveSubFilter] = useState<string>("全部");
 
   // PERF: 稳定化 toggle handler
   const handleToggleExpand = useCallback((agentId: string) => {
@@ -123,6 +128,24 @@ export default function AgentsPage({
 
   const builtInAgents = displayAgents.filter((a) => a.isBuiltIn);
   const customAgents = displayAgents.filter((a) => !a.isBuiltIn);
+
+  // 提取外贸专属智能体中所有非空的 category 标签做细分筛选
+  const categoriesList = useMemo(() => {
+    const set = new Set<string>();
+    builtInAgents.forEach((a) => {
+      if (Array.isArray(a.category)) {
+        a.category.forEach((c) => {
+          if (c && c.trim()) set.add(c.trim());
+        });
+      }
+    });
+    return ["全部", ...Array.from(set)];
+  }, [builtInAgents]);
+
+  const filteredBuiltInAgents = useMemo(() => {
+    if (activeSubFilter === "全部") return builtInAgents;
+    return builtInAgents.filter((a) => a.category?.includes(activeSubFilter));
+  }, [builtInAgents, activeSubFilter]);
 
   return (
     <div className="w-full max-w-7xl mx-auto py-6 px-6">
@@ -195,22 +218,52 @@ export default function AgentsPage({
           {isLoading ? (
             <AgentGridSkeleton />
           ) : builtInAgents.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {builtInAgents.map((agent) => (
-                <AgentCard
-                  key={agent.id}
-                  id={agent.id}
-                  name={agent.name}
-                  role={agent.role}
-                  status={agent.status}
-                  tags={agent.tags}
-                  taskCount={agent.taskCount}
-                  isBuiltIn={agent.isBuiltIn}
-                  automationLevel={agent.automationLevel ?? "L2"}
-                  isExpanded={expandedAgentId === agent.id}
-                  onToggleExpand={handleToggleExpand}
-                />
-              ))}
+            <div className="space-y-6">
+              {/* 二级 Pill 细化筛选器 */}
+              {categoriesList.length > 1 && (
+                <div className="flex flex-wrap items-center gap-2 bg-accent/30 border border-border/40 p-2 rounded-2xl w-full">
+                  <span className="text-xs text-muted-foreground font-semibold px-2">岗位细分：</span>
+                  {categoriesList.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setActiveSubFilter(cat)}
+                      className={cn(
+                        "text-xs px-3.5 py-1.5 rounded-xl transition-all duration-200 border",
+                        activeSubFilter === cat
+                          ? "bg-brand text-white border-brand shadow-sm font-semibold"
+                          : "bg-card border-border hover:border-brand/30 text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {filteredBuiltInAgents.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {filteredBuiltInAgents.map((agent) => (
+                    <AgentCard
+                      key={agent.id}
+                      id={agent.id}
+                      name={agent.name}
+                      role={agent.role}
+                      status={agent.status}
+                      tags={agent.tags}
+                      taskCount={agent.taskCount}
+                      isBuiltIn={agent.isBuiltIn}
+                      automationLevel={agent.automationLevel ?? "L2"}
+                      isExpanded={expandedAgentId === agent.id}
+                      onToggleExpand={handleToggleExpand}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 border border-dashed border-border rounded-2xl text-muted-foreground text-xs">
+                  该细分类别下暂无智能体记录
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-12 border border-dashed border-border rounded-2xl text-muted-foreground text-xs">

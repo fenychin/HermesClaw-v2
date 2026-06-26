@@ -29,6 +29,8 @@ export interface AuditInput {
   riskLevel?: 'low' | 'medium' | 'high';
   workspaceId: string;
   contextSnapshot?: Record<string, unknown>;
+  /** AGENTS.md §v3.28 四层日志链顶层关联约定：必须作为顶层字段传递，不得仅隐藏在 contextSnapshot 中 */
+  workflowRunId?: string;
 }
 
 export interface ApprovalDeps {
@@ -300,7 +302,13 @@ export async function decideApprovalCheckpoint(
     // 联动工作流恢复执行：如果有关联的工作流运行，则拒绝并取消
     if (updatedRecord.workflowRunId) {
       const { resumeWorkflowRun } = await import('./workflow/runtime-engine')
-      await resumeWorkflowRun(updatedRecord.workflowRunId, checkpoint.workspaceId, false, decidedBy)
+      try {
+        await resumeWorkflowRun(updatedRecord.workflowRunId, checkpoint.workspaceId, false, decidedBy)
+      } catch (err: any) {
+        if (err.name !== 'WorkflowRunNotFoundError' && !err.message?.includes('not found')) {
+          throw err
+        }
+      }
     }
 
     return mapDbToCheckpoint(updatedRecord);
@@ -343,7 +351,13 @@ export async function decideApprovalCheckpoint(
       // 联动工作流恢复执行：如果是工作流审批，批准并恢复运行
       if (updatedRecord.workflowRunId) {
         const { resumeWorkflowRun } = await import('./workflow/runtime-engine')
-        await resumeWorkflowRun(updatedRecord.workflowRunId, checkpoint.workspaceId, true, decidedBy)
+        try {
+          await resumeWorkflowRun(updatedRecord.workflowRunId, checkpoint.workspaceId, true, decidedBy)
+        } catch (err: any) {
+          if (err.name !== 'WorkflowRunNotFoundError' && !err.message?.includes('not found')) {
+            throw err
+          }
+        }
       }
 
       // 触发快照与 canary 灰度
@@ -406,7 +420,13 @@ export async function decideApprovalCheckpoint(
     // 联动工作流恢复执行：如果是工作流审批，批准并恢复运行
     if (updatedRecord.workflowRunId) {
       const { resumeWorkflowRun } = await import('./workflow/runtime-engine')
-      await resumeWorkflowRun(updatedRecord.workflowRunId, checkpoint.workspaceId, true, decidedBy)
+      try {
+        await resumeWorkflowRun(updatedRecord.workflowRunId, checkpoint.workspaceId, true, decidedBy)
+      } catch (err: any) {
+        if (err.name !== 'WorkflowRunNotFoundError' && !err.message?.includes('not found')) {
+          throw err
+        }
+      }
     }
 
     // 触发快照与 canary 灰度

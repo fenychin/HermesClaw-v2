@@ -6,6 +6,7 @@ import { writeAuditLog, createAuditEntry, updateAuditEntry } from "./audit"
 import {
   registerCapability,
   deprecateCapability,
+  reactivateCapability,
   CapabilityAlreadyRegisteredError
 } from "./capability-registry"
 import { validateManifest, type IndustryPackManifest } from "@hermesclaw/event-contracts"
@@ -62,7 +63,9 @@ export interface PackLoaderDeps {
   getSystemVersion?: () => string
   registerCapability?: typeof registerCapability
   deprecateCapability?: typeof deprecateCapability
+  reactivateCapability?: typeof reactivateCapability
 }
+
 
 function getSystemVersion(): string {
   try {
@@ -162,6 +165,38 @@ export async function installPack(
   const activeGetSystemVersion = deps?.getSystemVersion || getSystemVersion
   const activeRegisterCapability = deps?.registerCapability || registerCapability
   const activeDeprecateCapability = deps?.deprecateCapability || deprecateCapability
+
+  // 提取本包的所有资产 ID，用于在 Workspace 级做 ID 隔离
+  const packAgentIds = new Set<string>()
+  const packCapabilityIds = new Set<string>()
+  const packWorkflowIds = new Set<string>()
+  const packSkillIds = new Set<string>()
+  const packConnectorIds = new Set<string>()
+
+  const agents = (manifest as any).agents || []
+  if (Array.isArray(agents)) {
+    for (const agent of agents) {
+      if (agent.id) packAgentIds.add(agent.id)
+    }
+  }
+  if (Array.isArray(manifest.capabilities)) {
+    for (const cap of manifest.capabilities) {
+      if (cap.id) {
+        packCapabilityIds.add(cap.id)
+        if (cap.type === 'workflow') packWorkflowIds.add(cap.id)
+        if (cap.type === 'skill') packSkillIds.add(cap.id)
+        if (cap.type === 'connector') packConnectorIds.add(cap.id)
+      }
+    }
+  }
+
+  // 定义 Workspace 级前缀重写辅助函数
+  const toScopedId = (id: string) => {
+    if (!id) return id
+    const prefix = `${workspaceId}:`
+    if (id.startsWith(prefix)) return id
+    return `${prefix}${id}`
+  }
 
   // 1. 验证 Manifest
   const valResult = validateManifest(manifest)
@@ -264,31 +299,95 @@ export async function installPack(
     }
 
     // 5. 创建安装追踪记录 (installing)
-    const installationId = `ins-${crypto.randomUUID()}`
-    const logRecord = await activePrisma.industryPackInstallation.create({
-      data: {
-        installationId,
+    const existingRecord = await activePrisma.industryPackInstallation.findFirst({
+      where: {
         workspaceId,
         packId: manifest.packId,
-        packName: manifest.packName,
-        packVersion: manifest.packVersion,
-        status: 'installing',
-        installedCapabilities: '[]',
-        resolvedDependencies: JSON.stringify(manifest.dependencies || []),
-        manifest: manifest as any,
-        installedBy: installedBy || 'system'
+        packVersion: manifest.packVersion
       }
     })
+
+    let logRecord
+    if (existingRecord) {
+      logRecord = await activePrisma.industryPackInstallation.update({
+        where: { id: existingRecord.id },
+        data: {
+          status: 'installing',
+          errorMessage: null,
+          installedCapabilities: '[]',
+          resolvedDependencies: JSON.stringify(manifest.dependencies || []),
+          manifest: manifest as any,
+          installedBy: installedBy || 'system',
+          installedAt: null,
+          uninstalledAt: null,
+          uninstalledBy: null
+        }
+      })
+    } else {
+      const installationId = `ins-${crypto.randomUUID()}`
+      try {
+        logRecord = await activePrisma.industryPackInstallation.create({
+          data: {
+            installationId,
+            workspaceId,
+            packId: manifest.packId,
+            packName: manifest.packName,
+            packVersion: manifest.packVersion,
+            status: 'installing',
+            installedCapabilities: '[]',
+            resolvedDependencies: JSON.stringify(manifest.dependencies || []),
+            manifest: manifest as any,
+            installedBy: installedBy || 'system'
+          }
+        })
+      } catch (createErr: any) {
+        const isUniqueConstraint = 
+          createErr.code === 'P2002' || 
+          (createErr.message && createErr.message.includes('Unique constraint failed'))
+        
+        if (isUniqueConstraint) {
+          console.warn('[installPack] Create failed with unique constraint conflict, falling back to update:', createErr.message)
+          const fallbackRecord = await activePrisma.industryPackInstallation.findFirst({
+            where: {
+              workspaceId,
+              packId: manifest.packId,
+              packVersion: manifest.packVersion
+            }
+          })
+          if (fallbackRecord) {
+            logRecord = await activePrisma.industryPackInstallation.update({
+              where: { id: fallbackRecord.id },
+              data: {
+                status: 'installing',
+                errorMessage: null,
+                installedCapabilities: '[]',
+                resolvedDependencies: JSON.stringify(manifest.dependencies || []),
+                manifest: manifest as any,
+                installedBy: installedBy || 'system',
+                installedAt: null,
+                uninstalledAt: null,
+                uninstalledBy: null
+              }
+            })
+          } else {
+            throw createErr
+          }
+        } else {
+          throw createErr
+        }
+      }
+    }
     logRecordId = logRecord.id
 
     // 7. 遍历能力组件，写入对应底层表，并注册能力
     for (const entry of manifest.capabilities) {
+      const scopedCapId = toScopedId(entry.id)
       // 7a. 写入各自实体表
       if (entry.type === 'skill') {
-        const dbSkill = await activePrisma.skill.findUnique({ where: { id: entry.id } })
+        const dbSkill = await activePrisma.skill.findUnique({ where: { id: scopedCapId } })
         if (dbSkill) {
           await activePrisma.skill.update({
-            where: { id: entry.id },
+            where: { id: scopedCapId },
             data: {
               version: entry.version,
               description: entry.description
@@ -297,7 +396,7 @@ export async function installPack(
         } else {
           await activePrisma.skill.create({
             data: {
-              id: entry.id,
+              id: scopedCapId,
               workspaceId,
               name: entry.displayName,
               description: entry.description,
@@ -314,19 +413,20 @@ export async function installPack(
           })
         }
       } else if (entry.type === 'connector') {
-        const dbConn = await activePrisma.connector.findUnique({ where: { id: entry.id } })
+        const dbConn = await activePrisma.connector.findUnique({ where: { id: scopedCapId } })
         if (dbConn) {
           await activePrisma.connector.update({
-            where: { id: entry.id },
+            where: { id: scopedCapId },
             data: {
               description: entry.description,
+              packId: manifest.packId,
               config: sanitizeConfigTemplate(entry.configTemplate || {}) as Prisma.InputJsonValue
             }
           })
         } else {
           await activePrisma.connector.create({
             data: {
-              id: entry.id,
+              id: scopedCapId,
               workspaceId,
               name: entry.displayName,
               iconEmoji: '🔌',
@@ -335,30 +435,59 @@ export async function installPack(
               category: 'general',
               permissions: JSON.stringify(['read', 'write']),
               usedByAgents: '[]',
+              packId: manifest.packId,
               config: sanitizeConfigTemplate(entry.configTemplate || {}) as Prisma.InputJsonValue
             }
           })
         }
       } else if (entry.type === 'workflow') {
-        const dbWorkflow = await activePrisma.workflow.findUnique({ where: { id: entry.id } })
+        const dbWorkflow = await activePrisma.workflow.findUnique({ where: { id: scopedCapId } })
+        
+        // 级联重写 Nodes 中的 ID 引用 (智能体/技能/连接器)
+        const rawNodes = (entry.workflowDefinition?.nodes || []) as any[]
+        const scopedNodes = rawNodes.map((node: any) => {
+          const updatedNode = { ...node }
+          if (updatedNode.config) {
+            updatedNode.config = { ...updatedNode.config }
+            if (updatedNode.config.skillId && (packSkillIds.has(updatedNode.config.skillId) || packSkillIds.has(updatedNode.config.skillId.replace(/^skill-/, '')))) {
+              updatedNode.config.skillId = toScopedId(updatedNode.config.skillId)
+            }
+            if (updatedNode.config.agentId && packAgentIds.has(updatedNode.config.agentId)) {
+              updatedNode.config.agentId = toScopedId(updatedNode.config.agentId)
+            }
+            if (updatedNode.config.connectorId && packConnectorIds.has(updatedNode.config.connectorId)) {
+              updatedNode.config.connectorId = toScopedId(updatedNode.config.connectorId)
+            }
+          }
+          if (updatedNode.skillId && (packSkillIds.has(updatedNode.skillId) || packSkillIds.has(updatedNode.skillId.replace(/^skill-/, '')))) {
+            updatedNode.skillId = toScopedId(updatedNode.skillId)
+          }
+          if (updatedNode.agentId && packAgentIds.has(updatedNode.agentId)) {
+            updatedNode.agentId = toScopedId(updatedNode.agentId)
+          }
+          return updatedNode
+        })
+
+        const workflowData = {
+          description: entry.description,
+          nodes: JSON.stringify(scopedNodes),
+          edges: JSON.stringify(entry.workflowDefinition?.edges || [])
+        }
+
         if (dbWorkflow) {
           await activePrisma.workflow.update({
-            where: { id: entry.id },
-            data: {
-              description: entry.description,
-              nodes: JSON.stringify(entry.workflowDefinition?.nodes || []),
-              edges: JSON.stringify(entry.workflowDefinition?.edges || [])
-            }
+            where: { id: scopedCapId },
+            data: workflowData
           })
         } else {
           await activePrisma.workflow.create({
             data: {
-              id: entry.id,
+              id: scopedCapId,
               workspaceId,
               name: entry.displayName,
               description: entry.description,
               status: 'active',
-              nodes: JSON.stringify(entry.workflowDefinition?.nodes || []),
+              nodes: JSON.stringify(scopedNodes),
               edges: JSON.stringify(entry.workflowDefinition?.edges || []),
               industryId: manifest.packId,
               templateId: entry.id
@@ -370,7 +499,7 @@ export async function installPack(
       // 7b. 版本化能力注册到 Registry
       try {
         await activeRegisterCapability({
-          capabilityId: entry.id,
+          capabilityId: scopedCapId,
           capabilityType: entry.type as any,
           version: entry.version,
           workspaceId,
@@ -384,7 +513,7 @@ export async function installPack(
           publishedAt: new Date()
         }, { prisma: activePrisma, writeAuditLog: activeWriteAuditLog })
 
-        registeredCapIds.push({ id: entry.id, version: entry.version })
+        registeredCapIds.push({ id: scopedCapId, version: entry.version })
       } catch (err) {
         if (err instanceof CapabilityAlreadyRegisteredError) {
           // 幂等处理：写 warning 并跳过
@@ -392,13 +521,72 @@ export async function installPack(
             actor: installedBy || 'system',
             action: 'pack.install.warning',
             targetType: 'capability',
-            targetId: entry.id,
-            detail: `Capability ${entry.id}@${entry.version} already registered, skipping.`,
+            targetId: scopedCapId,
+            detail: `Capability ${scopedCapId}@${entry.version} already registered, skipping.`,
             riskLevel: 'low',
             workspaceId
           })
+          registeredCapIds.push({ id: scopedCapId, version: entry.version })
         } else {
           throw err // 其他错误直接向上抛出，触发回滚
+        }
+      }
+    }
+
+    // 7c. 写入智能体实体表
+    const agents = (manifest as any).agents || []
+    if (Array.isArray(agents)) {
+      for (const agent of agents) {
+        const scopedAgentId = toScopedId(agent.id)
+        const boundSkills = (agent.bindSkills || agent.skills || []).map((s: string) => {
+          const rawSkillId = s.startsWith('skill-') ? s : `skill-${s}`
+          const cleanSkillId = rawSkillId.replace(/^skill-/, '')
+          if (packSkillIds.has(cleanSkillId) || packSkillIds.has(rawSkillId)) {
+            return toScopedId(rawSkillId)
+          }
+          return rawSkillId
+        })
+        const boundConnectors = (agent.bindConnectors || []).map((c: string) => {
+          if (packConnectorIds.has(c)) {
+            return toScopedId(c)
+          }
+          return c
+        })
+
+        const dbAgent = await activePrisma.agent.findUnique({ where: { id: scopedAgentId } })
+        const agentData = {
+          name: agent.name,
+          role: agent.role,
+          description: agent.description || "",
+          status: agent.status || "active",
+          source: "pack",
+          category: JSON.stringify(agent.category || []),
+          bindSkills: JSON.stringify(boundSkills),
+          bindConnectors: JSON.stringify(boundConnectors),
+          memoryPermission: agent.memoryPermission || "read-write",
+          harnessVersion: agent.harnessVersion || "1.0.0",
+          automationLevel: agent.automationLevel || "L2",
+          canDo: JSON.stringify(agent.canDo || []),
+          cannotDo: JSON.stringify(agent.cannotDo || []),
+          statsJson: JSON.stringify(agent.statsJson || agent.stats || {}),
+          lastActive: agent.lastActive || new Date().toISOString(),
+          industryId: agent.industryId || manifest.packId,
+          templateId: agent.templateId || agent.id
+        }
+
+        if (dbAgent) {
+          await activePrisma.agent.update({
+            where: { id: scopedAgentId },
+            data: agentData
+          })
+        } else {
+          await activePrisma.agent.create({
+            data: {
+              id: scopedAgentId,
+              workspaceId,
+              ...agentData
+            }
+          })
         }
       }
     }
@@ -411,6 +599,19 @@ export async function installPack(
         status: 'installed',
         installedCapabilities: JSON.stringify(capList),
         installedAt: new Date()
+      }
+    })
+
+    // 8b. 升级时自动废弃旧的已安装版本（AGENTS.md §4.3 Harness Bundle 灰度与生命周期）
+    await activePrisma.industryPackInstallation.updateMany({
+      where: {
+        workspaceId,
+        packId: manifest.packId,
+        id: { not: logRecordId },
+        status: 'installed'
+      },
+      data: {
+        status: 'deprecated'
       }
     })
 
@@ -705,3 +906,206 @@ export async function refreshPackHealthFromRegistry(
 
   return result
 }
+
+/**
+ * 停用（暂停）Industry Pack
+ */
+export async function deactivatePack(
+  packId: string,
+  workspaceId: string,
+  deactivatedBy?: string,
+  deps?: PackLoaderDeps
+): Promise<IndustryPackInstallation> {
+  const activePrisma = deps?.prisma || prisma
+  const activeWriteAuditLog = deps?.writeAuditLog || writeAuditLog
+  const activeDeprecateCapability = deps?.deprecateCapability || deprecateCapability
+
+  // 1. 查找 installed 记录
+  const inst = await activePrisma.industryPackInstallation.findFirst({
+    where: {
+      workspaceId,
+      packId,
+      status: 'installed'
+    }
+  })
+  if (!inst) {
+    throw new PackInstallationNotFoundError(packId)
+  }
+
+  // 2. 预记录审计日志
+  const activeCreateAuditEntry = deps?.createAuditEntry || createAuditEntry
+  const activeUpdateAuditEntry = deps?.updateAuditEntry || updateAuditEntry
+
+  const auditResult = await activeCreateAuditEntry({
+    actor: deactivatedBy || 'system',
+    action: 'pack.deactivate.started',
+    targetType: 'pack',
+    targetId: packId,
+    riskLevel: 'medium',
+    workspaceId,
+    contextSnapshot: {
+      packId,
+      packVersion: inst.packVersion
+    }
+  })
+
+  // 3. 对已安装的能力逐一执行 deprecate (软下线)
+  let capList: string[] = []
+  try {
+    capList = JSON.parse(inst.installedCapabilities)
+  } catch {
+    capList = []
+  }
+
+  try {
+    for (const capStr of capList) {
+      const atIdx = capStr.lastIndexOf('@')
+      if (atIdx === -1) continue
+      const capId = capStr.substring(0, atIdx)
+      const capVer = capStr.substring(atIdx + 1)
+
+      await activeDeprecateCapability(
+        capId,
+        capVer,
+        `Pack ${packId}@${inst.packVersion} deactivated (paused)`,
+        deactivatedBy || 'system',
+        { prisma: activePrisma, writeAuditLog: activeWriteAuditLog }
+      )
+    }
+
+    // 4. 更新状态为 paused
+    const updated = await activePrisma.industryPackInstallation.update({
+      where: { id: inst.id },
+      data: {
+        status: 'paused'
+      }
+    })
+
+    // 5. 写入审计日志为 success
+    await activeUpdateAuditEntry({
+      auditId: auditResult.auditId,
+      status: 'success',
+      detail: `Successfully deactivated pack ${packId}@${inst.packVersion}. All ${capList.length} capabilities are deprecated.`
+    })
+
+    return updated
+  } catch (error: any) {
+    // 失败回滚
+    await activePrisma.industryPackInstallation.update({
+      where: { id: inst.id },
+      data: { status: 'installed' }
+    })
+
+    await activeUpdateAuditEntry({
+      auditId: auditResult.auditId,
+      status: 'failed',
+      detail: `Deactivation failed for pack ${packId}. Error: ${error.message || 'Unknown error'}`
+    })
+
+    throw error
+  }
+}
+
+/**
+ * 启用（恢复激活）一个已被暂停的 Industry Pack
+ */
+export async function activatePack(
+  packId: string,
+  workspaceId: string,
+  activatedBy?: string,
+  deps?: PackLoaderDeps
+): Promise<IndustryPackInstallation> {
+  const activePrisma = deps?.prisma || prisma
+  const activeWriteAuditLog = deps?.writeAuditLog || writeAuditLog
+  const activeReactivateCapability = deps?.reactivateCapability || reactivateCapability
+
+  // 1. 查找 paused 记录
+  const inst = await activePrisma.industryPackInstallation.findFirst({
+    where: {
+      workspaceId,
+      packId,
+      status: 'paused'
+    }
+  })
+  if (!inst) {
+    throw new PackInstallationNotFoundError(packId)
+  }
+
+  // 2. 预记录审计日志
+  const activeCreateAuditEntry = deps?.createAuditEntry || createAuditEntry
+  const activeUpdateAuditEntry = deps?.updateAuditEntry || updateAuditEntry
+
+  const auditResult = await activeCreateAuditEntry({
+    actor: activatedBy || 'system',
+    action: 'pack.activate.started',
+    targetType: 'pack',
+    targetId: packId,
+    riskLevel: 'medium',
+    workspaceId,
+    contextSnapshot: {
+      packId,
+      packVersion: inst.packVersion
+    }
+  })
+
+  // 3. 对已安装的能力逐一执行 reactivate (恢复上线)
+  let capList: string[] = []
+  try {
+    capList = JSON.parse(inst.installedCapabilities)
+  } catch {
+    capList = []
+  }
+
+  try {
+    for (const capStr of capList) {
+      const atIdx = capStr.lastIndexOf('@')
+      if (atIdx === -1) continue
+      const capId = capStr.substring(0, atIdx)
+      const capVer = capStr.substring(atIdx + 1)
+
+      await activeReactivateCapability(
+        capId,
+        capVer,
+        activatedBy || 'system',
+        { prisma: activePrisma, writeAuditLog: activeWriteAuditLog }
+      )
+    }
+
+    // 4. 更新状态为 installed
+    const updated = await activePrisma.industryPackInstallation.update({
+      where: { id: inst.id },
+      data: {
+        status: 'installed'
+      }
+    })
+
+    // 5. 写入审计日志为 success
+    await activeUpdateAuditEntry({
+      auditId: auditResult.auditId,
+      status: 'success',
+      detail: `Successfully activated pack ${packId}@${inst.packVersion}. All ${capList.length} capabilities are reactivated.`
+    })
+
+    return updated
+  } catch (error: any) {
+    // 失败回滚为 paused
+    try {
+      await activePrisma.industryPackInstallation.update({
+        where: { id: inst.id },
+        data: { status: 'paused' }
+      })
+    } catch (dbErr) {
+      console.error(`[activatePack Rollback] Failed to rollback status to paused:`, dbErr)
+    }
+
+    await activeUpdateAuditEntry({
+      auditId: auditResult.auditId,
+      status: 'failed',
+      detail: `Activation failed for pack ${packId}. Error: ${error.message || 'Unknown error'}`
+    })
+
+    throw error
+  }
+}
+
+
