@@ -342,6 +342,7 @@ export default function SkillsPage() {
               <SkillDetailPanel
                 skill={selectedSkill}
                 selectedFilePath={selectedFilePath}
+                onSelectFilePath={setSelectedFilePath}
                 onSkillUpdated={(updated) => {
                   setSkillDetails((prev) => ({
                     ...prev,

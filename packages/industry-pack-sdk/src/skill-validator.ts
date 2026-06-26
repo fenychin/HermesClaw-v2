@@ -5,6 +5,7 @@ const NAME_REGEX = /^[a-z0-9-]+$/
 export interface SkillMdValidationResult {
   valid: boolean
   errors: string[]
+  warnings: string[]
   suggestions: string[]
 }
 
@@ -32,12 +33,14 @@ export function parseFrontmatter(content: string): Record<string, any> | null {
   */
 export function validateSkillMd(content: string): SkillMdValidationResult {
   const errors: string[] = []
+  const warnings: string[] = []
   const suggestions: string[] = []
 
   if (!content || content.trim().length === 0) {
     return {
       valid: false,
       errors: ["SKILL.md 内容为空"],
+      warnings: [],
       suggestions: ["请输入有效的 SKILL.md Markdown 内容，并包含前言定义"]
     }
   }
@@ -48,10 +51,10 @@ export function validateSkillMd(content: string): SkillMdValidationResult {
 
     if (!data || typeof data !== "object" || Object.keys(data).length === 0) {
       errors.push("SKILL.md 缺少有效的前言定义（Frontmatter）。前言应以 '---' 包裹。")
-      return { valid: false, errors, suggestions }
+      return { valid: false, errors, warnings, suggestions }
     }
 
-    const { name, description } = data
+    const { name, description, version, tools } = data
 
     // 1. name 校验
     if (name === undefined || name === null) {
@@ -81,6 +84,22 @@ export function validateSkillMd(content: string): SkillMdValidationResult {
       }
     }
 
+    // 3. version 字段存在性（warning）
+    if (version === undefined || version === null || (typeof version === "string" && version.trim().length === 0)) {
+      warnings.push("建议添加 'version' 字段声明技能版本（例如: version: 1.0.0）")
+    } else if (typeof version !== "string") {
+      warnings.push("'version' 字段应为字符串类型（例如: version: 1.0.0）")
+    }
+
+    // 4. tools 块格式校验（warning）
+    if (tools !== undefined && tools !== null) {
+      if (!Array.isArray(tools)) {
+        warnings.push("'tools' 字段必须为数组格式")
+      } else if (tools.length === 0) {
+        warnings.push("'tools' 数组为空，如需声明工具请补充条目")
+      }
+    }
+
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err)
     errors.push(`Frontmatter 解析失败: ${errMsg}`)
@@ -89,6 +108,7 @@ export function validateSkillMd(content: string): SkillMdValidationResult {
   return {
     valid: errors.length === 0,
     errors,
+    warnings,
     suggestions
   }
 }

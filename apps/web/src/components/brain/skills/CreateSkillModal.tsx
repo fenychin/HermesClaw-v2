@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
   X,
   Upload,
@@ -9,6 +9,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   Loader2,
+  FileText,
+  Download,
+  Copy,
+  Check,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -36,6 +40,8 @@ export function CreateSkillModal({ open, onClose, onCreated }: CreateSkillModalP
   const [zipFile, setZipFile] = useState<File | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showTemplate, setShowTemplate] = useState(false);
+  const [copiedTemplate, setCopiedTemplate] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // 重置表单
@@ -45,6 +51,8 @@ export function CreateSkillModal({ open, onClose, onCreated }: CreateSkillModalP
       setDescription("");
       setZipFile(null);
       setSubmitting(false);
+      setShowTemplate(false);
+      setCopiedTemplate(false);
     }
   }, [open]);
 
@@ -100,6 +108,38 @@ export function CreateSkillModal({ open, onClose, onCreated }: CreateSkillModalP
       setSubmitting(false);
     }
   }, [canSubmit, zipFile, name, description, onCreated, onClose]);
+
+  // 生成 SKILL.md 模板
+  const generatedSkillMd = useMemo(() => {
+    if (!name || !description) return "";
+    return `---\nname: ${name}\ndescription: ${description}\nversion: 1.0.0\n---\n\n# ${name}\n\n## Input\n\n## Output\n`;
+  }, [name, description]);
+
+  const handleCopyTemplate = useCallback(async () => {
+    if (!generatedSkillMd) return;
+    try {
+      await navigator.clipboard.writeText(generatedSkillMd);
+      setCopiedTemplate(true);
+      toast.success("已复制 SKILL.md 模板");
+      setTimeout(() => setCopiedTemplate(false), 2000);
+    } catch {
+      toast.error("复制失败");
+    }
+  }, [generatedSkillMd]);
+
+  const handleDownloadTemplate = useCallback(() => {
+    if (!generatedSkillMd) return;
+    const blob = new Blob([generatedSkillMd], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "SKILL.md";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("SKILL.md 模板已下载");
+  }, [generatedSkillMd]);
 
   if (!open) return null;
 
@@ -249,6 +289,56 @@ export function CreateSkillModal({ open, onClose, onCreated }: CreateSkillModalP
                 {line}
               </div>
             ))}
+          </div>
+
+          {/* 生成 SKILL.md 模板 */}
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setShowTemplate((s) => !s)}
+              disabled={!name || !description}
+              className={cn(
+                "w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium rounded-lg border transition-colors",
+                !name || !description
+                  ? "border-border text-muted-foreground cursor-not-allowed"
+                  : "border-brand/30 text-brand hover:bg-brand/5",
+              )}
+            >
+              <FileText className="size-3.5" />
+              {showTemplate ? "隐藏 SKILL.md 模板" : "生成 SKILL.md 模板"}
+            </button>
+
+            {showTemplate && generatedSkillMd && (
+              <div className="border border-border rounded-xl overflow-hidden bg-black/30">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border/40 bg-accent/20">
+                  <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                    <FileText className="size-3.5 text-brand" />
+                    SKILL.md 预览
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleCopyTemplate}
+                      className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {copiedTemplate ? <Check className="size-3" /> : <Copy className="size-3" />}
+                      {copiedTemplate ? "已复制" : "复制"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadTemplate}
+                      className="inline-flex items-center gap-1 text-[10px] font-medium text-brand hover:text-brand/80 transition-colors"
+                    >
+                      <Download className="size-3" />
+                      下载
+                    </button>
+                  </div>
+                </div>
+                <pre className="p-3 text-[11px] font-mono text-muted-foreground leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
+                  {generatedSkillMd}
+                </pre>
+              </div>
+            )}
           </div>
         </div>
 

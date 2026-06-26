@@ -11,18 +11,8 @@ import * as path from "path"
 
 type RouteParams = { params: Promise<{ id: string }> }
 
-function getSkillDirectory(skillName: string): string | null {
-  const candidates = [
-    path.join(process.cwd(), ".agents", "skills", skillName),
-    path.join(process.cwd(), "..", ".agents", "skills", skillName),
-    path.join("C:\\Users\\frankfeny\\.gemini\\config\\plugins\\science\\skills", skillName)
-  ]
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
-      return candidate
-    }
-  }
-  return null
+function getSkillDirectory(skillName: string): string {
+  return path.join(process.cwd(), ".agents", "skills", skillName)
 }
 
 function buildFileTree(dir: string, baseDir: string): any[] {
@@ -52,16 +42,17 @@ export const GET = withRBAC<RouteParams>(async (_request: Request, ctx: Workspac
 
   let fileTree: any[] = []
   const skillDir = getSkillDirectory(skill.name)
-  if (skillDir) {
+  if (fs.existsSync(skillDir) && fs.statSync(skillDir).isDirectory()) {
     try {
       fileTree = buildFileTree(skillDir, skillDir)
     } catch (err) {
-      logger.error(`Failed to read file tree for skill directory: ${skillDir}`, { error: String(err) })
+      logger.warn(`Failed to read file tree for skill directory: ${skillDir}`, { error: String(err) })
     }
   }
 
   // 兜底：如果无磁盘目录，或读取为空，则虚拟一个 SKILL.md 节点
   if (fileTree.length === 0) {
+    logger.warn(`Skill directory not found or empty, returning fallback fileTree`, { skillName: skill.name, skillDir })
     fileTree = [{ path: "SKILL.md", type: "file" }]
   }
 
@@ -80,17 +71,20 @@ export const PUT = withRBAC<RouteParams>(async (request: Request, ctx: Workspace
   const skill = await getSkillById(id)
   if (!skill) return errorResponse("技能不存在", 404)
   if (skill.workspaceId !== ctx.workspaceId) return errorResponse("无权访问该技能", 403)
+  if (skill.source === "BUILTIN") return errorResponse("内置技能不可修改", 403)
 
   const parsed = validateBody(await request.json().catch(() => null), SkillUpdateSchema)
   if (parsed instanceof Response) return parsed
 
   // 校验 skillMdContent (P1)
+  let skillMdWarnings: string[] = []
   if (parsed.skillMdContent) {
     const { validateSkillMd, parseFrontmatter } = await import("@hermesclaw/industry-pack-sdk")
     const validation = validateSkillMd(parsed.skillMdContent)
     if (!validation.valid) {
       return errorResponse(`SKILL.md 校验失败: ${validation.errors.join("; ")}`, 400)
     }
+    skillMdWarnings = validation.warnings ?? []
     const fm = parseFrontmatter(parsed.skillMdContent)
     const targetName = parsed.name || skill.name
     if (fm && fm.name && fm.name !== targetName) {
@@ -101,15 +95,19 @@ export const PUT = withRBAC<RouteParams>(async (request: Request, ctx: Workspace
   const actor = await actorFromSession()
   const auditEntry = await createAuditEntry({
     actor, action: "skill.update", targetType: "skill", targetId: id,
-    detail: `更新技能: ${skill.name}`, riskLevel: "low",
+    detail: `更新技能: ${skill.name}${skillMdWarnings.length > 0 ? `; SKILL.md warnings: ${skillMdWarnings.join("; ")}` : ""}`,
+    riskLevel: skillMdWarnings.length > 0 ? "medium" : "low",
     workspaceId: ctx.workspaceId,
     automationLevel: (skill.automationLevel ?? "L2") as "L1" | "L2" | "L3" | "L4",
-    triggeredBy: "user"
+    triggeredBy: "user",
+    contextSnapshot: skillMdWarnings.length > 0 ? { skillMdWarnings } : undefined,
   })
   try {
     const updated = await updateSkillRecord(id, { id, ...parsed })
     await updateAuditEntry({ auditId: auditEntry.auditId, status: "success" })
-    return successResponse({ skill: serializeSkill(updated as unknown as Record<string, unknown>) })
+    const responsePayload: Record<string, unknown> = { skill: serializeSkill(updated as unknown as Record<string, unknown>) }
+    if (skillMdWarnings.length > 0) responsePayload.warnings = skillMdWarnings
+    return successResponse(responsePayload)
   } catch (err) {
     logger.error("更新技能失败:", { error: String(err) })
     await updateAuditEntry({ auditId: auditEntry.auditId, status: "failed" })
@@ -123,6 +121,7 @@ export const DELETE = withRBAC<RouteParams>(async (request: Request, ctx: Worksp
   const skill = await getSkillById(id)
   if (!skill) return errorResponse("技能不存在", 404)
   if (skill.workspaceId !== ctx.workspaceId) return errorResponse("无权访问该技能", 403)
+  if (skill.source === "BUILTIN") return errorResponse("内置技能不可删除", 403)
 
   // 客户端可传 force=true 强制删除
   const url = new URL(request.url)

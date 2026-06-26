@@ -26,29 +26,68 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { MarkdownRenderer } from "@/components/common/markdown-renderer";
 
-/** 客户端安全的 SKILL.md frontmatter 校验（与 SDK skill-validator 逻辑一致，但无 fs 依赖） */
-function validateSkillMdLocally(content: string): {
+type ValidationLevel = "error" | "warning" | "suggestion";
+
+interface LocalValidationMessage {
+  level: ValidationLevel;
+  message: string;
+}
+
+interface LocalValidationResult {
   valid: boolean;
   errors: string[];
+  warnings: string[];
   suggestions: string[];
-} {
-  const errors: string[] = [];
-  const suggestions: string[] = [];
+  items: LocalValidationMessage[];
+}
+
+/** 客户端安全的 SKILL.md frontmatter 校验（与 SDK skill-validator 逻辑一致，但无 fs 依赖） */
+function validateSkillMdLocally(content: string): LocalValidationResult {
+  const items: LocalValidationMessage[] = [];
   const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
-  const fm: Record<string, string> = {};
+  const fm: Record<string, any> = {};
   if (fmMatch) {
     for (const line of fmMatch[1].split(/\r?\n/)) {
       const kv = line.match(/^([\w-]+):\s*(.*)$/);
       if (kv) fm[kv[1]] = kv[2].trim();
     }
   }
+
   const name = fm["name"];
   const description = fm["description"];
-  if (!name) errors.push("缺少必填字段 name（技能名称）");
-  else if (!/^[a-z0-9-]+$/.test(name)) errors.push(`技能名称 "${name}" 不合法：只能包含小写字母、数字和连字符（例：inquiry-sorter）`);
-  if (!description || description.trim().length === 0) errors.push("缺少必填字段 description（技能描述）");
-  else if (description.trim().length < 10) suggestions.push(`描述过短（${description.trim().length} 字符），建议至少 10 字符`);
-  return { valid: errors.length === 0, errors, suggestions };
+  const version = fm["version"];
+  const tools = content.includes("tools:") ? fm["tools"] : undefined;
+
+  // error: name
+  if (!name) items.push({ level: "error", message: "缺少必填字段 name（技能名称）" });
+  else if (!/^[a-z0-9-]+$/.test(name)) items.push({ level: "error", message: `技能名称 "${name}" 不合法：只能包含小写字母、数字和连字符（例：inquiry-sorter）` });
+
+  // error: description
+  if (!description || description.trim().length === 0) items.push({ level: "error", message: "缺少必填字段 description（技能描述）" });
+  else if (description.trim().length < 10) items.push({ level: "suggestion", message: `描述过短（${description.trim().length} 字符），建议至少 10 字符` });
+
+  // warning: version
+  if (!version || version.trim().length === 0) {
+    items.push({ level: "warning", message: "建议添加 version 字段声明技能版本（例如：version: 1.0.0）" });
+  }
+
+  // warning: tools 格式
+  if (tools !== undefined && tools !== null) {
+    try {
+      const parsed = typeof tools === "string" ? JSON.parse(tools) : tools;
+      if (!Array.isArray(parsed)) {
+        items.push({ level: "warning", message: "tools 字段必须为数组格式" });
+      }
+    } catch {
+      items.push({ level: "warning", message: "tools 字段格式无法解析，必须为数组" });
+    }
+  }
+
+  const errors = items.filter((i) => i.level === "error").map((i) => i.message);
+  const warnings = items.filter((i) => i.level === "warning").map((i) => i.message);
+  const suggestions = items.filter((i) => i.level === "suggestion").map((i) => i.message);
+
+  return { valid: errors.length === 0, errors, warnings, suggestions, items };
 }
 
 /** 来源中文标签 */
@@ -151,6 +190,7 @@ interface SkillDetailPanelProps {
   selectedFilePath: string | null;
   onSkillUpdated?: (updated: Skill) => void;
   onSkillDeleted?: (skillId: string) => void;
+  onSelectFilePath?: (path: string | null) => void;
 }
 
 export function SkillDetailPanel({
@@ -158,6 +198,7 @@ export function SkillDetailPanel({
   selectedFilePath,
   onSkillUpdated,
   onSkillDeleted,
+  onSelectFilePath,
 }: SkillDetailPanelProps) {
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [testing, setTesting] = useState(false);
@@ -189,6 +230,13 @@ export function SkillDetailPanel({
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [testResultPayload, setTestResultPayload] = useState<any>(null);
 
+  // 绑定 Agent 信息
+  const [boundAgents, setBoundAgents] = useState<{ id: string; name: string }[] | null>(null);
+  const [loadingBoundAgents, setLoadingBoundAgents] = useState(false);
+
+  // SKILL.md 一键复制状态
+  const [copiedMd, setCopiedMd] = useState(false);
+
   // 编辑表单状态
   const [editName, setEditName] = useState(skill.name);
   const [editDescription, setEditDescription] = useState(skill.description);
@@ -202,10 +250,14 @@ export function SkillDetailPanel({
       "---",
       `name: ${editName}`,
       `description: ${editDescription}`,
+      `version: ${editVersion}`,
       "---",
     ].join("\n");
     return validateSkillMdLocally(md);
-  }, [mode, editName, editDescription]);
+  }, [mode, editName, editDescription, editVersion]);
+
+  // SDK warnings（来自服务端响应）
+  const [sdkWarnings, setSdkWarnings] = useState<string[]>([]);
 
   // 重置表单
   const resetForm = useCallback(() => {
@@ -242,6 +294,34 @@ export function SkillDetailPanel({
     loadContent();
   }, [skill.id, selectedFilePath]);
 
+  // 自动尝试加载 SKILL.md
+  useEffect(() => {
+    if (!selectedFilePath && skill.fileTree?.some((f) => f.path === "SKILL.md")) {
+      onSelectFilePath?.("SKILL.md");
+    }
+  }, [skill, selectedFilePath, onSelectFilePath]);
+
+  // 拉取已绑定 Agent 列表
+  useEffect(() => {
+    if (mode !== "view") {
+      setBoundAgents(null);
+      return;
+    }
+    const loadBoundAgents = async () => {
+      setLoadingBoundAgents(true);
+      try {
+        const res = await apiClient.getAgents({ skillId: skill.id });
+        const agents = (res.agents as Array<{ id: string; name: string }>) || [];
+        setBoundAgents(agents.map((a) => ({ id: a.id, name: a.name })));
+      } catch {
+        setBoundAgents([]);
+      } finally {
+        setLoadingBoundAgents(false);
+      }
+    };
+    loadBoundAgents();
+  }, [skill.id, mode]);
+
   // 拉取 CapabilityRegistry 状态
   const fetchCapStatus = useCallback(async () => {
     setLoadingCap(true);
@@ -271,14 +351,20 @@ export function SkillDetailPanel({
   // 保存编辑
   const handleSave = useCallback(async () => {
     setSaving(true);
+    setSdkWarnings([]);
     try {
-      const result = await apiClient.updateSkill(skill.id, {
+      const result = (await apiClient.updateSkill(skill.id, {
         name: editName,
         description: editDescription,
         version: editVersion,
         category: editCategory,
-      });
-      onSkillUpdated?.(result as unknown as Skill);
+      })) as { skill?: Skill; warnings?: string[] };
+      onSkillUpdated?.((result?.skill ?? result) as Skill);
+      if (result?.warnings && result.warnings.length > 0) {
+        setSdkWarnings(result.warnings);
+      } else {
+        setSdkWarnings([]);
+      }
       setMode("view");
       toast.success("技能信息已更新");
     } catch (err: unknown) {
@@ -359,6 +445,18 @@ export function SkillDetailPanel({
     }
   }, [skill.id, skill.status, onSkillUpdated]);
 
+  // 复制 SKILL.md 完整原文（含 frontmatter）
+  const handleCopySkillMd = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(fileContent);
+      setCopiedMd(true);
+      toast.success("已复制 SKILL.md 完整原文");
+      setTimeout(() => setCopiedMd(false), 2000);
+    } catch {
+      toast.error("复制失败");
+    }
+  }, [fileContent]);
+
   // ==========================================
   // 情况 1: 展示物理文件内容
   // ==========================================
@@ -366,43 +464,69 @@ export function SkillDetailPanel({
     return (
       <div className="space-y-4 animate-fade-in flex flex-col h-full min-h-[500px]">
         {/* 顶部面包屑与模式 Tab */}
-        <div className="flex items-center justify-between border-b border-border/40 pb-3">
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <span className="font-semibold text-foreground/80">{skill.name}</span>
+        <div className="flex items-center justify-between border-b border-border/40 pb-3 gap-3">
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground min-w-0">
+            <span className="font-semibold text-foreground/80 truncate">{skill.name}</span>
             <span>/</span>
-            <span className="font-mono text-xs bg-accent/40 px-2 py-0.5 rounded text-foreground">{selectedFilePath}</span>
+            <span className="font-mono text-xs bg-accent/40 px-2 py-0.5 rounded text-foreground truncate">{selectedFilePath}</span>
           </div>
 
-          {selectedFilePath.endsWith(".md") && (
-            <div className="flex gap-1 bg-accent/40 rounded-lg p-0.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            {/* SKILL.md 快捷跳转 */}
+            {skill.fileTree?.some((f) => f.path === "SKILL.md") && selectedFilePath !== "SKILL.md" && (
               <button
                 type="button"
-                onClick={() => setFileMode("preview")}
-                className={cn(
-                  "px-2.5 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1",
-                  fileMode === "preview"
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
+                onClick={() => onSelectFilePath?.("SKILL.md")}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-accent/40 hover:bg-accent/60 rounded-lg px-2.5 py-1.5 transition-colors"
               >
-                <Eye className="size-3" />
-                预览
+                <FileText className="size-3" />
+                SKILL.md
               </button>
+            )}
+
+            {/* 一键复制完整原文（含 frontmatter） */}
+            {selectedFilePath.endsWith(".md") && fileMode === "preview" && (
               <button
                 type="button"
-                onClick={() => setFileMode("source")}
-                className={cn(
-                  "px-2.5 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1",
-                  fileMode === "source"
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
+                onClick={handleCopySkillMd}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:text-brand/80 bg-brand/10 hover:bg-brand/15 rounded-lg px-2.5 py-1.5 transition-colors"
               >
-                <Code2 className="size-3" />
-                源码
+                {copiedMd ? <Check className="size-3" /> : <Copy className="size-3" />}
+                {copiedMd ? "已复制" : "复制完整原文"}
               </button>
-            </div>
-          )}
+            )}
+
+            {selectedFilePath.endsWith(".md") && (
+              <div className="flex gap-1 bg-accent/40 rounded-lg p-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setFileMode("preview")}
+                  className={cn(
+                    "px-2.5 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1",
+                    fileMode === "preview"
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <Eye className="size-3" />
+                  预览
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFileMode("source")}
+                  className={cn(
+                    "px-2.5 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1",
+                    fileMode === "source"
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <Code2 className="size-3" />
+                  源码
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 文件渲染核心 */}
@@ -524,7 +648,7 @@ export function SkillDetailPanel({
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={saving || (nameValidation && !nameValidation.valid)}
+                disabled={saving || (nameValidation?.valid === false)}
                 className="inline-flex items-center gap-1.5 bg-brand text-white rounded-lg px-2.5 py-1.5 text-xs transition-colors font-medium disabled:opacity-50"
               >
                 {saving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />}
@@ -578,14 +702,38 @@ export function SkillDetailPanel({
               {e}
             </div>
           ))}
+          {nameValidation.warnings.map((w, i) => (
+            <div
+              key={`warn-${i}`}
+              className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning"
+            >
+              <AlertTriangle className="mt-0.5 size-3 shrink-0" />
+              {w}
+            </div>
+          ))}
           {nameValidation.suggestions.map((s, i) => (
             <div
               key={`sug-${i}`}
-              className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning"
+              className="flex items-start gap-2 rounded-lg border border-hint/30 bg-hint/5 px-3 py-2 text-xs text-hint"
             >
               {s}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* SDK warnings 提示横幅 */}
+      {mode === "view" && sdkWarnings.length > 0 && (
+        <div className="space-y-1.5 rounded-xl border border-warning/30 bg-warning/5 p-3">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-warning">
+            <AlertTriangle className="size-3.5" />
+            SKILL.md 规范提示
+          </div>
+          <ul className="list-disc list-inside text-xs text-warning/90 space-y-0.5">
+            {sdkWarnings.map((w, i) => (
+              <li key={`sdk-warn-${i}`}>{w}</li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -613,6 +761,37 @@ export function SkillDetailPanel({
           </p>
         )}
       </div>
+
+      {/* 已绑定 Agent */}
+      {mode === "view" && (
+        <div className="space-y-2">
+          <h3 className="text-foreground text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5">
+            <Puzzle className="size-3.5" />
+            已绑定智能体
+          </h3>
+          {loadingBoundAgents ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-xs">
+              <Loader2 className="size-3 animate-spin" />
+              加载中…
+            </div>
+          ) : boundAgents && boundAgents.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {boundAgents.map((agent) => (
+                <span
+                  key={agent.id}
+                  className="inline-flex items-center gap-1 bg-accent/60 text-foreground rounded-md px-2.5 py-1 text-xs border border-border/40"
+                >
+                  {agent.name}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground/70 text-xs italic">
+              暂未绑定至任何智能体
+            </p>
+          )}
+        </div>
+      )}
 
       {mode === "edit" && (
         <div className="grid grid-cols-2 gap-4">

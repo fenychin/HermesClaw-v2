@@ -9,7 +9,22 @@ export const GET = withRBAC(async (req: Request, ctx: any) => {
   try {
     const { searchParams } = new URL(req.url); const status = searchParams.get('status')
     const page = parseInt(searchParams.get('page') || '1', 10); const limit = parseInt(searchParams.get('limit') || '20', 10)
+    const skillId = searchParams.get('skillId')
     const whereClause: any = { workspaceId: ctx.workspaceId }; if (status) whereClause.status = status
+
+    // 按 skillId 过滤：通过 SkillBinding 关联表查找已绑定该技能的 Agent
+    if (skillId) {
+      const bindings = await prisma.skillBinding.findMany({
+        where: { skillId, workspaceId: ctx.workspaceId },
+        select: { agentId: true },
+      })
+      const agentIds = bindings.map((b: { agentId: string }) => b.agentId)
+      if (agentIds.length === 0) {
+        return ApiResponse.ok({ agents: [] })
+      }
+      whereClause.id = { in: agentIds }
+    }
+
     const agents = await prisma.agent.findMany({ where: whereClause, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: "desc" } })
     const completedRuns = await prisma.workflowRun.groupBy({ by: ['agentId'], where: { workspaceId: ctx.workspaceId, status: 'completed', agentId: { in: agents.map((a: any) => a.id) } }, _count: { id: true } })
     const completedCountMap = new Map(completedRuns.map((r: any) => [r.agentId, r._count.id]))

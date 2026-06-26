@@ -71,8 +71,10 @@ async function apiFetch<T>(
 
 export const apiClient = {
   // ---- 智能体 ----
-  getAgents: () =>
-    apiFetch<{ agents: unknown[] }>("/api/agents"),
+  getAgents: (params?: { skillId?: string }) => {
+    const query = params?.skillId ? `?skillId=${encodeURIComponent(params.skillId)}` : ""
+    return apiFetch<{ agents: unknown[] }>(`/api/agents${query}`)
+  },
 
   getAgent: (id: string) =>
     apiFetch<{ agent: unknown }>(`/api/agents/${id}`),

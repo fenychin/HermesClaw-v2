@@ -67,6 +67,74 @@ description: Short
       expect(result.suggestions).toHaveLength(1)
       expect(result.suggestions[0]).toContain("建议至少 10 个字符")
     })
+
+    it("should warn if version is missing", () => {
+      const content = `---
+name: inquiry-sorter
+description: Automatically sort incoming inquiries.
+---`
+      const result = validateSkillMd(content)
+      expect(result.valid).toBe(true)
+      expect(result.warnings).toContain("建议添加 'version' 字段声明技能版本（例如: version: 1.0.0）")
+    })
+
+    it("should warn if version is empty", () => {
+      const content = `---
+name: inquiry-sorter
+description: Automatically sort incoming inquiries.
+version:
+---`
+      const result = validateSkillMd(content)
+      expect(result.valid).toBe(true)
+      expect(result.warnings).toContain("建议添加 'version' 字段声明技能版本（例如: version: 1.0.0）")
+    })
+
+    it("should pass without warnings if version is present", () => {
+      const content = `---
+name: inquiry-sorter
+description: Automatically sort incoming inquiries.
+version: 1.0.0
+---`
+      const result = validateSkillMd(content)
+      expect(result.valid).toBe(true)
+      expect(result.warnings).not.toContain("建议添加 'version' 字段声明技能版本（例如: version: 1.0.0）")
+    })
+
+    it("should warn if tools is not an array", () => {
+      const content = `---
+name: inquiry-sorter
+description: Automatically sort incoming inquiries.
+tools: not-an-array
+---`
+      const result = validateSkillMd(content)
+      expect(result.valid).toBe(true)
+      expect(result.warnings).toContain("'tools' 字段必须为数组格式")
+    })
+
+    it("should warn if tools is an empty array", () => {
+      const content = `---
+name: inquiry-sorter
+description: Automatically sort incoming inquiries.
+tools: []
+---`
+      const result = validateSkillMd(content)
+      expect(result.valid).toBe(true)
+      expect(result.warnings).toContain("'tools' 数组为空，如需声明工具请补充条目")
+    })
+
+    it("should pass without tools warnings if tools is a non-empty array", () => {
+      const content = `---
+name: inquiry-sorter
+description: Automatically sort incoming inquiries.
+version: 1.0.0
+tools:
+  - name: search
+    description: Search the web
+---`
+      const result = validateSkillMd(content)
+      expect(result.valid).toBe(true)
+      expect(result.warnings).toHaveLength(0)
+    })
   })
 
   describe("parseFrontmatter", () => {

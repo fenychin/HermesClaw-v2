@@ -31,12 +31,14 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
   if (parsed instanceof Response) return parsed
 
   // 校验 skillMdContent (P1)
+  let skillMdWarnings: string[] = []
   if (parsed.skillMdContent) {
     const { validateSkillMd, parseFrontmatter } = await import("@hermesclaw/industry-pack-sdk")
     const validation = validateSkillMd(parsed.skillMdContent)
     if (!validation.valid) {
       return errorResponse(`SKILL.md 校验失败: ${validation.errors.join("; ")}`, 400)
     }
+    skillMdWarnings = validation.warnings ?? []
     const fm = parseFrontmatter(parsed.skillMdContent)
     if (fm && fm.name && fm.name !== parsed.name) {
       return errorResponse(`前言中的 name "${fm.name}" 与技能名称 "${parsed.name}" 不匹配`, 400)
@@ -46,10 +48,12 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
   const actor = await actorFromSession()
   const auditEntry = await createAuditEntry({
     actor, action: "skill.create", targetType: "skill", targetId: "pending",
-    detail: `创建技能: ${parsed.name}`, riskLevel: "low",
+    detail: `创建技能: ${parsed.name}${skillMdWarnings.length > 0 ? `; SKILL.md warnings: ${skillMdWarnings.join("; ")}` : ""}`,
+    riskLevel: skillMdWarnings.length > 0 ? "medium" : "low",
     workspaceId: ctx.workspaceId,
     automationLevel: (parsed.automationLevel ?? "L2") as "L1" | "L2" | "L3" | "L4",
-    triggeredBy: "user"
+    triggeredBy: "user",
+    contextSnapshot: skillMdWarnings.length > 0 ? { skillMdWarnings } : undefined,
   })
   try {
     const skill = await createSkillRecord({
@@ -65,8 +69,10 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
       automationLevel: parsed.automationLevel,
       skillMdContent: parsed.skillMdContent,
     })
-    await updateAuditEntry({ auditId: auditEntry.auditId, status: "success", targetId: skill.id })
-    return successResponse({ skill: serializeSkill(skill as unknown as Record<string, unknown>) }, 201)
+    await updateAuditEntry({ auditId: auditEntry.auditId, status: "success", detail: `创建成功，目标 ID: ${skill.id}` })
+    const responsePayload: Record<string, unknown> = { skill: serializeSkill(skill as unknown as Record<string, unknown>) }
+    if (skillMdWarnings.length > 0) responsePayload.warnings = skillMdWarnings
+    return successResponse(responsePayload, 201)
   } catch (err) {
     await updateAuditEntry({ auditId: auditEntry.auditId, status: "failed" })
     return errorResponse("创建技能失败")
