@@ -78,7 +78,7 @@ export function toSkillDbRecord(tmpl: ForeignTradeSkillTemplate): SkillDbRecord 
     description: tmpl.description,
     version: 'v1.0.0',
     category: `foreign-trade:${tmpl.role}`,
-    source: 'industry-template',
+    source: 'EXTERNAL',
     status: 'active',
     inputSchema: stringifyJsonField({
       role: tmpl.role,

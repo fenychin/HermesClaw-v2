@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -39,6 +40,9 @@ import {
 } from "@/components/common/agent-status-badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useUiStore } from "@/stores/ui-store";
+import { useSkillStore } from "@/stores/skill-store";
+import { updateSkillBindings } from "@/lib/api/workspace";
+import type { Skill } from "@/types";
 
 /** 运行时校验 Agent 关键字段 */
 function isValidAgent(data: unknown): data is Agent {
@@ -115,6 +119,177 @@ function SseStatusLabel({ agentId }: { agentId: string }) {
     >
       {sseStatus === "executing" ? "SSE·执行中" : sseStatus === "failed" ? "SSE·失败" : sseStatus === "succeeded" ? "SSE·完成" : "SSE·已取消"}
     </span>
+  );
+}
+
+// ============================================================
+// 技能绑定区域（增强版：显示版本/来源 + 绑定选择器）
+// ============================================================
+const SOURCE_BADGE: Record<string, { label: string; className: string }> = {
+  BUILTIN: { label: "内置", className: "bg-blue-500/10 text-blue-400" },
+  CUSTOM: { label: "自定义", className: "bg-green-500/10 text-green-400" },
+  EXTERNAL: { label: "外部", className: "bg-purple-500/10 text-purple-400" },
+};
+
+function SkillBindingSection({ agent }: { agent: Agent }) {
+  const allSkills = useSkillStore((s) => s.skills);
+  const loadSkills = useSkillStore((s) => s.loadSkills);
+  const [showPicker, setShowPicker] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => { loadSkills(); }, [loadSkills]);
+
+  // 已绑定 skill IDs
+  const boundIds = new Set(agent.bindSkills ?? []);
+
+  // 可绑定（未绑定的活跃技能）
+  const availableSkills = allSkills.filter(
+    (s) => s.status === "active" && !boundIds.has(s.id),
+  );
+
+  // 已绑定技能的完整信息
+  const boundSkills = allSkills.filter((s) => boundIds.has(s.id));
+
+  const handleAddBinding = async (skillId: string) => {
+    setSubmitting(true);
+    try {
+      const patches = [...Array.from(boundIds), skillId].map((id) => ({
+        skillId: id,
+        enabled: true,
+      }));
+      const result = await updateSkillBindings(agent.id, patches);
+      toast.info(`技能绑定变更已提交审批，提案 ID: ${result.proposalId}`);
+    } catch {
+      toast.error("绑定技能失败");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRemoveBinding = async (skillId: string) => {
+    setSubmitting(true);
+    try {
+      const patches = Array.from(boundIds)
+        .filter((id) => id !== skillId)
+        .map((id) => ({ skillId: id, enabled: false }));
+      const result = await updateSkillBindings(agent.id, patches);
+      toast.info(`技能解绑变更已提交审批，提案 ID: ${result.proposalId}`);
+    } catch {
+      toast.error("解绑技能失败");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* 已绑定列表 */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-foreground text-sm font-semibold">
+          已绑定技能 ({boundSkills.length})
+        </h3>
+        <button
+          type="button"
+          onClick={() => setShowPicker(!showPicker)}
+          disabled={submitting}
+          className="text-brand hover:underline text-xs font-medium"
+        >
+          {showPicker ? "收起" : "+ 绑定技能"}
+        </button>
+      </div>
+
+      {/* 技能选择器 */}
+      {showPicker && (
+        <div className="bg-accent/20 border border-border rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto">
+          {availableSkills.length === 0 ? (
+            <p className="text-hint text-xs italic">所有活跃技能均已绑定</p>
+          ) : (
+            availableSkills.map((skill) => (
+              <div
+                key={skill.id}
+                className="flex items-center justify-between gap-3 py-1.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-foreground text-sm truncate">{skill.name}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-hint text-[10px] font-mono">v{skill.version}</span>
+                    <span
+                      className={cn(
+                        "rounded text-[10px] px-1.5 py-px",
+                        SOURCE_BADGE[skill.source]?.className ?? "bg-accent text-muted-foreground",
+                      )}
+                    >
+                      {SOURCE_BADGE[skill.source]?.label ?? skill.source}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleAddBinding(skill.id)}
+                  disabled={submitting}
+                  className="shrink-0 text-brand hover:underline text-xs font-medium"
+                >
+                  绑定
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* 已绑定技能卡片 */}
+      {boundSkills.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {boundSkills.map((skill) => (
+            <div
+              key={skill.id}
+              className="bg-card border border-border rounded-xl p-4 hover:border-brand/30 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="size-8 rounded-lg bg-brand/10 flex items-center justify-center shrink-0">
+                  <Puzzle className="size-4 text-brand" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-foreground text-sm font-medium truncate">
+                    {skill.name}
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-hint text-[10px] font-mono">
+                      v{skill.version}
+                    </span>
+                    <span
+                      className={cn(
+                        "rounded text-[10px] px-1.5 py-px",
+                        SOURCE_BADGE[skill.source]?.className ?? "bg-accent text-muted-foreground",
+                      )}
+                    >
+                      {SOURCE_BADGE[skill.source]?.label ?? skill.source}
+                    </span>
+                    <StatusBadge
+                      status={skill.status === "active" ? "running" : "idle"}
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveBinding(skill.id)}
+                  disabled={submitting}
+                  className="shrink-0 text-muted-foreground hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-xs font-medium"
+                >
+                  解绑
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon={Puzzle}
+          title="技能绑定管理"
+          description="点击「+ 绑定技能」为该智能体关联技能，支持版本选择与启用/禁用控制。"
+        />
+      )}
+    </div>
   );
 }
 
@@ -379,31 +554,9 @@ export default function AgentDetailPage() {
             </div>
           </TabsContent>
 
-          {/* 技能绑定 */}
+          {/* 技能绑定（增强版：显示版本/来源 + 绑定选择器） */}
           <TabsContent value="skills">
-            {agent.bindSkills && agent.bindSkills.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {agent.bindSkills.map((skill, i) => (
-                  <div key={i} className="bg-card border border-border rounded-xl p-4 hover:border-primary/30 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="size-8 rounded-lg bg-brand/10 flex items-center justify-center shrink-0">
-                        <Puzzle className="size-4 text-brand" />
-                      </div>
-                      <div>
-                        <p className="text-foreground text-sm font-medium">{skill}</p>
-                        <p className="text-hint text-xs mt-0.5">已绑定到 {agent.name}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                icon={Puzzle}
-                title="技能绑定管理"
-                description="在此管理该智能体绑定的行业技能、岗位技能与自定义技能。支持版本选择、优先级排序与启用/禁用控制。"
-              />
-            )}
+            <SkillBindingSection agent={agent} />
           </TabsContent>
 
           {/* 连接器 */}

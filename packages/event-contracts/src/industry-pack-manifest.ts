@@ -15,6 +15,7 @@ export interface PackCapabilityEntry {
   changelog: string
   // 对于 skill：指向实现文件或外部端点
   handler?: string
+  skillMdContent?: string
   // 对于 connector：SMTP/REST 等配置模板
   configTemplate?: Record<string, unknown>
   // 对于 workflow：nodes/edges 定义

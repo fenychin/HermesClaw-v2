@@ -5,443 +5,371 @@ import Link from "next/link";
 import {
   Puzzle,
   Circle,
+  Search,
+  Plus,
+  Folder,
+  FileText,
+  FileCode,
+  File,
+  ChevronDown,
   ChevronRight,
-  Play,
   Loader2,
-  CheckCircle2,
-  AlertTriangle,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { PageTransition } from "@/components/common/PageTransition";
-import { StatusBadge } from "@/components/common/status-badge";
-import { AutomationLevelBadge } from "@/components/common/agent-status-badge";
+import { SkillDetailPanel } from "@/components/brain/skills/SkillDetailPanel";
+import { CreateSkillModal } from "@/components/brain/skills/CreateSkillModal";
 import { useAgentStore } from "@/stores/agent-store";
 import { useSkillStore } from "@/stores/skill-store";
 import { apiClient } from "@/lib/api-client";
 import type { Skill, SkillSource } from "@/types";
 import { cn } from "@/lib/utils";
 
-
-
-/** 来源中文 */
-const SOURCE_LABEL: Record<SkillSource, string> = {
-  builtin: "内置",
-  custom: "自定义",
-  "industry-template": "行业模板",
-};
-
-/** 单条技能项（左侧列表） */
-function SkillListItem({
-  skill,
-  isActive,
+/** 物理文件树的单项组件 */
+function FileTreeItem({
+  item,
+  isSelected,
   onClick,
 }: {
-  skill: Skill;
-  isActive: boolean;
+  item: { path: string; type: "file" | "directory" };
+  isSelected: boolean;
   onClick: () => void;
 }) {
+  const parts = item.path.split("/");
+  const depth = parts.length - 1;
+  const displayName = parts[parts.length - 1];
+
   return (
     <button
       type="button"
       onClick={onClick}
+      style={{ paddingLeft: `${12 + depth * 16}px` }}
       className={cn(
-        "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
-        isActive
-          ? "bg-brand/10 text-foreground"
-          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+        "flex w-full items-center gap-1.5 py-1 text-left text-xs transition-colors",
+        isSelected
+          ? "bg-brand/10 text-brand font-medium rounded"
+          : "text-muted-foreground hover:bg-accent/40 hover:text-foreground rounded"
       )}
     >
-      <Puzzle className={cn("size-4 shrink-0", isActive && "text-brand")} />
-      <span className="min-w-0 flex-1 truncate">{skill.name}</span>
-      <Circle
-        className={cn(
-          "size-2 shrink-0 fill-current",
-          skill.status === "active" ? "text-success" : "text-hint"
-        )}
-      />
+      {item.type === "directory" ? (
+        <Folder className="size-3.5 text-hint shrink-0" />
+      ) : displayName.endsWith(".md") ? (
+        <FileText className="size-3.5 text-hint shrink-0 animate-fade-in" />
+      ) : displayName.endsWith(".py") ? (
+        <FileCode className="size-3.5 text-hint shrink-0 animate-fade-in" />
+      ) : (
+        <File className="size-3.5 text-hint shrink-0" />
+      )}
+      <span className="truncate">{displayName}</span>
     </button>
   );
 }
 
-/** 技能详情面板（右侧） */
-function SkillDetail({ skill }: { skill: Skill }) {
-  const storeAgents = useAgentStore((s) => s.agents);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{
-    ok: boolean;
-    message: string;
-  } | null>(null);
-  const usedAgents = useMemo(() => {
-    return storeAgents.filter((a) => skill.usedByAgents.includes(a.id));
-  }, [skill, storeAgents]);
+/** 来源 Tab 配置 */
+const SOURCE_TABS: { key: SkillSource | "ALL"; label: string }[] = [
+  { key: "ALL", label: "全部" },
+  { key: "BUILTIN", label: "内置" },
+  { key: "CUSTOM", label: "自定义" },
+  { key: "EXTERNAL", label: "外部安装" },
+];
 
-  const handleTest = async () => {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      // 首次尝试（不带 confirm）
-      const result = await apiClient.testSkill(skill.id);
-      const data = result as { success?: boolean; message?: string; error?: string };
-      setTestResult({
-        ok: data.success !== false,
-        message: data.message ?? "技能测试已执行",
-      });
-    } catch (err: unknown) {
-      // L3 技能需二次确认：API 返回 409
-      const apiErr = err as { status?: number; message?: string };
-      if (apiErr.status === 409 && skill.automationLevel === "L3") {
-        const confirmed = confirm(
-          `「${skill.name}」为 L3 需人工确认技能，测试后将立即生效且无法撤销。确认执行测试？`,
-        );
-        if (confirmed) {
-          try {
-            const retryResult = await apiClient.testSkill(skill.id, true);
-            const retryData = retryResult as { success?: boolean; message?: string };
-            setTestResult({
-              ok: retryData.success !== false,
-              message: retryData.message ?? "技能测试已执行（已确认）",
-            });
-          } catch (retryErr: unknown) {
-            const retryApiErr = retryErr as { message?: string };
-            setTestResult({
-              ok: false,
-              message: retryApiErr.message ?? "确认后测试请求失败",
-            });
-          }
-        } else {
-          setTestResult({
-            ok: false,
-            message: "已取消：L3 技能测试需人工确认",
-          });
-        }
-      } else {
-        setTestResult({
-          ok: false,
-          message: apiErr.message ?? "测试请求失败",
-        });
-      }
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* 标题行 */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-foreground text-lg font-semibold mr-1.5">
-              {skill.name}
-            </h2>
-            <AutomationLevelBadge level={skill.automationLevel} />
-            <span className="bg-accent text-muted-foreground rounded-md px-2 py-0.5 text-[10px] font-mono">
-              v{skill.version}
-            </span>
-            <span className="bg-accent text-muted-foreground rounded-md px-2 py-0.5 text-[10px]">
-              {SOURCE_LABEL[skill.source]}
-            </span>
-            {skill.source === "industry-template" && (
-              <>
-                <span className="bg-accent/60 text-muted-foreground rounded-md px-2 py-0.5 text-[10px]">
-                  来源包: {(skill as any).packId || "foreign-trade"}
-                </span>
-                {(() => {
-                  const health = (skill as any).healthStatus || "healthy";
-                  if (health === "healthy") {
-                    return <span className="inline-flex items-center gap-1 rounded-full border border-success/20 bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">已验证</span>;
-                  } else if (health === "degraded") {
-                    return <span className="inline-flex items-center gap-1 rounded-full border border-warning/20 bg-warning/10 px-2 py-0.5 text-[10px] font-semibold text-warning">性能下降</span>;
-                  } else {
-                    return <span className="inline-flex items-center gap-1 rounded-full border border-danger/20 bg-danger/10 px-2 py-0.5 text-[10px] font-semibold text-danger">不可用</span>;
-                  }
-                })()}
-              </>
-            )}
-            <StatusBadge
-              status={skill.status === "active" ? "running" : skill.status === "inactive" ? "idle" : "paused"}
-            />
-          </div>
-        </div>
-
-        {/* 启用/停用开关与自定义操作 */}
-        <div className="flex shrink-0 items-center gap-2">
-          {skill.source === "custom" && (
-            <div className="flex gap-2 mr-2">
-              <button
-                type="button"
-                onClick={() => alert("编辑自建技能功能已就绪（Phase 2 MVP 占位）")}
-                className="text-xs border border-border hover:bg-accent rounded-lg px-2.5 py-1.5 transition-colors font-medium text-muted-foreground hover:text-foreground"
-              >
-                编辑
-              </button>
-              <button
-                type="button"
-                onClick={() => alert("删除自建技能功能已就绪（Phase 2 MVP 占位）")}
-                className="text-xs border border-danger/20 text-danger hover:bg-danger/5 rounded-lg px-2.5 py-1.5 transition-colors font-medium"
-              >
-                删除
-              </button>
-            </div>
-          )}
-          <span className="text-muted-foreground text-xs">
-            {skill.status === "active" ? "已启用" : "已停用"}
-          </span>
-          <button
-            type="button"
-            className={cn(
-              "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
-              skill.status === "active" ? "bg-brand" : "bg-muted"
-            )}
-            role="switch"
-            aria-checked={skill.status === "active"}
-          >
-            <span
-              className={cn(
-                "pointer-events-none inline-block size-5 rounded-full bg-white shadow transition-transform",
-                skill.status === "active" ? "translate-x-5" : "translate-x-0"
-              )}
-            />
-          </button>
-        </div>
-      </div>
-
-      {/* 描述 */}
-      <p className="text-muted-foreground text-sm leading-relaxed">
-        {skill.description}
-      </p>
-
-      {/* 统计指标 */}
-      {skill.stats && (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-accent/30 border border-border/50 rounded-xl p-3 flex flex-col">
-            <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wide">最近执行统计</span>
-            <span className="text-foreground text-lg font-bold mt-1">
-              {skill.stats.callCount} 次调用
-            </span>
-          </div>
-          <div className="bg-accent/30 border border-border/50 rounded-xl p-3 flex flex-col">
-            <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wide">执行成功率</span>
-            <span className={cn(
-              "text-lg font-bold mt-1",
-              skill.stats.successRate >= 0.9 ? "text-success" : "text-warning"
-            )}>
-              {(skill.stats.successRate * 100).toFixed(0)}%
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* 输入规格 */}
-      <div>
-        <h3 className="text-foreground mb-2 text-xs font-semibold uppercase tracking-wide">
-          输入规格
-        </h3>
-        <pre className="bg-black/30 text-muted-foreground overflow-x-auto rounded-lg border border-white/5 p-3 font-mono text-xs leading-relaxed">
-          {JSON.stringify(JSON.parse(skill.inputSchema), null, 2)}
-        </pre>
-      </div>
-
-      {/* 输出规格 */}
-      <div>
-        <h3 className="text-foreground mb-2 text-xs font-semibold uppercase tracking-wide">
-          输出规格
-        </h3>
-        <pre className="bg-black/30 text-muted-foreground overflow-x-auto rounded-lg border border-white/5 p-3 font-mono text-xs leading-relaxed">
-          {JSON.stringify(JSON.parse(skill.outputSchema), null, 2)}
-        </pre>
-      </div>
-
-      {/* 适用场景 */}
-      <div>
-        <h3 className="text-foreground mb-2 text-xs font-semibold uppercase tracking-wide">
-          适用场景
-        </h3>
-        <div className="flex flex-wrap gap-1.5">
-          {skill.scenarios.map((s) => (
-            <span
-              key={s}
-              className="bg-accent text-muted-foreground rounded-md px-2.5 py-1 text-xs"
-            >
-              {s}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* 使用该技能的智能体 */}
-      {usedAgents.length > 0 && (
-        <div>
-          <h3 className="text-foreground mb-2 text-xs font-semibold uppercase tracking-wide">
-            使用该技能的智能体
-          </h3>
-          <div className="flex flex-wrap gap-1.5">
-            {usedAgents.map((agent) => (
-              <span
-                key={agent.id}
-                className="bg-brand/10 text-brand rounded-md px-2.5 py-1 text-xs font-medium"
-              >
-                {agent.name} · {agent.role}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 测试技能按钮 */}
-      <div className="border-border border-t pt-4 space-y-3">
-        <button
-          type="button"
-          onClick={handleTest}
-          disabled={testing}
-          className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm transition-colors disabled:opacity-60"
-        >
-          {testing ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Play className="size-4" />
-          )}
-          {testing ? "测试中…" : "测试技能"}
-        </button>
-
-        {testResult && (
-          <div
-            className={cn(
-              "flex items-start gap-2 rounded-lg border px-3 py-2 text-xs",
-              testResult.ok
-                ? "border-success/30 bg-success/5 text-success"
-                : "border-danger/30 bg-danger/5 text-danger",
-            )}
-          >
-            {testResult.ok ? (
-              <CheckCircle2 className="mt-0.5 size-3.5 shrink-0" />
-            ) : (
-              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-            )}
-            <span>{testResult.message}</span>
-          </div>
-        )}
-      </div>
-
-      {skill.source === "industry-template" && (
-        <div className="pt-4 border-t border-border flex justify-end">
-          <Link
-            href="/settings/industry-packs"
-            className="text-brand hover:underline text-xs flex items-center gap-1 font-medium"
-          >
-            管理行业包 →
-          </Link>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** 智慧大脑 → 技能库页 */
+/** 智慧大脑 → 技能库页（重构版：折叠式技能文件树结构） */
 export default function SkillsPage() {
   const skills = useSkillStore((s) => s.skills);
   const loadSkills = useSkillStore((s) => s.loadSkills);
   const loadAgents = useAgentStore((s) => s.loadAgents);
-  // 用户未手动选择时为 null，渲染时回退到首个技能（避免 setState-in-effect）
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<SkillSource | "ALL">("ALL");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // 技能的物理文件树缓存
+  const [skillDetails, setSkillDetails] = useState<Record<string, Skill>>({});
+  const [loadingDetails, setLoadingDetails] = useState<Record<string, boolean>>({});
+
+  // 折叠状态控制
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+  const [expandedSkills, setExpandedSkills] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadSkills();
     loadAgents();
   }, [loadSkills, loadAgents]);
 
-  // 有效选中 id：优先用户选择，否则默认首个技能
-  const effectiveId = selectedId ?? skills[0]?.id ?? "";
+  // 过滤后的技能列表
+  const filteredSkills = useMemo(() => {
+    let list = skills;
+    if (sourceFilter !== "ALL") {
+      list = list.filter((s) => s.source === sourceFilter);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (s) =>
+          s.name.toLowerCase().includes(q) ||
+          s.description.toLowerCase().includes(q) ||
+          s.category.toLowerCase().includes(q),
+      );
+    }
+    return list;
+  }, [skills, sourceFilter, search]);
+
+  // 有效选中 id
+  const effectiveId = selectedId ?? filteredSkills[0]?.id ?? "";
 
   const selectedSkill = useMemo(
     () => skills.find((s) => s.id === effectiveId) ?? null,
-    [skills, effectiveId]
+    [skills, effectiveId],
   );
+
+  // 异步加载选中的技能物理目录 fileTree
+  const loadSkillDetail = async (skillId: string) => {
+    if (skillDetails[skillId]) return;
+    setLoadingDetails((prev) => ({ ...prev, [skillId]: true }));
+    try {
+      const data = await apiClient.getSkill(skillId);
+      if (data && (data as any).skill) {
+        setSkillDetails((prev) => ({ ...prev, [skillId]: (data as any).skill }));
+      }
+    } catch (err) {
+      console.error("加载技能文件树失败:", err);
+    } finally {
+      setLoadingDetails((prev) => ({ ...prev, [skillId]: false }));
+    }
+  };
+
+  useEffect(() => {
+    if (effectiveId) {
+      loadSkillDetail(effectiveId);
+      setExpandedSkills((prev) => {
+        if (prev[effectiveId] === undefined) {
+          return { ...prev, [effectiveId]: true };
+        }
+        return prev;
+      });
+    }
+  }, [effectiveId]);
+
+  // 按 category 对技能分组
+  const groupedSkills = useMemo(() => {
+    const groups: Record<string, Skill[]> = {};
+    for (const s of filteredSkills) {
+      const cat = s.category || "常规技能";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(s);
+    }
+    return groups;
+  }, [filteredSkills]);
+
+  const toggleCategory = (cat: string) => {
+    setCollapsedCategories((prev) => ({ ...prev, [cat]: !prev[cat] }));
+  };
+
+  const toggleSkillExpand = (skillId: string) => {
+    setExpandedSkills((prev) => ({ ...prev, [skillId]: !prev[skillId] }));
+    loadSkillDetail(skillId);
+  };
 
   return (
     <PageTransition>
-    <div className="space-y-6">
-      <PageHeader
-        title="技能库"
-        description="行业 / 岗位 / 自定义技能，版本化、可测试、可绑定至智能体"
-      />
-
-      {/* 双栏布局 */}
-      <div className="flex gap-6">
-        {/* 左侧：双分区列表 */}
-        <div className="w-64 shrink-0 space-y-6">
-          {/* Section A: 内置与自建技能 */}
-          <div className="space-y-3">
-            <div className="text-muted-foreground px-1 text-[10px] font-bold uppercase tracking-wider border-b border-border/40 pb-1.5 flex items-center justify-between">
-              <span>系统内置 & 自建技能</span>
-              <span className="text-hint font-mono text-[9px]">
-                {skills.filter(s => s.source === "builtin" || s.source === "custom").length}
-              </span>
-            </div>
-            {(() => {
-              const secASkills = skills.filter(s => s.source === "builtin" || s.source === "custom");
-              if (secASkills.length === 0) {
-                return <div className="text-hint text-[11px] px-1 py-1 italic">暂无内置或自建技能</div>;
-              }
-              return (
-                <div className="space-y-0.5">
-                  {secASkills.map((skill) => (
-                    <SkillListItem
-                      key={skill.id}
-                      skill={skill}
-                      isActive={effectiveId === skill.id}
-                      onClick={() => setSelectedId(skill.id)}
-                    />
-                  ))}
-                </div>
-              );
-            })()}
+      <div className="space-y-6">
+        <PageHeader
+          title="技能库"
+          description="行业 / 岗位 / 自定义技能，版本化、可测试、可绑定至智能体"
+        />
+        {/* 搜索栏 + 来源 Tab + 创建入口 */}
+        <div className="flex items-center gap-4">
+          {/* 搜索 */}
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="搜索技能名称、描述、分类…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-accent/50 border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-brand/50 transition-colors"
+            />
           </div>
 
-          {/* Section B: 外部安装技能 */}
-          <div className="space-y-3">
-            <div className="text-muted-foreground px-1 text-[10px] font-bold uppercase tracking-wider border-b border-border/40 pb-1.5 flex items-center justify-between">
-              <span>外部安装技能</span>
-              <span className="text-hint font-mono text-[9px]">
-                {skills.filter(s => s.source === "industry-template").length}
-              </span>
-            </div>
-            {(() => {
-              const secBSkills = skills.filter(s => s.source === "industry-template");
-              if (secBSkills.length === 0) {
-                return <div className="text-hint text-[11px] px-1 py-1 italic">暂无外部安装技能</div>;
-              }
-              return (
-                <div className="space-y-0.5">
-                  {secBSkills.map((skill) => (
-                    <SkillListItem
-                      key={skill.id}
-                      skill={skill}
-                      isActive={effectiveId === skill.id}
-                      onClick={() => setSelectedId(skill.id)}
-                    />
-                  ))}
-                </div>
-              );
-            })()}
+          {/* 来源 Tab */}
+          <div className="flex gap-1 bg-accent/30 rounded-lg p-0.5">
+            {SOURCE_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setSourceFilter(tab.key)}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                  sourceFilter === tab.key
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
+
+          {/* 创建入口 */}
+          <button
+            type="button"
+            onClick={() => setShowCreateModal(true)}
+            className="shrink-0 inline-flex items-center gap-1.5 bg-brand text-white rounded-lg px-3.5 py-2 text-sm font-medium hover:bg-brand/90 transition-colors"
+          >
+            <Plus className="size-4" />
+            创建技能
+          </button>
         </div>
 
-        {/* 右侧：技能详情 */}
-        <div className="bg-card border-border min-h-[400px] flex-1 rounded-2xl border p-6">
-          {selectedSkill ? (
-            <SkillDetail skill={selectedSkill} />
-          ) : (
-            <EmptyState
-              icon={Puzzle}
-              title="暂无选中技能"
-              description="请从左侧列表选择一个技能以查看详细规格及测试"
-            />
-          )}
+        {/* 双栏布局 */}
+        <div className="flex gap-6 items-start">
+          {/* 左侧：折叠式技能文件树 */}
+          <div className="w-72 shrink-0 space-y-4 max-h-[75vh] overflow-y-auto pr-2 border-r border-border/40">
+            <div className="text-muted-foreground px-1 text-[10px] font-bold uppercase tracking-wider border-b border-border/40 pb-1.5 flex items-center justify-between">
+              <span>
+                {sourceFilter === "ALL" ? "全部技能分类" : SOURCE_TABS.find((t) => t.key === sourceFilter)?.label}
+              </span>
+              <span className="text-hint font-mono text-[9px]">{filteredSkills.length}</span>
+            </div>
+
+            {filteredSkills.length === 0 ? (
+              <div className="text-hint text-[11px] px-1 py-2 italic text-center bg-accent/10 rounded-lg border border-dashed border-border/50">
+                {search.trim() ? "无匹配结果" : "暂无技能"}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {Object.entries(groupedSkills).map(([category, catSkills]) => {
+                  const isCatCollapsed = collapsedCategories[category];
+                  return (
+                    <div key={category} className="space-y-1">
+                      {/* 一级分类 */}
+                      <button
+                        type="button"
+                        onClick={() => toggleCategory(category)}
+                        className="flex w-full items-center gap-1 px-1 py-1 text-left text-xs font-bold text-muted-foreground/80 hover:text-foreground transition-colors uppercase tracking-wider"
+                      >
+                        {isCatCollapsed ? (
+                          <ChevronRight className="size-3.5 shrink-0 text-hint" />
+                        ) : (
+                          <ChevronDown className="size-3.5 shrink-0 text-hint" />
+                        )}
+                        <span className="truncate">{category}</span>
+                        <span className="text-hint font-mono text-[9px] ml-auto bg-accent/40 px-1.5 py-0.5 rounded-full">
+                          {catSkills.length}
+                        </span>
+                      </button>
+
+                      {/* 二级技能 */}
+                      {!isCatCollapsed && (
+                        <div className="space-y-0.5 pl-2 border-l border-border/20 ml-2">
+                          {catSkills.map((skill) => {
+                            const isSelected = effectiveId === skill.id;
+                            const isExpanded = !!expandedSkills[skill.id];
+                            const detail = skillDetails[skill.id];
+                            const isDetailLoading = loadingDetails[skill.id];
+
+                            return (
+                              <div key={skill.id} className="space-y-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedId(skill.id);
+                                    setSelectedFilePath(null);
+                                    toggleSkillExpand(skill.id);
+                                  }}
+                                  className={cn(
+                                    "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition-all",
+                                    isSelected && selectedFilePath === null
+                                      ? "bg-brand/10 text-foreground font-semibold shadow-sm"
+                                      : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+                                  )}
+                                >
+                                  <Puzzle className={cn("size-4 shrink-0", isSelected && "text-brand")} />
+                                  <span className="min-w-0 flex-1 truncate">{skill.name}</span>
+                                  <Circle
+                                    className={cn(
+                                      "size-1.5 shrink-0 fill-current",
+                                      skill.status === "active" ? "text-success animate-pulse" : "text-hint",
+                                    )}
+                                  />
+                                </button>
+
+                                {/* 三级物理文件树 */}
+                                {isExpanded && (
+                                  <div className="pl-3.5 py-0.5 space-y-0.5">
+                                    {isDetailLoading && (
+                                      <div className="text-hint text-[10px] py-1 italic flex items-center gap-1.5 pl-3">
+                                        <Loader2 className="size-3 animate-spin text-brand" />
+                                        <span>读取文件树…</span>
+                                      </div>
+                                    )}
+                                    {!isDetailLoading && detail && detail.fileTree && (
+                                      <div className="space-y-0.5 border-l border-border/30 ml-2 pl-2">
+                                        {detail.fileTree.map((item) => (
+                                          <FileTreeItem
+                                            key={item.path}
+                                            item={item}
+                                            isSelected={isSelected && selectedFilePath === item.path}
+                                            onClick={() => {
+                                              if (item.type === "directory") return;
+                                              setSelectedId(skill.id);
+                                              setSelectedFilePath(item.path);
+                                            }}
+                                          />
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 右侧：技能详情 / 物理文件渲染 */}
+          <div className="bg-card border-border min-h-[500px] flex-1 rounded-2xl border p-6 shadow-sm transition-all">
+            {selectedSkill ? (
+              <SkillDetailPanel
+                skill={selectedSkill}
+                selectedFilePath={selectedFilePath}
+                onSkillUpdated={(updated) => {
+                  setSkillDetails((prev) => ({
+                    ...prev,
+                    [updated.id]: updated,
+                  }));
+                  loadSkills();
+                }}
+                onSkillDeleted={() => {
+                  setSelectedId(null);
+                  setSelectedFilePath(null);
+                  loadSkills();
+                }}
+              />
+            ) : (
+              <EmptyState
+                icon={Puzzle}
+                title="暂无选中技能"
+                description="请从左侧列表选择一个技能以查看详细规格及文件树"
+              />
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  </PageTransition>
+      <CreateSkillModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={() => { loadSkills(); }}
+      />
+    </PageTransition>
   );
 }

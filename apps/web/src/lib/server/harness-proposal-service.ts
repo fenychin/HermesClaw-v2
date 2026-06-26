@@ -39,3 +39,48 @@ export async function decideProposal(opts: { existing: any; action: "approve" | 
   if (opts.action === "reject") void writeAgentLog({ source: 'human-correction', taskName: `提案已拒绝：${opts.existing.proposalId}`, status: 'success', duration: '0s', detail: `提案已被拒绝`, riskLevel: 'medium' })
   return { ok: true as const, proposal }
 }
+
+/**
+ * 激活/应用提案修改
+ * 如果是技能绑定变更 (skill_binding)，则把变更同步写入 Agent.bindSkills 以及 SkillBinding 关系表
+ */
+export async function applyProposalChangesIfAny(proposalId: string, tx: any) {
+  const proposal = await tx.harnessProposal.findUnique({
+    where: { id: proposalId }
+  })
+  if (!proposal) return
+
+  const proposedChange = typeof proposal.proposedChange === 'string'
+    ? JSON.parse(proposal.proposedChange)
+    : proposal.proposedChange
+
+  if (proposedChange && proposedChange.targetComponent === 'skill_binding') {
+    const { agentId, skillBindings } = proposedChange
+    if (agentId && Array.isArray(skillBindings)) {
+      // 1. 更新 Agent 中的 bindSkills 字段
+      await tx.agent.update({
+        where: { id: agentId },
+        data: {
+          bindSkills: JSON.stringify(skillBindings)
+        }
+      })
+
+      // 2. 更新 SkillBinding 关系表
+      // 先删除现有的所有绑定
+      await tx.skillBinding.deleteMany({
+        where: { agentId }
+      })
+      // 再重新插入新的绑定
+      for (const skillId of skillBindings) {
+        await tx.skillBinding.create({
+          data: {
+            workspaceId: proposal.workspaceId,
+            agentId,
+            skillId
+          }
+        })
+      }
+    }
+  }
+}
+

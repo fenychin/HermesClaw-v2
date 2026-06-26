@@ -66,10 +66,20 @@ function ConnectorDrawer({
 }) {
   const router = useRouter();
   const storeAgents = useAgentStore((s) => s.agents);
-  const linkedAgents = useMemo(
-    () => storeAgents.filter((a) => connector.usedByAgents.includes(a.id)),
-    [connector, storeAgents],
-  );
+  const linkedAgents = useMemo(() => {
+    if (!connector || !connector.usedByAgents) return [];
+    let list: string[] = [];
+    if (Array.isArray(connector.usedByAgents)) {
+      list = connector.usedByAgents;
+    } else if (typeof connector.usedByAgents === "string") {
+      try {
+        list = JSON.parse(connector.usedByAgents);
+      } catch {
+        list = [];
+      }
+    }
+    return storeAgents.filter((a) => list.includes(a.id));
+  }, [connector, storeAgents]);
 
   return (
     <>

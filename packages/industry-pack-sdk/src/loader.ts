@@ -198,6 +198,10 @@ export function loadIndustryManifest(packId: string): IndustryManifest {
   }
 }
 
+export function setCachedManifest(packId: string, manifest: IndustryManifest): void {
+  manifestCache.set(packId, manifest)
+}
+
 export function getCachedManifest(packId: string): IndustryManifest {
   if (!manifestCache.has(packId)) {
     manifestCache.set(packId, loadIndustryManifest(packId))

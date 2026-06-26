@@ -380,6 +380,10 @@ export async function promoteCanary(
       data: { status: 'active' }
     })
 
+    // 应用提案变更
+    const { applyProposalChangesIfAny } = await import("./harness-proposal-service")
+    await applyProposalChangesIfAny(canary.proposalId, tx)
+
     return updated
   })
 

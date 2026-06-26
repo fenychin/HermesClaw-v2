@@ -135,7 +135,12 @@ function NewTopicPageInner() {
   });
 
   const activePacks = useMemo(() => {
-    return (installedPacksData || []).filter((p: any) => p.status === "installed");
+    return (installedPacksData || [])
+      .filter((p: any) => p.status === "installed")
+      .filter((p: any) => {
+        const targetInd = p.manifest?.targetIndustry || p.manifest?.industry;
+        return targetInd && targetInd !== "general";
+      });
   }, [installedPacksData]);
 
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
@@ -166,10 +171,12 @@ function NewTopicPageInner() {
 
   // 按场景/行业包过滤卡片
   const filteredQuickActions = useMemo(() => {
-    const actions = quickActionsData?.quickActions || [];
-    if (activeTab === "all") return actions;
-    return actions.filter((a: any) => a.packId === activeTab);
-  }, [quickActionsData?.quickActions, activeTab]);
+    if (activeTab === "all") {
+      return quickActionsData?.quickActions || [];
+    }
+    const all = quickActionsData?.allAvailable || [];
+    return all.filter((a: any) => a.packId === activeTab);
+  }, [quickActionsData?.quickActions, quickActionsData?.allAvailable, activeTab]);
 
   // 判断是否无行业包已安装
   const hasNoPacks = useMemo(() => {
@@ -731,7 +738,7 @@ ${cannotDoText}
                         exit={{ opacity: 0 }}
                         className="inline-flex items-center rounded-full bg-muted/40 border border-border/50 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 select-none"
                       >
-                        通用模型
+                        通用模式
                       </motion.div>
                     ) : activePacks.length === 1 ? (
                       <motion.div

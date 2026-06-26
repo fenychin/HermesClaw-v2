@@ -49,6 +49,7 @@ model Workspace {
   tasks                Task[]
   reports              Report[]
   settings             WorkspaceSettings?
+  skillBindings        SkillBinding[]
 }
 
 // ============================================================
@@ -157,6 +158,7 @@ model Agent {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
   runLogs          AgentLog[]
+  skillBindings    SkillBinding[]
 
   @@index([workspaceId])
   @@index([industryId])
@@ -321,28 +323,67 @@ model Connector {
 }
 
 // ============================================================
+// 技能来源枚举（BUILTIN 内置 / CUSTOM 自建 / EXTERNAL 外部安装）
+// ============================================================
+enum SkillSource {
+  BUILTIN
+  CUSTOM
+  EXTERNAL
+}
+
+// ============================================================
 // 技能
 // ============================================================
 model Skill {
-  id              String    @id
-  workspaceId     String    @default("default")
-  workspace       Workspace @relation(fields: [workspaceId], references: [id])
+  id              String      @id
+  workspaceId     String      @default("default")
+  workspace       Workspace   @relation(fields: [workspaceId], references: [id])
   name            String
   description     String
-  version         String    @default("v1.0.0")
+  version         String      @default("v1.0.0")
   category        String
-  source          String    @default("custom")
-  status          String    @default("active")
+  source          SkillSource @default(CUSTOM)
+  status          String      @default("active")
   inputSchema     String
   outputSchema    String
   usedByAgents    String // JSON 数组
   scenarios       String // JSON 数组
+  // SKILL.md 原始内容（自定义 / 外部安装技能保留）
+  skillMdContent  String?     @db.Text
+  // 外部安装技能关联的 zip 文件路径
+  zipPath         String?
+  // 前端校验标记
+  isValid         Boolean     @default(true)
   // 自动化授权等级（AGENTS.md §4.7）：L1 全自动 / L2 建议执行留痕 / L3 需人工确认 / L4 绝对禁止自动
-  automationLevel String    @default("L2")
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  automationLevel String      @default("L2")
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  bindings        SkillBinding[]
 
+  @@unique([workspaceId, name])
   @@index([workspaceId])
+  @@index([source])
+}
+
+// ============================================================
+// 技能绑定关系模型
+// ============================================================
+model SkillBinding {
+  id          String    @id @default(cuid())
+  workspaceId String    @default("default")
+  agentId     String
+  skillId     String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent       Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  skill       Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, skillId])
+  @@index([workspaceId])
+  @@index([agentId])
+  @@index([skillId])
 }
 
 // ============================================================

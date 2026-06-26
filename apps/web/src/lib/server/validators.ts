@@ -215,18 +215,29 @@ export const TaskExecuteSchema = z.object({
 });
 
 // ==============================
-// 技能（"沉淀为技能"功能）
+// 技能（"沉淀为技能"功能 + SKILL.md 自建技能）
 // ==============================
 
+const SKILL_NAME_REGEX = /^[a-z0-9-]+$/
+
 export const SkillCreateSchema = z.object({
-  name: z.string().min(1).max(100),
-  description: z.string().min(1).max(1000),
-  version: z.string().max(20).optional(),
-  category: z.string().max(100).optional(),
-  inputSchema: z.string().max(5000).optional(),
-  outputSchema: z.string().max(5000).optional(),
-  scenarios: z.string().max(2000).optional(),
-  automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional(),
+  name: z.string().min(1).max(100).regex(SKILL_NAME_REGEX, {
+    message: "技能名称只能包含小写字母、数字和连字符",
+  }),
+  description: z.string().min(1).max(2000),
+  version: z.string().max(20).optional().default("v1.0.0"),
+  category: z.string().max(100).optional().default("custom:通用"),
+  source: z.enum(["BUILTIN", "CUSTOM", "EXTERNAL"]).optional().default("CUSTOM"),
+  inputSchema: z.string().max(5000).optional().default(JSON.stringify({ role: "skill" })),
+  outputSchema: z.string().max(5000).optional().default(JSON.stringify({})),
+  scenarios: z.string().max(2000).optional().default("[]"),
+  automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional().default("L2"),
+  skillMdContent: z.string().max(50000).optional(),
+})
+
+export const SkillUpdateSchema = SkillCreateSchema.partial().extend({
+  id: z.string().min(1).optional(),
+  status: z.string().optional(),
 });
 
 // ==============================

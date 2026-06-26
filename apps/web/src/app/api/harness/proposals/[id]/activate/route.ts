@@ -38,6 +38,10 @@ export const POST = withRBAC(
       return ApiResponse.error(result.message, 400);
     }
 
+    // 激活时真正应用提案修改（例如智能体技能绑定）
+    const { applyProposalChangesIfAny } = await import("@/lib/server/harness-proposal-service");
+    await applyProposalChangesIfAny(proposal.id, prisma);
+
     return ApiResponse.ok({
       proposalId: proposal.proposalId,
       status: "active",

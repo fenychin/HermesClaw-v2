@@ -31,6 +31,7 @@ export {
   clearCache,
   clearManifestCache,
   configureIndustryPackLoader,
+  setCachedManifest,
 } from "./loader"
 
 export {
@@ -72,3 +73,5 @@ export type {
 } from './types'
 export { IndustryPackLoader } from './loader'
 
+export { validateSkillMd, parseFrontmatter } from "./skill-validator"
+export type { SkillMdValidationResult } from "./skill-validator"

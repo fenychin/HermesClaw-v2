@@ -434,7 +434,7 @@ describe("E2E Integration Test: Scenario H Link", () => {
         description: "New skill in canary",
         version: "v1.0.0",
         category: "API",
-        source: "custom",
+        source: "CUSTOM",
         status: "active",
         inputSchema: "{}",
         outputSchema: "{}",

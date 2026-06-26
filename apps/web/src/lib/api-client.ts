@@ -36,9 +36,15 @@ async function apiFetch<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
+  const isFormData = options?.body instanceof FormData
+  const defaultHeaders = isFormData ? {} : { "Content-Type": "application/json" }
+
   const res = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers: {
+      ...defaultHeaders,
+      ...(options?.headers || {}),
+    } as any,
   })
 
   const json: ApiResponse<T> = await res.json().catch(() => ({
@@ -236,6 +242,12 @@ export const apiClient = {
   getSkills: () =>
     apiFetch<{ skills: unknown[] }>("/api/skills"),
 
+  getSkill: (id: string) =>
+    apiFetch<{ skill: unknown }>(`/api/skills/${id}`),
+
+  getSkillFileContent: (id: string, filePath: string) =>
+    apiFetch<{ content: string }>(`/api/skills/${id}/file-content?path=${encodeURIComponent(filePath)}`),
+
   createSkill: (data: {
     name: string
     description: string
@@ -247,6 +259,23 @@ export const apiClient = {
     apiFetch<{ skill: unknown }>("/api/skills", {
       method: "POST",
       body: JSON.stringify(data),
+    }),
+
+  updateSkill: (id: string, data: Record<string, unknown>) =>
+    apiFetch<{ skill: unknown }>(`/api/skills/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteSkill: (id: string, force = false) =>
+    apiFetch<{ message: string }>(`/api/skills/${id}${force ? "?force=true" : ""}`, {
+      method: "DELETE",
+    }),
+
+  installSkill: (formData: FormData) =>
+    apiFetch<{ skill: unknown }>("/api/skills/install", {
+      method: "POST",
+      body: formData,
     }),
 
   testSkill: (id: string, confirm = false) =>

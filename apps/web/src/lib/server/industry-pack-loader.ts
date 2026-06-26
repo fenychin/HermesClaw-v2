@@ -384,13 +384,30 @@ export async function installPack(
       const scopedCapId = toScopedId(entry.id)
       // 7a. 写入各自实体表
       if (entry.type === 'skill') {
-        const dbSkill = await activePrisma.skill.findUnique({ where: { id: scopedCapId } })
+        let dbSkill = await activePrisma.skill.findUnique({ where: { id: scopedCapId } })
+        if (!dbSkill) {
+          const conflictingSkill = await activePrisma.skill.findUnique({
+            where: {
+              workspaceId_name: {
+                workspaceId,
+                name: entry.displayName
+              }
+            }
+          })
+          if (conflictingSkill) {
+            console.warn(`[installPack] 发现唯一约束冲突的同名技能 [${entry.displayName}]，将清理旧 ID: ${conflictingSkill.id}`)
+            await activePrisma.skill.delete({ where: { id: conflictingSkill.id } })
+          }
+        }
+        dbSkill = await activePrisma.skill.findUnique({ where: { id: scopedCapId } })
         if (dbSkill) {
           await activePrisma.skill.update({
             where: { id: scopedCapId },
             data: {
               version: entry.version,
-              description: entry.description
+              description: entry.description,
+              status: 'active',
+              skillMdContent: entry.skillMdContent || null,
             }
           })
         } else {
@@ -402,13 +419,14 @@ export async function installPack(
               description: entry.description,
               version: entry.version,
               category: 'general',
-              source: 'pack',
+              source: 'EXTERNAL',
               status: 'active',
               inputSchema: JSON.stringify(entry.inputSchema),
               outputSchema: JSON.stringify(entry.outputSchema),
               usedByAgents: '[]',
               scenarios: JSON.stringify(entry.tags || []),
-              automationLevel: 'L2'
+              automationLevel: 'L2',
+              skillMdContent: entry.skillMdContent || null,
             }
           })
         }
@@ -538,6 +556,22 @@ export async function installPack(
     if (Array.isArray(agents)) {
       for (const agent of agents) {
         const scopedAgentId = toScopedId(agent.id)
+        // 防御性去重：如果在当前 Workspace 已经存在同名但不同 ID 的 Agent，删除旧的以防同名重复
+        const conflictingAgents = await activePrisma.agent.findMany({
+          where: {
+            workspaceId,
+            name: agent.name,
+            id: { not: scopedAgentId }
+          }
+        })
+        if (conflictingAgents.length > 0) {
+          console.warn(`[installPack] 发现同名不同 ID 的智能体 [${agent.name}]，正在清理旧 ID: ${conflictingAgents.map((a: any) => a.id).join(', ')}`)
+          await activePrisma.agent.deleteMany({
+            where: {
+              id: { in: conflictingAgents.map((a: any) => a.id) }
+            }
+          })
+        }
         const boundSkills = (agent.bindSkills || agent.skills || []).map((s: string) => {
           const rawSkillId = s.startsWith('skill-') ? s : `skill-${s}`
           const cleanSkillId = rawSkillId.replace(/^skill-/, '')
@@ -739,6 +773,31 @@ export async function uninstallPack(
         uninstalledBy || 'system',
         { prisma: activePrisma, writeAuditLog: activeWriteAuditLog }
       )
+    }
+
+    // 4b. 卸载该包关联的所有智能体
+    const manifest = inst.manifest as any
+    const agents = manifest?.agents || []
+    const toScopedId = (id: string) => {
+      if (!id) return id
+      const prefix = `${workspaceId}:`
+      if (id.startsWith(prefix)) return id
+      return `${prefix}${id}`
+    }
+    if (Array.isArray(agents)) {
+      for (const agent of agents) {
+        if (!agent.id) continue
+        const scopedAgentId = toScopedId(agent.id)
+        const exists = await activePrisma.agent.findUnique({
+          where: { id: scopedAgentId }
+        })
+        if (exists) {
+          console.log(`[uninstallPack] 清理卸载包绑定的智能体 ID: ${scopedAgentId}`)
+          await activePrisma.agent.delete({
+            where: { id: scopedAgentId }
+          })
+        }
+      }
     }
 
     // 5. 更新状态为 uninstalled

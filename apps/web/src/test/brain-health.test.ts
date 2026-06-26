@@ -126,7 +126,7 @@ describe("智慧大脑 (Brain) 模块健康度测试", () => {
               description: "Custom Skill",
               version: "v1.0.0",
               category: "custom",
-              source: "custom",
+              source: "CUSTOM",
               status: "active",
               inputSchema: "{}",
               outputSchema: "{}",
@@ -137,6 +137,7 @@ describe("智慧大脑 (Brain) 模块健康度测试", () => {
               updatedAt: new Date(),
             },
           ]),
+          count: vi.fn().mockResolvedValue(1),
         },
         agentLog: {
           findMany: vi.fn().mockResolvedValue([
@@ -153,7 +154,7 @@ describe("智慧大脑 (Brain) 模块健康度测试", () => {
       expect(skills[0].stats?.successRate).toBe(0.5); // 1 success out of 2 calls
     });
 
-    it("在没有对应日志时，能基于 Hash 生成高逼真度的初始展示指标", async () => {
+    it("在没有对应日志时，调用量为 0，成功率为 0", async () => {
       const mockPrisma = {
         skill: {
           findMany: vi.fn().mockResolvedValue([
@@ -164,7 +165,7 @@ describe("智慧大脑 (Brain) 模块健康度测试", () => {
               description: "Demo Skill",
               version: "v1.0.0",
               category: "custom",
-              source: "custom",
+              source: "CUSTOM",
               status: "active",
               inputSchema: "{}",
               outputSchema: "{}",
@@ -175,6 +176,7 @@ describe("智慧大脑 (Brain) 模块健康度测试", () => {
               updatedAt: new Date(),
             },
           ]),
+          count: vi.fn().mockResolvedValue(1),
         },
         agentLog: {
           findMany: vi.fn().mockResolvedValue([]),
@@ -183,8 +185,8 @@ describe("智慧大脑 (Brain) 模块健康度测试", () => {
 
       const skills = await getSkillsWithStats("default", { prisma: mockPrisma });
       expect(skills.length).toBe(1);
-      expect(skills[0].stats?.callCount).toBeGreaterThan(0);
-      expect(skills[0].stats?.successRate).toBeGreaterThanOrEqual(0.8);
+      expect(skills[0].stats?.callCount).toBe(0);
+      expect(skills[0].stats?.successRate).toBe(0.0);
     });
   });
 

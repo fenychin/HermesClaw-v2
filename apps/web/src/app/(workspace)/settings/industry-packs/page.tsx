@@ -577,7 +577,11 @@ export default function IndustryPacksPage() {
         />
 
         {/* 多个行业包同时激活的警告 Banner */}
-        {installations.filter((i) => i.status === "installed").length > 1 && (
+        {installations.filter((i) => {
+          if (i.status !== "installed") return false;
+          const targetInd = (i.manifest as any)?.targetIndustry || (i.manifest as any)?.industry;
+          return targetInd && targetInd !== "general";
+        }).length > 1 && (
           <div className="w-full p-4 border border-danger/20 bg-danger/5 rounded-2xl flex items-center gap-2.5 text-sm text-danger animate-pulse select-none">
             <span>⚠️</span>
             <span className="font-semibold">

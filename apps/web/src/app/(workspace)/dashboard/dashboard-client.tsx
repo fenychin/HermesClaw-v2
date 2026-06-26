@@ -209,7 +209,12 @@ export default function DashboardClient({
     }
   });
 
-  const activePacks = (installedPacksData || []).filter((p: any) => p.status === "installed");
+  const activePacks = (installedPacksData || [])
+    .filter((p: any) => p.status === "installed")
+    .filter((p: any) => {
+      const targetInd = (p.manifest as any)?.targetIndustry || (p.manifest as any)?.industry;
+      return targetInd && targetInd !== "general";
+    });
 
   // ── P2 修复：使用 TanStack Query 替代原始 fetch ──
   //   staleTime: 30s（与后端缓存对齐）→ 页面切换不重复请求

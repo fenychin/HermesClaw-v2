@@ -29,7 +29,8 @@
   "dependencies": {
     "@hermesclaw/event-contracts": "workspace:*",
     "yaml": "^2.9.0",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "gray-matter": "^4.0.3"
   },
   "devDependencies": {
     "@types/node": "^20",

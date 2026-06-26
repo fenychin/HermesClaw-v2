@@ -59,6 +59,12 @@ function compilePackManifest(packId: string): IndustryPackManifest {
     const parsed = readAssetFile(skillPath)
     if (parsed) {
       const rawId = parsed.id || skillId
+      // 自动读取同名的 .SKILL.md 内容
+      let skillMdContent: string | undefined = undefined
+      const mdPath = path.join(packsDir, packId, "skills", `${skillId}.SKILL.md`)
+      if (fs.existsSync(mdPath)) {
+        skillMdContent = fs.readFileSync(mdPath, "utf-8")
+      }
       capabilities.push({
         id: rawId.startsWith('skill-') ? rawId : `skill-${rawId}`,
         type: 'skill',
@@ -68,7 +74,8 @@ function compilePackManifest(packId: string): IndustryPackManifest {
         inputSchema: parsed.inputSchema || {},
         outputSchema: parsed.outputSchema || parsed.outputContract || {},
         tags: parsed.harnessTags || parsed.tags || [],
-        changelog: parsed.changelog || "init"
+        changelog: parsed.changelog || "init",
+        skillMdContent
       })
     }
   }
