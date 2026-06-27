@@ -1,0 +1,6 @@
+export { PanelContainer } from "./panel-container"
+export { PanelErrorBoundary } from "./panel-error-boundary"
+export { AiSuggestionsPanel } from "./ai-suggestions-panel"
+export { RecommendedWorkflowsPanel } from "./recommended-workflows-panel"
+export { ActiveAgentsPanel } from "./active-agents-panel"
+export { useDashboardHeartbeat } from "./use-dashboard-heartbeat"
