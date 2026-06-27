@@ -68,6 +68,21 @@ async function main() {
     },
   })
 
+  // ---- 基础工作流（Chat Direct — 新对话入口 TaskEnvelope 外键依赖）----
+  console.log('→ 创建基础工作流...')
+  await prisma.workflow.upsert({
+    where: { id: 'chat-direct' },
+    update: { name: 'Chat Direct', status: 'active', nodes: '[]', edges: '[]' },
+    create: {
+      id: 'chat-direct',
+      workspaceId: 'default',
+      name: 'Chat Direct',
+      status: 'active',
+      nodes: '[]',
+      edges: '[]',
+    },
+  })
+
   // ---- 默认管理员账户 ----
   console.log('→ 创建默认管理员账户...')
   const hashedPassword = await bcrypt.hash('hermesclaw2026', 12)

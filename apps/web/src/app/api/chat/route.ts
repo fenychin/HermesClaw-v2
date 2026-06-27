@@ -8,6 +8,7 @@ import { loadIndustryPrompt } from "@hermesclaw/industry-pack-sdk";
 import { getGovernanceClause } from "@/lib/server/agents-md";
 import { createTrace, addTraceStep, completeTraceStep } from "@/lib/server/reasoning-trace";
 import { writeAgentLog } from "@/lib/server/agent-log";
+import { writeAuditLog, actorFromSession } from "@/lib/server/audit";
 import { createSseResponse } from "@hermesclaw/hermes-kernel";
 
 export const runtime = "nodejs";
@@ -23,6 +24,26 @@ export async function POST(req: NextRequest) {
   let ctx;
   try { ctx = await buildWorkspaceContext(req); }
   catch (e) { throw e; }
+
+  // Chat → Task 审计链路：如果有 taskId，写入关联审计日志
+  if (p.taskId) {
+    writeAuditLog({
+      actor: await actorFromSession(),
+      action: "chat.started",
+      targetType: "task",
+      targetId: p.taskId,
+      detail: `Chat 会话已启动，关联任务: ${p.taskId}`,
+      riskLevel: "low",
+      workspaceId: ctx.workspaceId,
+      contextSnapshot: {
+        taskId: p.taskId,
+        workflowRunId: p.workflowRunId ?? null,
+      },
+    }).catch((err) => {
+      // fire-and-forget，不阻塞 SSE 流
+      console.error("[chat/route] chat.started 审计写入失败:", err);
+    });
+  }
 
   return createSseResponse({ ...p, workspaceId: ctx.workspaceId, industryId: ctx.industryId }, {
     openStream: (o: any, od: any) => openChatStream({ ...o, maxTokens: o.maxTokens ?? 8192 }, od),

@@ -161,7 +161,7 @@ export function useChat() {
   );
 
   const sendMessage = useCallback(
-    async (content: string, systemPrompt?: string, modelId?: string) => {
+    async (content: string, systemPrompt?: string, modelId?: string, taskId?: string, workflowRunId?: string) => {
       if (!content.trim() || isStreamingRef.current) return;
 
       const userMessage: Message = {
@@ -192,6 +192,8 @@ export function useChat() {
             })),
             systemPrompt,
             modelId,
+            taskId,
+            workflowRunId,
           }),
           signal: abortControllerRef.current.signal,
         });

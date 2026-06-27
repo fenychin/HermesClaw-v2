@@ -10,27 +10,29 @@ import { GuardrailError } from "@/lib/server/exceptions"
 import { withTraceStep } from "./reasoning-trace"
 import type { ReasoningTrace } from "@hermesclaw/event-contracts"
 
-const INTENT_EXTRACT_SCHEMA = {
+/** 意图提取 JSON Schema（供 chat-task-dispatch 等模块复用） */
+export const INTENT_EXTRACT_SCHEMA = {
   type: "object",
   properties: {
-    actionType: { 
-      type: "string", 
-      description: "提取的动作类型，必须是非空字符串，表示该任务要执行的动作，例如 email.send, database.query, wechat.send" 
+    actionType: {
+      type: "string",
+      description: "提取的动作类型，必须是非空字符串，表示该任务要执行的动作，例如 email.send, database.query, wechat.send"
     },
-    input: { 
-      type: "object", 
-      description: "执行该动作所需的参数键值对，包含任务所需的具体参数" 
+    input: {
+      type: "object",
+      description: "执行该动作所需的参数键值对，包含任务所需的具体参数"
     },
-    callbackTarget: { 
-      type: "string", 
-      description: "回调的目标标识，如果用户未指定，默认输出 workflow-callback" 
+    callbackTarget: {
+      type: "string",
+      description: "回调的目标标识，如果用户未指定，默认输出 workflow-callback"
     }
   },
   required: ["actionType", "input"],
   additionalProperties: false
 } as const;
 
-const SYSTEM_PROMPT = `你是一个意图解析器，负责将用户的自然语言意图解析为结构化的任务参数。
+/** 意图解析系统提示词（供 chat-task-dispatch 等模块复用） */
+export const INTENT_SYSTEM_PROMPT = `你是一个意图解析器，负责将用户的自然语言意图解析为结构化的任务参数。
 你需要提取以下字段：
 1. actionType: 任务要执行的具体动作，必须是一个简短明确的标识符，如 email.send, inquiry.analyze。
 2. input: 动作所需的详细参数键值对，需根据用户输入的自然语言提取。例如，如果是发送邮件，需包含 to, subject, content 等字段。
@@ -82,7 +84,7 @@ export async function parseIntentToTaskEnvelope(
 
       if (decision.provider === "anthropic") {
         const raw = await callAnthropicStructured({
-          systemPrompt: SYSTEM_PROMPT,
+          systemPrompt: INTENT_SYSTEM_PROMPT,
           userPrompt: input,
           schema: INTENT_EXTRACT_SCHEMA as Record<string, unknown>,
           model: decision.model,
@@ -91,7 +93,7 @@ export async function parseIntentToTaskEnvelope(
         parsedResult = raw as typeof parsedResult;
       } else {
         const raw = await callDeepSeekJson({
-          systemPrompt: `${SYSTEM_PROMPT}
+          systemPrompt: `${INTENT_SYSTEM_PROMPT}
 只输出一个符合以下 JSON 结构的 JSON 对象，不要包含任何额外文字或 Markdown 标记包裹：
 {
   "actionType": "动作类型",
@@ -143,7 +145,6 @@ export async function parseIntentToTaskEnvelope(
         detail: `用户意图解析成功: "${input}" -> 动作: "${taskEnvelopeData.actionType}"`,
         riskLevel: auditRiskLevel,
         workspaceId: context.workspaceId,
-        workflowRunId: workflowRunId,
       });
 
       step._pendingUpdate = {
