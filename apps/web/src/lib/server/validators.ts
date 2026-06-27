@@ -115,6 +115,8 @@ export const ConversationCreateSchema = z.object({
   title: z.string().max(200).optional().default("新对话"),
   projectId: z.string().uuid().nullable().optional().default(null),
   initialMessage: z.string().max(100000).optional(),
+  /** 关联的 TaskEnvelope ID（Conversation → Task 审计链路） */
+  taskId: z.string().max(100).optional(),
   // 批量导入：一次性带入完整消息（用于本地 pending 队列原子回放，对话+消息单事务落库）
   messages: z
     .array(
@@ -158,9 +160,6 @@ export const ConnectorCreateSchema = z.object({
   description: z.string().max(500).optional().default(""),
   status: z.enum(["connected", "available", "disconnected", "error"]).optional().default("available"),
   category: z.string().min(1).max(50),
-  source: z.enum(["builtin", "industry-pack", "custom"]).optional().default("custom"),
-  version: z.string().max(50).nullable().optional().default(null),
-  health: z.enum(["healthy", "degraded", "down", "unknown"]).nullable().optional().default(null),
   lastSync: z.string().nullable().optional().default(null),
   permissions: z.array(z.string()).optional().default([]),
   usedByAgents: z.array(z.string()).optional().default([]),
@@ -170,9 +169,6 @@ export const ConnectorUpdateSchema = z.object({
   status: z.enum(["connected", "available", "disconnected", "error"]).optional(),
   name: z.string().min(1).max(50).optional(),
   description: z.string().max(500).optional(),
-  source: z.enum(["builtin", "industry-pack", "custom"]).optional(),
-  version: z.string().max(50).nullable().optional(),
-  health: z.enum(["healthy", "degraded", "down", "unknown"]).nullable().optional(),
 });
 
 // ==============================
@@ -213,6 +209,10 @@ export const ChatMessageSchema = z.object({
   systemPrompt: z.string().max(5000).optional(),
   /** 客户端模型偏好（如 "claude-sonnet-4-6"），用于覆写策略路由的默认模型 */
   modelId: z.string().max(100).optional(),
+  /** 关联的 TaskEnvelope ID（Chat → Task 审计链路） */
+  taskId: z.string().max(100).optional(),
+  /** 关联的 WorkflowRun ID（Chat → WorkflowRun → Task 全链路审计） */
+  workflowRunId: z.string().max(100).optional(),
 });
 
 export const TaskExecuteSchema = z.object({
@@ -221,29 +221,18 @@ export const TaskExecuteSchema = z.object({
 });
 
 // ==============================
-// 技能（"沉淀为技能"功能 + SKILL.md 自建技能）
+// 技能（"沉淀为技能"功能）
 // ==============================
 
-const SKILL_NAME_REGEX = /^[a-z0-9-]+$/
-
 export const SkillCreateSchema = z.object({
-  name: z.string().min(1).max(100).regex(SKILL_NAME_REGEX, {
-    message: "技能名称只能包含小写字母、数字和连字符",
-  }),
-  description: z.string().min(1).max(2000),
-  version: z.string().max(20).optional().default("v1.0.0"),
-  category: z.string().max(100).optional().default("custom:通用"),
-  source: z.enum(["BUILTIN", "CUSTOM", "EXTERNAL"]).optional().default("CUSTOM"),
-  inputSchema: z.string().max(5000).optional().default(JSON.stringify({ role: "skill" })),
-  outputSchema: z.string().max(5000).optional().default(JSON.stringify({})),
-  scenarios: z.string().max(2000).optional().default("[]"),
-  automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional().default("L2"),
-  skillMdContent: z.string().max(50000).optional(),
-})
-
-export const SkillUpdateSchema = SkillCreateSchema.partial().extend({
-  id: z.string().min(1).optional(),
-  status: z.string().optional(),
+  name: z.string().min(1).max(100),
+  description: z.string().min(1).max(1000),
+  version: z.string().max(20).optional(),
+  category: z.string().max(100).optional(),
+  inputSchema: z.string().max(5000).optional(),
+  outputSchema: z.string().max(5000).optional(),
+  scenarios: z.string().max(2000).optional(),
+  automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional(),
 });
 
 // ==============================
