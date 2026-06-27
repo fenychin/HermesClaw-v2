@@ -9,6 +9,23 @@ export type AgentStatus = 'running' | 'idle' | 'error' | 'paused'
 export type AgentSource = 'builtin' | 'custom' | 'industry'
 export type { AutomationLevel }
 
+/**
+ * Harness 治理状态（从最新 HarnessProposal.status 派生）。
+ * "none" 表示该 Agent 尚无任何治理提案。
+ */
+export type HarnessStatusValue =
+  | 'draft'
+  | 'pending'
+  | 'approved'
+  | 'canary'
+  | 'active'
+  | 'deprecated'
+  | 'rolled_back'
+  | 'none'
+
+/** Agent 当前风险等级 */
+export type AgentRiskLevel = 'low' | 'medium' | 'high'
+
 export interface Agent {
   id: string
   name: string
@@ -36,4 +53,16 @@ export interface Agent {
   }
   lastActive: string
   createdAt: string
+
+  // ======================== 治理状态字段（v3.5 新增）========================
+  /** 当前治理状态：从最新 HarnessProposal.status 派生 */
+  harnessStatus?: HarnessStatusValue
+  /** 风险等级：从 proposal.severity 派生或 automationLevel 映射 */
+  riskLevel?: AgentRiskLevel
+  /** 活跃 Canary ID（如有灰度进行中） */
+  activeCanaryId?: string | null
+  /** 最近一次 Proposal ID（HEP-{timestamp}） */
+  latestProposalId?: string | null
+  /** 最近一次 Proposal 状态 */
+  latestProposalStatus?: string | null
 }

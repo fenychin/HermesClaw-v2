@@ -8,6 +8,8 @@ export type {
   Agent,
   AgentStatus,
   AgentSource,
+  HarnessStatusValue,
+  AgentRiskLevel,
 } from './agent'
 
 // ---- Project 项目空间 ----
