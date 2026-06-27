@@ -33,15 +33,20 @@ export const GET = withRBAC(async (req: Request, ctx: any) => {
         frozen: m.frozen,
         tags,
         version: m.version,
+        status: m.status,
+        taskId: (m as any).taskId ?? null,
+        workflowRunId: (m as any).workflowRunId ?? null,
+        projectId: (m as any).projectId ?? null,
         createdAt: m.createdAt.toISOString(),
         updatedAt: m.updatedAt.toISOString(),
-        revisions: m.revisions.map(r => ({
+        revisions: (m.revisions || []).map(r => ({
           id: r.id,
           version: r.version,
           content: r.content,
           summary: r.summary,
           editedBy: r.editedBy,
           reason: r.reason,
+          proposalId: r.proposalId,
           createdAt: r.createdAt.toISOString()
         }))
       };

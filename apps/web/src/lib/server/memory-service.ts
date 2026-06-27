@@ -520,14 +520,14 @@ ${longMemories.map(m => `ID: ${m.id}\nSummary: ${m.summary}\nContent: ${m.conten
     return result;
   }
 
-  // 分页列表
+  // 分页列表（含完整版本链 + 来源追踪）
   static async listMemories(workspaceId: string, type: 'short' | 'mid' | 'long', page = 1, pageSize = 20) {
     return prisma.memory.findMany({
       where: { workspaceId, type, status: { not: 'deprecated' } },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      include: { revisions: { orderBy: { createdAt: 'desc' }, take: 1 } }
+      include: { revisions: { orderBy: { version: 'desc' } } }
     })
   }
 
@@ -542,5 +542,269 @@ ${longMemories.map(m => `ID: ${m.id}\nSummary: ${m.summary}\nContent: ${m.conten
   // 物理删除（短期专用）
   static async hardDeleteMemory(id: string, workspaceId: string) {
     return prisma.memory.delete({ where: { id, workspaceId } })
+  }
+
+  /**
+   * 获取记忆命中/未命中统计
+   * —— 从 MemoryAccessLog 聚合真实数据，禁止前端计算假数字
+   */
+  static async getMemoryStats(workspaceId: string) {
+    const [totalAccess, hitCount, missCount, byTypeRows] = await Promise.all([
+      prisma.memoryAccessLog.count({ where: { workspaceId } }),
+      prisma.memoryAccessLog.count({ where: { workspaceId, hit: true } }),
+      prisma.memoryAccessLog.count({ where: { workspaceId, hit: false } }),
+      // 按记忆类型分组统计
+      prisma.memoryAccessLog.groupBy({
+        by: ['hit'],
+        where: { workspaceId, memoryId: { not: null } },
+        _count: { id: true },
+      }),
+    ])
+
+    const hitRate = totalAccess > 0 ? hitCount / totalAccess : 0
+
+    return {
+      totalAccess,
+      hitCount,
+      missCount,
+      hitRate: Math.round(hitRate * 10000) / 10000, // 保留 4 位小数
+    }
+  }
+
+  /**
+   * 冻结 / 解冻记忆
+   * —— 仅 ADMIN 可操作，写入 AuditLog
+   */
+  static async freezeMemory(
+    workspaceId: string,
+    id: string,
+    frozen: boolean,
+    actor: string,
+    reason?: string,
+    workflowRunId?: string,
+  ) {
+    const memory = await prisma.$transaction(async (tx) => {
+      const existing = await tx.memory.findUnique({ where: { id } })
+      if (!existing) throw new Error("Memory not found")
+      if (existing.workspaceId !== workspaceId) throw new Error("Unauthorized workspace access")
+
+      const updated = await tx.memory.update({
+        where: { id },
+        data: { frozen },
+      })
+
+      // 冻结/解冻写入修订快照
+      await tx.memoryRevision.create({
+        data: {
+          workspaceId,
+          memoryId: id,
+          version: existing.version,
+          content: existing.content,
+          summary: existing.summary,
+          confidence: existing.confidence,
+          editedBy: actor,
+          reason: reason ?? (frozen ? "管理员冻结记忆" : "管理员解冻记忆"),
+        },
+      })
+
+      return updated
+    })
+
+    // 审计日志 — 绑定来源上下文
+    const action = frozen ? "memory.frozen" : "memory.unfrozen"
+    const contextSource = workflowRunId ?? memory.workflowRunId ?? "direct-admin-action"
+    await writeAuditLog({
+      actor,
+      action,
+      targetType: "memory",
+      targetId: memory.id,
+      detail: `${memory.type} · ${memory.summary} — ${frozen ? "已冻结" : "已解冻"}${reason ? `（原因：${reason}）` : ""}`,
+      riskLevel: "low",
+      workspaceId,
+      workflowRunId: contextSource === "direct-admin-action" ? undefined : contextSource,
+      contextSnapshot: {
+        frozen,
+        memoryVersion: memory.version,
+        source: contextSource,
+      },
+    }).catch((err: unknown) => {
+      console.error(`[MemoryService] Failed to write audit log for ${action}:`, err)
+    })
+
+    return memory
+  }
+
+  /**
+   * 记录记忆访问日志（召回时调用）
+   */
+  static async recordAccess(
+    workspaceId: string,
+    input: {
+      query: string
+      hit: boolean
+      recalledCount: number
+      memoryId?: string
+      sourceTaskId?: string
+      sourceStep?: string
+    },
+  ) {
+    return prisma.memoryAccessLog.create({
+      data: {
+        workspaceId,
+        query: input.query,
+        hit: input.hit,
+        recalledCount: input.recalledCount,
+        memoryId: input.memoryId ?? null,
+        sourceTaskId: input.sourceTaskId ?? null,
+        sourceStep: input.sourceStep ?? null,
+      },
+    })
+  }
+
+  /**
+   * 获取知识缺口列表
+   */
+  static async listKnowledgeGaps(
+    workspaceId: string,
+    status?: 'open' | 'filling' | 'filled' | 'dismissed',
+    type?: string,
+  ) {
+    const where: Record<string, unknown> = { workspaceId }
+    if (status) where.status = status
+    if (type) where.type = type
+
+    return prisma.knowledgeGap.findMany({
+      where,
+      orderBy: [{ priority: 'asc' as const }, { createdAt: 'desc' as const }],
+    })
+  }
+
+  /**
+   * 创建知识缺口
+   */
+  static async createKnowledgeGap(
+    workspaceId: string,
+    input: {
+      type: string
+      title: string
+      description: string
+      impact: string
+      affectedWorkflows?: string[]
+      suggestedSource?: string
+      priority?: string
+    },
+  ) {
+    const gap = await prisma.knowledgeGap.create({
+      data: {
+        workspaceId,
+        type: input.type,
+        title: input.title,
+        description: input.description,
+        impact: input.impact,
+        affectedWorkflows: input.affectedWorkflows ? JSON.stringify(input.affectedWorkflows) : null,
+        suggestedSource: input.suggestedSource ?? null,
+        priority: input.priority ?? 'medium',
+        status: 'open',
+      },
+    })
+
+    return gap
+  }
+
+  /**
+   * 更新知识缺口状态
+   */
+  static async updateKnowledgeGapStatus(
+    workspaceId: string,
+    id: string,
+    status: 'open' | 'filling' | 'filled' | 'dismissed',
+    filledByTaskId?: string,
+  ) {
+    const gap = await prisma.knowledgeGap.findUnique({ where: { id } })
+    if (!gap) throw new Error("KnowledgeGap not found")
+    if (gap.workspaceId !== workspaceId) throw new Error("Unauthorized workspace access")
+
+    return prisma.knowledgeGap.update({
+      where: { id },
+      data: {
+        status,
+        filledByTaskId: filledByTaskId ?? null,
+      },
+    })
+  }
+
+  /**
+   * 增强版记忆列表 — 包含完整修订历史、来源任务追踪
+   */
+  static async enhancedListMemories(
+    workspaceId: string,
+    params: {
+      type?: 'short' | 'mid' | 'long'
+      projectId?: string
+      status?: string
+      search?: string
+      frozen?: boolean
+      page?: number
+      pageSize?: number
+    } = {},
+  ) {
+    const page = params.page ?? 1
+    const pageSize = params.pageSize ?? 20
+    const skip = (page - 1) * pageSize
+
+    const where: Record<string, unknown> = {
+      workspaceId,
+      status: params.status ?? { not: 'deprecated' } as any,
+    }
+    if (params.type) where.type = params.type
+    if (params.projectId) where.projectId = params.projectId
+    if (params.frozen !== undefined) where.frozen = params.frozen
+    if (params.search) {
+      where.OR = [
+        { content: { contains: params.search } },
+        { summary: { contains: params.search } },
+      ]
+    }
+
+    const [memories, total] = await Promise.all([
+      prisma.memory.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: pageSize,
+        include: {
+          revisions: { orderBy: { version: 'desc' } },
+        },
+      }),
+      prisma.memory.count({ where }),
+    ])
+
+    return { memories, total, page, pageSize }
+  }
+
+  /**
+   * 获取单条记忆详情（含完整版本链 + 来源 WorkflowRun 摘要）
+   */
+  static async getMemoryDetail(workspaceId: string, id: string) {
+    const memory = await prisma.memory.findUnique({
+      where: { id },
+      include: {
+        revisions: { orderBy: { version: 'desc' } },
+        workflowRun: {
+          select: {
+            runId: true,
+            status: true,
+            triggerType: true,
+            startedAt: true,
+            completedAt: true,
+          },
+        },
+      },
+    })
+
+    if (!memory) return null
+    if (memory.workspaceId !== workspaceId) throw new Error("Unauthorized workspace access")
+
+    return memory
   }
 }

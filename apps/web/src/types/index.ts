@@ -29,6 +29,14 @@ export type {
 export type {
   Memory,
   MemoryType,
+  MemoryRevision,
+  MemoryStats,
+  KnowledgeGap,
+  KnowledgeGapType,
+  MemoryAccessLog,
+  MemoryListParams,
+  MemoryListResponse,
+  FreezeToggleRequest,
 } from './memory'
 
 // ---- Connector 连接器 ----

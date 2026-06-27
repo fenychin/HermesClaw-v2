@@ -29,6 +29,8 @@ model Workspace {
   projects             Project[]
   memories             Memory[]
   memoryRevisions      MemoryRevision[]
+  memoryAccessLogs     MemoryAccessLog[]
+  knowledgeGaps        KnowledgeGap[]
   connectors           Connector[]
   skills               Skill[]
   harnessProposals     HarnessProposal[]
@@ -63,7 +65,7 @@ model WorkspaceSettings {
   defaultModel    String    @default("deepseek-chat") // 默认模型（可配置，路由 fallback）
   taskProviderMap String    @default("{}") // JSON：{chat|workflow|analysis|generation} -> 'anthropic'|'deepseek'
   workflowEngine  String    @default("local") // local | hermes
-  webhookUrl      String?   // 评估异常通知 webhook
+  webhookUrl      String? // 评估异常通知 webhook
   evalWindowHours Int       @default(24) // 评估时间窗口（小时）
   updatedAt       DateTime  @updatedAt
   createdAt       DateTime  @default(now())
@@ -135,28 +137,28 @@ model Session {
 //   2. 规范化 category 存储，以便快速区分外贸专属岗位 ('foreign-trade' / 'trade') 和通用智能体。
 // ============================================================
 model Agent {
-  id               String     @id
-  workspaceId      String     @default("default")
-  workspace        Workspace  @relation(fields: [workspaceId], references: [id])
+  id               String         @id
+  workspaceId      String         @default("default")
+  workspace        Workspace      @relation(fields: [workspaceId], references: [id])
   name             String
   role             String
   description      String
-  status           String     @default("idle")
-  source           String     @default("custom")
+  status           String         @default("idle")
+  source           String         @default("custom")
   category         String // JSON 数组
   bindSkills       String // JSON 数组
   bindConnectors   String // JSON 数组
-  memoryPermission String     @default("read")
-  harnessVersion   String     @default("v1.0.0")
-  automationLevel  String     @default("L2") // 自动化授权等级（AGENTS.md §4.7）：L1/L2/L3/L4
+  memoryPermission String         @default("read")
+  harnessVersion   String         @default("v1.0.0")
+  automationLevel  String         @default("L2") // 自动化授权等级（AGENTS.md §4.7）：L1/L2/L3/L4
   canDo            String // JSON 数组
   cannotDo         String // JSON 数组
   statsJson        String // JSON 对象
   lastActive       String?
   industryId       String?
   templateId       String?
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
   runLogs          AgentLog[]
   skillBindings    SkillBinding[]
 
@@ -168,22 +170,22 @@ model Agent {
 // —— agentId 可空：Hermes 控制面对话 / 快捷任务等非绑定具体 Agent 的执行也须留日志
 //    source 标识来源：agent（绑定智能体）| hermes-chat（控制面对话）| quick-task（快捷任务）
 model AgentLog {
-  id          String    @id
-  workspaceId String    @default("default")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id])
-  agentId     String?
-  agent       Agent?    @relation(fields: [agentId], references: [id])
-  source      String    @default("agent")
-  taskName    String
-  status      String
-  duration    String
-  detail      String?
+  id            String    @id
+  workspaceId   String    @default("default")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id])
+  agentId       String?
+  agent         Agent?    @relation(fields: [agentId], references: [id])
+  source        String    @default("agent")
+  taskName      String
+  status        String
+  duration      String
+  detail        String?
   // 风险等级（AGENTS.md §4.4 闭环反馈 / §4.7 自动化授权）：low | medium | high
   // Skill 节点执行时由 automationLevel 映射填充
-  riskLevel   String?
+  riskLevel     String?
   workflowRunId String?
-  createdAt   DateTime  @default(now())
-  archivedAt  DateTime?
+  createdAt     DateTime  @default(now())
+  archivedAt    DateTime?
 
   @@index([workspaceId])
   @@index([agentId])
@@ -198,15 +200,15 @@ model AgentLog {
 // 推理轨迹（ReasoningTrace）
 // ============================================================
 model ReasoningTrace {
-  id             String   @id @default(cuid())
-  traceId        String   @unique
-  conversationId String
-  messageId      String?
-  workspaceId    String
-  agentId        String?
-  steps          Json     // TraceStep[]
+  id              String   @id @default(cuid())
+  traceId         String   @unique
+  conversationId  String
+  messageId       String?
+  workspaceId     String
+  agentId         String?
+  steps           Json // TraceStep[]
   totalDurationMs Int?
-  createdAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
 
   @@index([conversationId, createdAt(sort: Desc)])
   @@index([workspaceId, createdAt(sort: Desc)])
@@ -248,31 +250,37 @@ model Project {
 //    不原地覆盖；status 标识 active/archived，便于 KCL 追溯。
 // ============================================================
 model Memory {
-  id             String           @id
-  workspaceId    String           @default("default")
-  workspace      Workspace        @relation(fields: [workspaceId], references: [id])
+  id             String            @id
+  workspaceId    String            @default("default")
+  workspace      Workspace         @relation(fields: [workspaceId], references: [id])
   type           String // short | mid | long
   content        String
   summary        String
   source         String
   relatedProject String?
   relatedAgent   String?
-  confidence     Float            @default(0.8)
-  frozen         Boolean          @default(false)
+  confidence     Float             @default(0.8)
+  frozen         Boolean           @default(false)
   tags           String // JSON 数组
-  version        Int              @default(1)
-  status         String           @default("active") // active | archived
+  version        Int               @default(1)
+  status         String            @default("active") // active | archived
   projectId      String?
-  project        Project?         @relation(fields: [projectId], references: [id])
+  project        Project?          @relation(fields: [projectId], references: [id])
+  taskId         String? // 来源任务 ID（Hermes Task）
+  workflowRunId  String? // 来源工作流运行 ID
+  workflowRun    WorkflowRun?      @relation(fields: [workflowRunId], references: [runId])
   revisions      MemoryRevision[]
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  accessLogs     MemoryAccessLog[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   @@index([workspaceId])
   @@index([workspaceId, status])
   @@index([type])
   @@index([frozen])
   @@index([projectId])
+  @@index([taskId])
+  @@index([workflowRunId])
 }
 
 // 记忆修订历史（知识变更日志 KCL 的载体）
@@ -296,6 +304,49 @@ model MemoryRevision {
   @@index([memoryId])
 }
 
+// 记忆访问日志（用于 hit/miss 统计与召回溯源）
+model MemoryAccessLog {
+  id            String    @id @default(cuid())
+  workspaceId   String    @default("default")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id])
+  memoryId      String?
+  memory        Memory?   @relation(fields: [memoryId], references: [id], onDelete: SetNull)
+  query         String // 召回查询文本
+  hit           Boolean // true=命中, false=未命中
+  recalledCount Int       @default(0) // 召回的记忆条数
+  sourceTaskId  String? // 触发召回的任务 ID
+  sourceStep    String? // 触发召回的步骤标识（如 "intent-parsing" / "skill-exec"）
+  createdAt     DateTime  @default(now())
+
+  @@index([workspaceId])
+  @@index([workspaceId, hit])
+  @@index([memoryId])
+  @@index([createdAt])
+}
+
+// 知识缺口（AI 识别出但尚未填补的知识空白）
+model KnowledgeGap {
+  id                String    @id @default(cuid())
+  workspaceId       String    @default("default")
+  workspace         Workspace @relation(fields: [workspaceId], references: [id])
+  type              String // 缺口类型：missing_sop | missing_fact | missing_rule | stale_knowledge
+  title             String // 缺口标题
+  description       String // 缺口详细描述
+  impact            String // 影响范围说明（影响的工作流/智能体）
+  affectedWorkflows String? // JSON 数组：受影响的工作流 ID 列表
+  suggestedSource   String? // 建议的知识来源
+  status            String    @default("open") // open | filling | filled | dismissed
+  filledByTaskId    String? // 填补该缺口的任务 ID
+  priority          String    @default("medium") // low | medium | high | critical
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([workspaceId])
+  @@index([workspaceId, status])
+  @@index([type])
+  @@index([priority])
+}
+
 // ============================================================
 // 连接器配置
 // ============================================================
@@ -309,16 +360,16 @@ model Connector {
   status           String    @default("available")
   category         String
   source           String    @default("custom") // 来源：builtin / industry-pack / custom
-  version          String?   // 连接器版本号
-  health           String?   // 健康状态：healthy / degraded / down / unknown
+  version          String? // 连接器版本号
+  health           String? // 健康状态：healthy / degraded / down / unknown
   lastSync         String?
-  permissions      String    // JSON 数组
-  usedByAgents     String    // JSON 数组
-  config           Json?     // 连接器配置（SMTP: host/port/auth；IMAP: host/port 等）
+  permissions      String // JSON 数组
+  usedByAgents     String // JSON 数组
+  config           Json? // 连接器配置（SMTP: host/port/auth；IMAP: host/port 等）
   rateLimit        Int       @default(100) // 每小时最大发送数
   rateLimitUsed    Int       @default(0) // 当前小时已使用量
   rateLimitResetAt DateTime? // 速率限制重置时间
-  packId           String?   // 关联的行业包ID
+  packId           String? // 关联的行业包ID
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -338,29 +389,29 @@ enum SkillSource {
 // 技能
 // ============================================================
 model Skill {
-  id              String      @id
-  workspaceId     String      @default("default")
-  workspace       Workspace   @relation(fields: [workspaceId], references: [id])
+  id              String         @id
+  workspaceId     String         @default("default")
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id])
   name            String
   description     String
-  version         String      @default("v1.0.0")
+  version         String         @default("v1.0.0")
   category        String
-  source          SkillSource @default(CUSTOM)
-  status          String      @default("active")
+  source          SkillSource    @default(CUSTOM)
+  status          String         @default("active")
   inputSchema     String
   outputSchema    String
   usedByAgents    String // JSON 数组
   scenarios       String // JSON 数组
   // SKILL.md 原始内容（自定义 / 外部安装技能保留）
-  skillMdContent  String?     @db.Text
+  skillMdContent  String?        @db.Text
   // 外部安装技能关联的 zip 文件路径
   zipPath         String?
   // 前端校验标记
-  isValid         Boolean     @default(true)
+  isValid         Boolean        @default(true)
   // 自动化授权等级（AGENTS.md §4.7）：L1 全自动 / L2 建议执行留痕 / L3 需人工确认 / L4 绝对禁止自动
-  automationLevel String      @default("L2")
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  automationLevel String         @default("L2")
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
   bindings        SkillBinding[]
 
   @@unique([workspaceId, name])
@@ -372,16 +423,16 @@ model Skill {
 // 技能绑定关系模型
 // ============================================================
 model SkillBinding {
-  id          String    @id @default(cuid())
-  workspaceId String    @default("default")
+  id          String   @id @default(cuid())
+  workspaceId String   @default("default")
   agentId     String
   skillId     String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  agent       Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  skill       Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent     Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  skill     Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
 
   @@unique([agentId, skillId])
   @@index([workspaceId])
@@ -710,10 +761,10 @@ model WorkflowRun {
   triggerType String @default("manual")
   // 'manual' | 'scheduled' | 'event' | 'agent-dispatch'
 
-  inputContext      Json    @default(dbgenerated("'{}'"))
-  outputContext     Json?
-  envelopeSnapshot  Json?   // TD-004: TaskEnvelope snapshot from dispatchEnvelope
-  errorMessage      String?
+  inputContext     Json    @default(dbgenerated("'{}'"))
+  outputContext    Json?
+  envelopeSnapshot Json? // TD-004: TaskEnvelope snapshot from dispatchEnvelope
+  errorMessage     String?
 
   startedAt   DateTime?
   completedAt DateTime?
@@ -725,7 +776,8 @@ model WorkflowRun {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  steps StepRun[]
+  steps    StepRun[]
+  memories Memory[] // 该工作流运行产生的记忆
 
   // --- 旧字段兼容开始 ---
   trigger     String            @default("manual") // manual | auto | subworkflow
@@ -920,8 +972,8 @@ model Report {
   workspaceId  String
   workspace    Workspace @relation(fields: [workspaceId], references: [id])
   type         String    @default("MORNING") // MORNING | EVENING | WEEKLY
-  title        String    @default("")           // TD-003: "2026-06-18 晨报"
-  createdBy    String    @default("system")     // TD-003: actor email or "system"
+  title        String    @default("") // TD-003: "2026-06-18 晨报"
+  createdBy    String    @default("system") // TD-003: actor email or "system"
   content      String // LLM 生成的 markdown 摘要
   generatedAt  DateTime  @default(now())
   dataSnapshot String // JSON：生成时使用的数据快照
@@ -1065,21 +1117,21 @@ model HarnessRollback {
 // ActionReceipt 回执存储（Phase 6 — 四层日志证据链之 Receipt Store）
 // ============================================================
 model ActionReceipt {
-  id                String   @id @default(cuid())
-  receiptId         String   @unique
-  taskId            String
-  workflowRunId     String
-  connectorId       String
-  idempotencyKey    String
-  outcome           String   // 'success' | 'failure'
-  executedAt        DateTime
-  response          Json?
-  errorCode         String?
+  id                   String   @id @default(cuid())
+  receiptId            String   @unique
+  taskId               String
+  workflowRunId        String
+  connectorId          String
+  idempotencyKey       String
+  outcome              String // 'success' | 'failure'
+  executedAt           DateTime
+  response             Json?
+  errorCode            String?
   compensationStrategy String?
-  version           String   @default("1.0.0")
-  workspaceId       String
+  version              String   @default("1.0.0")
+  workspaceId          String
 
-  createdAt         DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([workspaceId, taskId])
   @@index([workspaceId, workflowRunId])
@@ -1213,21 +1265,21 @@ model EmailSendLog {
 // —— 发布前审计新增：补齐 Subscription / Invoice / PaymentMethod 模型
 // ============================================================
 model Subscription {
-  id                     String   @id @default(cuid())
-  userId                 String
-  workspaceId            String
-  planId                 String   @default("free") // free | pro | pro_plus | max | ultra
-  status                 String   @default("active") // active | past_due | canceled | trialing
-  stripeSubscriptionId   String?  // Stripe Subscription ID
-  stripeCustomerId       String?  // Stripe Customer ID
-  stripePriceId          String?  // Stripe Price ID
-  currentPeriodStart     DateTime
-  currentPeriodEnd       DateTime
-  cancelAtPeriodEnd      Boolean  @default(false)
-  canceledAt             DateTime?
-  trialEndsAt            DateTime?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  id                   String    @id @default(cuid())
+  userId               String
+  workspaceId          String
+  planId               String    @default("free") // free | pro | pro_plus | max | ultra
+  status               String    @default("active") // active | past_due | canceled | trialing
+  stripeSubscriptionId String? // Stripe Subscription ID
+  stripeCustomerId     String? // Stripe Customer ID
+  stripePriceId        String? // Stripe Price ID
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean   @default(false)
+  canceledAt           DateTime?
+  trialEndsAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   @@index([userId])
   @@index([workspaceId])
@@ -1236,20 +1288,20 @@ model Subscription {
 }
 
 model Invoice {
-  id                String   @id @default(cuid())
-  userId            String
-  workspaceId       String
-  stripeInvoiceId   String?  // Stripe Invoice ID
-  stripeInvoiceUrl  String?  // Stripe Hosted Invoice URL
-  stripeInvoicePdf  String?  // Stripe Invoice PDF URL
-  subscriptionId    String?
-  amount            Float
-  currency          String   @default("usd")
-  status            String   @default("open") // draft | open | paid | void | uncollectible
-  invoiceDate       DateTime
-  paidAt            DateTime?
-  planName          String?  // e.g. "Professional 月付"
-  createdAt         DateTime @default(now())
+  id               String    @id @default(cuid())
+  userId           String
+  workspaceId      String
+  stripeInvoiceId  String? // Stripe Invoice ID
+  stripeInvoiceUrl String? // Stripe Hosted Invoice URL
+  stripeInvoicePdf String? // Stripe Invoice PDF URL
+  subscriptionId   String?
+  amount           Float
+  currency         String    @default("usd")
+  status           String    @default("open") // draft | open | paid | void | uncollectible
+  invoiceDate      DateTime
+  paidAt           DateTime?
+  planName         String? // e.g. "Professional 月付"
+  createdAt        DateTime  @default(now())
 
   @@index([userId])
   @@index([workspaceId])
@@ -1257,16 +1309,16 @@ model Invoice {
 }
 
 model PaymentMethod {
-  id                     String   @id @default(cuid())
-  userId                 String
-  stripePaymentMethodId  String?
-  brand                  String   // visa | mastercard | amex | etc
-  last4                  String   // 卡号末 4 位
-  expMonth               Int
-  expYear                Int
-  isDefault              Boolean  @default(false)
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  userId                String
+  stripePaymentMethodId String?
+  brand                 String // visa | mastercard | amex | etc
+  last4                 String // 卡号末 4 位
+  expMonth              Int
+  expYear               Int
+  isDefault             Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   @@index([userId])
 }
@@ -1278,10 +1330,10 @@ model CreditLedger {
   id          String   @id @default(cuid())
   userId      String
   workspaceId String
-  amount      Float    // 正=收入, 负=支出
-  type        String   // subscription | daily_reward | reward_task | invite_bonus | purchase | usage
+  amount      Float // 正=收入, 负=支出
+  type        String // subscription | daily_reward | reward_task | invite_bonus | purchase | usage
   description String
-  referenceId String?  // 关联 taskId / inviteId / invoiceId
+  referenceId String? // 关联 taskId / inviteId / invoiceId
   createdAt   DateTime @default(now())
 
   @@index([userId, createdAt])
@@ -1292,8 +1344,8 @@ model RewardLedger {
   id          String    @id @default(cuid())
   userId      String
   workspaceId String
-  taskId      String    // 任务标识
-  rewardType  String    // connect_x | connect_discord | verify_email | create_workspace | etc
+  taskId      String // 任务标识
+  rewardType  String // connect_x | connect_discord | verify_email | create_workspace | etc
   points      Int
   status      String    @default("pending") // pending | awarded | rejected
   awardedAt   DateTime?
@@ -1305,7 +1357,7 @@ model RewardLedger {
 
 model Invite {
   id            String    @id @default(cuid())
-  inviterId     String    // 邀请人
+  inviterId     String // 邀请人
   inviteeEmail  String
   inviteCode    String    @unique // 唯一邀请码
   status        String    @default("pending") // pending | registered
@@ -1320,15 +1372,15 @@ model Invite {
 // Phase 1 密钥与偏好（账户中心 Settings）
 // ============================================================
 model Secret {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   userId         String
   workspaceId    String?
   name           String
-  type           String   // api_key | token | password
-  encryptedValue String   // AES-256-GCM 加密后的值
-  scope          String   @default("[\"read\"]") // JSON 数组: ["read","write","admin","execute"]
+  type           String // api_key | token | password
+  encryptedValue String // AES-256-GCM 加密后的值
+  scope          String    @default("[\"read\"]") // JSON 数组: ["read","write","admin","execute"]
   lastUsedAt     DateTime?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime  @default(now())
 
   @@index([userId])
   @@index([workspaceId])
@@ -1339,9 +1391,9 @@ model ApiKey {
   userId      String
   workspaceId String?
   name        String
-  prefix      String    // 存储前 12 字符用于列表显示
-  hash        String    // bcrypt hash of full key
-  permission  String    // read | write | admin
+  prefix      String // 存储前 12 字符用于列表显示
+  hash        String // bcrypt hash of full key
+  permission  String // read | write | admin
   expiresAt   DateTime?
   lastUsedAt  DateTime?
   createdAt   DateTime  @default(now())
@@ -1351,24 +1403,24 @@ model ApiKey {
 }
 
 model UserPreference {
-  id                  String   @id @default(cuid())
-  userId              String   @unique
-  theme               String   @default("dark")
-  language            String   @default("zh-CN")
-  defaultWorkspaceId  String?
-  notificationSettings String  @default("{}") // JSON
-  quickActionOrder    String   @default("[]") // JSON array for customized quick actions order
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  theme                String   @default("dark")
+  language             String   @default("zh-CN")
+  defaultWorkspaceId   String?
+  notificationSettings String   @default("{}") // JSON
+  quickActionOrder     String   @default("[]") // JSON array for customized quick actions order
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  token     String   @unique
+  token     String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
   @@index([token])
