@@ -38,6 +38,7 @@ const DEV_BYPASS_ROUTES = [
   "/api/v1/industry/kpi-snapshot",
   "/api/v1/harness",
   "/api/v1/audit",
+  "/api/tasks/dispatch",
 ];
 
 function isDevAuthBypassEnabled(): boolean {
