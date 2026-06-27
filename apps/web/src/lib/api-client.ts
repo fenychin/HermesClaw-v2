@@ -200,10 +200,10 @@ export const apiClient = {
       body: JSON.stringify(data),
     }),
 
-  createConversation: (title: string, initialMessage?: string) =>
+  createConversation: (title: string, initialMessage?: string, taskId?: string) =>
     apiFetch<{ conversation: { id: string } }>("/api/conversations", {
       method: "POST",
-      body: JSON.stringify({ title, initialMessage }),
+      body: JSON.stringify({ title, initialMessage, taskId }),
     }),
 
   /** 原子导入：对话 + 完整消息一次事务落库（用于本地 pending 队列回放） */

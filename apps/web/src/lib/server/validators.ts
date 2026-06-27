@@ -115,6 +115,8 @@ export const ConversationCreateSchema = z.object({
   title: z.string().max(200).optional().default("新对话"),
   projectId: z.string().uuid().nullable().optional().default(null),
   initialMessage: z.string().max(100000).optional(),
+  /** 关联的 TaskEnvelope ID（Conversation → Task 审计链路） */
+  taskId: z.string().max(100).optional(),
   // 批量导入：一次性带入完整消息（用于本地 pending 队列原子回放，对话+消息单事务落库）
   messages: z
     .array(
@@ -207,6 +209,10 @@ export const ChatMessageSchema = z.object({
   systemPrompt: z.string().max(5000).optional(),
   /** 客户端模型偏好（如 "claude-sonnet-4-6"），用于覆写策略路由的默认模型 */
   modelId: z.string().max(100).optional(),
+  /** 关联的 TaskEnvelope ID（Chat → Task 审计链路） */
+  taskId: z.string().max(100).optional(),
+  /** 关联的 WorkflowRun ID（Chat → WorkflowRun → Task 全链路审计） */
+  workflowRunId: z.string().max(100).optional(),
 });
 
 export const TaskExecuteSchema = z.object({

@@ -14,12 +14,15 @@ import { QuickTaskPanel } from "@/components/pages/new/quick-task-panel";
 import { ConversationArea } from "@/components/pages/new/conversation-area";
 import { SuggestionPanel } from "@/components/pages/new/suggestion-panel";
 import { RecentPanel } from "@/components/pages/new/recent-panel";
+import { RiskConfirmDialog } from "@/components/pages/new/risk-confirm-dialog";
+import { TaskDispatchBanner } from "@/components/pages/new/task-dispatch-banner";
 import { useChat } from "@/hooks/useChat";
 import { SELECTABLE_MODELS } from "@/config/models";
 import { useUiStore } from "@/stores/ui-store";
 import { useAgentStore } from "@/stores/agent-store";
 import { ModelSelectorInline } from "@/components/workspace/ModelSelectorInline";
 import { useModelPreference } from "@/hooks/use-model-preference";
+import { toast } from "sonner";
 
 // 翻译用的能力常量映射
 const AVAILABLE_SKILLS = [
@@ -93,6 +96,31 @@ function NewTopicPageInner() {
   // 快捷任务面板折叠态（仅空态展示）
   const [showQuickTask, setShowQuickTask] = useState(false);
   const [activeWorkflowKey, setActiveWorkflowKey] = useState<string | null>(null);
+
+  // L3 风险确认弹窗状态
+  const [confirmationDialog, setConfirmationDialog] = useState<{
+    open: boolean;
+    riskLevel: string;
+    automationLevel: string;
+    message: string;
+    pendingInput: string;
+    pendingSystemPrompt?: string;
+    pendingModelId?: string;
+  } | null>(null);
+
+  // 当前任务上下文（dispatch 返回后用于 UI 回显）
+  const [currentTaskContext, setCurrentTaskContext] = useState<{
+    taskId: string;
+    workflowRunId: string;
+    actionType: string;
+    riskLevel: string;
+    automationLevel: string;
+    fallback?: boolean;
+    durationMs?: number;
+  } | null>(null);
+
+  // 手动关闭 banner 后隐藏
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   const handleStartWizard = useCallback((prompt: string) => {
     // 自动抓取当前输入内容，若为空则提供一个贴近外贸核算场景的默认需求描述
@@ -213,7 +241,7 @@ ${connectorsListText}
     setActiveWorkflowKey(null);
   }, []);
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     if (!input.trim() || isStreaming) return;
     const apiModelId = getApiModelId();
 
@@ -243,9 +271,116 @@ ${connectorsListText}
         : projectCtx;
     }
 
-    sendMessage(input.trim(), enhancedSystemPrompt, apiModelId);
+    const trimmedInput = input.trim();
+
+    // ═══ 阶段 1: TaskEnvelope 写入闭环 ═══
+    let taskId: string | undefined;
+    let workflowRunId: string | undefined;
+
+    try {
+      const dispatchRes = await fetch("/api/tasks/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: trimmedInput }),
+      });
+
+      if (dispatchRes.ok) {
+        const json = await dispatchRes.json();
+        if (json.success && json.data) {
+          taskId = json.data.taskId;
+          workflowRunId = json.data.workflowRunId;
+          setCurrentTaskContext({
+            taskId: taskId!,
+            workflowRunId: workflowRunId!,
+            actionType: json.data.envelope.actionType,
+            riskLevel: json.data.envelope.riskLevel,
+            automationLevel: json.data.envelope.automationLevel,
+            fallback: json.data.fallback,
+            durationMs: json.data.durationMs,
+          });
+          setBannerDismissed(false);
+        }
+      } else if (dispatchRes.status === 409) {
+        // L3 — 需用户确认
+        const json = await dispatchRes.json();
+        setConfirmationDialog({
+          open: true,
+          riskLevel: json.riskLevel || "L3",
+          automationLevel: json.automationLevel || "L3",
+          message: json.error || "该操作存在高风险，确认后将立即生效且无法撤销",
+          pendingInput: trimmedInput,
+          pendingSystemPrompt: enhancedSystemPrompt,
+          pendingModelId: apiModelId,
+        });
+        return; // 保留输入，等用户确认/取消
+      } else if (dispatchRes.status === 403) {
+        // L4 — 硬拒绝
+        const json = await dispatchRes.json();
+        toast.error("风险过高，无法自动执行", {
+          description: json.error || "请简化需求后重试，或通过人工审批通道发起",
+        });
+        return; // 不发送，保留输入让用户修改
+      }
+      // 其他错误（500 等）→ 降级继续
+    } catch (err) {
+      // 网络错误 → 降级继续（仍可对话，只是无 taskId）
+      console.warn("[handleSend] /api/tasks/dispatch 网络失败，降级为直接对话:", err);
+    }
+
+    // ═══ 阶段 2: 发送对话消息 ═══
+    sendMessage(trimmedInput, enhancedSystemPrompt, apiModelId, taskId, workflowRunId);
     clearNewTopicInput();
   }, [input, isStreaming, sendMessage, pendingSystemPrompt, getApiModelId, clearNewTopicInput]);
+
+  // L3 确认后重试 dispatch
+  const handleConfirmedSend = useCallback(async () => {
+    if (!confirmationDialog) return;
+    const { pendingInput, pendingSystemPrompt, pendingModelId } = confirmationDialog;
+    setConfirmationDialog(null);
+
+    let taskId: string | undefined;
+    let workflowRunId: string | undefined;
+
+    try {
+      const dispatchRes = await fetch("/api/tasks/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: pendingInput, confirmed: true }),
+      });
+
+      if (dispatchRes.ok) {
+        const json = await dispatchRes.json();
+        if (json.success && json.data) {
+          taskId = json.data.taskId;
+          workflowRunId = json.data.workflowRunId;
+          setCurrentTaskContext({
+            taskId: taskId!,
+            workflowRunId: workflowRunId!,
+            actionType: json.data.envelope.actionType,
+            riskLevel: json.data.envelope.riskLevel,
+            automationLevel: json.data.envelope.automationLevel,
+            fallback: json.data.fallback,
+          });
+          setBannerDismissed(false);
+        }
+      } else {
+        const json = await dispatchRes.json().catch(() => ({}));
+        toast.error(json.error || "任务分发失败", {
+          description: "将降级为直接对话模式",
+        });
+      }
+    } catch (err) {
+      console.warn("[handleConfirmedSend] dispatch 重试失败:", err);
+    }
+
+    sendMessage(pendingInput, pendingSystemPrompt, pendingModelId, taskId, workflowRunId);
+    clearNewTopicInput();
+  }, [confirmationDialog, sendMessage, clearNewTopicInput]);
+
+  // L3 确认取消 — 保留输入
+  const handleCancelConfirmation = useCallback(() => {
+    setConfirmationDialog(null);
+  }, []);
 
   const handleQuickActionSelect = useCallback(
     (prompt: string, systemPrompt?: string) => {
@@ -296,6 +431,24 @@ ${connectorsListText}
           {hasMessages && (
             <div className="flex-1 px-4 md:px-8 pt-6 pb-2">
               <div className="max-w-2xl mx-auto">
+                {/* 任务分发 Banner — 回显 taskId / automationLevel / riskLevel */}
+                {currentTaskContext && !bannerDismissed && (
+                  <div className="mb-4">
+                    <TaskDispatchBanner
+                      taskId={currentTaskContext.taskId}
+                      workflowRunId={currentTaskContext.workflowRunId}
+                      actionType={currentTaskContext.actionType}
+                      riskLevel={currentTaskContext.riskLevel}
+                      automationLevel={currentTaskContext.automationLevel}
+                      fallback={currentTaskContext.fallback}
+                      durationMs={currentTaskContext.durationMs}
+                      onDismiss={() => {
+                        setBannerDismissed(true);
+                        setTimeout(() => setCurrentTaskContext(null), 300);
+                      }}
+                    />
+                  </div>
+                )}
                 <ConversationArea
                   messages={messages}
                   isStreaming={isStreaming}
@@ -381,6 +534,18 @@ ${connectorsListText}
           <RecentPanel />
         </aside>
       </div>
+
+      {/* L3 风险确认弹窗 */}
+      {confirmationDialog && (
+        <RiskConfirmDialog
+          open={confirmationDialog.open}
+          riskLevel={confirmationDialog.riskLevel}
+          automationLevel={confirmationDialog.automationLevel}
+          message={confirmationDialog.message}
+          onConfirm={handleConfirmedSend}
+          onCancel={handleCancelConfirmation}
+        />
+      )}
     </PageTransition>
   );
 }
