@@ -576,7 +576,7 @@ ${cannotDoText}
     setActiveWorkflowKey(null);
   }, []);
 
-  const handleSend = useCallback((finalPrompt?: string) => {
+  const handleSend = useCallback(async (finalPrompt?: string) => {
     const activePrompt = typeof finalPrompt === "string" ? finalPrompt : input.trim();
     if (!activePrompt || isStreaming) return;
     const apiModelId = getApiModelId();
