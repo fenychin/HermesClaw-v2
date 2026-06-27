@@ -106,6 +106,7 @@ export function serializeConnector(connector: Record<string, unknown>): Connecto
   const serialized = serializeDates(connector, ["createdAt", "updatedAt"])
   return {
     ...serialized,
+    source: (serialized.source as Connector["source"]) || "custom",
     permissions: parseJsonField(serialized.permissions as string, []),
     usedByAgents: parseJsonField(serialized.usedByAgents as string, []),
   } as unknown as Connector

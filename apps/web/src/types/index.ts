@@ -34,6 +34,12 @@ export type {
   Connector,
   ConnectorStatus,
   ConnectorCategory,
+  ConnectorHealth,
+  ConnectorSource,
+  ConnectorTestResult,
+  ConnectorUsage,
+  ConnectorEvent,
+  ConnectorSelfCheck,
 } from './connector'
 
 // ---- Skill 技能 ----

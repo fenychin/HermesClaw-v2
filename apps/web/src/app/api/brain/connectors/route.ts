@@ -16,10 +16,22 @@ function groupBy<T>(array: T[], keyFn: (item: T) => string): Record<string, T[]>
   }, {} as Record<string, T[]>);
 }
 
+/** 安全解析 JSON 字符串字段，失败时返回默认值 */
+function parseJsonField<T>(raw: unknown, fallback: T): T {
+  if (Array.isArray(raw)) return raw as unknown as T;
+  if (typeof raw !== "string") return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as unknown as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export const GET = withRBAC(async (req: Request, ctx: any) => {
   try {
     const workspaceId = ctx.workspaceId || "default";
-    
+
     const connectors = await prisma.connector.findMany({
       where: { workspaceId },
       select: {
@@ -29,13 +41,22 @@ export const GET = withRBAC(async (req: Request, ctx: any) => {
         status: true,
         packId: true,
         description: true,
+        iconEmoji: true,
+        lastSync: true,
+        permissions: true,
+        usedByAgents: true,
+        source: true,
+        version: true,
+        health: true,
       }
     });
 
     // 兼容处理：旧数据的 packId 为空时映射到 foreign-trade
     const formatted = connectors.map(c => ({
       ...c,
-      packId: c.packId || (c.id === 'email' || c.id === 'crm' ? 'foreign-trade' : 'system')
+      packId: c.packId || (c.id === 'email' || c.id === 'crm' ? 'foreign-trade' : 'system'),
+      permissions: parseJsonField<string[]>(c.permissions, []),
+      usedByAgents: parseJsonField<string[]>(c.usedByAgents, []),
     }));
 
     const grouped = groupBy(formatted, c => c.category || 'other');
@@ -63,6 +84,16 @@ export const PATCH = withRBAC(async (req: Request, ctx: any) => {
       return ApiResponse.apiError("Missing id or status", 400);
     }
 
+    // 系统内置连接器保护：不允许停用
+    const existing = await prisma.connector.findUnique({ where: { id, workspaceId }, select: { source: true, status: true } });
+    if (!existing) {
+      return ApiResponse.apiError("连接器不存在", 404);
+    }
+    const isDeactivating = status !== 'active' && status !== 'connected';
+    if (existing.source === "builtin" && isDeactivating) {
+      return ApiResponse.apiError("系统内置连接器不可停用", 403);
+    }
+
     // 二阶段审计：操作前 pending
     const auditResult = await createAuditEntry({
       actor: ctx.userId || "system",
@@ -72,7 +103,7 @@ export const PATCH = withRBAC(async (req: Request, ctx: any) => {
       riskLevel: 'medium',
       workspaceId,
       workflowRunId: undefined, // 顶层字段，操作无 workflowRunId
-      contextSnapshot: { previousStatus: status === 'active' || status === 'connected' ? 'disabled' : 'active' }
+      contextSnapshot: { previousStatus: existing.status }
     });
 
     try {

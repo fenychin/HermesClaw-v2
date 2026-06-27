@@ -308,14 +308,17 @@ model Connector {
   description      String
   status           String    @default("available")
   category         String
+  source           String    @default("custom") // 来源：builtin / industry-pack / custom
+  version          String?   // 连接器版本号
+  health           String?   // 健康状态：healthy / degraded / down / unknown
   lastSync         String?
-  permissions      String // JSON 数组
-  usedByAgents     String // JSON 数组
-  config           Json? // 连接器配置（SMTP: host/port/auth；IMAP: host/port 等）
+  permissions      String    // JSON 数组
+  usedByAgents     String    // JSON 数组
+  config           Json?     // 连接器配置（SMTP: host/port/auth；IMAP: host/port 等）
   rateLimit        Int       @default(100) // 每小时最大发送数
   rateLimitUsed    Int       @default(0) // 当前小时已使用量
   rateLimitResetAt DateTime? // 速率限制重置时间
-  packId           String? // 关联的行业包ID
+  packId           String?   // 关联的行业包ID
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

@@ -158,6 +158,9 @@ export const ConnectorCreateSchema = z.object({
   description: z.string().max(500).optional().default(""),
   status: z.enum(["connected", "available", "disconnected", "error"]).optional().default("available"),
   category: z.string().min(1).max(50),
+  source: z.enum(["builtin", "industry-pack", "custom"]).optional().default("custom"),
+  version: z.string().max(50).nullable().optional().default(null),
+  health: z.enum(["healthy", "degraded", "down", "unknown"]).nullable().optional().default(null),
   lastSync: z.string().nullable().optional().default(null),
   permissions: z.array(z.string()).optional().default([]),
   usedByAgents: z.array(z.string()).optional().default([]),
@@ -167,6 +170,9 @@ export const ConnectorUpdateSchema = z.object({
   status: z.enum(["connected", "available", "disconnected", "error"]).optional(),
   name: z.string().min(1).max(50).optional(),
   description: z.string().max(500).optional(),
+  source: z.enum(["builtin", "industry-pack", "custom"]).optional(),
+  version: z.string().max(50).nullable().optional(),
+  health: z.enum(["healthy", "degraded", "down", "unknown"]).nullable().optional(),
 });
 
 // ==============================

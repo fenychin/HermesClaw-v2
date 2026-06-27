@@ -286,10 +286,87 @@ export const apiClient = {
     }),
 
   // ---- 连接器 ----
+  /** 获取连接器列表（基于 openclaw-adapter 的 HTTP 客户端） */
   getConnectors: () => getConnectors(),
 
+  /** 获取单个连接器详情 */
+  getConnector: (id: string) =>
+    apiFetch<{ connector: unknown }>(`/api/connectors/${id}`),
+
+  /** 创建连接器 */
+  createConnector: (data: {
+    name: string
+    category: string
+    description?: string
+    iconEmoji?: string
+    source?: string
+    permissions?: string[]
+    usedByAgents?: string[]
+  }) =>
+    apiFetch<{ connector: unknown }>("/api/connectors", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  /** 更新连接器 */
   updateConnector: (id: string, data: Record<string, unknown>) =>
     updateConnector(id, data),
+
+  /** 删除连接器（需二次确认） */
+  deleteConnector: (id: string, confirm = false) =>
+    apiFetch<{ message: string }>(
+      `/api/connectors/${id}?confirm=${confirm}`,
+      { method: "DELETE" },
+    ),
+
+  /** Brain 连接器列表（含分组、VIEWER RBAC） */
+  getBrainConnectors: () =>
+    apiFetch<{ connectors: unknown[]; grouped: Record<string, unknown[]>; totalCount: number }>(
+      "/api/brain/connectors",
+    ),
+
+  /** Brain 连接器激活/停用 */
+  toggleBrainConnector: (id: string, status: string) =>
+    apiFetch<{ success: boolean }>("/api/brain/connectors", {
+      method: "PATCH",
+      body: JSON.stringify({ id, status }),
+    }),
+
+  /** 测试连接器连通性（高风险类型需 confirm=true） */
+  testConnector: (id: string, confirm = false) =>
+    apiFetch<{
+      success: boolean
+      latencyMs: number
+      error?: string
+      details?: Record<string, unknown>
+      timestamp: string
+      connectorName: string
+    }>(`/api/connectors/${id}/test`, {
+      method: "POST",
+      body: JSON.stringify({ confirm }),
+    }),
+
+  /** 连接器用量快照（24h统计 + 最近事件） */
+  getConnectorUsage: (id: string) =>
+    apiFetch<{
+      connectorId: string
+      totalCalls24h: number
+      successRate24h: number
+      avgLatencyMs24h: number
+      lastTestResult?: { success: boolean; latencyMs: number; timestamp: string; error?: string }
+      lastError?: { timestamp: string; message: string }
+      lastSuccessAt?: string
+      recentEvents: Array<{ id: string; action: string; status: string; timestamp: string; detail: string; latencyMs?: number }>
+    }>(`/api/connectors/${id}/usage`),
+
+  /** 连接器发布前自检（逐项校验凭证/网络/模板/回执/权限） */
+  selfCheckConnector: (id: string) =>
+    apiFetch<{
+      checks: Array<{ label: string; key: string; status: string; detail?: string }>
+    }>(`/api/connectors/${id}/test`, {
+      method: "POST",
+      body: JSON.stringify({ confirm: true, input: { mode: "self-check" } }),
+    }),
 
   // ---- 外贸：询盘 / 情报 / 报价 ----
   getInquiries: () =>
