@@ -235,6 +235,11 @@ export const SkillCreateSchema = z.object({
   automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional(),
 });
 
+export const SkillUpdateSchema = SkillCreateSchema.partial().extend({
+  confirm: z.boolean().optional(),
+  reason: z.string().max(500).optional(),
+});
+
 // ==============================
 // 外贸询盘
 // ==============================
