@@ -227,6 +227,7 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
   const dagResult = await runDag(dagWithActions, dagCtx)
 
   // 7a. 将 DAG 产出持久化到 WorkflowRun.outputContext（供 getKpiSnapshot/getKnowledgeGraph 读取）
+  //     并写入 Artifact 表建立文件追踪链路（Phase 2 — 文件中心闭环）
   try {
     const nodeOutputs: Record<string, unknown> = {}
     for (const [nodeId, output] of dagResult.nodeResults) {
@@ -241,6 +242,46 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
         durationMs: dagResult.durationMs,
       },
     })
+
+    // Artifact 写入：每个 DAG 节点的结构化产出作为 AI 生成物记录
+    for (const [nodeId, output] of dagResult.nodeResults) {
+      if (!output) continue
+      try {
+        const label = typeof output === "object" && output !== null
+          ? (output as any).label ?? nodeId
+          : nodeId
+        await prisma.artifact.create({
+          data: {
+            workspaceId: workspace.id,
+            fileName: `Agent产物_${agentId}_${nodeId}_${new Date().toISOString().slice(0, 10)}.json`,
+            originalName: `${label}.json`,
+            mimeType: "application/json",
+            size: Buffer.byteLength(JSON.stringify(output), "utf-8"),
+            url: `artifact://${runId}/${nodeId}`,
+            category: "document",
+            sourceType: "artifact",
+            taskId: taskEnvelope?.taskId ?? null,
+            workflowRunId: runId,
+            receiptHash: null, // 非 connector 执行无 receipt
+            connectorId: null,
+            parseStatus: "parsed",
+            parseSummary: typeof output === "object" && output !== null
+              ? JSON.stringify(output).slice(0, 500)
+              : null,
+            operatedBy: agentId,
+            tags: [agentId, nodeId],
+          },
+        })
+      } catch (artifactErr) {
+        // Artifact 写入失败不阻断主流程
+        logger.warn("[AgentRunner] Artifact 写入失败", {
+          agentId,
+          runId,
+          nodeId,
+          error: artifactErr instanceof Error ? artifactErr.message : String(artifactErr),
+        })
+      }
+    }
   } catch (err) {
     logger.error("[AgentRunner] WorkflowRun 产出持久化失败", {
       agentId,
