@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
   Search,
@@ -28,6 +29,11 @@ import {
   Files,
   Loader2,
   CheckCircle2,
+  Bot,
+  UserPlus,
+  AlertTriangle,
+  ExternalLink,
+  Hash,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -219,6 +225,57 @@ function FileTypeBadge({ type }: { type: string }) {
   );
 }
 
+/** 文件来源 Badge（AI 生成物 / 用户上传 / 来源未知） */
+function SourceBadge({ sourceType, taskId }: { sourceType: string; taskId: string | null }) {
+  if (sourceType === "artifact") {
+    // 防御：artifact 类型必须绑定 taskId，否则为数据异常
+    if (!taskId) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-danger/30 bg-danger/5 px-2 py-0.5 text-[11px] font-medium text-danger">
+          <AlertTriangle className="size-3" />
+          数据异常
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-brand/30 bg-brand/5 px-2 py-0.5 text-[11px] font-medium text-brand">
+        <Bot className="size-3" />
+        AI 生成物
+      </span>
+    );
+  }
+  if (!taskId) {
+    // 历史数据无 taskId → 来源未知警告
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/5 px-2 py-0.5 text-[11px] font-medium text-warning">
+        <AlertTriangle className="size-3" />
+        来源未知
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-hint">
+      <UserPlus className="size-3" />
+      用户上传
+    </span>
+  );
+}
+
+/** 回执 Hash 摘要（前8位） */
+function ReceiptHashBadge({ hash }: { hash: string | null }) {
+  if (!hash) {
+    return (
+      <span className="text-hint text-[11px]">—</span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 font-mono text-[11px] text-hint">
+      <Hash className="size-3" />
+      {hash.slice(0, 8)}
+    </span>
+  );
+}
+
 /** 文件详情 Drawer（右侧滑出） */
 function FileDetailDrawer({
   file,
@@ -255,6 +312,72 @@ function FileDetailDrawer({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {/* 来源追踪链路（新增） */}
+          <div className="space-y-1.5">
+            <p className="text-hint text-[11px] font-medium uppercase tracking-wide">
+              来源追踪链路
+            </p>
+            <div className="bg-accent/40 border border-border rounded-xl p-3 space-y-2.5 text-xs">
+              {/* 来源类型 */}
+              <div className="flex items-center justify-between">
+                <span className="text-hint">来源类型</span>
+                <SourceBadge sourceType={file.sourceType} taskId={file.taskId} />
+              </div>
+
+              {/* taskId */}
+              <div className="flex items-center justify-between">
+                <span className="text-hint">任务 ID</span>
+                {file.taskId ? (
+                  <Link
+                    href={`/workspace/runs/${file.workflowRunId || ""}`}
+                    className="text-brand-blue hover:underline font-mono text-[11px] flex items-center gap-1"
+                  >
+                    {file.taskId.slice(0, 12)}…
+                    <ExternalLink className="size-3" />
+                  </Link>
+                ) : (
+                  <span className="text-warning flex items-center gap-1">
+                    <AlertTriangle className="size-3" />
+                    来源未知
+                  </span>
+                )}
+              </div>
+
+              {/* workflowRunId */}
+              <div className="flex items-center justify-between">
+                <span className="text-hint">工作流运行 ID</span>
+                {file.workflowRunId ? (
+                  <Link
+                    href={`/workspace/runs/${file.workflowRunId}`}
+                    className="text-brand-blue hover:underline font-mono text-[11px]"
+                  >
+                    {file.workflowRunId.slice(0, 12)}…
+                  </Link>
+                ) : (
+                  <span className="text-hint">—</span>
+                )}
+              </div>
+
+              {/* receiptHash */}
+              <div className="flex items-center justify-between">
+                <span className="text-hint">执行回执 Hash</span>
+                <ReceiptHashBadge hash={file.receiptHash} />
+              </div>
+
+              {/* connectorId */}
+              <div className="flex items-center justify-between">
+                <span className="text-hint">连接器 ID</span>
+                {file.connectorId ? (
+                  <span className="text-foreground font-mono text-[11px]">
+                    {file.connectorId}
+                  </span>
+                ) : (
+                  <span className="text-hint">—</span>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* 解析状态 */}
           <div className="space-y-1.5">
             <p className="text-hint text-[11px] font-medium uppercase tracking-wide">
@@ -820,6 +943,7 @@ export function FilesPageClient() {
   // 状态
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [taskIdFilter, setTaskIdFilter] = useState("");
   const [viewMode, setViewMode] = useState<"table" | "card">("table");
   const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(
     new Set(),
@@ -836,6 +960,14 @@ export function FilesPageClient() {
       files = files.filter((f) => f.category === selectedCategory);
     }
 
+    // taskId 过滤
+    if (taskIdFilter.trim()) {
+      const taskQ = taskIdFilter.toLowerCase();
+      files = files.filter(
+        (f) => f.taskId && f.taskId.toLowerCase().includes(taskQ),
+      );
+    }
+
     // 搜索过滤
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -844,12 +976,13 @@ export function FilesPageClient() {
           f.name.toLowerCase().includes(q) ||
           f.tags.some((t) => t.toLowerCase().includes(q)) ||
           (f.relatedProjectName &&
-            f.relatedProjectName.toLowerCase().includes(q)),
+            f.relatedProjectName.toLowerCase().includes(q)) ||
+          (f.receiptHash && f.receiptHash.toLowerCase().includes(q)),
       );
     }
 
     return files;
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, searchQuery, taskIdFilter]);
 
   // 各分类文件计数
   const categoryCounts = useMemo(() => {
@@ -923,11 +1056,31 @@ export function FilesPageClient() {
             <div className="relative flex-1 max-w-sm">
               <Search className="text-hint absolute left-3 top-1/2 size-4 -translate-y-1/2 pointer-events-none" />
               <Input
-                placeholder="搜索文件名称、标签或关联项目..."
+                placeholder="搜索文件名称、标签、回执 hash..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 h-9 text-sm"
               />
+            </div>
+
+            {/* taskId 过滤器 */}
+            <div className="relative w-40">
+              <Hash className="text-hint absolute left-3 top-1/2 size-3.5 -translate-y-1/2 pointer-events-none" />
+              <Input
+                placeholder="按 taskId 过滤…"
+                value={taskIdFilter}
+                onChange={(e) => setTaskIdFilter(e.target.value)}
+                className="pl-8 h-9 text-xs"
+              />
+              {taskIdFilter && (
+                <button
+                  type="button"
+                  onClick={() => setTaskIdFilter("")}
+                  className="text-hint hover:text-foreground absolute right-2 top-1/2 -translate-y-1/2"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
             </div>
 
             {/* 上传按钮 */}
@@ -1000,7 +1153,23 @@ export function FilesPageClient() {
                   <X className="size-4" />
                 </button>
               </div>
-            ) : null}
+            ) : (
+              <div className="ml-auto flex items-center gap-2">
+                {taskIdFilter && (
+                  <Badge variant="outline" className="text-[10px] gap-1">
+                    <Hash className="size-3" />
+                    taskId: {taskIdFilter}
+                    <button
+                      type="button"
+                      onClick={() => setTaskIdFilter("")}
+                      className="hover:text-foreground"
+                    >
+                      <X className="size-2.5" />
+                    </button>
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1039,9 +1208,10 @@ export function FilesPageClient() {
                       />
                     </TableHead>
                     <TableHead>文件名</TableHead>
-                    <TableHead className="w-20">类型</TableHead>
-                    <TableHead className="w-20">大小</TableHead>
-                    <TableHead className="w-36">关联项目</TableHead>
+                    <TableHead className="w-16">类型</TableHead>
+                    <TableHead className="w-16">大小</TableHead>
+                    <TableHead className="w-24">来源</TableHead>
+                    <TableHead className="w-28">执行证据</TableHead>
                     <TableHead className="w-24">解析状态</TableHead>
                     <TableHead className="w-28">更新时间</TableHead>
                     <TableHead className="w-24">操作</TableHead>
@@ -1082,22 +1252,23 @@ export function FilesPageClient() {
                         {formatFileSize(file.size)}
                       </TableCell>
                       <TableCell>
-                        {file.relatedProjectName ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(
-                                `/projects/${file.relatedProjectId}`,
-                              );
-                            }}
-                            className="text-brand-blue hover:underline text-sm truncate max-w-[140px] block text-left"
-                          >
-                            {file.relatedProjectName}
-                          </button>
-                        ) : (
-                          <span className="text-hint text-sm">—</span>
-                        )}
+                        <SourceBadge sourceType={file.sourceType} taskId={file.taskId} />
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {file.taskId ? (
+                            <Link
+                              href={`/workspace/runs/${file.workflowRunId || ""}`}
+                              className="text-brand-blue hover:underline text-[11px] font-mono block truncate max-w-[120px]"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {file.taskId.slice(0, 8)}…
+                            </Link>
+                          ) : (
+                            <span className="text-hint text-[11px]">—</span>
+                          )}
+                          <ReceiptHashBadge hash={file.receiptHash} />
+                        </div>
                       </TableCell>
                       <TableCell>
                         <ParseStatusBadge status={file.parseStatus} />

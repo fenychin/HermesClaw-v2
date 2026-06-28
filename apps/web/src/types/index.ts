@@ -89,6 +89,8 @@ export type {
   FileParseStatus,
   VectorIndexStatus,
   FileVersion,
+  FileSourceType,
+  ArtifactCategory,
 } from './file'
 
 // ---- Chat 对话 ----

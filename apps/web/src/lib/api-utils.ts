@@ -122,7 +122,7 @@ export function serializeSkill(skill: Record<string, unknown>): Skill {
   } as unknown as Skill
 }
 
-/** 统一错误响应 */
-export function errorResponse(message: string, status = 500) {
-  return Response.json({ success: false, error: message }, { status })
+/** 统一错误响应（支持附加 data 负载，如 approval 引导） */
+export function errorResponse(message: string, status = 500, data?: Record<string, unknown>) {
+  return Response.json({ success: false, error: message, ...(data ? { data } : {}) }, { status })
 }

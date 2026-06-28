@@ -263,6 +263,27 @@ export type {
   ActionRecommendation,
 } from "./sandbox-scenario"
 
+// artifact (Phase 2 — 文件中心追踪链路)
+export {
+  ArtifactRecordSchema,
+  ArtifactSourceTypeSchema,
+  ArtifactCategorySchema,
+  ArtifactParseStatusSchema,
+  ArtifactQuerySchema,
+  CreateArtifactSchema,
+  ARTIFACT_VERSION,
+  isArtifactTraceable,
+  getArtifactSourceLabel,
+} from "./artifact"
+export type {
+  ArtifactRecord,
+  ArtifactSourceType,
+  ArtifactCategory,
+  ArtifactParseStatus,
+  ArtifactQuery,
+  CreateArtifact,
+} from "./artifact"
+
 // intel-sse-events (Phase 0 — V2 门户升级专项)
 export {
   IntelSSEEventSchema,

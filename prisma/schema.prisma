@@ -50,6 +50,7 @@ model Workspace {
   reports              Report[]
   settings             WorkspaceSettings?
   skillBindings        SkillBinding[]
+  artifacts            Artifact[]
 }
 
 // ============================================================
@@ -1067,6 +1068,7 @@ model HarnessRollback {
 model ActionReceipt {
   id                String   @id @default(cuid())
   receiptId         String   @unique
+  receiptHash       String?                    // SHA-256 哈希前16位（不可篡改验证）
   taskId            String
   workflowRunId     String
   connectorId       String
@@ -1075,6 +1077,9 @@ model ActionReceipt {
   executedAt        DateTime
   response          Json?
   errorCode         String?
+  failureReason     String?                    // 失败原因
+  retryable         Boolean  @default(false)   // 是否可重试
+  durationMs        Int?                       // 执行耗时 ms
   compensationStrategy String?
   version           String   @default("1.0.0")
   workspaceId       String
@@ -1084,6 +1089,43 @@ model ActionReceipt {
   @@index([workspaceId, taskId])
   @@index([workspaceId, workflowRunId])
   @@index([idempotencyKey])
+  @@index([receiptHash])
+}
+
+// ============================================================
+// Artifact 文件/产物存储（Phase 2 — 文件中心追踪链路）
+// OpenClaw Runtime 职责：文件元数据 + 执行证据关联
+// ============================================================
+model Artifact {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  fileName       String                     // 展示文件名
+  originalName   String                     // 原始文件名
+  mimeType       String   @default("application/octet-stream")
+  size           Int                        // 字节
+  url            String                     // 文件存储路径/URL
+  category       String   @default("document") // document / image / audio / video / archive
+  sourceType     String   @default("user_upload") // "artifact" | "user_upload"
+  taskId         String?                    // 关联 task（AI 生成物非空）
+  workflowRunId  String?                    // 关联 workflow run
+  receiptHash    String?                    // 对应 ActionReceipt.receiptId（执行证据 hash）
+  connectorId    String?                    // 产生此文件的连接器 ID
+  parseStatus    String   @default("unparsed") // unparsed / parsing / parsed / failed
+  parseSummary   String?                    // 解析摘要（文本）
+  vectorIndexed  Boolean  @default(false)
+  tags           Json     @default("[]")    // string[]
+  metadata       Json?                      // 扩展元数据
+  operatedBy     String   @default("system")
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, category])
+  @@index([workspaceId, taskId])
+  @@index([workspaceId, sourceType])
+  @@index([workspaceId, createdAt])
 }
 
 // ============================================================

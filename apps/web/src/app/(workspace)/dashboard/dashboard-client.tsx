@@ -18,6 +18,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { PageTransition } from "@/components/common/PageTransition";
 import { cn } from "@/lib/utils";
 import { PackUpgradeModal } from "@/components/common/pack-upgrade-modal";
+import SecurityMetricsClient from "./_components/security-metrics-client";
 
 // 动态懒加载 Recharts 图表，防止 SSR 报错并提升性能
 const TaskLineChart = dynamic(() => import("./_components/task-line-chart"), {
@@ -381,8 +382,13 @@ export default function DashboardClient({
           </div>
         </div>
 
-        {/* 底部：条形图 - 外贸转化漏斗 */}
-        <div className="bg-card/45 border border-border backdrop-blur-md rounded-2xl p-5">
+        {/* 底部：安全指标 + 外贸转化漏斗 双列 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* 安全态势指标 */}
+          <SecurityMetricsClient workspaceId="default" />
+
+          {/* 外贸转化漏斗 */}
+          <div className="bg-card/45 border border-border backdrop-blur-md rounded-2xl p-5">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-foreground font-semibold text-sm">外贸转化漏斗</h3>
@@ -408,6 +414,7 @@ export default function DashboardClient({
               当前暂无询盘和报价流转记录
             </div>
           )}
+        </div>
         </div>
       </div>
     </PageTransition>
