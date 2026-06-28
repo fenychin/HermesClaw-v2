@@ -12,6 +12,9 @@ import {
   Zap,
   Cpu,
   RefreshCw as RefreshIcon,
+  ClipboardCheck,
+  AlertTriangle,
+  ArrowRight,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { PageHeader } from "@/components/common/page-header";
@@ -198,9 +201,11 @@ function TrendBadge({ curr, prev }: { curr: number; prev: number }) {
 export default function DashboardClient({
   initialData,
   period: initialPeriod,
+  pendingApprovalCount = 0,
 }: {
   initialData: DashboardData | null;
   period: string;
+  pendingApprovalCount?: number;
 }) {
   const router = useRouter();
   const [period, setPeriod] = useState(initialPeriod);
@@ -325,6 +330,32 @@ export default function DashboardClient({
               className="text-xs font-bold underline hover:opacity-80 shrink-0 ml-4"
             >
               立即停用 →
+            </button>
+          </div>
+        )}
+        {/* 待审批入口：仅在存在 pending checkpoint 时展示 */}
+        {pendingApprovalCount > 0 && (
+          <div className="w-full p-4 border border-warning/30 bg-warning/5 rounded-2xl flex items-center justify-between backdrop-blur-sm shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="size-9 rounded-xl bg-warning/10 border border-warning/20 flex items-center justify-center shrink-0">
+                <AlertTriangle className="size-4 text-warning" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  有 {pendingApprovalCount} 项高危任务等待审批
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  L3/L4 风险级别的运行时任务拦截审批，点击立即处理进入审批决策面板
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push("/workspace/approvals")}
+              className="bg-warning hover:bg-warning/90 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-sm shrink-0 ml-4"
+            >
+              <ClipboardCheck className="size-3.5" />
+              立即处理
+              <ArrowRight className="size-3" />
             </button>
           </div>
         )}

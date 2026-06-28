@@ -1,21 +1,22 @@
 /**
  * Prisma 客户端单例
- * —— 使用 BetterSqlite3 驱动适配器（本地开发 / 单机部署使用 SQLite）
+ * —— 使用 PostgreSQL 异步驱动，不阻塞事件循环（CLAUDE.md §11.8 反模式 9）
+ * —— Prisma 7.x 要求必须传入 adapter 或 accelerateUrl（engine type "client"）
  * —— 开发热重载时避免重复创建客户端实例
- * —— 切换 PostgreSQL 时：移除 adapter，PrismaClient 会自动读取
- *    DATABASE_URL 中的 ?connection_limit=10&pool_timeout=20 连接池参数
  */
 import { PrismaClient } from "@/generated/prisma-v2/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
 function createPrismaClient() {
-  const adapter = new PrismaBetterSqlite3({
-    url: process.env["DATABASE_URL"] ?? "file:./dev.db",
-  });
+  const connectionString =
+    process.env["DATABASE_URL"] ?? "postgresql://localhost:5432/hermesclaw_dev";
+  const pool = new Pool({ connectionString, max: 10 });
+  const adapter = new PrismaPg(pool);
   return new PrismaClient({
     adapter,
     // 开发环境启 query 日志方便调试；生产环境仅记录 error 减少开销

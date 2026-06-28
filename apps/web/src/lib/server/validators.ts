@@ -235,6 +235,11 @@ export const SkillCreateSchema = z.object({
   automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional(),
 });
 
+/** 技能更新请求 Schema —— 所有字段可选（PATCH 语义） */
+export const SkillUpdateSchema = SkillCreateSchema.partial().extend({
+  skillMdContent: z.string().max(50000).optional(),
+});
+
 // ==============================
 // 外贸询盘
 // ==============================

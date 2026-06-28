@@ -1,5 +1,6 @@
 import { getDashboardOverview } from "@hermesclaw/hermes-kernel";
 import { prisma } from "@/lib/prisma";
+import { expireStaleCheckpoints } from "@/lib/server/approval";
 import DashboardClient from "./dashboard-client";
 import type { DashboardData } from "./dashboard-client";
 
@@ -26,5 +27,22 @@ export default async function DashboardPage(props: PageProps) {
     // 降级为客户端加载
   }
 
-  return <DashboardClient initialData={initialData} period={period} />;
+  // 服务端获取待审批计数：先清理过期，再查 pending 总数
+  let pendingApprovalCount = 0;
+  try {
+    await expireStaleCheckpoints("default");
+    pendingApprovalCount = await prisma.approvalCheckpoint.count({
+      where: { workspaceId: "default", decision: "pending" },
+    });
+  } catch {
+    // 降级，计数为 0
+  }
+
+  return (
+    <DashboardClient
+      initialData={initialData}
+      period={period}
+      pendingApprovalCount={pendingApprovalCount}
+    />
+  );
 }
