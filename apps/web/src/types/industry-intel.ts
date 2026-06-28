@@ -81,7 +81,7 @@ export interface ConnectorHealthItem {
 }
 
 /** SSE 连接状态 */
-export type SSEConnectionStatus = "disconnected" | "connecting" | "connected" | "reconnecting"
+export type SSEConnectionStatus = "disconnected" | "connecting" | "connected" | "reconnecting" | "fallback-polling"
 
 /** 客户端沙盘提交输入（映射到 SandboxScenarioRequest 之前） */
 export interface SandboxSubmitInput {

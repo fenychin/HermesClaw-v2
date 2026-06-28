@@ -41,13 +41,21 @@ async function isSandboxAvailable(): Promise<boolean> {
 }
 
 /** 沙盒模式：代理沙盒的 SSE 流到客户端 */
-function sandboxProxyStream(packId: string): ReadableStream {
-  return new ReadableStream({
+function sandboxProxyStream(packId: string): { stream: ReadableStream; headers: HeadersInit } {
+  let sandboxHeaders: HeadersInit = {}
+
+  const stream = new ReadableStream({
     async start(controller) {
       try {
         const res = await fetch(`${SANDBOX_STREAM_URL}?packId=${encodeURIComponent(packId)}`)
         if (!res.ok || !res.body) {
           throw new Error(`Sandbox stream 返回 ${res.status}`)
+        }
+
+        // v3.43: 捕获沙盒响应头中的数据源模式
+        const dataMode = res.headers.get("X-Intel-Data-Mode")
+        if (dataMode) {
+          sandboxHeaders["X-Intel-Data-Mode"] = dataMode
         }
 
         const reader = res.body.getReader()
@@ -68,6 +76,8 @@ function sandboxProxyStream(packId: string): ReadableStream {
       // 客户端断开，不需要额外清理（fetch 会自动释放）
     },
   })
+
+  return { stream, headers: sandboxHeaders }
 }
 
 /** 降级模式：内联调度器（沙盒不可用时） */
@@ -131,7 +141,8 @@ export async function GET(req: NextRequest): Promise<Response> {
     }
 
     logger.info("[Intel SSE] 使用沙盒代理模式")
-    return new Response(sandboxProxyStream(industryId ?? ""), {
+    const { stream, headers: sandboxHeaders } = sandboxProxyStream(industryId ?? "")
+    return new Response(stream, {
       status: 200,
       headers: {
         "Content-Type": "text/event-stream",
@@ -139,12 +150,14 @@ export async function GET(req: NextRequest): Promise<Response> {
         Connection: "keep-alive",
         "X-Accel-Buffering": "no",
         "X-Intel-Sandbox": "proxied",
+        ...sandboxHeaders, // v3.43: 传递数据源模式
       },
     })
   }
 
   // 降级：内联模式
   logger.warn("[Intel SSE] 沙盒不可用，降级到内联模式")
+  const isInlineMock = process.env.NODE_ENV !== "production"
   return new Response(inlineFallbackStream(workspaceId, industryId), {
     status: 200,
     headers: {
@@ -153,6 +166,8 @@ export async function GET(req: NextRequest): Promise<Response> {
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
       "X-Intel-Sandbox": "fallback",
+      // v3.43: 数据源模式标识 — 降级内联模式非生产环境均为 mock
+      "X-Intel-Data-Mode": isInlineMock ? "mock" : "real",
     },
   })
 }

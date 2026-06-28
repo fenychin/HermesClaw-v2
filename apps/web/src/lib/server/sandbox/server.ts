@@ -29,6 +29,7 @@ import {
   unsubscribeIntelStream,
   sendIntelHeartbeat,
   sendFlowTickCompensation,
+  isIntelMockRunning,
 } from "@hermesclaw/openclaw-adapter"
 
 // ─── 配置 ──────────────────────────────────────────────────────────────
@@ -99,6 +100,7 @@ function handleHealth(_req: IncomingMessage, res: ServerResponse): void {
 
 function handleStream(_req: IncomingMessage, res: ServerResponse): void {
   const connectionId = `sse-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const isMock = isIntelMockRunning()
 
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
@@ -106,6 +108,8 @@ function handleStream(_req: IncomingMessage, res: ServerResponse): void {
     Connection: "keep-alive",
     "X-Accel-Buffering": "no",
     "Access-Control-Allow-Origin": "*",
+    // v3.43: 数据源模式标识 — 前端据此显示 MOCK DATA badge
+    "X-Intel-Data-Mode": isMock ? "mock" : "real",
   })
 
   // 连接确认
