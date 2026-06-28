@@ -161,6 +161,7 @@ export async function findMissingReceipts(
 function mapRow(row: any): ActionReceiptContract {
   return {
     receiptId: row.receiptId,
+    receiptHash: row.receiptHash ?? undefined,
     taskId: row.taskId,
     workflowRunId: row.workflowRunId,
     connectorId: row.connectorId,
@@ -169,6 +170,9 @@ function mapRow(row: any): ActionReceiptContract {
     executedAt: row.executedAt.toISOString(),
     response: row.response ?? {},
     errorCode: row.errorCode ?? undefined,
+    failureReason: row.failureReason ?? undefined,
+    retryable: row.retryable ?? undefined,
+    durationMs: row.durationMs ?? undefined,
     compensationStrategy: row.compensationStrategy ?? undefined,
     version: row.version,
   }

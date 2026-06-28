@@ -11,8 +11,9 @@
  */
 import { prisma } from "@/lib/prisma";
 import { serializeConnector } from "@/lib/api-utils";
-import type { Connector, ConnectorHealth } from "@/types";
+import type { Connector, ConnectorHealth, ConnectorLease } from "@/types";
 import type { ActionReceipt } from "@hermesclaw/event-contracts";
+import { randomUUID } from "crypto";
 
 export interface ConnectorsDeps {
   prisma: typeof prisma;
@@ -141,20 +142,232 @@ function resolveAutomationLevel(
   return inferRequiredAutomationLevel(category, source);
 }
 
-/** 根据 health 字段推导线上的 lease 状态 */
-function inferLeaseStatus(
+/** 根据 DB 中真实 ConnectorLease 记录 + health 字段推导线上的 lease 状态 */
+async function inferLeaseStatus(
+  connectorId: string,
+  workspaceId: string,
   health: string | undefined | null,
   status: string,
   lastHeartbeatAt?: string | null,
-): "active" | "expired" | "revoked" | "none" {
+): Promise<"active" | "expired" | "revoked" | "none"> {
+  // 1. 优先查真实 ConnectorLease 记录
+  const activeLease = await prisma.connectorLease.findFirst({
+    where: {
+      workspaceId,
+      connectorId,
+      status: "active",
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { expiresAt: "desc" },
+  });
+  if (activeLease) return "active";
+
+  // 2. 检查是否有已过期的租约
+  const expiredLease = await prisma.connectorLease.findFirst({
+    where: {
+      workspaceId,
+      connectorId,
+      status: "expired",
+    },
+  });
+  if (expiredLease) return "expired";
+
+  // 3. Fallback: 基于心跳推断
   if (status === "error") return "revoked";
   if (!lastHeartbeatAt) return "none";
   const lastHb = new Date(lastHeartbeatAt).getTime();
   const now = Date.now();
-  // 30s 无心跳视为 expired
   if (now - lastHb > 30_000) return "expired";
   if (health === "healthy" || health === "active") return "active";
   return "none";
+}
+
+// ─── 租约管理（真实 ConnectorLease CRUD）──────────────────────────────────
+
+/** 获取连接器的当前活跃租约 */
+export async function getActiveLease(
+  workspaceId: string,
+  connectorId: string,
+): Promise<ConnectorLease | null> {
+  const row = await prisma.connectorLease.findFirst({
+    where: {
+      workspaceId,
+      connectorId,
+      status: "active",
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { expiresAt: "desc" },
+  });
+  if (!row) return null;
+  return mapLeaseRow(row);
+}
+
+/** 获取连接器的所有租约记录（最近 N 条） */
+export async function listLeases(
+  workspaceId: string,
+  connectorId: string,
+  limit = 10,
+): Promise<ConnectorLease[]> {
+  const rows = await prisma.connectorLease.findMany({
+    where: { workspaceId, connectorId },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+  return rows.map(mapLeaseRow);
+}
+
+/** 获取连接器租约 — 含状态过滤 */
+export async function getLeasesByStatus(
+  workspaceId: string,
+  connectorId: string,
+  status: string,
+  limit = 10,
+): Promise<ConnectorLease[]> {
+  const rows = await prisma.connectorLease.findMany({
+    where: { workspaceId, connectorId, status },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+  return rows.map(mapLeaseRow);
+}
+
+/** 获取连接器租约 */
+export async function getLeaseById(leaseId: string): Promise<ConnectorLease | null> {
+  const row = await prisma.connectorLease.findUnique({ where: { leaseId } });
+  if (!row) return null;
+  return mapLeaseRow(row);
+}
+
+/** 申请租约（创建 ConnectorLease 记录） */
+export async function acquireLease(params: {
+  workspaceId: string
+  connectorId: string
+  taskId?: string
+  runtimeId?: string
+  scope?: string[]
+  maxRiskLevel?: string
+  ttlMinutes?: number
+}): Promise<ConnectorLease> {
+  const {
+    workspaceId,
+    connectorId,
+    taskId = null,
+    runtimeId = "openclaw-runtime",
+    scope = ["read"],
+    maxRiskLevel = "medium",
+    ttlMinutes = 60,
+  } = params;
+
+  const leaseId = `lease_${randomUUID().slice(0, 16)}`;
+  const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
+
+  const row = await prisma.connectorLease.create({
+    data: {
+      leaseId,
+      workspaceId,
+      connectorId,
+      taskId,
+      runtimeId,
+      scope: JSON.stringify(scope),
+      maxRiskLevel,
+      status: "active",
+      grantedAt: new Date(),
+      expiresAt,
+      version: "1.0.0",
+    },
+  });
+
+  return mapLeaseRow(row);
+}
+
+/** 释放租约（标记为 revoked） */
+export async function releaseLease(leaseId: string): Promise<ConnectorLease | null> {
+  const existing = await prisma.connectorLease.findUnique({ where: { leaseId } });
+  if (!existing) return null;
+
+  const row = await prisma.connectorLease.update({
+    where: { leaseId },
+    data: { status: "revoked" },
+  });
+  return mapLeaseRow(row);
+}
+
+/** 吊销连接器的所有活跃租约（连接器断开/故障时使用） */
+export async function revokeAllLeases(
+  workspaceId: string,
+  connectorId: string,
+): Promise<number> {
+  const result = await prisma.connectorLease.updateMany({
+    where: {
+      workspaceId,
+      connectorId,
+      status: "active",
+    },
+    data: { status: "revoked" },
+  });
+  return result.count;
+}
+
+/** 校验租约是否有效 */
+export function checkLeaseValid(
+  lease: ConnectorLease | null,
+  requiredScope: string,
+  riskLevel: string,
+): { valid: boolean; reason?: string } {
+  if (!lease) {
+    return { valid: false, reason: "无有效租约" };
+  }
+  if (lease.status !== "active") {
+    return { valid: false, reason: `租约状态为 ${lease.status}` };
+  }
+  if (new Date(lease.expiresAt).getTime() < Date.now()) {
+    return { valid: false, reason: "租约已过期" };
+  }
+  if (!lease.scope.includes(requiredScope)) {
+    return { valid: false, reason: `租约作用域不包含 ${requiredScope}（当前: ${lease.scope.join(", ")}）` };
+  }
+  const riskOrder = ["low", "medium", "high", "critical"];
+  const leaseRiskIndex = riskOrder.indexOf(lease.maxRiskLevel);
+  const requiredRiskIndex = riskOrder.indexOf(riskLevel);
+  if (leaseRiskIndex < requiredRiskIndex) {
+    return { valid: false, reason: `租约风险等级不足（允许: ${lease.maxRiskLevel}，需要: ${riskLevel}）` };
+  }
+  return { valid: true };
+}
+
+/** 自动清理过期租约（定时任务调用） */
+export async function expireStaleLeases(workspaceId: string): Promise<number> {
+  const result = await prisma.connectorLease.updateMany({
+    where: {
+      workspaceId,
+      status: "active",
+      expiresAt: { lt: new Date() },
+    },
+    data: { status: "expired" },
+  });
+  return result.count;
+}
+
+/** DB 行 → ConnectorLease 前端类型 */
+function mapLeaseRow(row: any): ConnectorLease {
+  let scope: string[] = [];
+  try {
+    scope = typeof row.scope === "string" ? JSON.parse(row.scope) : row.scope ?? [];
+  } catch { /* keep default */ }
+
+  return {
+    leaseId: row.leaseId,
+    connectorId: row.connectorId,
+    workspaceId: row.workspaceId,
+    taskId: row.taskId ?? undefined,
+    runtimeId: row.runtimeId,
+    grantedAt: row.grantedAt instanceof Date ? row.grantedAt.toISOString() : row.grantedAt,
+    expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt,
+    scope,
+    maxRiskLevel: row.maxRiskLevel as ConnectorLease["maxRiskLevel"],
+    status: row.status as ConnectorLease["status"],
+    version: row.version,
+  };
 }
 
 /**
@@ -177,7 +390,7 @@ export async function getEnrichedConnectors(
   const connectorIds = connectors.map((c) => c.id);
   const statsMap = await batchGetConnectorStats(workspaceId, connectorIds, deps);
 
-  return connectors.map((c) => {
+  return Promise.all(connectors.map(async (c) => {
     const serialized = serializeConnector(c as unknown as Record<string, unknown>);
     const permissions = (serialized.permissions || []) as string[];
     const stats = statsMap.get(c.id);
@@ -213,8 +426,10 @@ export async function getEnrichedConnectors(
       c.source,
     );
 
-    // 5. 租用状态
-    const leaseStatus = inferLeaseStatus(
+    // 5. 租用状态（异步：优先查真实 ConnectorLease 记录）
+    const leaseStatus = await inferLeaseStatus(
+      c.id,
+      workspaceId,
       c.health,
       c.status,
       c.lastHeartbeatAt?.toISOString(),
@@ -233,7 +448,7 @@ export async function getEnrichedConnectors(
       leaseStatus,
       lastHeartbeatAt: c.lastHeartbeatAt?.toISOString(),
     };
-  });
+  }));
 }
 
 /**

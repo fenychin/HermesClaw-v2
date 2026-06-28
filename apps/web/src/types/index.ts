@@ -52,6 +52,7 @@ export type {
   ConnectorSelfCheck,
   ActionReceipt,
   LeaseStatus,
+  ConnectorLease,
 } from './connector'
 
 // ---- Skill 技能 ----

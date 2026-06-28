@@ -1146,6 +1146,32 @@ model ActionReceipt {
 }
 
 // ============================================================
+// 连接器租约（ConnectorLease）
+// Hermes 授予 OpenClaw Runtime 在限定窗口内使用某连接器的授权凭证
+// 对应 event-contracts ConnectorLeaseSchema（AGENTS §3.4 / §6）
+// ============================================================
+model ConnectorLease {
+  id           String   @id @default(cuid())
+  leaseId      String   @unique
+  workspaceId  String   @default("default")
+  connectorId  String
+  taskId       String?
+  runtimeId    String   @default("openclaw-runtime")
+  grantedAt    DateTime @default(now())
+  expiresAt    DateTime
+  scope        String   @default("[]") // JSON 数组，如 ["read","send","write"]
+  maxRiskLevel String   @default("medium") // low | medium | high | critical
+  status       String   @default("active") // active | expired | revoked
+  version      String   @default("1.0.0")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([workspaceId, connectorId])
+  @@index([workspaceId, taskId])
+  @@index([status])
+}
+
+// ============================================================
 // 能力版本管理与能力调用遥测
 // ============================================================
 model CapabilityVersion {

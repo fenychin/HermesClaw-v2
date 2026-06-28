@@ -36,6 +36,7 @@ import type {
   ConnectorCategory,
   ConnectorSelfCheck,
   ActionReceipt,
+  ConnectorLease,
 } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -152,6 +153,53 @@ function ConnectorDrawer({
     refetchInterval: 30_000,
   });
   const receipts: ActionReceipt[] = (receiptsData?.receipts || []) as ActionReceipt[];
+
+  // 租约数据
+  const { data: leaseData, refetch: refetchLease } = useQuery({
+    queryKey: ["connector-lease", connector.id],
+    queryFn: () => apiClient.getConnectorLease(connector.id),
+    enabled: activeTab === "harness" || activeTab === "overview",
+    refetchInterval: 30_000,
+  });
+  const activeLease: ConnectorLease | null = (leaseData?.lease || null) as ConnectorLease | null;
+
+  // 租约历史
+  const { data: leaseHistoryData } = useQuery({
+    queryKey: ["connector-lease-history", connector.id],
+    queryFn: () => apiClient.getConnectorLeaseHistory(connector.id, 5),
+    enabled: activeTab === "harness",
+  });
+  const leaseHistory: ConnectorLease[] = (leaseHistoryData?.leases || []) as ConnectorLease[];
+
+  const queryClient = useQueryClient();
+
+  // 申请租约 mutation
+  const acquireLeaseMut = useMutation({
+    mutationFn: (params: { scope?: string[]; maxRiskLevel?: string; ttlMinutes?: number; confirm?: boolean }) =>
+      apiClient.acquireConnectorLease(connector.id, params),
+    onSuccess: () => {
+      toast.success("租约申请成功");
+      queryClient.invalidateQueries({ queryKey: ["connector-lease", connector.id] });
+      queryClient.invalidateQueries({ queryKey: ["connector-lease-history", connector.id] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "租约申请失败");
+    },
+  });
+
+  // 吊销租约 mutation
+  const revokeLeaseMut = useMutation({
+    mutationFn: (leaseId?: string) => apiClient.revokeConnectorLease(connector.id, leaseId),
+    onSuccess: () => {
+      toast.success("租约已吊销");
+      queryClient.invalidateQueries({ queryKey: ["connector-lease", connector.id] });
+      queryClient.invalidateQueries({ queryKey: ["connector-lease-history", connector.id] });
+      refetchLease();
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "吊销租约失败");
+    },
+  });
 
   const storeAgents = useAgentStore((s) => s.agents);
   const linkedAgents = useMemo(() => {
@@ -438,6 +486,11 @@ function ConnectorDrawer({
                           ? "已撤销"
                           : "未租用"}
                   </span>
+                  {activeLease && (
+                    <p className="text-hint text-[10px] mt-1">
+                      过期: {formatDate(activeLease.expiresAt)} · 作用域: {activeLease.scope?.join(", ") || "—"}
+                    </p>
+                  )}
                 </div>
 
                 <div className="bg-card rounded-xl border border-border p-3">
@@ -988,6 +1041,54 @@ function ConnectorDrawer({
                           : "未租用"}
                   </span>
                 </div>
+                {/* 真实租约详情（当有活跃租约时展示） */}
+                {activeLease && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground text-sm">租约 ID</span>
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {activeLease.leaseId.slice(0, 16)}…
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground text-sm">过期时间</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(activeLease.expiresAt)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground text-sm">作用域</span>
+                      <span className="text-xs text-muted-foreground">
+                        {activeLease.scope?.join(", ") || "—"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground text-sm">最大风险等级</span>
+                      <span className="text-xs font-semibold">{activeLease.maxRiskLevel}</span>
+                    </div>
+                  </>
+                )}
+                {/* 租约历史（最近 5 条） */}
+                {leaseHistory.length > 0 && (
+                  <div className="border-t border-border pt-3 mt-2">
+                    <span className="text-foreground text-xs font-semibold">租约历史</span>
+                    <div className="mt-2 space-y-1.5 max-h-32 overflow-y-auto">
+                      {leaseHistory.map((l) => (
+                        <div key={l.leaseId} className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground font-mono">{l.leaseId.slice(0, 12)}…</span>
+                          <span className={cn(
+                            "px-1.5 py-0.5 rounded-full font-semibold",
+                            l.status === "active" ? "bg-success/10 text-success" :
+                            l.status === "expired" ? "bg-warning/10 text-warning" :
+                            "bg-danger/10 text-danger"
+                          )}>
+                            {l.status === "active" ? "活跃" : l.status === "expired" ? "已过期" : "已撤销"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="text-foreground text-sm">内置保护</span>
                   <span className="text-xs font-semibold">
@@ -1023,6 +1124,51 @@ function ConnectorDrawer({
                       : "—"}
                   </span>
                 </div>
+              </div>
+
+              {/* 租约操作按钮 */}
+              <div className="space-y-2">
+                {!activeLease || activeLease.status !== "active" ? (
+                  <button
+                    onClick={() => {
+                      const scope = isHighRisk ? ["read"] : ["read", "send"];
+                      const maxRiskLevel = isHighRisk ? "medium" : "low";
+                      // confirm 基于 scope 是否含写操作（与 API hasWriteScope 一致），而非 isHighRisk
+                      const hasWrite = scope.some((s) =>
+                        ["write", "send", "create", "modify", "delete"].includes(s.toLowerCase()),
+                      );
+                      acquireLeaseMut.mutate({
+                        scope,
+                        maxRiskLevel,
+                        ttlMinutes: 60,
+                        confirm: hasWrite,
+                      });
+                    }}
+                    disabled={acquireLeaseMut.isPending}
+                    className="bg-brand text-white hover:bg-brand/80 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
+                  >
+                    <ShieldAlert className="size-4" />
+                    {acquireLeaseMut.isPending ? "申请中…" : isHighRisk ? "申请租约（需审批）" : "申请租约"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (confirm("确认吊销当前活跃租约？此操作将立即终止连接器访问权限。")) {
+                        revokeLeaseMut.mutate(activeLease.leaseId);
+                      }
+                    }}
+                    disabled={revokeLeaseMut.isPending}
+                    className="border-danger text-danger hover:bg-danger/10 inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
+                  >
+                    <XCircle className="size-4" />
+                    {revokeLeaseMut.isPending ? "吊销中…" : "吊销租约"}
+                  </button>
+                )}
+                {acquireLeaseMut.isError && (
+                  <p className="text-danger text-xs text-center">
+                    {String(acquireLeaseMut.error)}
+                  </p>
+                )}
               </div>
             </div>
           )}

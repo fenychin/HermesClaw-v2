@@ -19,6 +19,25 @@ export type ConnectorHealth = 'active' | 'degraded' | 'disabled' | 'error'
 /** ConnectorLease 租用状态 */
 export type LeaseStatus = 'active' | 'expired' | 'revoked' | 'none'
 
+/** ConnectorLease — 连接器使用租约（Hermes 授予 Runtime 在限定窗口内使用某连接器） */
+export interface ConnectorLease {
+  leaseId: string
+  connectorId: string
+  workspaceId: string
+  taskId?: string
+  runtimeId: string
+  grantedAt: string
+  expiresAt: string
+  /** 允许的操作作用域，如 ["read", "send", "write"] */
+  scope: string[]
+  /** 租约允许的最高风险等级 */
+  maxRiskLevel: 'low' | 'medium' | 'high' | 'critical'
+  /** 租约状态 */
+  status: LeaseStatus
+  /** 契约版本 */
+  version: string
+}
+
 export type { AutomationLevel }
 
 export interface Connector {
