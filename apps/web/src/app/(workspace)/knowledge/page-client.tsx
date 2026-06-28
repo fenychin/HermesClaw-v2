@@ -214,7 +214,7 @@ export default function KnowledgePageClient() {
           <PageHeader
             title="记忆体"
             description="短/中/长期三级记忆体系：知识版本化 · 来源溯源 · 命中统计 · 缺口管理"
-            breadcrumb={[{ label: "智慧大脑", href: "/workspace/knowledge" }, { label: "记忆体" }]}
+            breadcrumb={[{ label: "智慧大脑", href: "/knowledge" }, { label: "记忆体" }]}
           />
           <div className="grid grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -239,7 +239,7 @@ export default function KnowledgePageClient() {
           <PageHeader
             title="记忆体"
             description="短/中/长期三级记忆体系：知识版本化 · 来源溯源 · 命中统计 · 缺口管理"
-            breadcrumb={[{ label: "智慧大脑", href: "/workspace/knowledge" }, { label: "记忆体" }]}
+            breadcrumb={[{ label: "智慧大脑", href: "/knowledge" }, { label: "记忆体" }]}
           />
           <div className="flex flex-col items-center justify-center py-20">
             <div className="bg-danger/10 mb-4 flex size-14 items-center justify-center rounded-2xl">
@@ -274,7 +274,7 @@ export default function KnowledgePageClient() {
         <PageHeader
           title="记忆体"
           description="短/中/长期三级记忆体系：知识版本化 · 来源溯源 · 命中统计 · 缺口管理"
-          breadcrumb={[{ label: "智慧大脑", href: "/workspace/knowledge" }, { label: "记忆体" }]}
+          breadcrumb={[{ label: "智慧大脑", href: "/knowledge" }, { label: "记忆体" }]}
           actions={
             <div className="flex items-center gap-2">
               <Button

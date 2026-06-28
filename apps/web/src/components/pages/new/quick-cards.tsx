@@ -35,13 +35,24 @@ const colorMap: Record<string, string> = {
 const STAGGER_DELAY = 0.04;
 
 interface QuickCardsProps {
-  actions: any[];
+  actions?: any[];
   loading?: boolean;
   onSelect?: (prompt: string, systemPrompt?: string) => void;
   onWorkflowSelect?: (cardKey: string) => void;
 }
 
+/** 默认快捷卡片（工作流入口），与 quick-workflow-form.tsx 中的 WORKFLOW_CONFIGS 对齐 */
+const DEFAULT_ACTIONS = [
+  { id: "inquiry-grade", label: "分析询盘", prompt: "", systemPrompt: "" },
+  { id: "dev-letter", label: "生成开发信", prompt: "", systemPrompt: "" },
+  { id: "quote-gen", label: "生成报价单", prompt: "", systemPrompt: "" },
+  { id: "customer-profile", label: "客户画像", prompt: "", systemPrompt: "" },
+  { id: "project-space", label: "项目空间", prompt: "", systemPrompt: "" },
+  { id: "agent-dispatch", label: "智能体调度", prompt: "", systemPrompt: "" },
+];
+
 export function QuickCards({ actions, loading, onSelect, onWorkflowSelect }: QuickCardsProps) {
+  const cards = actions ?? DEFAULT_ACTIONS;
   if (loading) {
     return (
       <div className="grid grid-cols-3 gap-2">
@@ -60,7 +71,7 @@ export function QuickCards({ actions, loading, onSelect, onWorkflowSelect }: Qui
 
   return (
     <div className="grid grid-cols-3 gap-2">
-      {actions.map((card, i) => {
+      {cards.map((card, i) => {
         const Icon = iconMap[card.id] || Workflow;
         const colorClass = colorMap[card.id] || "text-muted-foreground";
 

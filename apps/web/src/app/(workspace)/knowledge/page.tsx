@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * /workspace/knowledge — Hermes Memory 状态面板
+ * /knowledge — Hermes Memory 状态面板
  * —— SSR 直出，客户端 hydration 后接管实时交互
  */
 export default function KnowledgePage() {
