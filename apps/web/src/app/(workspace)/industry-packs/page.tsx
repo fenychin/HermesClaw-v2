@@ -1090,11 +1090,11 @@ export default function IndustryPacksPage() {
               />
             ))}
           </div>
-        ) : available.length === 0 ? (
+        ) : available.length === 0 && installations.length === 0 ? (
           <EmptyState
             icon={Package}
-            title="暂无可用行业包"
-            description="请在 industry-packs/ 目录下添加行业包资产（含 manifest.yaml），然后刷新此页面。"
+            title="暂无行业包"
+            description="当前工作空间尚未安装任何行业包。请联系系统管理员部署行业包资产，或检查服务端 industry-packs/ 目录是否配置正确。"
           />
         ) : (
           <div className="space-y-4">
@@ -1102,11 +1102,25 @@ export default function IndustryPacksPage() {
             <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
               <ChevronRight className="size-3" />
               可用行业包
-              <span className="text-hint ml-auto">{available.length}</span>
+              <span className="text-hint ml-auto">{available.length || installations.filter(i => i.status === 'installed').length}</span>
             </div>
 
             <div className="grid gap-4">
-              {available.map((pack) => {
+              {/* 优先展示 available 列表（文件系统扫描结果），若为空则从安装记录反向派生 */}
+              {(available.length > 0 ? available : installations
+                .filter((i, idx, arr) => arr.findIndex(x => x.packId === i.packId) === idx)
+                .map(i => ({
+                  packId: i.packId,
+                  packName: i.packName || i.packId,
+                  version: i.packVersion,
+                  description: (i.manifest as any)?.description || "",
+                  targetIndustry: (i.manifest as any)?.targetIndustry || (i.manifest as any)?.industry || "general",
+                  compatibleHermesApi: (i.manifest as any)?.compatibleHermesApi || "1.0.0",
+                  compatibleRuntimeApi: (i.manifest as any)?.compatibleRuntimeApi || "1.0.0",
+                  capabilityCount: JSON.parse(i.installedCapabilities || "[]").length,
+                  agentCount: ((i.manifest as any)?.agents || []).length,
+                })) as AvailablePack[]
+              ).map((pack) => {
                 // 取该 packId 下最新的 installed 或 paused 记录
                 const relevantInstallations = installations
                   .filter((i) => i.packId === pack.packId)
