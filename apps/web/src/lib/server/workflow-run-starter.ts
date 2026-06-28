@@ -48,7 +48,7 @@ export async function startAgentWorkflowRun(opts: {
       taskId,
       workflowRunId,
       workspaceId: opts.workspaceId,
-      industryId: agent.industryId || "foreign-trade",
+      industryId: agent.industryId || "default",
       agentId: agent.id,
       actionType: opts.actionType,
       input: opts.input,

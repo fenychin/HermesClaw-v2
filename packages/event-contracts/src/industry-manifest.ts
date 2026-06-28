@@ -137,6 +137,9 @@ export const IndustryManifestSchema = z.object({
     )
     .default([]),
 
+  /** 高危动作类型列表（Hermes 控制平面据此做 automation gate 与 audit riskLevel 判断）。 */
+  criticalActionTypes: z.array(z.string().min(1)).default([]),
+
   /** KPI Schema 声明（定义该行业包的 KPI 指标计算方式）。 */
   kpiSchemas: z
     .array(

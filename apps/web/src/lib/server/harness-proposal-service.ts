@@ -1,11 +1,24 @@
 /**
- * Harness Proposal Mutation Service — 提案审批操作
+ * Harness Proposal Mutation Service — Agent 演化提案的审批与变更应用
+ *
+ * 三域归属：Hermes Control Kernel（治理层 — 提案生命周期）
+ *
+ * 职责边界（P2 厘清）：
+ *   - decideProposal()       → 处理 HarnessProposal 的 approve/reject 决策
+ *                               （评估引擎产出的 Agent 自动演化建议）
+ *   - applyProposalChangesIfAny() → 将 approved 提案变更落地到 Agent/SkillBinding
+ *
+ * 注意区别于 approval.ts：
+ *   - approval.ts 处理 ApprovalCheckpoint（高危动作执行前的人工审批门禁）
+ *   - 本文件处理 HarnessProposal（Agent 演化提案的生命周期决策）
+ *   - 两条路径在运行时可能串联：proposal approved → 下次 Agent 执行通过 guardrail 检查时
+ *     无需再创建 checkpoint（已通过提案审批）
  */
 import { prisma } from "@/lib/prisma"
 import { createAuditEntry, updateAuditEntry } from "@/lib/server/audit"
 import { writeAgentLog } from "@/lib/server/agent-log"
 import { checkAutomationGate } from "@/lib/server/guardrail"
-import { HarnessProposalSchema } from "@hermesclaw/event-contracts"
+import { HarnessProposalSchema, AuditAction } from "@hermesclaw/event-contracts"
 
 export function serializeProposal(p: any) {
   return HarnessProposalSchema.parse({
@@ -32,7 +45,16 @@ export async function decideProposal(opts: { existing: any; action: "approve" | 
     const gate = await checkAutomationGate({ automationLevel: propChange?.automationLevel, riskLevel: propChange?.riskLevel, confirmed: opts.confirm, actionName: "批准" })
     if (!gate.ok) return { ok: false as const, response: gate.response }
   }
-  const entry = await createAuditEntry({ actor: opts.reviewedBy, action: opts.action === "approve" ? "approve.proposal" : "reject.proposal", targetType: "proposal", targetId: opts.existing.id, detail: `${opts.existing.proposalId} · ${propChange?.automationLevel}`, riskLevel: propChange?.riskLevel, workspaceId: opts.workspaceId, triggeredBy: "user" })
+  const entry = await createAuditEntry({
+    actor: opts.reviewedBy,
+    action: opts.action === "approve" ? AuditAction.APPROVAL_GRANTED : AuditAction.APPROVAL_REJECTED,
+    targetType: "proposal",
+    targetId: opts.existing.id,
+    detail: `${opts.existing.proposalId} · ${propChange?.automationLevel}`,
+    riskLevel: propChange?.riskLevel,
+    workspaceId: opts.workspaceId,
+    triggeredBy: "user",
+  })
   const data: any = { status: opts.action === "approve" ? "approved" : "rejected", reviewedBy: opts.reviewedBy, reviewedAt: new Date() }
   const proposal = await prisma.harnessProposal.update({ where: { id: opts.existing.id }, data })
   await updateAuditEntry({ auditId: entry.auditId, status: "success" })

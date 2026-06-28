@@ -1,8 +1,7 @@
 import { rateLimit } from "@/lib/rate-limit";
 import { TaskExecuteSchema, validateBody } from "@/lib/server/validators";
 import { TypedTaskInputSchema } from "@hermesclaw/event-contracts";
-import { isCriticalActionType } from "@/lib/server/check-automation-gate";
-import { TRADE_CRITICAL_ACTION_TYPES } from "@foreign-trade/policy/critical-actions";
+import { isCriticalActionType, getCriticalActionTypes } from "@/lib/server/check-automation-gate";
 import type { WorkspaceContext } from "@/lib/workspace";
 import { withRBAC } from "@/lib/server/api-handler";
 import { selectModel } from "@/lib/server/model-router";
@@ -23,13 +22,14 @@ export const POST = withRBAC(async (req: Request, ctx: WorkspaceContext) => {
   if (p instanceof Response) return p;
   let pj: any = null;
   try { pj = JSON.parse(p.input); } catch { /* pass */ }
-  if (pj?._type && !TypedTaskInputSchema.safeParse(pj).success && isCriticalActionType(pj._type, TRADE_CRITICAL_ACTION_TYPES))
+  const workspaceCriticalTypes = getCriticalActionTypes();
+  if (pj?._type && !TypedTaskInputSchema.safeParse(pj).success && isCriticalActionType(pj._type, workspaceCriticalTypes))
     return Response.json({ error: "参数不符合 actionType 要求" }, { status: 400 });
 
   // ─── Sprint 3 场景 E：checkPolicy 拦截 critical action ───
   // 对 isCriticalActionType=true 的操作，调用 kernel checkPolicy()
   // 按 workspace.automationLevel × riskLevel 矩阵裁决
-  if (pj?._type && isCriticalActionType(pj._type, TRADE_CRITICAL_ACTION_TYPES)) {
+  if (pj?._type && isCriticalActionType(pj._type, workspaceCriticalTypes)) {
     try {
       const policyResult = await checkPolicy(
         {
@@ -68,8 +68,9 @@ export const POST = withRBAC(async (req: Request, ctx: WorkspaceContext) => {
     }
   }
 
-  // 从上下文驱动 industryId，禁止 kernel 内硬编码
-  const industryId = ctx.industryId ?? "foreign-trade"
+  // 从上下文驱动 industryId，禁止 kernel 内硬编码。
+  // 若上下文未提供，使用 default 让 handleQuickTask 自行降级。
+  const industryId = ctx.industryId || "default"
 
   try {
     return Response.json(await handleQuickTask(

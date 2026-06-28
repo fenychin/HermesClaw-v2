@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma-v2/client";
 import { isCheckpointExpired } from "@hermesclaw/event-contracts";
+import { AuditAction } from "@hermesclaw/event-contracts";
 import type {
   HumanApprovalCheckpoint,
   ApprovalDecision,
@@ -188,10 +189,10 @@ export async function createApprovalCheckpoint(
     },
   });
 
-  // 2. 写入审计日志 (action: 'approval.requested')
+  // 2. 写入审计日志 (action: AuditAction.APPROVAL_REQUESTED)
   await activeDeps.writeAuditLog({
     actor: input.creator || 'system',
-    action: 'approval.requested',
+    action: AuditAction.APPROVAL_REQUESTED,
     targetType: 'approval',
     targetId: checkpointId,
     detail: input.actionSummary,
@@ -255,7 +256,7 @@ export async function decideApprovalCheckpoint(
 
     await activeDeps.writeAuditLog({
       actor: 'system',
-      action: 'approval.expired',
+      action: AuditAction.APPROVAL_EXPIRED,
       targetType: 'approval',
       targetId: checkpointId,
       detail: `审批超时失效，已拒绝该审批决策: ${checkpoint.actionSummary}`,
@@ -289,7 +290,7 @@ export async function decideApprovalCheckpoint(
 
     await activeDeps.writeAuditLog({
       actor: decidedBy,
-      action: 'approval.rejected',
+      action: AuditAction.APPROVAL_REJECTED,
       targetType: 'approval',
       targetId: checkpointId,
       detail: `审批决策: [rejected]。${reason ? `拒绝原因: ${reason}。` : ''}审批摘要: ${checkpoint.actionSummary}`,
@@ -338,7 +339,7 @@ export async function decideApprovalCheckpoint(
 
       await activeDeps.writeAuditLog({
         actor: decidedBy,
-        action: 'approval.granted',
+        action: AuditAction.APPROVAL_GRANTED,
         targetType: 'approval',
         targetId: checkpointId,
         detail: `审批决策: [approved] (多人全票通过)。审批摘要: ${checkpoint.actionSummary}`,
@@ -382,7 +383,7 @@ export async function decideApprovalCheckpoint(
 
       await activeDeps.writeAuditLog({
         actor: decidedBy,
-        action: 'approval.signed',
+        action: AuditAction.APPROVAL_SIGNED,
         targetType: 'approval',
         targetId: checkpointId,
         detail: `审批人 ${decidedBy} 已签字同意，当前进度: [${newSigned.length}/${requiredList.length}]，等待其他人审批。`,
@@ -407,7 +408,7 @@ export async function decideApprovalCheckpoint(
 
     await activeDeps.writeAuditLog({
       actor: decidedBy,
-      action: 'approval.granted',
+      action: AuditAction.APPROVAL_GRANTED,
       targetType: 'approval',
       targetId: checkpointId,
       detail: `审批决策: [approved]。审批摘要: ${checkpoint.actionSummary}`,
@@ -478,7 +479,7 @@ export async function expireStaleCheckpoints(
   for (const record of staleRecords) {
     await activeDeps.writeAuditLog({
       actor: 'system',
-      action: 'approval.expired',
+      action: AuditAction.APPROVAL_EXPIRED,
       targetType: 'approval',
       targetId: record.checkpointId,
       detail: `超时未审批，自动失效拒绝: ${record.actionSummary}`,

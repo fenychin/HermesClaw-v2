@@ -226,7 +226,7 @@ export async function buildWorkspaceContext(request: Request): Promise<Workspace
       workspaceId: headerWorkspaceId ?? "default",
       role: "OWNER",
       userId: "dev-bypass-user",
-      industryId: "foreign-trade",
+      industryId: undefined,
     };
   }
 
@@ -256,7 +256,7 @@ export async function buildWorkspaceContext(request: Request): Promise<Workspace
   }
 
   // TODO: 未来从 WorkspaceSettings 或 IndustryPackInstallation 推导 industryId
-  const industryId = "foreign-trade";
+  const industryId: string | undefined = undefined;
 
   const ctx: WorkspaceContext = { workspaceId, role, userId: session?.userId, industryId };
 

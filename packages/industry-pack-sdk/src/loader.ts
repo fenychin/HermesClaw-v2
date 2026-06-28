@@ -23,6 +23,7 @@ import {
 } from "./schemas"
 import { mapLegacyManifest } from "./legacy-mapper"
 import type { IndustryPackLoaderOptions, IndustryPackAuditEvent } from "./types"
+import { registerCriticalActionTypes } from "./critical-action-registry"
 
 function resolvePacksDir(): string {
   const candidates = [
@@ -178,6 +179,10 @@ export function loadIndustryManifest(packId: string): IndustryManifest {
     const manifest = IndustryManifestSchema.parse(mapped)
 
     manifestCache.set(packId, manifest)
+
+    // 注册该行业包声明的高危动作类型，供 Hermes 控制平面查询。
+    // 三域原则：行业包自声明，核心不硬编码。
+    registerCriticalActionTypes(packId, manifest.criticalActionTypes)
 
     // 通过 DI 回调通知主应用记录审计日志（不阻塞加载流程）
     // 三域原则：SDK 不直接依赖 @/lib/server/audit，由主应用注入 onAuditLog

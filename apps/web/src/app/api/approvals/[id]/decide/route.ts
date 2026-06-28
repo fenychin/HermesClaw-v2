@@ -2,6 +2,7 @@ import { withRBAC } from "@/lib/server/api-handler";
 import { decideApprovalCheckpoint } from "@/lib/server/approval";
 import type { RouteContext } from "@/lib/server/api-handler";
 import { prisma } from "@/lib/prisma";
+import { AuditAction } from "@hermesclaw/event-contracts";
 
 export const POST = withRBAC(async (request: any, ctx: any, routeContext: RouteContext<{ id: string }>) => {
   const { id } = await routeContext.params;
@@ -29,7 +30,7 @@ export const POST = withRBAC(async (request: any, ctx: any, routeContext: RouteC
   if (ctx.role !== "ADMIN" && ctx.role !== "OWNER") {
     const requestLog = await prisma.auditLog.findFirst({
       where: {
-        action: "approval.requested",
+        action: AuditAction.APPROVAL_REQUESTED,
         targetId: id,
         workspaceId: ctx.workspaceId
       },

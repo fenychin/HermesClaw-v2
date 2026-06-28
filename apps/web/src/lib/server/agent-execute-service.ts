@@ -24,7 +24,12 @@ export async function executeAgentAction(opts: { agentId: string; workspaceId: s
     void writeAuditLog({ actor, action: "agent.boundary_violation", targetType: "agent", targetId: opts.agentId, detail: `边界违规: ${boundary.violation}`, riskLevel: "high", workspaceId: opts.workspaceId }).catch(() => {})
     return { status: "blocked" as const, violation: boundary.violation }
   }
-  const systemPrompt = loadIndustryPrompt(opts.industryId ?? "foreign-trade", agent.role || "默认") ?? `你是 ${agent.name}，请用中文回复。`
+  // 从 agent 记录推导 industryId，禁止硬编码默认行业。
+  // 若 agent 无 industryId 则降级为通用 system prompt。
+  const resolvedIndustryId = opts.industryId || agent.industryId || undefined
+  const systemPrompt = resolvedIndustryId
+    ? (loadIndustryPrompt(resolvedIndustryId, agent.role || "默认") ?? `你是 ${agent.name}，请用中文回复。`)
+    : `你是 ${agent.name}，请用中文回复。`
   const decision = await selectModel({ taskType: "chat", riskLevel: "low", estimatedTokens: Math.ceil((systemPrompt.length + opts.action.length) / 4), workspaceId: opts.workspaceId })
   const result = await callLlmText({ provider: decision.provider, model: decision.model, systemPrompt, userPrompt: opts.action, maxTokens: 2048 })
   const guard = guardOutput(result, { minLength: 1, maxLength: 8000 })

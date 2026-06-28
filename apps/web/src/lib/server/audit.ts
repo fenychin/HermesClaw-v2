@@ -10,11 +10,15 @@
  *
  * ⚠️ 仅在服务端调用；写审计失败不得阻断主流程，故全程 try/catch 静默吞错。
  * 配套 actorFromSession() 从登录会话解析操作者标识。
+ *
+ * 推荐导入：
+ *   import { AuditAction } from "@hermesclaw/event-contracts"
+ *   await writeAuditLog({ ..., action: AuditAction.CONNECTOR_EXECUTE })
  */
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@/generated/prisma-v2/client"
 import { auth } from "@/lib/auth"
-import type { AutomationLevel } from "@hermesclaw/event-contracts"
+import type { AutomationLevel, AuditAction as AuditActionType } from "@hermesclaw/event-contracts"
 import type { AuditRiskLevel } from "@/types"
 
 // ==============================
@@ -45,7 +49,7 @@ export interface AuditEvent {
 export interface WriteAuditLogInput {
   /** 操作者：用户邮箱 / 名，或 "system" */
   actor: string
-  /** 动作标识，如 approve.proposal | delete.agent | connector.connect */
+  /** 动作标识，如 AuditAction.PROPOSAL_APPROVE | AuditAction.AGENT_DELETE | AuditAction.CONNECTOR_CONNECT */
   action: string
   /** 目标类型，如 agent | connector | memory | project | proposal */
   targetType: string

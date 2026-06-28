@@ -393,7 +393,7 @@ export async function dispatchChatTask(
     });
 
     // 7. Chat 场景无 DAG 步骤——标记 WorkflowRun 为 completed，
-    //    写入 ExecutionSummary 避免 WorkflowRun 永久僵尸状态。
+    //    并写入独立 ExecutionSummary 表（P2 治理闭环）。
     const now = new Date();
     const startedAt = run.startedAt ? new Date(run.startedAt) : now;
     const durationMs = now.getTime() - startedAt.getTime();
@@ -413,6 +413,26 @@ export async function dispatchChatTask(
         },
       },
     });
+
+    // 写入 ExecutionSummary 独立表（P2 治理闭环）
+    try {
+      await prisma.executionSummary.create({
+        data: {
+          summaryId: `es-${run.runId}`,
+          taskId: envelope.taskId,
+          workflowRunId: run.runId,
+          workspaceId: run.workspaceId,
+          finalStatus: "completed",
+          startedAt,
+          completedAt: now,
+          eventCount: 1,
+          receiptHashes: "[]",
+          version: "1.0.0",
+        },
+      })
+    } catch (e) {
+      console.error("[chat-task-dispatch] ExecutionSummary 写入失败", e)
+    }
 
     // 8. 写入 run.completed 审计事件（OpenClaw 事件合同要求）
     writeAuditLog({

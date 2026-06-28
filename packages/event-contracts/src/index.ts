@@ -311,4 +311,8 @@ export type {
   PerformanceThresholds,
 } from "./dashboard-config"
 
+// AuditAction 枚举（审计治理真相源）
+export { AuditAction, AUDIT_REQUIRED_ACTIONS } from "./audit-action"
+export type { AuditAction as AuditActionType } from "./audit-action"
+
 

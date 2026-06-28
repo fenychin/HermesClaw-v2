@@ -13,7 +13,7 @@ import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import { ApiResponse } from "@/lib/server/api-response"
 import { buildWorkspaceContext } from "@/lib/workspace"
-import { EvaluationReportSchema } from "@hermesclaw/event-contracts"
+import { EvaluationReportSchema, AuditAction } from "@hermesclaw/event-contracts"
 
 export const runtime = "nodejs"
 export const revalidate = 60
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
     const latestApproval = await prisma.auditLog.findFirst({
       where: {
         workspaceId: ctx.workspaceId,
-        action: { in: ["approve.proposal", "reject.proposal"] },
+        action: { in: [AuditAction.APPROVAL_GRANTED, AuditAction.APPROVAL_REJECTED] },
       },
       orderBy: { createdAt: "desc" },
     })

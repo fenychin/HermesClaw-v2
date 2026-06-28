@@ -82,6 +82,18 @@ describe("IndustryManifest（行业包清单）", () => {
     expect(restored.packId).toBe("pack-foreign-trade")
     expect(restored.compatibleHermesApi.min).toBe("1.0.0")
     expect(restored.directories.agents).toBe(true)
+    expect(restored.criticalActionTypes).toEqual([])
+  })
+
+  it("criticalActionTypes 可选且可声明", () => {
+    const withCritical = IndustryManifestSchema.parse({
+      ...valid,
+      criticalActionTypes: ["trade.send-quotation", "trade.sign-contract"],
+    })
+    expect(withCritical.criticalActionTypes).toEqual([
+      "trade.send-quotation",
+      "trade.sign-contract",
+    ])
   })
 
   it("缺必备字段被拒", () => {
@@ -113,6 +125,7 @@ describe("IndustryManifest（行业包清单）", () => {
     expect(parsed.dependencies).toEqual([])
     expect(parsed.languages).toEqual(["zh-CN"])
     expect(parsed.status).toBe("draft")
+    expect(parsed.criticalActionTypes).toEqual([])
   })
 
   it("不兼容的 API 版本区间格式被拒", () => {

@@ -43,10 +43,10 @@ export const GET = withRBAC(async (req: Request, ctx: any) => {
     // 使用富化后的连接器列表（含真实健康数据）
     const enriched = await getEnrichedConnectors(workspaceId);
 
-    // 兼容处理：旧数据的 packId 为空时映射到 foreign-trade
+    // 兼容旧数据：packId 为空时标记为系统级而非特定行业
     const formatted = enriched.map((c) => ({
       ...c,
-      packId: c.packId || (c.id === "email" || c.id === "crm" ? "foreign-trade" : "system"),
+      packId: c.packId || "system",
       permissions: Array.isArray(c.permissions) ? c.permissions : parseJsonField<string[]>(c.permissions, []),
       usedByAgents: Array.isArray(c.usedByAgents) ? c.usedByAgents : parseJsonField<string[]>(c.usedByAgents, []),
     }));

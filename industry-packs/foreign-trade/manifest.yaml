@@ -66,6 +66,12 @@ directory:
     - development-letter
     - quotation
     - customer-profile
+
+# 高危动作类型声明（Hermes 控制平面据此做 automation gate 与 audit riskLevel 判断）
+criticalActionTypes:
+  - trade.send-quotation
+  - trade.sign-contract
+
 languages:
   - zh-CN
 status: active

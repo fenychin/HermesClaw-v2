@@ -1,6 +1,7 @@
 import { expireStaleCheckpoints } from "@/lib/server/approval";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { AuditAction } from "@hermesclaw/event-contracts";
 import ApprovalsClient from "./approvals-client";
 
 export interface ApprovalCheckpoint {
@@ -45,7 +46,7 @@ export default async function ApprovalsPage() {
   // 获取发起人映射
   const logs = records.length > 0 ? await prisma.auditLog.findMany({
     where: { 
-      action: "approval.requested", 
+      action: AuditAction.APPROVAL_REQUESTED,
       targetId: { in: records.map((r) => r.checkpointId) } 
     },
     select: { targetId: true, actor: true }

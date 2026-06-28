@@ -1146,6 +1146,29 @@ model ActionReceipt {
 }
 
 // ============================================================
+// ExecutionSummary — 执行摘要独立持久化表（P2 治理闭环）
+// 对应 event-contracts ExecutionSummarySchema
+// ============================================================
+model ExecutionSummary {
+  id            String   @id @default(cuid())
+  summaryId     String   @unique
+  taskId        String
+  workflowRunId String
+  workspaceId   String
+  finalStatus   String   // 'completed' | 'failed' | 'cancelled' | 'partial'
+  startedAt     DateTime
+  completedAt   DateTime
+  eventCount    Int
+  receiptHashes String   @default("[]") // JSON 数组
+  error         String?
+  version       String   @default("1.0.0")
+  createdAt     DateTime @default(now())
+
+  @@index([workspaceId, taskId])
+  @@index([workspaceId, workflowRunId])
+}
+
+// ============================================================
 // 连接器租约（ConnectorLease）
 // Hermes 授予 OpenClaw Runtime 在限定窗口内使用某连接器的授权凭证
 // 对应 event-contracts ConnectorLeaseSchema（AGENTS §3.4 / §6）

@@ -55,7 +55,7 @@ export const mainNav: NavItem[] = [
   { href: "/industry-intelligence", label: "行业舆情", icon: Radar, description: "五板块实时情报中枢大屏" },
   { href: "/projects", label: "空间", icon: FolderKanban, description: "面向客户 / 订单 / 市场的 AI 工作单元" },
   /* ——— 治理 ——— */
-  { href: "/workspace/approvals", label: "审批中心", icon: ClipboardCheck, description: "高危任务拦截与 Harness 升级提案的统一决策面板" },
+  { href: "/approvals", label: "审批中心", icon: ClipboardCheck, description: "高危任务拦截与 Harness 升级提案的统一决策面板" },
   /* ——— 第三板块：资料库 ——— */
   { href: "/files", label: "文件", icon: FileText, description: "企业内容供给链与结构化解析" },
   { href: "/recent", label: "最近", icon: Clock, description: "继续最近的对话、任务与项目" },
@@ -68,7 +68,7 @@ export const navSections: NavSection[] = [
     items: [
       mainNav.find((n) => n.href === "/workspace/chat")!,
       mainNav.find((n) => n.href === "/brain/memory")!,
-      mainNav.find((n) => n.href === "/workspace/approvals")!,
+      mainNav.find((n) => n.href === "/approvals")!,
     ],
   },
   {

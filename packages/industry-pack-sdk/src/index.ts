@@ -35,6 +35,15 @@ export {
 } from "./loader"
 
 export {
+  registerCriticalActionTypes,
+  unregisterCriticalActionTypes,
+  getCriticalActionTypes,
+  getAllCriticalActionTypes,
+  isCriticalActionTypeRegistered,
+  clearCriticalActionTypes,
+} from "./critical-action-registry"
+
+export {
   WorkflowMetaSchema,
   WorkflowDagFileSchema,
   WorkflowStepsFileSchema,

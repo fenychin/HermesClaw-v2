@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       select: { industryId: true }
     });
 
-    const industryId = agent?.industryId ?? ctx.industryId ?? "foreign-trade";
+    const industryId = agent?.industryId ?? ctx.industryId ?? undefined;
 
     const sessionContext = {
       sessionId: crypto.randomUUID(),
