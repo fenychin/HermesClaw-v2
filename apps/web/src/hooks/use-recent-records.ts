@@ -33,20 +33,45 @@ export function matchTimeFilter(
   }
 }
 
-/** 行业选项 */
+/** 行业选项（当前 AuditLog 模式下暂不可用，保留 UI 兼容） */
 export const INDUSTRY_OPTIONS = [
   { value: "all", label: "全部行业" },
-  { value: "外贸", label: "外贸" },
-  { value: "家居", label: "家居" },
-  { value: "电子", label: "电子" },
-  { value: "机械", label: "机械" },
 ];
 
+/** action → 来源描述 */
+const ACTION_INFER_MAP: Record<string, string> = {
+  "conversation.create": "Hermes 对话 · 新建",
+  "conversation.message": "Hermes 对话 · 新消息",
+  "task.create": "任务 · 新建",
+  "task.dispatch": "任务 · 已派发",
+  "task.cancel": "任务 · 已取消",
+  "project.create": "项目 · 新建",
+  "project.update": "项目 · 更新",
+  "project.archive": "项目 · 已归档",
+  "workflow.generate": "工作流 · 已生成",
+  "workflow.run": "工作流 · 运行中",
+  "file.upload": "文件 · 已上传",
+  "file.delete": "文件 · 已删除",
+  "proposal.create": "提案 · 已提交",
+  "proposal.approve": "提案 · 已批准",
+  "proposal.reject": "提案 · 已驳回",
+  "connector.create": "连接器 · 新建",
+  "connector.authorize": "连接器 · 已授权",
+  "connector.execute": "连接器 · 已执行",
+  "approval.requested": "审批 · 待处理",
+  "approval.resolved": "审批 · 已通过",
+  "approval.rejected": "审批 · 已驳回",
+};
+
 /**
- * 从 meta 推断来源描述（供列表展示）
- * 将 API 返回的结构化 meta 转为人类可读的来源文本
+ * 从 action 推断来源描述
+ * —— 优先匹配已知 action 标签，fallback 到 action 原始值
  */
 function inferSource(record: RecentRecordItem): string {
+  if (record.action && ACTION_INFER_MAP[record.action]) {
+    return ACTION_INFER_MAP[record.action];
+  }
+  // fallback：旧版兼容
   switch (record.type) {
     case "conversation":
       return "Hermes 对话";
@@ -67,24 +92,31 @@ function inferSource(record: RecentRecordItem): string {
     }
     case "file":
       return "文件上传";
+    case "workflow":
+      return "工作流";
+    case "connector":
+      return "连接器";
+    case "approval":
+      return "审批";
     case "upgrade": {
       const risk = record.meta?.riskLevel as string | undefined;
       return `Harness 升级 · ${risk === "high" ? "高风险" : risk === "medium" ? "中风险" : "低风险"}`;
     }
     default:
-      return "未知来源";
+      return record.action ?? "未知来源";
   }
 }
 
 /**
- * 共享 Hook：从 /api/recent 获取聚合最近记录
- * —— 使用 TanStack Query 缓存，staleTime 30s
+ * 共享 Hook：从 /api/recent 获取聚合最近记录（AuditLog 真相源）
+ * —— TanStack Query 缓存，staleTime 5s，refetchInterval 10s
+ * —— enabled 参数控制是否发起查询（侧边栏折叠时禁用）
  */
-export function useRecentRecords(type = "all", industry?: string) {
+export function useRecentRecords(type = "all", enabled = true) {
   return useQuery({
-    queryKey: ["recent-records", type, industry],
+    queryKey: ["recent-records", type],
     queryFn: async () => {
-      const { records } = await apiClient.getRecent(type, industry);
+      const { records } = await apiClient.getRecent(type);
       return records.map(
         (r): RecentRecordEnriched => ({
           ...r,
@@ -93,10 +125,10 @@ export function useRecentRecords(type = "all", industry?: string) {
         }),
       );
     },
-    staleTime: 30_000,
-    // 聚合查询单次重试即可（任一子查询失败时后端已用 allSettled 部分降级）
+    enabled,
+    staleTime: 5_000,           // 5s 内视为新鲜
+    refetchInterval: enabled ? 10_000 : false,  // 禁用时停止轮询
     retry: 1,
-    // VIEWER 可读；失败不抛出，返回空数组确保页面不崩溃
     placeholderData: (prev) => prev,
   });
 }

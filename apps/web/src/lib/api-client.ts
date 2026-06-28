@@ -542,10 +542,9 @@ export const apiClient = {
       body: JSON.stringify(data),
     }),
 
-  // ---- 最近记录 ----
-  getRecent: (type = "all", industry?: string) => {
+  // ---- 最近记录（以 AuditLog 为真相源） ----
+  getRecent: (type = "all") => {
     const params = new URLSearchParams({ type })
-    if (industry) params.set("industry", industry)
     return apiFetch<{ records: RecentRecordItem[] }>(
       `/api/recent?${params.toString()}`,
     )
@@ -559,9 +558,22 @@ export const apiClient = {
 /** 最近记录统合类型（与 /api/recent 返回一致） */
 export interface RecentRecordItem {
   id: string
-  type: "conversation" | "task" | "project" | "file" | "upgrade"
+  type: "conversation" | "task" | "project" | "file" | "upgrade" | "workflow" | "connector" | "approval" | "system"
   title: string
   timestamp: string
   href: string
+  /** AuditLog 原始 action，如 "task.dispatch"、"conversation.create" */
+  action: string
+  /** 审计记录 ID（同时作为 traceId） */
+  traceId: string
+  /** 关联的工作流运行 ID，跨系统追踪 */
+  workflowRunId?: string
+  /** 目标实体类型 */
+  targetType: string
+  /** 目标实体 ID */
+  targetId: string
+  /** 审计状态 */
+  status?: string
+  /** 扩展元数据 */
   meta?: Record<string, unknown>
 }

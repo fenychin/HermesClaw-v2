@@ -12,6 +12,10 @@ import {
   ArrowRight,
   Filter,
   Loader2,
+  Workflow,
+  Plug,
+  ShieldCheck,
+  Monitor,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
@@ -23,7 +27,6 @@ import {
   matchTimeFilter,
   type RecentRecordEnriched,
   type TimeFilter,
-  INDUSTRY_OPTIONS,
 } from "@/hooks/use-recent-records";
 import type { RecentRecordItem } from "@/lib/api-client";
 
@@ -69,6 +72,30 @@ const TYPE_CONFIG: Record<
     bg: "bg-brand/10",
     label: "升级建议",
   },
+  workflow: {
+    icon: Workflow,
+    color: "text-brand-blue",
+    bg: "bg-brand-blue/10",
+    label: "工作流",
+  },
+  connector: {
+    icon: Plug,
+    color: "text-warning",
+    bg: "bg-warning/10",
+    label: "连接器",
+  },
+  approval: {
+    icon: ShieldCheck,
+    color: "text-success",
+    bg: "bg-success/10",
+    label: "审批",
+  },
+  system: {
+    icon: Monitor,
+    color: "text-muted-foreground",
+    bg: "bg-muted",
+    label: "系统",
+  },
 };
 
 /** 是否是升级建议记录 */
@@ -94,6 +121,9 @@ const FILTER_TABS: { key: RecentType | "all"; label: string }[] = [
   { key: "project", label: "项目" },
   { key: "file", label: "文件" },
   { key: "upgrade", label: "升级建议" },
+  { key: "workflow", label: "工作流" },
+  { key: "connector", label: "连接器" },
+  { key: "approval", label: "审批" },
 ];
 
 const TIME_FILTERS: { key: TimeFilter; label: string }[] = [
@@ -111,14 +141,13 @@ const TIME_FILTERS: { key: TimeFilter; label: string }[] = [
 export function RecentPageClient() {
   const [activeFilter, setActiveFilter] = useState<RecentType | "all">("all");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
-  const [industryFilter, setIndustryFilter] = useState<string>("all");
 
   // TanStack Query：聚合最近记录，staleTime 30s
   const {
     data: apiRecords = [],
     isLoading,
     isError,
-  } = useRecentRecords("all", industryFilter !== "all" ? industryFilter : undefined);
+  } = useRecentRecords("all");
 
   // 客户端侧按类型 + 时间筛选
   const allRecords = useMemo(() => {
@@ -186,21 +215,6 @@ export function RecentPageClient() {
             {TIME_FILTERS.map((tf) => (
               <option key={tf.key} value={tf.key}>
                 {tf.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* 行业筛选 */}
-        <div className="flex items-center gap-1">
-          <select
-            value={industryFilter}
-            onChange={(e) => setIndustryFilter(e.target.value)}
-            className="text-xs bg-transparent border border-border rounded-lg px-2 py-1.5 text-muted-foreground hover:text-foreground focus:outline-none focus:border-primary cursor-pointer appearance-none"
-          >
-            {INDUSTRY_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
               </option>
             ))}
           </select>
@@ -276,23 +290,70 @@ export function RecentPageClient() {
                         <Icon className={cn("size-4", cfg.color)} />
                       </div>
 
-                      {/* 中间：标题 + 来源 */}
+                      {/* 中间：标题 + 来源 + trace 信息 */}
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">
                           {record.title}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {record.source}
+                        <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+                          <span>{record.source}</span>
+                          {/* workflowRunId — 可点击跳转到运行详情 */}
+                          {record.workflowRunId ? (
+                            <Link
+                              href={`/workspace/workflows/runs/${record.workflowRunId}`}
+                              className="font-mono text-[10px] text-hint hover:text-brand-blue hover:underline"
+                              title={`workflowRunId: ${record.workflowRunId}`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              run:{(record.workflowRunId as string).slice(-8)}
+                            </Link>
+                          ) : null}
+                          {/* traceId — 可点击跳转到审计日志 */}
+                          <Link
+                            href={`/workspace/settings?section=audit`}
+                            className="font-mono text-[10px] text-hint/60 hover:text-brand-blue hover:underline"
+                            title={`AuditLog traceId: ${record.traceId}`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            trace:{record.traceId.slice(-8)}
+                          </Link>
                           {isUpgrade && record.meta?.proposalId ? (
-                            <span className="ml-2 font-mono text-[10px] text-hint">
+                            <span className="font-mono text-[10px] text-hint">
                               {record.meta.proposalId as string}
                             </span>
                           ) : null}
                         </p>
                       </div>
 
-                      {/* 右侧：时间 + 操作 */}
+                      {/* 右侧：riskLevel / automationLevel 徽章 + 时间 + 操作 */}
                       <div className="flex items-center gap-2 shrink-0">
+                        {/* riskLevel 徽章 */}
+                        {record.meta?.riskLevel ? (
+                          <span
+                            className={cn(
+                              "shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium border",
+                              record.meta.riskLevel === "high"
+                                ? "bg-danger/10 text-danger border-danger/30"
+                                : record.meta.riskLevel === "medium"
+                                  ? "bg-warning/10 text-warning border-warning/30"
+                                  : "bg-success/10 text-success border-success/30",
+                            )}
+                          >
+                            {(record.meta.riskLevel as string).slice(0, 1).toUpperCase()}
+                          </span>
+                        ) : null}
+                        {/* automationLevel 徽章 */}
+                        {record.meta?.automationLevel ? (
+                          <span
+                            className={cn(
+                              "shrink-0 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium",
+                              "bg-muted text-muted-foreground",
+                            )}
+                            title={`自动化等级: ${record.meta.automationLevel}`}
+                          >
+                            {(record.meta.automationLevel as string)}
+                          </span>
+                        ) : null}
                         <span className="text-xs text-muted-foreground whitespace-nowrap">
                           {formatTime(record.timestamp, record.timeGroup)}
                         </span>

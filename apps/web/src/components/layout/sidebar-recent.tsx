@@ -7,18 +7,41 @@ import {
   Clock,
   ChevronDown,
   ArrowRight,
+  MessageSquare,
+  CheckSquare,
+  FolderKanban,
+  File,
+  Zap,
+  Workflow,
+  Plug,
+  ShieldCheck,
+  Monitor,
 } from "lucide-react";
 import { RelativeTime } from "@/components/common/relative-time";
-import { useRecentConversations } from "@/hooks/use-recent-conversations";
+import { useRecentRecords } from "@/hooks/use-recent-records";
+import type { RecentRecordItem } from "@/lib/api-client";
+
+/** 类型 → 图标配置 */
+const TYPE_ICON: Record<RecentRecordItem["type"], typeof Clock> = {
+  conversation: MessageSquare,
+  task: CheckSquare,
+  project: FolderKanban,
+  file: File,
+  upgrade: Zap,
+  workflow: Workflow,
+  connector: Plug,
+  approval: ShieldCheck,
+  system: Monitor,
+};
 
 /**
  * 侧边栏"最近"可展开面板
- * —— 点击展开/收起最近对话、任务与项目记录
+ * —— 从 AuditLog 聚合数据源获取（useRecentRecords）
+ *    与 /recent 页面共享 TanStack Query 缓存
  *    当前路由为 /recent 时自动展开
  *    侧边栏收起时自动折叠二级展开
  *
- * PERF: 同 SidebarBrain，不使用 framer-motion，改用 CSS transition 处理展开/收起，
- * 避免点击主板块时动画帧阻塞导致卡顿。
+ * PERF: 不使用 framer-motion，改用 CSS transition 处理展开/收起。
  */
 export const SidebarRecent = memo(function SidebarRecent({
   collapsed = false,
@@ -30,23 +53,24 @@ export const SidebarRecent = memo(function SidebarRecent({
   const [expanded, setExpanded] = useState(isActive);
   const shouldLoadRecent = !collapsed && (expanded || isActive);
 
-  // 从 API 获取真实对话列表（共享 hook：含自动刷新）
-  const { apiConversations } = useRecentConversations(shouldLoadRecent);
+  // 从 AuditLog 聚合数据源获取（与 /recent 页面共享缓存）
+  // 折叠态禁用查询 + 轮询，避免全站后台流量
+  const { data: apiRecords = [], isLoading } = useRecentRecords("all", shouldLoadRecent);
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // 仅取 API 真实最近对话并按更新时间排序展示（与右下角最近对话保持一致）
+  // 取前 8 条并按时间排序
   const recentRecords = useMemo(() => {
-    if (!mounted) return [];
-    return [...apiConversations]
+    if (!mounted || !shouldLoadRecent) return [];
+    return [...apiRecords]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 8);
-  }, [apiConversations, mounted]);
+  }, [apiRecords, mounted, shouldLoadRecent]);
 
-  /** 收起态时强制折叠（派生状态，避免在 effect 中 setState） */
+  /** 收起态时强制折叠 */
   const effectiveExpanded = collapsed ? false : expanded;
 
   const toggleExpanded = useCallback(() => {
@@ -56,7 +80,7 @@ export const SidebarRecent = memo(function SidebarRecent({
   return (
     <div className="w-full">
       {collapsed ? (
-        /* 折叠态：独立居中图标链接，避免隐藏 span 干扰布局 */
+        /* 折叠态：独立居中图标链接 */
         <Link
           href="/recent"
           className={cn(
@@ -101,34 +125,41 @@ export const SidebarRecent = memo(function SidebarRecent({
             )}
           >
             <div className="min-h-0">
-              <div className="mt-1 ml-1 space-y-0.5 pr-2">
-                {recentRecords.map((record) => {
-                  const linkHref = `/new?load=${record.id}`;
-                  return (
-                    <Link
-                      key={record.id}
-                      href={linkHref}
-                      prefetch={false}
-                      className={cn(
-                        "flex items-center gap-2 px-2 py-1.5 rounded-md",
-                        "hover:bg-sidebar-accent transition-colors",
-                      )}
-                    >
-                      <span className="text-sidebar-foreground text-xs truncate flex-1">
-                        {record.title}
-                      </span>
-                      <RelativeTime
-                        value={record.timestamp}
-                        className="text-hint text-[10px] shrink-0"
-                      />
-                    </Link>
-                  );
-                })}
-              </div>
+              {isLoading && recentRecords.length === 0 ? (
+                <div className="mt-2 ml-1 text-xs text-hint">加载中…</div>
+              ) : recentRecords.length === 0 ? (
+                <div className="mt-2 ml-1 text-xs text-hint">暂无最近记录</div>
+              ) : (
+                <div className="mt-1 ml-1 space-y-0.5 pr-2">
+                  {recentRecords.map((record) => {
+                    const Icon = TYPE_ICON[record.type] ?? Clock;
+                    return (
+                      <Link
+                        key={record.id}
+                        href={record.href}
+                        prefetch={false}
+                        className={cn(
+                          "flex items-center gap-2 px-2 py-1.5 rounded-md",
+                          "hover:bg-sidebar-accent transition-colors",
+                        )}
+                      >
+                        <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                        <span className="text-sidebar-foreground text-xs truncate flex-1">
+                          {record.title}
+                        </span>
+                        <RelativeTime
+                          value={record.timestamp}
+                          className="text-hint text-[10px] shrink-0"
+                        />
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* 查看全部：展开态始终可见，移出折叠 grid */}
+          {/* 查看全部 */}
           {effectiveExpanded && (
             <Link
               href="/recent"
