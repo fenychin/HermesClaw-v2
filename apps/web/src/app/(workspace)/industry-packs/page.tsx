@@ -107,6 +107,16 @@ function formatTime(iso: string): string {
   }
 }
 
+/** 从 manifest 原始字段中提取 API 版本字符串（{min, max} 对象 → min 值，字符串 → 原值） */
+function extractApiVersion(raw: any): string {
+  if (!raw) return "";
+  if (typeof raw === "string") return raw;
+  if (typeof raw === "object" && raw !== null) {
+    return raw.min || raw.version || "";
+  }
+  return "";
+}
+
 function getActionLabel(action: string): { label: string; color: string } {
   if (action.includes("install.started")) return { label: "安装开始", color: "text-blue-400" };
   if (action.includes("install.warning")) return { label: "安装警告", color: "text-yellow-400" };
@@ -520,12 +530,10 @@ function PackCard({
       i.packVersion !== installation?.packVersion
   );
 
-  // 从 manifest 中提取 compatibleHermesApi
+  // 从 manifest 中提取 compatibleHermesApi（可能是 {min, max} 对象或字符串）
   const compatibleHermesApi =
-    installation?.manifest?.compatibleHermesApi ||
-    (typeof installation?.manifest?.compatibleHermesApi === "string"
-      ? installation.manifest.compatibleHermesApi
-      : available.compatibleHermesApi);
+    extractApiVersion(installation?.manifest?.compatibleHermesApi) ||
+    available.compatibleHermesApi;
 
   return (
     <div
@@ -1115,8 +1123,8 @@ export default function IndustryPacksPage() {
                   version: i.packVersion,
                   description: (i.manifest as any)?.description || "",
                   targetIndustry: (i.manifest as any)?.targetIndustry || (i.manifest as any)?.industry || "general",
-                  compatibleHermesApi: (i.manifest as any)?.compatibleHermesApi || "1.0.0",
-                  compatibleRuntimeApi: (i.manifest as any)?.compatibleRuntimeApi || "1.0.0",
+                  compatibleHermesApi: extractApiVersion((i.manifest as any)?.compatibleHermesApi) || "1.0.0",
+                  compatibleRuntimeApi: extractApiVersion((i.manifest as any)?.compatibleRuntimeApi) || "1.0.0",
                   capabilityCount: JSON.parse(i.installedCapabilities || "[]").length,
                   agentCount: ((i.manifest as any)?.agents || []).length,
                 })) as AvailablePack[]
