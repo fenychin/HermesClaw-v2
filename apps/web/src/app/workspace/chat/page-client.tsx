@@ -16,6 +16,8 @@ import { SuggestionPanel } from "@/components/pages/new/suggestion-panel";
 import { RecentPanel } from "@/components/pages/new/recent-panel";
 import { RiskConfirmDialog } from "@/components/pages/new/risk-confirm-dialog";
 import { TaskDispatchBanner } from "@/components/pages/new/task-dispatch-banner";
+import { IndustryPackReminder } from "@/components/pages/new/industry-pack-reminder";
+import { IndustryPackBadge } from "@/components/pages/new/industry-pack-badge";
 import { useChat } from "@/hooks/useChat";
 import { SELECTABLE_MODELS } from "@/config/models";
 import { useUiStore } from "@/stores/ui-store";
@@ -427,6 +429,9 @@ ${connectorsListText}
             )}
           </div>
 
+          {/* 行业包未安装提醒 — 仅在未安装任何行业包时展示 */}
+          <IndustryPackReminder />
+
           {/* 对话历史 — 移除内部滚动，改为由外层容器滚动 */}
           {hasMessages && (
             <div className="flex-1 px-4 md:px-8 pt-6 pb-2">
@@ -474,6 +479,10 @@ ${connectorsListText}
           >
             <>
               <div className="w-full max-w-2xl mx-auto">
+                {/* 已安装行业包标识 — 输入框右上角 */}
+                <div className="flex justify-end mb-1.5">
+                  <IndustryPackBadge />
+                </div>
                 <CommandBox
                   value={input}
                   onChange={setInput}
