@@ -351,27 +351,29 @@ model KnowledgeGap {
 // 连接器配置
 // ============================================================
 model Connector {
-  id               String    @id
-  workspaceId      String    @default("default")
-  workspace        Workspace @relation(fields: [workspaceId], references: [id])
-  name             String
-  iconEmoji        String
-  description      String
-  status           String    @default("available")
-  category         String
-  source           String    @default("custom") // 来源：builtin / industry-pack / custom
-  version          String? // 连接器版本号
-  health           String? // 健康状态：healthy / degraded / down / unknown
-  lastSync         String?
-  permissions      String // JSON 数组
-  usedByAgents     String // JSON 数组
-  config           Json? // 连接器配置（SMTP: host/port/auth；IMAP: host/port 等）
-  rateLimit        Int       @default(100) // 每小时最大发送数
-  rateLimitUsed    Int       @default(0) // 当前小时已使用量
-  rateLimitResetAt DateTime? // 速率限制重置时间
-  packId           String? // 关联的行业包ID
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id                      String    @id
+  workspaceId             String    @default("default")
+  workspace               Workspace @relation(fields: [workspaceId], references: [id])
+  name                    String
+  iconEmoji               String
+  description             String
+  status                  String    @default("available")
+  category                String
+  source                  String    @default("custom") // 来源：builtin / industry-pack / custom
+  version                 String? // 连接器版本号
+  health                  String? // 健康状态：healthy / degraded / down / unknown
+  lastSync                String?
+  permissions             String // JSON 数组
+  usedByAgents            String // JSON 数组
+  config                  Json? // 连接器配置（SMTP: host/port/auth；IMAP: host/port 等）
+  rateLimit               Int       @default(100) // 每小时最大发送数
+  rateLimitUsed           Int       @default(0) // 当前小时已使用量
+  rateLimitResetAt        DateTime? // 速率限制重置时间
+  packId                  String? // 关联的行业包ID
+  requiredAutomationLevel String   @default("L1") // L1/L2/L3/L4 — 调用此连接器所需最低自动化等级
+  lastHeartbeatAt         DateTime? // 最后心跳时间（用于判断 offline）
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   @@index([workspaceId])
 }
@@ -1119,6 +1121,7 @@ model HarnessRollback {
 model ActionReceipt {
   id                   String   @id @default(cuid())
   receiptId            String   @unique
+  receiptHash          String? // SHA-256 证据哈希，用于不可篡改验证
   taskId               String
   workflowRunId        String
   connectorId          String
@@ -1127,6 +1130,9 @@ model ActionReceipt {
   executedAt           DateTime
   response             Json?
   errorCode            String?
+  failureReason        String? // 人类可读的失败原因（非"执行失败"）
+  retryable            Boolean  @default(false) // 是否可重试
+  durationMs           Int? // 执行耗时（毫秒）
   compensationStrategy String?
   version              String   @default("1.0.0")
   workspaceId          String
@@ -1135,6 +1141,7 @@ model ActionReceipt {
 
   @@index([workspaceId, taskId])
   @@index([workspaceId, workflowRunId])
+  @@index([workspaceId, connectorId, createdAt])
   @@index([idempotencyKey])
 }
 

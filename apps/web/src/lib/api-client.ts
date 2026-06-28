@@ -368,6 +368,29 @@ export const apiClient = {
       body: JSON.stringify({ confirm: true, input: { mode: "self-check" } }),
     }),
 
+  /** 连接器执行回执列表（ActionReceipt） */
+  getConnectorReceipts: (id: string, limit = 10) =>
+    apiFetch<{
+      receipts: Array<{
+        receiptId: string
+        receiptHash?: string
+        taskId: string
+        workflowRunId: string
+        connectorId: string
+        idempotencyKey: string
+        outcome: 'success' | 'failure'
+        executedAt: string
+        response?: Record<string, unknown>
+        errorCode?: string
+        failureReason?: string
+        retryable: boolean
+        durationMs?: number
+        compensationStrategy?: string
+        version: string
+        createdAt: string
+      }>
+    }>(`/api/connectors/${id}/receipts?limit=${limit}`),
+
   // ---- 外贸：询盘 / 情报 / 报价 ----
   getInquiries: () =>
     apiFetch<{ inquiries: unknown[] }>("/api/inquiries"),
