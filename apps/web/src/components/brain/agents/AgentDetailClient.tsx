@@ -38,6 +38,7 @@ import {
   AutomationLevelBadge,
   AUTOMATION_LEVEL_META_V2,
 } from "./AutomationLevelBadge";
+import { GovernanceTab } from "./GovernanceTab";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
@@ -520,6 +521,9 @@ export function AgentDetailClient({ initialAgent }: AgentDetailClientProps) {
             </TabsTrigger>
             <TabsTrigger value="harness">
               <GitBranch className="size-4 mr-1.5" />Harness 版本
+            </TabsTrigger>
+            <TabsTrigger value="governance">
+              <Shield className="size-4 mr-1.5" />治理
             </TabsTrigger>
           </TabsList>
 
@@ -1335,6 +1339,11 @@ export function AgentDetailClient({ initialAgent }: AgentDetailClientProps) {
                 </div>
               </div>
             )}
+          </TabsContent>
+
+          {/* ======================== 治理 ======================== */}
+          <TabsContent value="governance">
+            <GovernanceTab agentId={currentAgent.id} />
           </TabsContent>
         </Tabs>
       </div>

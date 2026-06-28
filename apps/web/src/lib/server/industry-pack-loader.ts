@@ -1167,4 +1167,291 @@ export async function activatePack(
   }
 }
 
+/**
+ * 回滚 Industry Pack 到上一个已安装版本
+ *
+ * 执行流程：
+ * 1. 查找当前 installed 版本
+ * 2. 查找最近一个 deprecated 版本（自动废弃的旧版本）
+ * 3. 废弃当前版本的所有能力，重新激活上一版本的能力
+ * 4. 恢复上一版本的 Agent 实体
+ * 5. 更新两个 installation 记录的状态
+ * 6. 全程记录 AuditLog（预记录→成功/失败）
+ */
+export async function rollbackPack(
+  packId: string,
+  workspaceId: string,
+  rolledBackBy?: string,
+  targetVersion?: string,
+  deps?: PackLoaderDeps
+): Promise<{
+  previousInstallation: IndustryPackInstallation
+  restoredInstallation: IndustryPackInstallation
+}> {
+  const activePrisma = deps?.prisma || prisma
+  const activeWriteAuditLog = deps?.writeAuditLog || writeAuditLog
+  const activeDeprecateCapability = deps?.deprecateCapability || deprecateCapability
+  const activeReactivateCapability = deps?.reactivateCapability || reactivateCapability
+  const activeCreateAuditEntry = deps?.createAuditEntry || createAuditEntry
+  const activeUpdateAuditEntry = deps?.updateAuditEntry || updateAuditEntry
 
+  // 1. 查找当前 installed 版本
+  const currentInst = await activePrisma.industryPackInstallation.findFirst({
+    where: { workspaceId, packId, status: 'installed' },
+    orderBy: { createdAt: 'desc' }
+  })
+
+  if (!currentInst) {
+    throw new PackInstallationNotFoundError(packId)
+  }
+
+  const currentVersion = currentInst.packVersion
+
+  // 2. 查找回滚目标版本
+  let targetInst: any = null
+
+  if (targetVersion) {
+    targetInst = await activePrisma.industryPackInstallation.findFirst({
+      where: { workspaceId, packId, packVersion: targetVersion }
+    })
+    if (!targetInst) {
+      throw new Error(`回滚目标版本 ${targetVersion} 不存在`)
+    }
+  } else {
+    // 自动选择：最近一个 deprecated 版本
+    targetInst = await activePrisma.industryPackInstallation.findFirst({
+      where: { workspaceId, packId, status: 'deprecated' },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    if (!targetInst) {
+      targetInst = await activePrisma.industryPackInstallation.findFirst({
+        where: {
+          workspaceId,
+          packId,
+          id: { not: currentInst.id },
+          status: { notIn: ['uninstalled', 'uninstalling'] }
+        },
+        orderBy: { createdAt: 'desc' }
+      })
+    }
+  }
+
+  if (!targetInst) {
+    throw new Error(`无法回滚：未找到 ${packId} 的历史版本。请先安装新版本后再执行回滚。`)
+  }
+
+  const targetPackVersion = targetInst.packVersion
+
+  if (targetPackVersion === currentVersion) {
+    throw new Error(`回滚目标版本 ${targetPackVersion} 与当前版本相同，无需回滚`)
+  }
+
+  // 3. 预记录审计日志
+  const auditResult = await activeCreateAuditEntry({
+    actor: rolledBackBy || 'system',
+    action: 'pack.rollback.started',
+    targetType: 'pack',
+    targetId: packId,
+    riskLevel: 'high',
+    workspaceId,
+    contextSnapshot: {
+      packId,
+      fromVersion: currentVersion,
+      toVersion: targetPackVersion,
+      rolledBackBy: rolledBackBy || 'system'
+    }
+  })
+  const auditId = auditResult.auditId
+
+  // 4. 解析能力列表
+  let currentCapList: string[] = []
+  try { currentCapList = JSON.parse(currentInst.installedCapabilities) } catch { /* ignore */ }
+
+  let targetCapList: string[] = []
+  try { targetCapList = JSON.parse(targetInst.installedCapabilities) } catch { /* ignore */ }
+
+  try {
+    // 5a. 废弃当前版本的所有能力
+    for (const capStr of currentCapList) {
+      const atIdx = capStr.lastIndexOf('@')
+      if (atIdx === -1) continue
+      const capId = capStr.substring(0, atIdx)
+      const capVer = capStr.substring(atIdx + 1)
+
+      try {
+        await activeDeprecateCapability(
+          capId, capVer,
+          `Rolled back from pack ${packId}@${currentVersion} to ${targetPackVersion}`,
+          rolledBackBy || 'system',
+          { prisma: activePrisma, writeAuditLog: activeWriteAuditLog }
+        )
+      } catch (err) {
+        console.error(`[rollbackPack] 废弃能力 ${capId}@${capVer} 失败:`, err)
+      }
+    }
+
+    // 5b. 重新激活目标版本的能力
+    for (const capStr of targetCapList) {
+      const atIdx = capStr.lastIndexOf('@')
+      if (atIdx === -1) continue
+      const capId = capStr.substring(0, atIdx)
+      const capVer = capStr.substring(atIdx + 1)
+
+      try {
+        await activeReactivateCapability(
+          capId, capVer,
+          rolledBackBy || 'system',
+          { prisma: activePrisma, writeAuditLog: activeWriteAuditLog }
+        )
+      } catch (err) {
+        console.error(`[rollbackPack] 重新激活能力 ${capId}@${capVer} 失败:`, err)
+      }
+    }
+
+    // 5c. 处理 Agent：清理当前版本的 Agent，恢复目标版本的 Agent
+    const toScopedId = (id: string) => {
+      if (!id) return id
+      const prefix = `${workspaceId}:`
+      if (id.startsWith(prefix)) return id
+      return `${prefix}${id}`
+    }
+
+    // 删除当前版本的 Agent
+    const currentManifest = currentInst.manifest as any
+    const currentAgents = currentManifest?.agents || []
+    if (Array.isArray(currentAgents)) {
+      for (const agent of currentAgents) {
+        if (!agent.id) continue
+        const scopedAgentId = toScopedId(agent.id)
+        try {
+          const exists = await activePrisma.agent.findUnique({ where: { id: scopedAgentId } })
+          if (exists) {
+            await activePrisma.agent.delete({ where: { id: scopedAgentId } })
+          }
+        } catch (err) {
+          console.error(`[rollbackPack] 删除当前 Agent ${scopedAgentId} 失败:`, err)
+        }
+      }
+    }
+
+    // 恢复目标版本的 Agent
+    const targetManifest = targetInst.manifest as any
+    const targetAgents = targetManifest?.agents || []
+    if (Array.isArray(targetAgents)) {
+      for (const agent of targetAgents) {
+        if (!agent.id) continue
+        const scopedAgentId = toScopedId(agent.id)
+
+        try {
+          await activePrisma.agent.upsert({
+            where: { id: scopedAgentId },
+            update: {
+              name: agent.name,
+              role: agent.role,
+              description: agent.description || '',
+              status: agent.status || 'active',
+              source: 'pack',
+              category: JSON.stringify(agent.category || []),
+              bindSkills: JSON.stringify(agent.bindSkills || []),
+              bindConnectors: JSON.stringify(agent.bindConnectors || []),
+              memoryPermission: agent.memoryPermission || 'read-write',
+              harnessVersion: agent.harnessVersion || '1.0.0',
+              automationLevel: agent.automationLevel || 'L2',
+              canDo: JSON.stringify(agent.canDo || []),
+              cannotDo: JSON.stringify(agent.cannotDo || []),
+              statsJson: JSON.stringify(agent.statsJson || agent.stats || {}),
+              industryId: agent.industryId || packId,
+              templateId: agent.templateId || agent.id
+            },
+            create: {
+              id: scopedAgentId,
+              workspaceId,
+              name: agent.name,
+              role: agent.role,
+              description: agent.description || '',
+              status: agent.status || 'active',
+              source: 'pack',
+              category: JSON.stringify(agent.category || []),
+              bindSkills: JSON.stringify(agent.bindSkills || []),
+              bindConnectors: JSON.stringify(agent.bindConnectors || []),
+              memoryPermission: agent.memoryPermission || 'read-write',
+              harnessVersion: agent.harnessVersion || '1.0.0',
+              automationLevel: agent.automationLevel || 'L2',
+              canDo: JSON.stringify(agent.canDo || []),
+              cannotDo: JSON.stringify(agent.cannotDo || []),
+              statsJson: JSON.stringify(agent.statsJson || agent.stats || {}),
+              industryId: agent.industryId || packId,
+              templateId: agent.templateId || agent.id
+            }
+          })
+        } catch (err) {
+          console.error(`[rollbackPack] 恢复 Agent ${scopedAgentId} 失败:`, err)
+        }
+      }
+    }
+
+    // 6. 更新 installation 记录状态
+    const previousInstallation = await activePrisma.industryPackInstallation.update({
+      where: { id: currentInst.id },
+      data: { status: 'deprecated' }
+    })
+
+    const restoredInstallation = await activePrisma.industryPackInstallation.update({
+      where: { id: targetInst.id },
+      data: {
+        status: 'installed',
+        installedAt: new Date(),
+        installedBy: rolledBackBy || 'system',
+        uninstalledAt: null,
+        uninstalledBy: null
+      }
+    })
+
+    // 7. 更新审计日志为 success
+    await activeUpdateAuditEntry({
+      auditId,
+      status: 'success',
+      detail: `成功回滚行业包 ${packId}：${currentVersion} → ${targetPackVersion}。` +
+        `已废弃 ${currentCapList.length} 项能力，已恢复 ${targetCapList.length} 项能力。`
+    })
+
+    // 额外写一条明文审计
+    await activeWriteAuditLog({
+      actor: rolledBackBy || 'system',
+      action: 'pack.rollback.completed',
+      targetType: 'pack',
+      targetId: packId,
+      detail: `Rollback complete: ${currentVersion} → ${targetPackVersion}`,
+      riskLevel: 'high',
+      workspaceId,
+      contextSnapshot: {
+        fromVersion: currentVersion,
+        toVersion: targetPackVersion,
+        deprecatedCaps: currentCapList.length,
+        restoredCaps: targetCapList.length
+      }
+    })
+
+    return { previousInstallation, restoredInstallation }
+
+  } catch (error: any) {
+    // 回滚失败：尝试恢复当前版本状态
+    try {
+      await activePrisma.industryPackInstallation.update({
+        where: { id: currentInst.id },
+        data: { status: 'installed' }
+      })
+    } catch (dbErr) {
+      console.error(`[rollbackPack] 回滚失败，恢复当前状态也失败:`, dbErr)
+    }
+
+    await activeUpdateAuditEntry({
+      auditId,
+      status: 'failed',
+      detail: `回滚失败：${error.message || '未知错误'}`
+    })
+
+    throw error
+  }
+}

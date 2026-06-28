@@ -5,16 +5,38 @@ import {
   Bot,
   AlertTriangle,
   ChevronRight,
+  Activity,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { PageTransition } from "@/components/common/PageTransition";
 import { EmptyState } from "@/components/common/empty-state";
 import { AutomationLevelBadge } from "./AutomationLevelBadge";
+import { HarnessStatusBadge } from "./HarnessStatusBadge";
 import { cn } from "@/lib/utils";
-import type { Agent } from "@/types";
+import type { Agent, AgentRiskLevel } from "@/types";
+
+function RiskLevelIndicator({ level }: { level?: AgentRiskLevel }) {
+  if (!level) return null;
+  const meta: Record<string, { color: string; label: string }> = {
+    high: { color: "bg-danger", label: "高风险" },
+    medium: { color: "bg-warning", label: "中风险" },
+    low: { color: "bg-success", label: "低风险" },
+  };
+  const m = meta[level] ?? meta.low;
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+      <span className={cn("size-1.5 rounded-full", m.color)} />
+      {m.label}
+    </span>
+  );
+}
 
 function AgentRow({ agent }: { agent: Agent }) {
   const initial = agent.name.charAt(0).toUpperCase();
+  const hasHarnessStatus =
+    agent.harnessStatus && agent.harnessStatus !== "none";
+  const hasCanary = !!agent.activeCanaryId;
+
   return (
     <Link
       href={`/brain/agents/${agent.id}`}
@@ -39,6 +61,12 @@ function AgentRow({ agent }: { agent: Agent }) {
             </span>
           )}
           <AutomationLevelBadge level={agent.automationLevel} />
+          {hasHarnessStatus && (
+            <HarnessStatusBadge
+              status={agent.harnessStatus!}
+              size="sm"
+            />
+          )}
         </div>
         <p className="text-muted-foreground truncate text-xs mt-0.5">
           {agent.role}
@@ -55,6 +83,21 @@ function AgentRow({ agent }: { agent: Agent }) {
               ? "异常"
               : "空闲"}
         </span>
+        {agent.riskLevel && (
+          <>
+            <span>·</span>
+            <RiskLevelIndicator level={agent.riskLevel} />
+          </>
+        )}
+        {hasCanary && (
+          <>
+            <span>·</span>
+            <span className="inline-flex items-center gap-1 text-purple-500">
+              <Activity className="size-3" />
+              <span>灰度中</span>
+            </span>
+          </>
+        )}
       </div>
       <ChevronRight className="size-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
     </Link>

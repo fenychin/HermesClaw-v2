@@ -8,6 +8,8 @@ export type {
   Agent,
   AgentStatus,
   AgentSource,
+  HarnessStatusValue,
+  AgentRiskLevel,
 } from './agent'
 
 // ---- Project 项目空间 ----
@@ -27,6 +29,14 @@ export type {
 export type {
   Memory,
   MemoryType,
+  MemoryRevision,
+  MemoryStats,
+  KnowledgeGap,
+  KnowledgeGapType,
+  MemoryAccessLog,
+  MemoryListParams,
+  MemoryListResponse,
+  FreezeToggleRequest,
 } from './memory'
 
 // ---- Connector 连接器 ----
@@ -40,6 +50,9 @@ export type {
   ConnectorUsage,
   ConnectorEvent,
   ConnectorSelfCheck,
+  ActionReceipt,
+  LeaseStatus,
+  ConnectorLease,
 } from './connector'
 
 // ---- Skill 技能 ----

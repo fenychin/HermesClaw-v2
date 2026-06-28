@@ -93,10 +93,10 @@ export const bottomNav: NavItem[] = [
 /** 智慧大脑二级导航（PRD 9.2） */
 export const brainNav: NavItem[] = [
   { href: "/workspace/agents", label: "智能体", icon: Bot, description: "自演化数字员工与智能体库" },
-  { href: "/brain/memory", label: "记忆体", icon: Database, description: "短/中/长期三级记忆体统一控制面" },
+  { href: "/knowledge", label: "记忆体", icon: Database, description: "短/中/长期三级记忆体统一控制面 · 版本溯源 · 命中统计" },
   { href: "/brain/skills", label: "技能 Skill", icon: Puzzle, description: "行业 / 岗位 / 自定义技能与版本管理" },
   { href: "/brain/connectors", label: "连接器 MCP", icon: Plug, description: "邮箱、CRM、ERP 等连接器授权" },
-  { href: "/settings/industry-packs", label: "行业包", icon: PackageOpen, description: "安装、激活与卸载 Industry Pack 行业插件" },
+  { href: "/industry-packs", label: "行业包", icon: PackageOpen, description: "安装、激活与回滚 Industry Pack 行业插件" },
 ];
 
 /** 资料库二级导航 */
@@ -111,6 +111,6 @@ export const knowledgeNav: NavItem[] = [
 export const settingsNav: NavItem[] = [
   { href: "/settings/team", label: "团队与权限", icon: Users, description: "成员、角色与访问控制" },
   { href: "/settings/harness", label: "Harness 审批", icon: ShieldCheck, description: "动态 Harness 升级提案审批中心" },
-  { href: "/settings/industry-packs", label: "行业包管理", icon: PackageOpen, description: "安装、激活与卸载 Industry Pack 行业插件" },
+  { href: "/industry-packs", label: "行业包管理", icon: PackageOpen, description: "行业包生命周期管理与版本回滚" },
 ];
 

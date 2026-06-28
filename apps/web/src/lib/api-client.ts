@@ -368,6 +368,106 @@ export const apiClient = {
       body: JSON.stringify({ confirm: true, input: { mode: "self-check" } }),
     }),
 
+  /** 连接器执行回执列表（ActionReceipt） */
+  getConnectorReceipts: (id: string, limit = 10) =>
+    apiFetch<{
+      receipts: Array<{
+        receiptId: string
+        receiptHash?: string
+        taskId: string
+        workflowRunId: string
+        connectorId: string
+        idempotencyKey: string
+        outcome: 'success' | 'failure'
+        executedAt: string
+        response?: Record<string, unknown>
+        errorCode?: string
+        failureReason?: string
+        retryable: boolean
+        durationMs?: number
+        compensationStrategy?: string
+        version: string
+        createdAt: string
+      }>
+    }>(`/api/connectors/${id}/receipts?limit=${limit}`),
+
+  /** 获取连接器当前活跃租约 */
+  getConnectorLease: (id: string) =>
+    apiFetch<{
+      lease: {
+        leaseId: string
+        connectorId: string
+        workspaceId: string
+        taskId?: string
+        runtimeId: string
+        grantedAt: string
+        expiresAt: string
+        scope: string[]
+        maxRiskLevel: string
+        status: string
+        version: string
+      } | null
+    }>(`/api/connectors/${id}/leases`),
+
+  /** 获取连接器租约历史 */
+  getConnectorLeaseHistory: (id: string, limit = 10) =>
+    apiFetch<{
+      leases: Array<{
+        leaseId: string
+        connectorId: string
+        workspaceId: string
+        taskId?: string
+        runtimeId: string
+        grantedAt: string
+        expiresAt: string
+        scope: string[]
+        maxRiskLevel: string
+        status: string
+        version: string
+      }>
+    }>(`/api/connectors/${id}/leases?history=true&limit=${limit}`),
+
+  /** 申请连接器租约 */
+  acquireConnectorLease: (
+    id: string,
+    params: {
+      taskId?: string
+      scope?: string[]
+      maxRiskLevel?: string
+      ttlMinutes?: number
+      confirm?: boolean
+    },
+  ) =>
+    apiFetch<{
+      lease: {
+        leaseId: string
+        connectorId: string
+        workspaceId: string
+        taskId?: string
+        runtimeId: string
+        grantedAt: string
+        expiresAt: string
+        scope: string[]
+        maxRiskLevel: string
+        status: string
+        version: string
+      }
+    }>(`/api/connectors/${id}/leases`, {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
+
+  /** 吊销连接器租约（需 confirm=true） */
+  revokeConnectorLease: (id: string, leaseId?: string) =>
+    apiFetch<{
+      revokedCount?: number
+      lease?: unknown
+      message: string
+    }>(
+      `/api/connectors/${id}/leases?confirm=true${leaseId ? `&leaseId=${leaseId}` : ""}`,
+      { method: "DELETE" },
+    ),
+
   // ---- 外贸：询盘 / 情报 / 报价 ----
   getInquiries: () =>
     apiFetch<{ inquiries: unknown[] }>("/api/inquiries"),

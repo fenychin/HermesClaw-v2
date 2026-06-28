@@ -52,6 +52,8 @@ export type LlmResponse = z.infer<typeof LlmResponseSchema>
 export const ActionReceiptSchema = z.object({
   /** 回执唯一 ID。 */
   receiptId: IdSchema,
+  /** SHA-256 证据哈希，用于不可篡改验证。 */
+  receiptHash: z.string().optional(),
   /** 关联任务 ID。 */
   taskId: IdSchema,
   /** 关联工作流运行 ID。 */
@@ -68,6 +70,12 @@ export const ActionReceiptSchema = z.object({
   response: PayloadSchema,
   /** 错误码（outcome=failure 时应提供）。 */
   errorCode: z.string().optional(),
+  /** 人类可读的失败原因（非"执行失败"这类无信息文字）。 */
+  failureReason: z.string().optional(),
+  /** 是否可重试。 */
+  retryable: z.boolean().optional(),
+  /** 执行耗时（毫秒）。 */
+  durationMs: z.number().int().nonnegative().optional(),
   /** 补偿策略（不可逆写操作必须声明，AGENTS §3.4）。 */
   compensationStrategy: z.string().optional(),
   /** 契约版本。 */

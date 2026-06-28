@@ -106,11 +106,11 @@ export function useChat() {
    * —— 首次调用时创建 conversation，后续调用追加消息
    */
   const persistConversation = useCallback(
-    async (userContent: string, assistantContent: string, traceObj?: any) => {
+    async (userContent: string, assistantContent: string, traceObj?: any, taskId?: string) => {
       try {
         if (!conversationIdRef.current) {
           const title = truncateTitle(userContent);
-          const result = await apiClient.createConversation(title);
+          const result = await apiClient.createConversation(title, undefined, taskId);
           conversationIdRef.current = result.conversation.id;
           setConversationId(result.conversation.id);
         }
@@ -258,7 +258,7 @@ export function useChat() {
         setCurrentTrace(null);
 
         // 对话完成后持久化到数据库（后台异步，不阻塞 UI）
-        void persistConversation(content.trim(), fullContent, traceObj);
+        void persistConversation(content.trim(), fullContent, traceObj, taskId);
       } catch (err: unknown) {
         if (err instanceof Error && err.name !== "AbortError") {
           setError(err.message || "对话失败，请重试");
@@ -275,7 +275,7 @@ export function useChat() {
           setMessages((prev) => [...prev, partialMessage]);
           setStreamingContent("");
           setCurrentTrace(null);
-          void persistConversation(content.trim(), fullContent, traceObj);
+          void persistConversation(content.trim(), fullContent, traceObj, taskId);
         }
       } finally {
         setIsStreaming(false);

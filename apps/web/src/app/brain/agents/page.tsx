@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { serializeAgent } from "@/lib/server/agent-serializer";
 import { AgentListClient } from "@/components/brain/agents/AgentListClient";
-import type { Agent } from "@/types";
+import { mapAutomationToAuditRisk } from "@/types";
+import type { Agent, HarnessStatusValue, AgentRiskLevel } from "@/types";
 
 /** 格式化为 Agent 前端类型 */
 function toAgent(raw: Record<string, unknown>): Agent {
@@ -37,6 +38,22 @@ function toAgent(raw: Record<string, unknown>): Agent {
   };
 }
 
+/**
+ * 按 affectedAgents（JSON 字符串数组）匹配 agentId。
+ * affectedAgents 在 DB 中是 JSON string，形如 `["agent-aaa","agent-bbb"]`，
+ * 需要先 JSON.parse 再 Array.includes。
+ */
+function proposalMatchesAgent(affectedAgents: unknown, agentId: string): boolean {
+  if (!affectedAgents) return false;
+  try {
+    const raw = typeof affectedAgents === "string" ? affectedAgents : JSON.stringify(affectedAgents);
+    const ids: unknown = JSON.parse(raw);
+    return Array.isArray(ids) && ids.includes(agentId);
+  } catch {
+    return false;
+  }
+}
+
 export default async function BrainAgentsPage() {
   let agents: Agent[] = [];
   let error: string | null = null;
@@ -48,6 +65,47 @@ export default async function BrainAgentsPage() {
       take: 50,
     });
     agents = rawAgents.map((r) => toAgent(r as unknown as Record<string, unknown>));
+
+    // 批量拉取所有 agent 的最新提案（一次查询，避免 N+1）
+    const agentIds = agents.map((a) => a.id);
+    if (agentIds.length > 0) {
+      const allProposals = await prisma.harnessProposal.findMany({
+        where: {
+          workspaceId: "default",
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          proposalId: true,
+          status: true,
+          severity: true,
+          affectedAgents: true,
+        },
+      });
+
+      // 按 agentId 分组最新提案
+      const agentProposalMap = new Map<string, { proposalId: string; status: string; severity: string }>();
+      for (const p of allProposals) {
+        for (const agentId of agentIds) {
+          if (!agentProposalMap.has(agentId) && proposalMatchesAgent(p.affectedAgents, agentId)) {
+            agentProposalMap.set(agentId, {
+              proposalId: p.proposalId,
+              status: p.status,
+              severity: p.severity,
+            });
+          }
+        }
+      }
+
+      // 注入治理字段
+      for (const agent of agents) {
+        const proposal = agentProposalMap.get(agent.id);
+        agent.harnessStatus = (proposal?.status as HarnessStatusValue) ?? "none";
+        agent.riskLevel = (proposal?.severity as AgentRiskLevel)
+          ?? mapAutomationToAuditRisk(agent.automationLevel);
+        agent.latestProposalId = proposal?.proposalId ?? null;
+        agent.latestProposalStatus = proposal?.status ?? null;
+      }
+    }
   } catch (e) {
     error = e instanceof Error ? e.message : "加载智能体列表失败";
   }

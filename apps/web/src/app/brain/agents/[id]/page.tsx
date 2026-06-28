@@ -2,7 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { serializeAgent } from "@/lib/server/agent-serializer";
 import { AgentDetailClient } from "@/components/brain/agents/AgentDetailClient";
 import { notFound } from "next/navigation";
-import type { Agent } from "@/types";
+import { mapAutomationToAuditRisk } from "@/types";
+import type { Agent, HarnessStatusValue, AgentRiskLevel } from "@/types";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -53,6 +54,43 @@ export default async function BrainAgentDetailPage({ params }: PageProps) {
     });
     if (!raw) notFound();
     agent = toAgent(raw as unknown as Record<string, unknown>);
+
+    // 并行查询治理数据（affectedAgents 是 JSON string，需 JS 端过滤）
+    const [allProposals, activeCanary] = await Promise.all([
+      prisma.harnessProposal.findMany({
+        where: { workspaceId: "default" },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: { proposalId: true, status: true, severity: true, affectedAgents: true },
+      }),
+      prisma.harnessCanary.findFirst({
+        where: {
+          agentId: id,
+          workspaceId: "default",
+          status: { in: ["running", "promoting", "rolling-back"] },
+        },
+        orderBy: { startedAt: "desc" },
+        select: { canaryId: true },
+      }),
+    ]);
+
+    // JS 端过滤：affectedAgents 是 JSON 字符串数组
+    const latestProposal = allProposals.find((p) => {
+      try {
+        const ids: unknown = JSON.parse((p.affectedAgents as string) ?? "[]");
+        return Array.isArray(ids) && ids.includes(id);
+      } catch {
+        return false;
+      }
+    });
+
+    // 注入治理字段
+    agent.harnessStatus = (latestProposal?.status as HarnessStatusValue) ?? "none";
+    agent.riskLevel = (latestProposal?.severity as AgentRiskLevel)
+      ?? mapAutomationToAuditRisk(agent.automationLevel);
+    agent.latestProposalId = latestProposal?.proposalId ?? null;
+    agent.latestProposalStatus = latestProposal?.status ?? null;
+    agent.activeCanaryId = activeCanary?.canaryId ?? null;
   } catch {
     notFound();
   }

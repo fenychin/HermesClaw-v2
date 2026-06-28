@@ -65,6 +65,7 @@ export function Sidebar() {
         if (
           pathname.startsWith("/brain/") ||
           pathname.startsWith("/workspace/agents") ||
+          pathname.startsWith("/knowledge") ||
           pathname.startsWith("/settings/industry-packs")
         ) {
           set.add(item.href);

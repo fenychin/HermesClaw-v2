@@ -18,6 +18,12 @@ import { PageHeader } from "@/components/common/page-header";
 import { PageTransition } from "@/components/common/PageTransition";
 import { cn } from "@/lib/utils";
 import { PackUpgradeModal } from "@/components/common/pack-upgrade-modal";
+import {
+  PanelErrorBoundary,
+  AiSuggestionsPanel,
+  RecommendedWorkflowsPanel,
+  ActiveAgentsPanel,
+} from "./_components/panels";
 
 // 动态懒加载 Recharts 图表，防止 SSR 报错并提升性能
 const TaskLineChart = dynamic(() => import("./_components/task-line-chart"), {
@@ -216,6 +222,14 @@ export default function DashboardClient({
       return targetInd && targetInd !== "general";
     });
 
+  // 提取第一个活跃行业包的 industryId（供 Panel 2 过滤推荐工作流）
+  const activeIndustryId: string | null =
+    activePacks.length > 0
+      ? (activePacks[0] as any)?.manifest?.targetIndustry ||
+        (activePacks[0] as any)?.manifest?.industry ||
+        null
+      : null;
+
   // ── P2 修复：使用 TanStack Query 替代原始 fetch ──
   //   staleTime: 30s（与后端缓存对齐）→ 页面切换不重复请求
   //   refetchInterval: 60s（降低轮询频率）→ 减少后端压力
@@ -291,8 +305,11 @@ export default function DashboardClient({
 
   return (
     <PageTransition>
-      <div className="p-6 max-w-7xl mx-auto space-y-6">
-        <PackUpgradeModal />
+      <div className="p-6 max-w-[1400px] mx-auto">
+        <div className="flex gap-6 items-start">
+          {/* ═══════════════ 主内容区 ═══════════════ */}
+          <div className="flex-1 min-w-0 space-y-6">
+            <PackUpgradeModal />
 
         {/* 多个行业包同时激活的冲突阻断 Banner 警告 */}
         {activePacks.length > 1 && (
@@ -408,6 +425,26 @@ export default function DashboardClient({
               当前暂无询盘和报价流转记录
             </div>
           )}
+        </div>
+        {/* ═══════════════ 主内容区结束 ═══════════════ */}
+        </div>
+
+        {/* ═══════════════ 右侧面板区 ═══════════════ */}
+        <aside className="hidden xl:flex w-[320px] shrink-0 flex-col gap-5 sticky top-6">
+          <PanelErrorBoundary title="今日 AI 建议">
+            <AiSuggestionsPanel />
+          </PanelErrorBoundary>
+
+          <PanelErrorBoundary title="推荐工作流">
+            <RecommendedWorkflowsPanel industryId={activeIndustryId} />
+          </PanelErrorBoundary>
+
+          <PanelErrorBoundary title="活跃智能体">
+            <ActiveAgentsPanel />
+          </PanelErrorBoundary>
+        </aside>
+
+        {/* ═══════════════ 双栏容器结束 ═══════════════ */}
         </div>
       </div>
     </PageTransition>
