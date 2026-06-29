@@ -190,7 +190,7 @@ export function WorkflowHealthMonitor() {
             <span className="text-lg font-bold text-foreground tabular-nums">
               {(health.successRate * 100).toFixed(0)}%
             </span>
-            {health.successRate >= 0.85 ? (
+            {health.successRate >= 0.90 ? (
               <span className="text-[9px] text-success font-medium">健康</span>
             ) : (
               <span className="text-[9px] text-danger font-medium">告警</span>

@@ -593,17 +593,17 @@ export default function ForeignTradePage() {
         </div>
       )}
 
-      {/* 外层容器：左主区 + 右侧面板 */}
-      <div className="flex flex-col lg:flex-row h-full min-h-0 p-6 gap-6 overflow-y-auto lg:overflow-hidden">
+      {/* 外层容器：左主区 + 右侧面板（对齐「新对话」页面布局结构） */}
+      <div className="flex h-full bg-background">
         {/* ================================================ */}
         {/* 左主区                                          */}
         {/* ================================================ */}
-        <div className="flex-1 min-w-0 lg:overflow-y-auto space-y-6">
+        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto p-6 space-y-6">
           {/* 页头 */}
           <PageHeader title="工作台" description="外贸行业工作台、专属工作流与动态大盘" />
 
           {/* ---- 经营概览 4列网格（接入真实整合与折算数据） ---- */}
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
             <StatCard
               title="今日询盘"
               value={stats?.todayInquiries ?? 0}
@@ -1163,7 +1163,7 @@ export default function ForeignTradePage() {
           <InquiryQuickEntry />
 
           {/* ---- 常用工作流 ---- */}
-          <section className="mt-6">
+          <section>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-foreground font-semibold text-sm">常用工作流控制台</h3>
               <span className="text-xs text-hint">一键启动，自动通过底层 DAG 运行引擎执行</span>
@@ -1176,17 +1176,17 @@ export default function ForeignTradePage() {
           </section>
 
           {/* ---- 外贸专属智能体推荐 ---- */}
-          <div className="mt-6">
+          <div>
             <AgentSection agents={tradeAgents} isLoading={capabilitiesLoading} />
           </div>
 
           {/* ---- 外贸知识与Skill模板 ---- */}
-          <div className="mt-6">
+          <div>
             <SkillSection skills={tradeSkills} isLoading={capabilitiesLoading} />
           </div>
 
           {/* ---- 连接器推荐 ---- */}
-          <div className="mt-6">
+          <div>
             <ConnectorSection connectors={tradeConnectors} isLoading={capabilitiesLoading} />
           </div>
         </div>
@@ -1195,10 +1195,7 @@ export default function ForeignTradePage() {
         {/* 右侧面板：健康、汇率与风险监测                     */}
         {/* ================================================ */}
         <aside
-          className={cn(
-            "w-full lg:w-72 shrink-0 lg:border-l border-border",
-            "lg:overflow-y-auto lg:pl-6 space-y-4"
-          )}
+          className="w-64 xl:w-72 shrink-0 border-l border-border overflow-y-auto hidden xl:flex flex-col p-3 gap-3"
         >
           {/* 行业动态主入口 */}
           <IndustryDynamicsCard />

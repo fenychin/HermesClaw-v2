@@ -68,23 +68,25 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
   if (parsed instanceof Response) return parsed
 
   try {
-    const result = await auditedWrite(
+    // BUG-03 修复：先调用 createInquiry 取得真实 inquiry.id，再以此 ID 写入 AuditLog，
+    // 确保审计链路中 targetId 与数据库记录 id 严格一致。
+    const result = await handlers.createInquiry(
+      { workspaceId: ctx.workspaceId, ...parsed, countryCode: parsed.countryCode },
+      { prisma },
+    )
+    await auditedWrite(
       {
         actor: await actorFromSession(),
         action: "inquiry.create",
         targetType: "inquiry",
-        targetId: crypto.randomUUID(),
+        targetId: result.id,  // ← 使用实际 Inquiry ID
         detail: `创建询盘: ${parsed.subject.slice(0, 100)}`,
         riskLevel: "low",
         workspaceId: ctx.workspaceId,
         automationLevel: "L2",
         triggeredBy: "user",
       },
-      () =>
-        handlers.createInquiry(
-          { workspaceId: ctx.workspaceId, ...parsed, countryCode: parsed.countryCode },
-          { prisma },
-        ),
+      () => Promise.resolve(result),  // 数据已写入，仅补审计日志
     )
     return successResponse(result, 201)
   } catch {

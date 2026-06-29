@@ -32,6 +32,38 @@ export interface InquiryGenerateEmailInput {
   selectModel: (ctx: { taskType: string; riskLevel: string; estimatedTokens: number; workspaceId: string }) => Promise<{ provider: string; model: string }>;
 }
 
+// ============================================================
+// 辅助函数
+// ============================================================
+
+/**
+ * 将两位国家代码转为对应 emoji 国旗。
+ * 利用区域指示符 Unicode 偏移（A=0x1F1E6）计算旗帜序列。
+ */
+function countryCodeToFlag(code: string): string {
+  try {
+    const upper = (code ?? "US").toUpperCase().slice(0, 2);
+    if (!/^[A-Z]{2}$/.test(upper)) return "🌐";
+    const codePoints = [...upper].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65);
+    return String.fromCodePoint(...codePoints);
+  } catch {
+    return "🌐";
+  }
+}
+
+/**
+ * 将 Schema 中的 priority 值（high/mid/low）统一映射为前端约定值（high/medium/low）。
+ * Schema 与前端历史上使用了不同的枚举字符串，此函数集中处理转换。
+ */
+function normalizePriority(priority: string): string {
+  if (priority === "mid") return "medium";
+  return priority; // high / low 保持不变
+}
+
+// ============================================================
+// listInquiries
+// ============================================================
+
 export async function listInquiries(
   input: InquiryListInput,
   deps: InquiryHandlerDeps,
@@ -74,6 +106,7 @@ export async function listInquiries(
     else if (hasRejected && !hasSent) status = "已流失";
     else if (relatedQuotes.length > 0 || inquiry.replied) status = "已报价";
 
+    // 基于 summary 字段识别技能标签
     const summaryLower = String(inquiry.summary || "").toLowerCase();
     const skills: string[] = [];
     if (summaryLower.includes("报价") || summaryLower.includes("quotation")) skills.push("报价单");
@@ -82,10 +115,19 @@ export async function listInquiries(
     if (summaryLower.includes("付款") || summaryLower.includes("payment")) skills.push("付款");
 
     return {
-      id: inquiry.id, fromEmail: inquiry.fromEmail, subject: inquiry.subject,
-      content: inquiry.content, fromName: inquiry.fromName, companyName: inquiry.companyName,
-      fromCountry: inquiry.fromCountry, countryFlag: inquiry.countryFlag,
-      priority: inquiry.priority, status, value, currency,
+      id: inquiry.id,
+      // ——— 前端期望字段名（BUG-01 修复：统一别名映射） ———
+      customerName: inquiry.companyName,       // companyName → customerName
+      product: inquiry.summary,               // summary → product
+      country: inquiry.fromCountry,           // fromCountry → country
+      // ——— 原始字段（保持，供其他消费者使用） ———
+      companyName: inquiry.companyName,
+      fromCountry: inquiry.fromCountry,
+      countryFlag: inquiry.countryFlag,
+      summary: inquiry.summary,
+      // ——— priority：mid→medium（BUG-01 修复） ———
+      priority: normalizePriority(inquiry.priority ?? "low"),
+      status, value, currency,
       daysSinceLastContact, estimatedValue: value,
       repliesCount: relatedQuotes.length,
       lastFollowUpAt: lastFollowUpAt.toISOString(),
@@ -95,9 +137,12 @@ export async function listInquiries(
     };
   });
 
-  // 筛选
+  // 筛选（前端 priority 已统一为 medium，筛选参数也需转换）
   let filtered = formattedList;
-  if (input.priority) filtered = filtered.filter((i: any) => i.priority === input.priority);
+  if (input.priority) {
+    const normalizedFilter = normalizePriority(input.priority);
+    filtered = filtered.filter((i: any) => i.priority === normalizedFilter);
+  }
   if (input.status) filtered = filtered.filter((i: any) => i.status === input.status);
 
   // 排序：优先级 DESC + 跟进时间 ASC
@@ -113,28 +158,61 @@ export async function listInquiries(
   return { items: paged, total, page, limit };
 }
 
+// ============================================================
+// createInquiry
+// ============================================================
+
 export async function createInquiry(
   input: InquiryCreateInput,
   deps: InquiryHandlerDeps,
 ): Promise<any> {
   const p = deps.prisma;
+
+  // BUG-01/02 修复：将 fromEmail/subject/content 适配为 Schema 实际字段
+  // companyName：从邮箱域名提取公司名称（去掉 TLD，首字母大写）
+  const emailDomain = (input.fromEmail ?? "").split("@")[1] ?? "";
+  const domainBase = emailDomain.split(".")[0] ?? "Unknown";
+  const companyName = domainBase.charAt(0).toUpperCase() + domainBase.slice(1) || "Unknown";
+
+  // summary：合并主题与内容（截断到 2000 字符，与 UI 展示 line-clamp-1 匹配）
+  const summary = [`[${input.subject ?? "No Subject"}]`, input.content ?? ""]
+    .filter(Boolean)
+    .join("\n")
+    .slice(0, 2000);
+
+  const countryCode = (input.countryCode ?? "US").toUpperCase().slice(0, 2);
+  const inquiryId = crypto.randomUUID();
+
   const inquiry = await p.inquiry.create({
     data: {
-      id: crypto.randomUUID(),
+      id: inquiryId,
       workspaceId: input.workspaceId,
-      fromEmail: input.fromEmail,
-      subject: input.subject,
-      content: input.content,
-      fromCountry: input.countryCode ?? "US",
+      companyName,
+      summary,
+      fromCountry: countryCode,
+      countryFlag: countryCodeToFlag(countryCode),
+      channel: "email",
+      priority: "mid",
       receivedAt: new Date(),
     },
   });
+
   return {
     ...inquiry,
+    id: inquiry.id,
+    // 同样返回前端别名字段，让 InquirySuccessPanel 可直接消费
+    customerName: inquiry.companyName,
+    product: inquiry.summary,
+    country: inquiry.fromCountry,
+    priority: normalizePriority(inquiry.priority ?? "low"),
     receivedAt: inquiry.receivedAt?.toISOString(),
     createdAt: inquiry.createdAt?.toISOString(),
   };
 }
+
+// ============================================================
+// generateInquiryEmail
+// ============================================================
 
 export async function generateInquiryEmail(
   input: InquiryGenerateEmailInput,
@@ -147,9 +225,8 @@ export async function generateInquiryEmail(
   }
   const systemPrompt = "你是一个专业的外贸业务员，负责回复海外客户的询盘。请用英文撰写回复邮件，语气专业友好。";
   const userPrompt = `客户询盘信息：
-发件人：${inquiry.fromEmail}
-主题：${inquiry.subject}
-内容：${inquiry.content}
+公司：${inquiry.companyName}
+摘要：${inquiry.summary}
 国家：${inquiry.fromCountry}
 
 请根据以上询盘内容，撰写一封英文回复邮件。邮件应包含：
