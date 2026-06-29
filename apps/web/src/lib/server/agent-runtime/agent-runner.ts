@@ -248,11 +248,11 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
       if (!output) continue
       try {
         const label = typeof output === "object" && output !== null
-          ? (output as any).label ?? nodeId
+          ? ((output as unknown as Record<string, unknown>).label as string | undefined) ?? nodeId
           : nodeId
         await prisma.artifact.create({
           data: {
-            workspaceId: workspace.id,
+            workspaceId,
             fileName: `Agent产物_${agentId}_${nodeId}_${new Date().toISOString().slice(0, 10)}.json`,
             originalName: `${label}.json`,
             mimeType: "application/json",

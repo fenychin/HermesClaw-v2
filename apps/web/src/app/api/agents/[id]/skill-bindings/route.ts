@@ -117,7 +117,7 @@ export const PUT = withRBAC<{ params: Promise<{ id: string }> }>(async (request:
     await createApprovalCheckpoint({
       proposalId: proposal.id,
       workspaceId: proposal.workspaceId,
-      triggerReason: 'manual.proposal.created',
+      triggerReason: 'manual.escalation',
       riskLevel: 'medium',
       automationLevel: 'L3',
       actionSummary: `修改智能体技能绑定待审批：${proposal.title}`,
@@ -134,7 +134,7 @@ export const PUT = withRBAC<{ params: Promise<{ id: string }> }>(async (request:
     await updateAuditEntry({
       auditId: auditEntry.auditId,
       status: "success",
-      targetId: proposal.id
+      detail: `提案已创建：${proposal.id}`
     })
 
     return ApiResponse.ok({ proposalId: proposal.proposalId })

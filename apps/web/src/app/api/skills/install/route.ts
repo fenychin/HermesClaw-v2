@@ -226,7 +226,7 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
       }
     })
 
-    await updateAuditEntry({ auditId: auditEntry.auditId, status: "success", targetId: updatedSkill.id })
+    await updateAuditEntry({ auditId: auditEntry.auditId, status: "success", detail: `已安装/更新技能：${updatedSkill.id}` })
     return successResponse({ skill: serializeSkill(updatedSkill as unknown as Record<string, unknown>) }, 201)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)

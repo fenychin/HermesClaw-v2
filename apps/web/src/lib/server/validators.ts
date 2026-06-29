@@ -163,6 +163,10 @@ export const ConnectorCreateSchema = z.object({
   lastSync: z.string().nullable().optional().default(null),
   permissions: z.array(z.string()).optional().default([]),
   usedByAgents: z.array(z.string()).optional().default([]),
+  /** schema.prisma#Connector 已存在的可选列 */
+  source: z.string().max(50).optional(),
+  version: z.string().max(50).nullable().optional(),
+  health: z.string().max(50).nullable().optional(),
 });
 
 export const ConnectorUpdateSchema = z.object({
@@ -233,12 +237,14 @@ export const SkillCreateSchema = z.object({
   outputSchema: z.string().max(5000).optional(),
   scenarios: z.string().max(2000).optional(),
   automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional(),
+  /** SKILL.md frontmatter + body（来自 industry-pack-sdk validateSkillMd） */
+  skillMdContent: z.string().max(50000).optional(),
+  /** 技能来源标识：'builtin' / 'custom' / 'industry' / 'external' 等 */
+  source: z.string().max(50).optional(),
 });
 
 /** 技能更新请求 Schema —— 所有字段可选（PATCH 语义） */
-export const SkillUpdateSchema = SkillCreateSchema.partial().extend({
-  skillMdContent: z.string().max(50000).optional(),
-});
+export const SkillUpdateSchema = SkillCreateSchema.partial();
 
 // ==============================
 // 外贸询盘
@@ -272,6 +278,24 @@ export const QuotationCreateSchema = z.object({
 export const WorkflowRunSchema = z.object({
   /** 工作流输入变量（可选，键为字符串，值限于基础 JSON 类型） */
   input: z.record(z.string(), z.unknown()).optional().default({}),
+});
+
+// ==============================
+// 任务调度（聊天入口）
+// ==============================
+
+/**
+ * POST /api/tasks/dispatch 请求体 Schema。
+ *
+ * workspaceId / userId 由 RBAC 中间件从 ctx 注入，故不在请求体里。
+ * 字段对齐 [task-dispatch-service.ts] 的 DispatchTaskInput 接口。
+ */
+export const TaskDispatchSchema = z.object({
+  inputText: z.string().min(1).max(5000),
+  industryId: z.string().max(100).optional(),
+  automationLevel: z.enum(["L1", "L2", "L3", "L4"]).optional(),
+  idempotencyKey: z.string().max(120).optional(),
+  confirmed: z.boolean().optional(),
 });
 
 // ==============================

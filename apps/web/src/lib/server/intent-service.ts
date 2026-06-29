@@ -10,7 +10,7 @@ import { GuardrailError } from "@/lib/server/exceptions"
 import { withTraceStep } from "./reasoning-trace"
 import type { ReasoningTrace } from "@hermesclaw/event-contracts"
 
-/** 意图提取 JSON Schema（供 chat-task-dispatch 等模块复用） */
+/** 意图提取 JSON Schema（供 task-dispatch-service 等模块复用） */
 export const INTENT_EXTRACT_SCHEMA = {
   type: "object",
   properties: {
@@ -31,7 +31,7 @@ export const INTENT_EXTRACT_SCHEMA = {
   additionalProperties: false
 } as const;
 
-/** 意图解析系统提示词（供 chat-task-dispatch 等模块复用） */
+/** 意图解析系统提示词（供 task-dispatch-service 等模块复用） */
 export const INTENT_SYSTEM_PROMPT = `你是一个意图解析器，负责将用户的自然语言意图解析为结构化的任务参数。
 你需要提取以下字段：
 1. actionType: 任务要执行的具体动作，必须是一个简短明确的标识符，如 email.send, inquiry.analyze。

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 export const MANIFEST_SCHEMA_VERSION = '1.0'
 
 export type PackCapabilityType = 'skill' | 'workflow' | 'connector'

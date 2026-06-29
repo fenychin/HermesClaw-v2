@@ -7,7 +7,7 @@
  * 独立 DB 实体写入。写入点在 WorkflowRun 终态（completed/failed/cancelled）时调用。
  */
 import { prisma } from "@/lib/prisma"
-import { executionSummarySchema } from "@hermesclaw/event-contracts"
+import { ExecutionSummarySchema } from "@hermesclaw/event-contracts"
 
 export interface StoreExecutionSummaryInput {
   summaryId: string
@@ -24,7 +24,7 @@ export interface StoreExecutionSummaryInput {
 }
 
 export async function storeExecutionSummary(input: StoreExecutionSummaryInput): Promise<void> {
-  const summary = executionSummarySchema.parse({
+  const summary = ExecutionSummarySchema.parse({
     summaryId: input.summaryId,
     taskId: input.taskId,
     workflowRunId: input.workflowRunId,

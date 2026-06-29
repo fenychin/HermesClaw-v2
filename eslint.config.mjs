@@ -1,9 +1,15 @@
 import tsParser from '@typescript-eslint/parser'
+import tsEslintPlugin from '@typescript-eslint/eslint-plugin'
 
 export default [
   // 共享基础解析选项：让 ESLint 认识 TypeScript
   {
     files: ['**/*.ts', '**/*.tsx'],
+    plugins: {
+      // 仅注册插件（让单文件 `eslint-disable @typescript-eslint/xxx` 指令生效）
+      // 不开启 recommended 全集，避免引爆海量历史 any 告警
+      '@typescript-eslint': tsEslintPlugin,
+    },
     languageOptions: {
       parser: tsParser,
       parserOptions: {

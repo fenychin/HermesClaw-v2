@@ -1169,6 +1169,37 @@ model ExecutionSummary {
 }
 
 // ============================================================
+// Artifact — AI 生成物 / 文件中心追踪条目（v2.10.21-beta）
+// Agent DAG 节点产出、连接器执行回执文件等的统一记录。
+// 字段由 agent-runtime/agent-runner.ts 的 DAG 产出写入消费。
+// ============================================================
+model Artifact {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  fileName      String
+  originalName  String
+  mimeType      String
+  size          Int
+  url           String
+  category      String   @default("document")
+  sourceType    String   @default("artifact")
+  taskId        String?
+  workflowRunId String?
+  receiptHash   String?
+  connectorId   String?
+  parseStatus   String   @default("pending")
+  parseSummary  String?
+  operatedBy    String
+  tags          Json     @default("[]")
+  createdAt     DateTime @default(now())
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([taskId])
+  @@index([workflowRunId])
+  @@index([receiptHash])
+}
+
+// ============================================================
 // 连接器租约（ConnectorLease）
 // Hermes 授予 OpenClaw Runtime 在限定窗口内使用某连接器的授权凭证
 // 对应 event-contracts ConnectorLeaseSchema（AGENTS §3.4 / §6）
