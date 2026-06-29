@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Clock,
   BookOpen,
+  GitBranch,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -198,17 +199,21 @@ export default function HarnessApprovalPage() {
   }, [rejectMutation.mutate]);
 
   return (
-    <div className="flex gap-6 p-6 min-h-full">
-      {/* 左主区 */}
-      <div className="flex-1 min-w-0">
-        <PageHeader
-          title="Harness 升级审批中心"
-          description="管理动态 Harness 自演化系统的升级提案，所有变更须经人工审批"
-          breadcrumb={[
-            { label: "设置", href: "/settings" },
-            { label: "Harness 审批" },
-          ]}
-        />
+    <div className="space-y-8 font-sans">
+      {/* 标题 */}
+      <div className="space-y-1.5 border-b border-[#262626] pb-5 select-none">
+        <div className="text-[#F5F5F5] text-2xl font-bold flex items-center gap-2">
+          <GitBranch className="size-6 text-[#6D5EF9]" />
+          Harness 升级审批中心
+        </div>
+        <p className="text-[#B3B3B3] text-sm">
+          管理动态 Harness 自演化系统的升级提案，所有变更须经人工审批
+        </p>
+      </div>
+
+      <div className="flex gap-6 items-start">
+        {/* 左主区 */}
+        <div className="flex-1 min-w-0">
 
         {/* Tabs */}
         <Tabs
@@ -390,6 +395,7 @@ export default function HarnessApprovalPage() {
         onConfirm={handleConfirmApprove}
         isPending={approveMutation.isPending}
       />
+      </div>
     </div>
   );
 }

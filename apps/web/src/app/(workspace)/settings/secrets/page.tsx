@@ -117,7 +117,7 @@ export default function SecretsSettingsPage() {
         const result = await res.json();
         setSecrets((prev) => [...prev, result.secret]);
         // 缓存生成的密钥值，进入一次性明文展示视图
-        setCreatedSecretValue(result.value);
+        setCreatedSecretValue(data.value);
         toast.success("密钥创建成功");
         reset();
       } else {

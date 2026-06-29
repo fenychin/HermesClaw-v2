@@ -44,7 +44,18 @@ export async function POST(req: NextRequest) {
       });
     } catch { /* 审计非致命 */ }
 
-    return NextResponse.json({ success: true, ...apiKey });
+    const { rawKey, ...apiKeyData } = apiKey;
+
+    return NextResponse.json({
+      success: true,
+      apiKey: {
+        ...apiKeyData,
+        createdAt: new Date().toISOString().split("T")[0],
+        lastUsedAt: "从未",
+        expiresAt: expiresAt || "永久",
+      },
+      rawKey,
+    });
   } catch (error) {
     console.error("Failed to create API key:", error);
     return NextResponse.json({ error: "创建 API 密钥失败" }, { status: 500 });

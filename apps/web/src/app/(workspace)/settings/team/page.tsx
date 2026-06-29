@@ -312,23 +312,28 @@ export default function TeamPage() {
   const canManage = isAdmin(currentRole);
 
   return (
-    <div className="p-6 h-full flex flex-col">
-      <PageHeader
-        title="团队与权限"
-        description="管理工作空间成员、角色与访问控制"
-        breadcrumb={[
-          { label: "设置", href: "/settings" },
-          { label: "团队与权限" },
-        ]}
-        actions={
-          canManage ? (
-            <Button onClick={() => setInviteOpen(true)} size="sm">
-              <UserPlus className="size-4 mr-1.5" />
-              邀请成员
-            </Button>
-          ) : undefined
-        }
-      />
+    <div className="space-y-8 font-sans">
+      {/* 标题 */}
+      <div className="flex justify-between items-start border-b border-[#262626] pb-5 select-none">
+        <div className="space-y-1.5">
+          <div className="text-[#F5F5F5] text-2xl font-bold flex items-center gap-2">
+            <Users className="size-6 text-[#6D5EF9]" />
+            团队与权限
+          </div>
+          <p className="text-[#B3B3B3] text-sm">
+            管理工作空间成员、角色与访问控制
+          </p>
+        </div>
+        {canManage && (
+          <Button
+            onClick={() => setInviteOpen(true)}
+            className="h-10 px-4 bg-[#6D5EF9] hover:bg-[#6D5EF9]/90 text-white rounded-[12px] font-semibold text-xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <UserPlus className="size-4" />
+            邀请成员
+          </Button>
+        )}
+      </div>
 
       {/* 工作空间信息卡片 */}
       {workspace && (

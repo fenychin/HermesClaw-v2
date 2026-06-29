@@ -27,6 +27,21 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  try { const r = await decode<any>(request, RemoveMemberSchema); if (r instanceof Response) return r; return successResponse(await removeMember(r.ctx.workspaceId, r.data.userId)) }
-  catch (e) { if (e instanceof MemberServiceError) return errorResponse(e.message, e.httpStatus); return errorResponse("服务器内部错误") }
+  try {
+    const ctx = await buildWorkspaceContext(request);
+    const guard = guardRole(ctx.role, "ADMIN");
+    if (guard) return guard;
+
+    const url = new URL(request.url);
+    const userId = url.searchParams.get("userId");
+    const p = RemoveMemberSchema.safeParse({ userId });
+    if (!p.success) {
+      return errorResponse(`参数错误: ${p.error.issues.map((i: any) => i.message).join(", ")}`, 400);
+    }
+
+    return successResponse(await removeMember(ctx.workspaceId, p.data.userId));
+  } catch (e) {
+    if (e instanceof MemberServiceError) return errorResponse(e.message, e.httpStatus);
+    return errorResponse("服务器内部错误");
+  }
 }

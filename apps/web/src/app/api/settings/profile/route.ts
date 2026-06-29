@@ -54,7 +54,20 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { name } = body;
+    const { name, action, platform } = body;
+
+    if (action === "disconnect") {
+      if (!platform || !["twitter", "discord", "google"].includes(platform)) {
+        return NextResponse.json({ error: "不支持的第三方平台" }, { status: 400 });
+      }
+      await prisma.account.deleteMany({
+        where: {
+          userId: session.user.id,
+          provider: platform,
+        },
+      });
+      return NextResponse.json({ success: true });
+    }
 
     if (name) {
       await prisma.user.update({

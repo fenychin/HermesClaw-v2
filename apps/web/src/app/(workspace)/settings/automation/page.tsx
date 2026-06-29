@@ -173,18 +173,17 @@ export default function AutomationSettingsPage() {
 
   return (
     <PageTransition>
-      <div className="p-6 max-w-5xl mx-auto space-y-6 pb-12">
-        <Link 
-          href="/dashboard"
-          className="text-muted-foreground hover:text-foreground text-xs font-medium flex items-center gap-1.5 transition-colors"
-        >
-          <ArrowLeft className="size-3.5" /> 返回工作台
-        </Link>
-
-        <PageHeader 
-          title="自动化授权等级配置"
-          description="AGENTS.md §5.2 / §6.2 组织级多租户自动化授权控制面板"
-        />
+      <div className="space-y-8 font-sans">
+        {/* 标题 */}
+        <div className="space-y-1.5 border-b border-[#262626] pb-5 select-none">
+          <div className="text-[#F5F5F5] text-2xl font-bold flex items-center gap-2">
+            <ShieldCheck className="size-6 text-[#6D5EF9]" />
+            自动化授权等级配置
+          </div>
+          <p className="text-[#B3B3B3] text-sm">
+            AGENTS.md §5.2 / §6.2 组织级多租户自动化授权控制面板
+          </p>
+        </div>
 
         {/* 顶部安全性提示区域 */}
         <div className="bg-card/45 border border-border backdrop-blur-md rounded-2xl p-4 flex gap-3">
@@ -305,21 +304,37 @@ export default function AutomationSettingsPage() {
                 </div>
               </div>
 
-              {selectedLevel === "L4" && (
-                <div className="space-y-2 bg-danger/5 border border-danger/20 rounded-xl p-4">
-                  <span className="text-[10px] text-danger font-bold flex items-center gap-1">
+              {(selectedLevel === "L3" || selectedLevel === "L4") && (
+                <div className={cn(
+                  "space-y-2 border rounded-xl p-4",
+                  selectedLevel === "L4" ? "bg-danger/5 border-danger/20" : "bg-warning/5 border-warning/20"
+                )}>
+                  <span className={cn(
+                    "text-[10px] font-bold flex items-center gap-1",
+                    selectedLevel === "L4" ? "text-danger" : "text-warning"
+                  )}>
                     <Info className="size-3.5" /> 风险释放安全验证
                   </span>
                   <p className="text-hint text-[10px] leading-snug">
-                    若您经过详细安全评估确知一切后果并执意开启，请在下方文本框中输入确认标识短语：
-                    <code className="text-danger font-bold bg-danger/10 rounded px-1.5 py-0.5 mx-1 font-mono text-[9px]">{L4_CONFIRM_TOKEN}</code>
+                    {selectedLevel === "L4" 
+                      ? "若您经过详细安全评估确知一切后果并执意开启，请在下方文本框中输入确认标识短语："
+                      : "启用 L3 监督自动等级需要进行安全确认，请输入确认标识短语："}
+                    <code className={cn(
+                      "font-bold rounded px-1.5 py-0.5 mx-1 font-mono text-[9px]",
+                      selectedLevel === "L4" ? "text-danger bg-danger/10" : "text-warning bg-warning/10"
+                    )}>
+                      {selectedLevel === "L4" ? L4_CONFIRM_TOKEN : L3_CONFIRM_TOKEN}
+                    </code>
                   </p>
                   <input
                     type="text"
                     value={inputToken}
                     onChange={(e) => setInputToken(e.target.value)}
                     placeholder="请输入安全确认令牌"
-                    className="w-full bg-background border border-danger/30 rounded-lg px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-danger font-mono"
+                    className={cn(
+                      "w-full bg-background rounded-lg px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none font-mono border",
+                      selectedLevel === "L4" ? "border-danger/30 focus:border-danger" : "border-warning/30 focus:border-warning"
+                    )}
                   />
                 </div>
               )}
@@ -333,7 +348,7 @@ export default function AutomationSettingsPage() {
                   取消
                 </button>
                 <button
-                  disabled={isUpdating || (selectedLevel === "L4" && inputToken !== L4_CONFIRM_TOKEN)}
+                  disabled={isUpdating || (selectedLevel === "L4" && inputToken !== L4_CONFIRM_TOKEN) || (selectedLevel === "L3" && inputToken !== L3_CONFIRM_TOKEN)}
                   onClick={handleConfirmSubmit}
                   className={cn(
                     "text-xs font-semibold rounded-lg px-4 py-2 transition-all shadow-sm text-primary-foreground disabled:opacity-50",

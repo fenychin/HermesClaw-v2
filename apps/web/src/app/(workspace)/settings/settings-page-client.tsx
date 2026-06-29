@@ -126,7 +126,7 @@ function CompanySettings() {
       </div>
 
       {/* 保存按钮（disabled + 提示） */}
-      <div className="sticky bottom-0 bg-background pt-4 pb-4 flex items-center justify-end gap-3 mt-4">
+      <div className="sticky bottom-0 bg-[#050505] pt-4 pb-4 flex items-center justify-end gap-3 mt-4 select-none">
         <span className="text-xs text-hint flex items-center gap-1.5">
           <span className="inline-block size-1.5 rounded-full bg-warning" />
           保存功能即将上线
@@ -134,7 +134,7 @@ function CompanySettings() {
         <button
           type="button"
           disabled
-          className="bg-primary/50 text-white/60 px-5 py-2 rounded-xl text-sm font-medium cursor-not-allowed transition-colors"
+          className="h-10 px-5 bg-[#262626] text-[#B3B3B3]/40 border border-[#333333] rounded-[12px] font-semibold text-xs cursor-not-allowed transition-all"
         >
           保存更改
         </button>
@@ -538,18 +538,8 @@ function AgentsRulesSettings() {
 }
 
 function SettingsPageContent() {
-  const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   const section = searchParams.get("section") || "company";
-
-  const handleNavClick = (item: typeof NAV_ITEMS[0]) => {
-    if (item.isRoute) {
-      router.push(`/settings/${item.key}`);
-    } else {
-      router.push(`${pathname}?section=${item.key}`);
-    }
-  };
 
   const renderContent = () => {
     switch (section) {
@@ -581,38 +571,8 @@ function SettingsPageContent() {
   };
 
   return (
-    <div className="flex flex-col h-full p-6">
-      <PageHeader title="设置" description="企业配置、模型路由、连接器授权与系统偏好" />
-      <div className="flex flex-1 gap-8 mt-6 min-h-0 overflow-hidden">
-        {/* 左侧导航 */}
-        <nav className="w-48 shrink-0 space-y-1 overflow-y-auto pr-2 pb-6">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const isActive = !item.isRoute && section === item.key;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => handleNavClick(item)}
-                className={cn(
-                  "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors text-left",
-                  isActive
-                    ? "bg-accent text-foreground font-medium"
-                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                )}
-              >
-                <Icon className="size-4 shrink-0" />
-                <span className="truncate">{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* 右侧内容 */}
-        <div className="flex-1 min-w-0 overflow-y-auto relative px-1 pb-6">
-          {renderContent()}
-        </div>
-      </div>
+    <div className="w-full">
+      {renderContent()}
     </div>
   );
 }

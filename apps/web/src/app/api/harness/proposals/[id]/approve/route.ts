@@ -61,6 +61,48 @@ export const POST = withRBAC(
       return ApiResponse.error(result.message, 400);
     }
 
+    // 🔗 贯通自演化升级审批数据链：若提案状态变更为 canary，强制进行系统快照并物理启动 Canary 进程
+    if (result.newStatus === "canary") {
+      try {
+        const { captureSnapshot } = await import("@/lib/server/harness-snapshot");
+        const { startCanary } = await import("@/lib/server/canary");
+        const { getLatestSnapshot } = await import("@/lib/server/harness-snapshot");
+
+        let agentIds: string[] = [];
+        try {
+          agentIds = typeof proposal.affectedAgents === "string"
+            ? JSON.parse(proposal.affectedAgents) || []
+            : Array.isArray(proposal.affectedAgents) ? proposal.affectedAgents : [];
+        } catch {}
+
+        // 1. 捕获升级前安全备份快照
+        for (const agentId of agentIds.length > 0 ? agentIds : ["default"]) {
+          await captureSnapshot({
+            workspaceId: proposal.workspaceId,
+            agentId,
+            proposalId: proposal.id,
+            snapshotType: "pre-canary",
+            createdBy: "system",
+          });
+        }
+
+        // 2. 物理唤醒并运行 Canary 灰度监测
+        const targetAgentId = agentIds.length > 0 ? agentIds[0] : "default";
+        const snapshot = await getLatestSnapshot(proposal.workspaceId, targetAgentId);
+        if (snapshot) {
+          await startCanary({
+            proposalId: proposal.id,
+            workspaceId: proposal.workspaceId,
+            agentId: targetAgentId,
+            snapshotId: snapshot.snapshotId,
+            startedBy: "system",
+          });
+        }
+      } catch (err) {
+        console.error("[harness-approve-api] 触发快照或启动 Canary 失败:", err);
+      }
+    }
+
     return ApiResponse.ok({
       proposalId: proposal.proposalId,
       status: result.newStatus,

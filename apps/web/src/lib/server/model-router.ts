@@ -50,6 +50,8 @@ export interface ModelRouteContext {
   estimatedTokens: number
   /** 工作空间 ID（多租户隔离 + 配置读取 + 审计归属） */
   workspaceId: string
+  /** 关联的工作流运行 ID */
+  workflowRunId?: string
 }
 
 /** 路由决策结果 */
@@ -251,6 +253,7 @@ export async function selectModel(
         detail: decision.reason,
         riskLevel: toAuditRiskLevel(ctx.riskLevel),
         workspaceId: ctx.workspaceId,
+        workflowRunId: ctx.workflowRunId,
         contextSnapshot: {
           taskType: ctx.taskType,
           estimatedTokens: ctx.estimatedTokens,
