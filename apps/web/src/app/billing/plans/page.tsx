@@ -76,10 +76,11 @@ export default function PlansPage() {
     if (subscription?.planId === planId) return; // 当前套餐
     setLoadingPlanId(planId);
     try {
+      const idempotencyKey = `idemp_checkout_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId, interval: billingCycle })
+        body: JSON.stringify({ planId, interval: billingCycle, idempotencyKey })
       });
       if (res.ok) {
         const data = await res.json();
@@ -122,10 +123,11 @@ export default function PlansPage() {
   const handlePurchaseFlexible = async () => {
     setPurchasing(true);
     try {
+      const idempotencyKey = `idemp_credits_purchase_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
       const res = await fetch("/api/billing/credits/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credits: purchaseAmount })
+        body: JSON.stringify({ credits: purchaseAmount, idempotencyKey })
       });
       if (res.ok) {
         toast.success(`充值成功！已向账户购买并注入了 ${purchaseAmount} 积分！`);
@@ -143,10 +145,11 @@ export default function PlansPage() {
   const handlePurchaseBulk = async () => {
     setPurchasingBulk(true);
     try {
+      const idempotencyKey = `idemp_credits_purchase_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
       const res = await fetch("/api/billing/credits/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credits: 4000 })
+        body: JSON.stringify({ credits: 4000, idempotencyKey })
       });
       if (res.ok) {
         toast.success("充值成功！已向您的账户注入了 4000 积分大礼包！");

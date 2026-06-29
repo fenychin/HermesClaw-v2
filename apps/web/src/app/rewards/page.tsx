@@ -17,6 +17,7 @@ import {
   UserPlus,
   Compass,
   ArrowRight,
+  ArrowLeft,
   TrendingUp,
   CheckCircle2,
   HelpCircle
@@ -96,27 +97,40 @@ export default function RewardsPage() {
     enabled: activeTab === "invites"
   });
 
-  // 4. 任务模拟点击完成 (乐观更新与 Zustand 积分同步)
+  // 4. 任务真实完成接口调用 (配合二阶段审计与幂等)
   const handleCompleteTask = async (taskId: string, reward: number) => {
     setLoadingTaskId(taskId);
-    
-    // 模拟延迟 1s 的 OAuth 交互或现场状态查询
-    setTimeout(() => {
-      // 乐观修改 React Query 的缓存数据
-      queryClient.setQueryData<RewardTask[]>(["rewardTasks"], (oldTasks) => {
-        if (!oldTasks) return [];
-        return oldTasks.map((t) => 
-          t.taskId === taskId 
-            ? { ...t, completed: true, completedAt: new Date().toISOString().replace("T", " ").substring(0, 16) } 
-            : t
-        );
+    try {
+      const idempotencyKey = `idemp_task_claim_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      const res = await fetch("/api/rewards/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId, idempotencyKey })
       });
 
-      // 实时更新全局 Zustand 积分余额
-      setPoints(points + reward);
-      toast.success(`恭喜完成任务！已向账户注入 ${reward} 积分`);
+      if (res.ok) {
+        // 乐观修改 React Query 的缓存数据
+        queryClient.setQueryData<RewardTask[]>(["rewardTasks"], (oldTasks) => {
+          if (!oldTasks) return [];
+          return oldTasks.map((t) => 
+            t.taskId === taskId 
+              ? { ...t, completed: true, completedAt: new Date().toISOString().replace("T", " ").substring(0, 16) } 
+              : t
+          );
+        });
+
+        // 实时更新全局 Zustand 积分余额
+        setPoints(points + reward);
+        toast.success(`恭喜完成任务！已向账户注入 ${reward} 积分`);
+      } else {
+        const data = await res.json();
+        throw new Error(data.error || "领取奖励失败");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "领取奖励失败，请重试");
+    } finally {
       setLoadingTaskId(null);
-    }, 1000);
+    }
   };
 
   // 5. 复制专属链接
@@ -143,6 +157,17 @@ export default function RewardsPage() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-[#F5F5F5] font-sans px-6 py-12 md:px-12 lg:px-24 select-none relative overflow-x-hidden">
+      {/* 返回按钮 */}
+      <div className="max-w-6xl mx-auto mb-6">
+        <button
+          onClick={() => router.push("/foreign-trade")}
+          className="flex items-center gap-1.5 text-xs text-[#B3B3B3] hover:text-[#F5F5F5] transition-colors cursor-pointer bg-transparent border-none outline-none font-semibold"
+        >
+          <ArrowLeft className="size-3.5" />
+          返回工作台
+        </button>
+      </div>
+
       {/* 顶部标题区 */}
       <div className="max-w-6xl mx-auto flex flex-col lg:flex-row justify-between items-start gap-8 relative">
         <div className="space-y-2 max-w-2xl">

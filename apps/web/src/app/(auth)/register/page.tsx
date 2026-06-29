@@ -64,6 +64,7 @@ export default function RegisterPage() {
       }
 
       // 1. 调用注册 API 路由
+      const inviteCode = typeof window !== "undefined" ? localStorage.getItem("inviteCode") : null;
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -72,6 +73,7 @@ export default function RegisterPage() {
           password: data.password,
           confirmPassword: data.confirmPassword,
           turnstileToken: token,
+          inviteCode: inviteCode || undefined,
         }),
       });
 
@@ -92,6 +94,9 @@ export default function RegisterPage() {
       }
 
       // 3. 重定向到引导页 /onboarding
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("inviteCode");
+      }
       router.push("/onboarding");
       router.refresh();
     } catch (err: any) {

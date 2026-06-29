@@ -221,10 +221,11 @@ export default function BillingSettingsPage() {
   const handlePurchase = async () => {
     setPurchasing(true);
     try {
+      const idempotencyKey = `idemp_credits_purchase_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
       const res = await fetch("/api/billing/credits/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credits: purchaseAmount })
+        body: JSON.stringify({ credits: purchaseAmount, idempotencyKey })
       });
       if (res.ok) {
         toast.success(`成功充值了 ${purchaseAmount} 积分！`);
