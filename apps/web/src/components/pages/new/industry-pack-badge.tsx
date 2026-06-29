@@ -56,33 +56,27 @@ export function IndustryPackBadge() {
 
   if (!activePack) return null;
 
-  const industryEmoji =
-    activePack.targetIndustry === "foreign-trade"
-      ? "🚢"
-      : activePack.targetIndustry === "industry-intelligence"
-        ? "📡"
-        : "📦";
+  const displayName =
+    activePack.packId === "foreign-trade"
+      ? "外贸行业"
+      : activePack.packName.replace(/包$/, "");
 
   return (
     <button
       type="button"
       onClick={() => router.push("/industry-packs")}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px]",
-        "bg-emerald-500/5 border-emerald-500/20 text-emerald-600",
-        "hover:bg-emerald-500/10 transition-colors cursor-pointer",
+        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]",
+        "bg-emerald-500/10 border-emerald-500/30 text-white",
+        "hover:bg-emerald-500/15 hover:border-emerald-500/50 transition-colors cursor-pointer",
         "select-none"
       )}
       title={`当前行业上下文：${activePack.packName} v${activePack.packVersion}`}
     >
-      <span className="text-sm leading-none">{industryEmoji}</span>
       <span className="font-semibold max-w-[120px] truncate">
-        {activePack.packName}
+        {displayName}
       </span>
-      <span className="text-[9px] text-emerald-500/60 font-mono">
-        v{activePack.packVersion}
-      </span>
-      <ChevronRight className="size-3 text-emerald-500/40" />
+      <ChevronRight className="size-3 text-white/40" />
     </button>
   );
 }

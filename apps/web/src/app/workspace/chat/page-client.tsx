@@ -479,10 +479,6 @@ ${connectorsListText}
           >
             <>
               <div className="w-full max-w-2xl mx-auto">
-                {/* 已安装行业包标识 — 输入框右上角 */}
-                <div className="flex justify-end mb-1.5">
-                  <IndustryPackBadge />
-                </div>
                 <CommandBox
                   value={input}
                   onChange={setInput}
@@ -491,6 +487,7 @@ ${connectorsListText}
                   isStreaming={isStreaming}
                   error={error}
                   onStartWizard={!hasMessages ? handleStartWizard : undefined}
+                  headerExtra={<IndustryPackBadge />}
                 />
               </div>
 

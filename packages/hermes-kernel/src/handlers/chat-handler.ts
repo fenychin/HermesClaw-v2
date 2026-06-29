@@ -87,6 +87,9 @@ export interface ChatHandlerDeps {
 
   /** SSE 帧头（"data: [DONE]\n\n"） */
   readonly SSE_DONE: string;
+
+  /** 获取系统日志统计摘要（可选，用于日志分析） */
+  loadLogsSummary?: (workspaceId: string) => Promise<string>;
 }
 
 // ==============================
@@ -193,7 +196,25 @@ export async function executeChatStream(
     loadedPrompt = deps.loadPrompt(input.industryId, promptKey);
   }
   const baseSystem = loadedPrompt || systemPrompt || "";
-  const fullSystem = baseSystem + governance;
+
+  // 3. 构建系统当前时间锚点与动态日志摘要
+  const nowStr = new Date().toLocaleString("zh-CN");
+  let timeAndLogsContext = `\n\n【系统环境上下文】\n- 当前服务器系统时间是：${nowStr}`;
+
+  // 检查是否需要注入运行日志摘要
+  const lastUserMessage = messages[messages.length - 1]?.content || "";
+  const isLogsQuery = /运行日志|日志分析|排查日志|错误日志|系统日志/.test(lastUserMessage);
+  
+  if (isLogsQuery && deps.loadLogsSummary) {
+    try {
+      const logsSummary = await deps.loadLogsSummary(workspaceId);
+      timeAndLogsContext += `\n- 近 24 小时真实运行日志统计摘要如下：\n${logsSummary}`;
+    } catch (err) {
+      timeAndLogsContext += `\n- 获取运行日志摘要失败：${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  const fullSystem = baseSystem + governance + timeAndLogsContext;
 
   // 3. 预估 token
   const estimatedTokens = Math.ceil(
