@@ -157,7 +157,18 @@
       "Bash(echo \"---\")",
       "Bash(ls /Users/Feng/Desktop/Hermesclaw-v2/industry-packs/foreign-trade/agents/)",
       "Bash(wc -l /Users/Feng/Desktop/Hermesclaw-v2/prisma/seed-trade-workflows.ts /Users/Feng/Desktop/Hermesclaw-v2/prisma/seed-inquiry-workflow.ts /Users/Feng/Desktop/Hermesclaw-v2/src/app/\\\\\\(workspace\\\\\\)/foreign-trade/_data/workflow-details.ts /Users/Feng/Desktop/Hermesclaw-v2/src/app/\\\\\\(workspace\\\\\\)/foreign-trade/_data/workflows.ts)",
-      "Bash(mkdir -p \"/Users/Feng/Desktop/Hermesclaw-v2/src/app/api/industry/[packId]/workflows/[workflowId]\")"
+      "Bash(mkdir -p \"/Users/Feng/Desktop/Hermesclaw-v2/src/app/api/industry/[packId]/workflows/[workflowId]\")",
+      "Bash(powershell -Command \"netstat -ano | Select-String ':3001 '\")",
+      "Bash(taskkill /PID 8528 /F)",
+      "Bash(powershell -Command \"Stop-Process -Id 8528 -Force; echo 'killed'\")",
+      "Bash(npx next *)",
+      "Bash(powershell -Command \"Stop-Process -Id 6988 -Force; echo 'killed'\")",
+      "Bash(npx tsc *)",
+      "Bash(npx tsup *)",
+      "Bash(powershell -Command \"netstat -ano | Select-String ':3000 '\")",
+      "Bash(powershell -Command \"Stop-Process -Id 14544 -Force; echo 'killed'\")",
+      "Bash(git ls-tree *)",
+      "Bash(git log *)"
     ],
     "additionalDirectories": [
       "/Users/Feng/Desktop/Hermesclaw-v2/src/components/pages",

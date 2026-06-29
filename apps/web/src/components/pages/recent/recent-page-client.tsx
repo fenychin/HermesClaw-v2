@@ -21,6 +21,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatTime } from "@/lib/date-utils";
 import {
   useRecentRecords,
@@ -141,6 +142,7 @@ const TIME_FILTERS: { key: TimeFilter; label: string }[] = [
 export function RecentPageClient() {
   const [activeFilter, setActiveFilter] = useState<RecentType | "all">("all");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
+  const router = useRouter();
 
   // TanStack Query：聚合最近记录，staleTime 30s
   const {
@@ -299,24 +301,30 @@ export function RecentPageClient() {
                           <span>{record.source}</span>
                           {/* workflowRunId — 可点击跳转到运行详情 */}
                           {record.workflowRunId ? (
-                            <Link
-                              href={`/workspace/workflows/runs/${record.workflowRunId}`}
-                              className="font-mono text-[10px] text-hint hover:text-brand-blue hover:underline"
+                            <span
+                              className="font-mono text-[10px] text-hint hover:text-brand-blue hover:underline cursor-pointer"
                               title={`workflowRunId: ${record.workflowRunId}`}
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                router.push(`/workspace/workflows/runs/${record.workflowRunId}`);
+                              }}
                             >
                               run:{(record.workflowRunId as string).slice(-8)}
-                            </Link>
+                            </span>
                           ) : null}
                           {/* traceId — 可点击跳转到审计日志 */}
-                          <Link
-                            href={`/workspace/settings?section=audit`}
-                            className="font-mono text-[10px] text-hint/60 hover:text-brand-blue hover:underline"
+                          <span
+                            className="font-mono text-[10px] text-hint/60 hover:text-brand-blue hover:underline cursor-pointer"
                             title={`AuditLog traceId: ${record.traceId}`}
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              router.push(`/workspace/settings?section=audit`);
+                            }}
                           >
                             trace:{record.traceId.slice(-8)}
-                          </Link>
+                          </span>
                           {isUpgrade && record.meta?.proposalId ? (
                             <span className="font-mono text-[10px] text-hint">
                               {record.meta.proposalId as string}

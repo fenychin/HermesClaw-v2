@@ -16,6 +16,7 @@
  *   GET /stream  → SSE 事件流（text/event-stream）
  */
 
+import "dotenv/config"
 import { createServer, IncomingMessage, ServerResponse } from "http"
 import { prisma } from "../../prisma"
 import { logger } from "../../logger"
