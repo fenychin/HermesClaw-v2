@@ -210,10 +210,10 @@ export const apiClient = {
       body: JSON.stringify(data),
     }),
 
-  createConversation: (title: string, initialMessage?: string, taskId?: string) =>
+  createConversation: (title: string, initialMessage?: string, taskId?: string, projectId?: string) =>
     apiFetch<{ conversation: { id: string } }>("/api/conversations", {
       method: "POST",
-      body: JSON.stringify({ title, initialMessage, taskId }),
+      body: JSON.stringify({ title, initialMessage, taskId, projectId }),
     }),
 
   /** 原子导入：对话 + 完整消息一次事务落库（用于本地 pending 队列回放） */
@@ -574,6 +574,8 @@ export interface RecentRecordItem {
   targetId: string
   /** 审计状态 */
   status?: string
+  /** 关联的项目空间 ID */
+  projectId?: string | null
   /** 扩展元数据 */
   meta?: Record<string, unknown>
 }

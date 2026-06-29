@@ -25,6 +25,8 @@ export interface RecentRecord {
   href?: string;
   /** 时间分组（供 /recent 页面归组展示，侧边栏忽略） */
   timeGroup?: string;
+  /** 关联项目 ID */
+  projectId?: string | null;
 }
 
 /**
@@ -35,7 +37,7 @@ export interface RecentRecord {
  * @returns RecentRecord[] — API 真实对话
  */
 export function mapApiConversations(
-  convs: Array<{ id: string; title: string; updatedAt: string }>,
+  convs: Array<{ id: string; title: string; updatedAt: string; projectId?: string | null }>,
   includeTimeGroup = false,
 ): RecentRecord[] {
   return convs.map((c) => {
@@ -44,6 +46,7 @@ export function mapApiConversations(
       type: "conversation",
       title: c.title,
       timestamp: c.updatedAt,
+      projectId: c.projectId ?? null,
     };
     if (includeTimeGroup) {
       record.timeGroup = classifyTimeGroup(c.updatedAt);
@@ -75,7 +78,7 @@ export function useRecentConversations(enabled = true) {
     queryKey: RECENT_CONVERSATIONS_QUERY_KEY,
     queryFn: async () => {
       const res = (await apiClient.getConversations()) as {
-        conversations: Array<{ id: string; title: string; updatedAt: string }>;
+        conversations: Array<{ id: string; title: string; updatedAt: string; projectId?: string | null }>;
       };
       return mapApiConversations(res.conversations ?? [], true);
     },

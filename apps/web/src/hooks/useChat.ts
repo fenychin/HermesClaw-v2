@@ -47,6 +47,8 @@ export function useChat() {
   /** 当前持久化对话 ID（ref 供回调闭包，state 供组件消费） */
   const conversationIdRef = useRef<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  /** 当前项目 ID（ref 供回调闭包，防持久化新建会话时上下文丢失） */
+  const projectIdRef = useRef<string | null>(null);
 
   // PERF: 用 ref 持有 messages 最新值，避免 sendMessage 因 messages 变化而重建，
   // 防止每条消息发送/接收后触发 CommandBox / QuickCards 全量重渲染
@@ -110,7 +112,12 @@ export function useChat() {
       try {
         if (!conversationIdRef.current) {
           const title = truncateTitle(userContent);
-          const result = await apiClient.createConversation(title, undefined, taskId);
+          const result = await apiClient.createConversation(
+            title,
+            undefined,
+            taskId,
+            projectIdRef.current || undefined,
+          );
           conversationIdRef.current = result.conversation.id;
           setConversationId(result.conversation.id);
         }
@@ -161,8 +168,10 @@ export function useChat() {
   );
 
   const sendMessage = useCallback(
-    async (content: string, systemPrompt?: string, modelId?: string, taskId?: string, workflowRunId?: string) => {
+    async (content: string, systemPrompt?: string, modelId?: string, taskId?: string, workflowRunId?: string, projectId?: string) => {
       if (!content.trim() || isStreamingRef.current) return;
+
+      projectIdRef.current = projectId || null;
 
       const userMessage: Message = {
         id: Date.now().toString(),
@@ -194,6 +203,7 @@ export function useChat() {
             modelId,
             taskId,
             workflowRunId,
+            projectId,
           }),
           signal: abortControllerRef.current.signal,
         });
@@ -303,7 +313,7 @@ export function useChat() {
    * 从数据库加载历史对话（含重试）
    * —— 用于 /recent → /new?load= 跳转恢复会话
    */
-  const loadConversation = useCallback(async (conversationId: string) => {
+  const loadConversation = useCallback(async (conversationId: string, currentProjectId?: string) => {
     setError(null);
     const MAX_RETRIES = 2;
     let lastErr: unknown;
@@ -311,7 +321,7 @@ export function useChat() {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         const data = await apiClient.getConversation(conversationId);
-        const conv = (data as { conversation: { id: string; messages: Array<{ id: string; role: string; content: string; createdAt: string }> } }).conversation;
+        const conv = (data as { conversation: { id: string; projectId?: string | null; messages: Array<{ id: string; role: string; content: string; createdAt: string }> } }).conversation;
         if (!conv?.messages) return;
 
         const loaded: Message[] = conv.messages.map((m) => ({
@@ -325,6 +335,17 @@ export function useChat() {
         setStreamingContent("");
         conversationIdRef.current = conv.id;
         setConversationId(conv.id);
+
+        // 如果传入了项目空间 ID，且当前对话尚未关联该项目，则执行“自动转存”并刷新
+        if (currentProjectId && conv.projectId !== currentProjectId) {
+          try {
+            await apiClient.updateConversation(conv.id, { projectId: currentProjectId });
+            window.dispatchEvent(new CustomEvent("conversation-saved"));
+          } catch (updateErr) {
+            console.error("[useChat] 自动转存会话到项目失败:", updateErr);
+          }
+        }
+
         return; // 成功，退出
       } catch (err) {
         lastErr = err;

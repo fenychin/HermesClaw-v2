@@ -113,7 +113,7 @@ export const MemoryUpdateSchema = z.object({
 
 export const ConversationCreateSchema = z.object({
   title: z.string().max(200).optional().default("新对话"),
-  projectId: z.string().uuid().nullable().optional().default(null),
+  projectId: z.string().max(100).nullable().optional().default(null),
   initialMessage: z.string().max(100000).optional(),
   /** 关联的 TaskEnvelope ID（Conversation → Task 审计链路） */
   taskId: z.string().max(100).optional(),
@@ -217,6 +217,8 @@ export const ChatMessageSchema = z.object({
   taskId: z.string().max(100).optional(),
   /** 关联的 WorkflowRun ID（Chat → WorkflowRun → Task 全链路审计） */
   workflowRunId: z.string().max(100).optional(),
+  /** 关联的项目 ID */
+  projectId: z.string().max(100).optional(),
 });
 
 export const TaskExecuteSchema = z.object({

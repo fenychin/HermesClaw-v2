@@ -2,6 +2,8 @@
 
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   Clock,
   MessageSquare,
@@ -16,6 +18,7 @@ import {
   Plug,
   ShieldCheck,
   Monitor,
+  Trash2,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
@@ -143,6 +146,58 @@ export function RecentPageClient() {
   const [activeFilter, setActiveFilter] = useState<RecentType | "all">("all");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const router = useRouter();
+  const queryClient = useQueryClient();
+
+  // 跟踪哪个会话正在进行项目关联编辑
+  const [editingConvId, setEditingConvId] = useState<string | null>(null);
+
+  // 获取所有项目列表用于转存选择
+  const { data: projectsData } = useQuery({
+    queryKey: ["all-projects"],
+    queryFn: async () => {
+      const res = await fetch("/api/projects");
+      if (!res.ok) throw new Error("获取项目列表失败");
+      const json = await res.json();
+      return json.data?.projects || json.projects || [];
+    },
+  });
+
+  // 删除对话
+  const handleDeleteConversation = async (convId: string) => {
+    if (!confirm("确定要删除此历史对话吗？删除后该对话数据将不可恢复。")) return;
+    try {
+      const res = await fetch(`/api/conversations/${convId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("删除对话失败");
+      toast.success("历史对话已成功删除");
+      queryClient.invalidateQueries({ queryKey: ["recent-records"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-conversations"] });
+    } catch (err) {
+      console.error(err);
+      toast.error("删除对话失败，请重试");
+    }
+  };
+
+  // 转存会话关联至特定项目空间
+  const handleTransferConversation = async (convId: string, projectId: string) => {
+    try {
+      const res = await fetch(`/api/conversations/${convId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      });
+      if (!res.ok) throw new Error("转存失败");
+      toast.success("对话已成功转存至选定的项目空间");
+      queryClient.invalidateQueries({ queryKey: ["recent-records"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-conversations"] });
+      window.dispatchEvent(new CustomEvent("conversation-saved"));
+      setEditingConvId(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("转存失败，请重试");
+    }
+  };
 
   // TanStack Query：聚合最近记录，staleTime 30s
   const {
@@ -334,54 +389,124 @@ export function RecentPageClient() {
                       </div>
 
                       {/* 右侧：riskLevel / automationLevel 徽章 + 时间 + 操作 */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        {/* riskLevel 徽章 */}
-                        {record.meta?.riskLevel ? (
-                          <span
-                            className={cn(
-                              "shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium border",
-                              record.meta.riskLevel === "high"
-                                ? "bg-danger/10 text-danger border-danger/30"
-                                : record.meta.riskLevel === "medium"
-                                  ? "bg-warning/10 text-warning border-warning/30"
-                                  : "bg-success/10 text-success border-success/30",
-                            )}
-                          >
-                            {(record.meta.riskLevel as string).slice(0, 1).toUpperCase()}
-                          </span>
-                        ) : null}
-                        {/* automationLevel 徽章 */}
-                        {record.meta?.automationLevel ? (
-                          <span
-                            className={cn(
-                              "shrink-0 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium",
-                              "bg-muted text-muted-foreground",
-                            )}
-                            title={`自动化等级: ${record.meta.automationLevel}`}
-                          >
-                            {(record.meta.automationLevel as string)}
-                          </span>
-                        ) : null}
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      <div className="flex items-center gap-4 shrink-0 justify-end min-w-[200px]">
+                        {/* 风险与自动化等级徽章容器：固定宽度以确保对齐 */}
+                        <div className="flex items-center gap-1.5 justify-end w-20 shrink-0">
+                          {/* riskLevel 徽章 */}
+                          {record.meta?.riskLevel ? (
+                            <span
+                              className={cn(
+                                "shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium border",
+                                record.meta.riskLevel === "high"
+                                  ? "bg-danger/10 text-danger border-danger/30"
+                                  : record.meta.riskLevel === "medium"
+                                    ? "bg-warning/10 text-warning border-warning/30"
+                                    : "bg-success/10 text-success border-success/30",
+                              )}
+                              title={`风险等级: ${record.meta.riskLevel}`}
+                            >
+                              {(record.meta.riskLevel as string).slice(0, 1).toUpperCase()}
+                            </span>
+                          ) : (
+                            // 占位符，防没有风险等级时徽章错位
+                            <div className="w-5 h-4" />
+                          )}
+
+                          {/* automationLevel 徽章 */}
+                          {record.meta?.automationLevel ? (
+                            <span
+                              className={cn(
+                                "shrink-0 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-muted text-muted-foreground",
+                              )}
+                              title={`自动化等级: ${record.meta.automationLevel}`}
+                            >
+                              {(record.meta.automationLevel as string)}
+                            </span>
+                          ) : (
+                            // 占位符
+                            <div className="w-6 h-4" />
+                          )}
+                        </div>
+
+                        {/* 时间展示：固定宽度，右对齐 */}
+                        <span className="text-xs text-muted-foreground w-16 text-right shrink-0 whitespace-nowrap">
                           {formatTime(record.timestamp, record.timeGroup)}
                         </span>
 
-                        {isUpgrade ? (
-                          <span
-                            className={cn(
-                              "flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium",
-                              "bg-warning/10 text-warning",
-                              "opacity-0 group-hover:opacity-100 transition-opacity",
-                            )}
-                          >
-                            <span>立即审批</span>
-                            <ArrowRight className="size-3" />
-                          </span>
-                        ) : (
-                          <span className="text-xs text-hint opacity-0 group-hover:opacity-100 transition-opacity">
-                            查看 →
-                          </span>
-                        )}
+                        {/* 操作栏：固定宽度，右对齐 */}
+                        <div className="w-24 flex justify-end shrink-0">
+                          {record.type === "conversation" ? (
+                            <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                              {/* 转存项目选择 */}
+                              {editingConvId === record.targetId ? (
+                                <select
+                                  autoFocus
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                  }}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    if (e.target.value) {
+                                      handleTransferConversation(record.targetId, e.target.value);
+                                    }
+                                  }}
+                                  onBlur={() => setEditingConvId(null)}
+                                  className="text-xs bg-background border border-border rounded px-1.5 py-0.5 text-foreground focus:outline-none"
+                                >
+                                  <option value="">选择项目...</option>
+                                  {projectsData?.map((p: any) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.title || p.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    setEditingConvId(record.targetId);
+                                  }}
+                                  className="px-2 py-1 rounded-lg bg-card border border-border hover:bg-accent text-[10px] font-medium flex items-center gap-1 transition-colors cursor-pointer select-none"
+                                  title="转存至指定项目空间"
+                                >
+                                  <FolderKanban className="size-3 text-muted-foreground" />
+                                  {record.projectId ? "重新关联" : "转存项目"}
+                                </button>
+                              )}
+
+                              {/* 删除会话 */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  handleDeleteConversation(record.targetId);
+                                }}
+                                className="p-1.5 rounded-lg text-hint hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer select-none"
+                                title="删除此历史对话"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
+                          ) : isUpgrade ? (
+                            <span
+                              className={cn(
+                                "flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-warning/10 text-warning opacity-0 group-hover:opacity-100 transition-opacity",
+                              )}
+                            >
+                              <span>立即审批</span>
+                              <ArrowRight className="size-3" />
+                            </span>
+                          ) : (
+                            <span className="text-xs text-hint opacity-0 group-hover:opacity-100 transition-opacity">
+                              查看 →
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </motion.div>
                   );

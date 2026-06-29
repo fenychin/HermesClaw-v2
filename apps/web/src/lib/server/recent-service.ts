@@ -38,9 +38,12 @@ function buildResourceLink(
   targetId: string,
   action: string,
   workflowRunId: string | null | undefined,
+  projectId?: string | null,
 ): string {
   const linkMap: Record<string, string> = {
-    conversation: `/workspace/chat?load=${targetId}`,
+    conversation: projectId
+      ? `/projects/${projectId}?load=${targetId}`
+      : `/workspace/chat?load=${targetId}`,
     task: `/workspace/tasks`,
     project: `/projects/${targetId}`,
     proposal: `/workspace/settings?tab=harness`,
@@ -116,24 +119,32 @@ const TYPE_ACTION_MAP: Record<string, string[]> = {
 // ============================================================
 
 /** 将 AuditLog 记录映射为 RecentRecordItem */
-function mapAuditLogToRecentRecord(log: {
-  id: string
-  action: string
-  actor: string
-  targetType: string
-  targetId: string
-  detail: string | null
-  riskLevel: string | null
-  status: string
-  workflowRunId: string | null
-  createdAt: Date
-}): RecentRecordItem {
+function mapAuditLogToRecentRecord(
+  log: {
+    id: string
+    action: string
+    actor: string
+    targetType: string
+    targetId: string
+    detail: string | null
+    riskLevel: string | null
+    status: string
+    workflowRunId: string | null
+    createdAt: Date
+  },
+  convProjectMap: Map<string, string | null>,
+): RecentRecordItem {
   const uiType = inferUiTypeFromAction(log.action)
+  const associatedProjectId = log.targetType === "conversation"
+    ? convProjectMap.get(log.targetId) || null
+    : null
+
   const href = buildResourceLink(
     log.targetType,
     log.targetId,
     log.action,
     log.workflowRunId,
+    associatedProjectId,
   )
   const title = extractTitle(log.detail, log.action)
 
@@ -149,6 +160,7 @@ function mapAuditLogToRecentRecord(log: {
     targetType: log.targetType,
     targetId: log.targetId,
     status: log.status,
+    projectId: associatedProjectId,
     meta: {
       actor: log.actor,
       riskLevel: log.riskLevel,
@@ -200,7 +212,34 @@ export async function getRecentRecords(
       },
     })
 
-    const records = logs.map(mapAuditLogToRecentRecord)
+    // 对相同资源类型与资源的最近审计事件在内存中去重，保证同一条目（如同一个对话）不重复出现在最近列表中
+    const seen = new Set<string>()
+    const uniqueLogs = []
+    for (const log of logs) {
+      const key = `${log.targetType}-${log.targetId}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        uniqueLogs.push(log)
+      }
+    }
+
+    // 批量提取会话的 projectId，用以生成跳转到项目的具体 href
+    const conversationIds = uniqueLogs
+      .filter((l) => l.targetType === "conversation")
+      .map((l) => l.targetId)
+
+    const conversations = conversationIds.length > 0
+      ? await prisma.conversation.findMany({
+          where: { id: { in: conversationIds } },
+          select: { id: true, projectId: true },
+        })
+      : []
+
+    const convProjectMap = new Map<string, string | null>(
+      conversations.map((c) => [c.id, c.projectId]),
+    )
+
+    const records = uniqueLogs.map((log) => mapAuditLogToRecentRecord(log, convProjectMap))
     return { records }
   } catch (error) {
     logger.error(

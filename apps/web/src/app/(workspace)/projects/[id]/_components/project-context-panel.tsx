@@ -129,7 +129,7 @@ export function ProjectContextPanel({ className }: ProjectContextPanelProps) {
         <div className="flex items-center justify-between">
           <h4 className="text-foreground text-xs font-medium flex items-center gap-1.5">
             <Sparkles className="size-3.5 text-primary" />
-            系统指令
+            项目指令
           </h4>
           <button
             onClick={focusInstructions}
@@ -146,7 +146,7 @@ export function ProjectContextPanel({ className }: ProjectContextPanelProps) {
             ref={textareaRef}
             value={localInstructions}
             onChange={(e) => setLocalInstructions(e.target.value)}
-            placeholder="告诉 HermesClaw 在此空间中如何工作..."
+            placeholder="输入此项目的最高规则提示词 prompt，仅服务于当前项目..."
             rows={4}
             className="w-full text-[11px] leading-relaxed bg-card border border-border/80 rounded-lg p-2.5 text-foreground outline-none resize-none placeholder:text-hint focus:border-primary transition-all"
           />

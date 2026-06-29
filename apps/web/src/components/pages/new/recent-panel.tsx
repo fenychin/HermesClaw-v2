@@ -100,7 +100,11 @@ export function RecentPanel() {
                     ease: "easeOut",
                   }}
                   onClick={() => {
-                    router.push(`/new?load=${record.id}`);
+                    if (record.projectId) {
+                      router.push(`/projects/${record.projectId}?load=${record.id}`);
+                    } else {
+                      router.push(`/new?load=${record.id}`);
+                    }
                   }}
                   className={cn(
                     "w-full flex items-center gap-2 px-2 py-1.5 rounded-lg",
