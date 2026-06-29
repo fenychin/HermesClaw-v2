@@ -24,6 +24,50 @@ const AUTOMATION_LABEL: Record<string, string> = {
   L4: "L4·人工",
 };
 
+const BRAND_LOGOS: Record<string, string> = {
+  'Gmail': '/logos/gmail.svg',
+  'Outlook': '/logos/outlook.svg',
+  'Slack': '/logos/slack.svg',
+  'Discord': '/logos/discord.svg',
+  'HubSpot': '/logos/hubspot.svg',
+  'SAP Business One': '/logos/sap.svg',
+  'Notion': '/logos/notion.svg',
+  'Google Drive': '/logos/googledrive.svg',
+  'Stripe': '/logos/stripe.svg',
+  'GitHub': '/logos/github.svg',
+  // 外贸专属
+  '外贸邮件群发器': '/logos/sendgrid.svg',
+  'WhatsApp Bulk Sender': '/logos/whatsapp.svg',
+  '海关数据分析器': '/logos/trade.svg',
+  'Alibaba RFQ 同步器': '/logos/alibaba.svg',
+  '外贸客户管理(CRM)连接器': '/logos/salesforce.svg',
+  '外贸工厂 ERP 同步器': '/logos/odoo.svg',
+  '外贸报价计算引擎': '/logos/xe.svg',
+  '外贸物流运费跟踪器': '/logos/flexport.svg',
+  '外贸多语种合同解析器': '/logos/docusign.svg',
+  '外贸海关关税计算器': '/logos/wto.svg',
+};
+
+export function ConnectorIcon({ name, emoji, className }: { name: string; emoji: string; className?: string }) {
+  const logoUrl = BRAND_LOGOS[name];
+  if (logoUrl) {
+    return (
+      <div className={cn("size-10 rounded-xl bg-white flex items-center justify-center border border-border/80 shadow-sm shrink-0 p-1.5", className)}>
+        <img
+          src={logoUrl}
+          alt={name}
+          className="size-7 object-contain rounded"
+        />
+      </div>
+    );
+  }
+  return (
+    <span className={cn("text-3xl leading-none shrink-0", className)} role="img" aria-label={name}>
+      {emoji}
+    </span>
+  );
+}
+
 interface ConnectorCardProps {
   connector: Connector;
   onConnect?: () => void;
@@ -56,13 +100,7 @@ export function ConnectorCard({
       {/* 顶部：iconEmoji + 名称 + category badge */}
       <div>
         <div className="flex items-start gap-3">
-          <span
-            className="text-3xl leading-none"
-            role="img"
-            aria-label={connector.name}
-          >
-            {connector.iconEmoji}
-          </span>
+          <ConnectorIcon name={connector.name} emoji={connector.iconEmoji} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-foreground truncate text-sm font-semibold">

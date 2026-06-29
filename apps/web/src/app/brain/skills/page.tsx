@@ -179,7 +179,6 @@ export default function SkillsPage() {
         <PageHeader
           title="技能库"
           description="行业 / 岗位 / 自定义技能，版本化、可测试、可绑定至智能体"
-          breadcrumb={[{ label: "智慧大脑", href: "/brain/memory" }, { label: "技能 Skill" }]}
         />
         <div className="flex items-center gap-4">
           {/* 搜索 */}

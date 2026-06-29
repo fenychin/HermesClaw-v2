@@ -1034,10 +1034,6 @@ export default function IndustryPacksPage() {
         <PageHeader
           title="行业包"
           description="安装、激活与回滚 Industry Pack。每个行业包包含数字员工、技能组件、工作流模板与系统连接器，安装后自动注册到能力注册表。"
-          breadcrumb={[
-            { label: "智慧大脑", href: "/knowledge" },
-            { label: "行业包" },
-          ]}
           actions={
             <button
               type="button"

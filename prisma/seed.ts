@@ -13,7 +13,7 @@ import {
   mockProjects,
   mockMemories,
 } from '../apps/web/src/lib/server/__mocks__/mock-data'
-import { mockProposals as sharedProposals } from '../apps/web/src/app/(workspace)/settings/harness/_data/mock-proposals'
+const sharedProposals: any[] = []
 import { createSeedPrisma } from './seed-utils'
 import { foreignTradeSkillTemplates, toSkillDbRecord } from './seed-skills'
 
@@ -55,6 +55,17 @@ const prisma = createSeedPrisma()
 
 async function main() {
   console.log('🌱 开始填充种子数据...\n')
+
+  console.log('→ 清理旧版冲突数据...')
+  await prisma.actionReceipt.deleteMany().catch(() => {})
+  await prisma.connectorLease.deleteMany().catch(() => {})
+  await prisma.connector.deleteMany().catch(() => {})
+  await prisma.agent.deleteMany().catch(() => {})
+  await prisma.skill.deleteMany().catch(() => {})
+  await prisma.project.deleteMany().catch(() => {})
+  await prisma.memory.deleteMany().catch(() => {})
+  await prisma.harnessProposal.deleteMany().catch(() => {})
+  await prisma.industryPackInstallation.deleteMany().catch(() => {})
 
   // ---- 默认工作空间 ----
   console.log('→ 创建默认工作空间...')
@@ -152,6 +163,9 @@ async function main() {
         description: c.description,
         status: c.status,
         category: c.category,
+        source: c.source || 'custom',
+        packId: c.packId || null,
+        requiredAutomationLevel: c.requiredAutomationLevel || 'L1',
         lastSync: c.lastSync ?? null,
         permissions: JSON.stringify(c.permissions),
         usedByAgents: JSON.stringify(c.usedByAgents),
@@ -255,6 +269,56 @@ async function main() {
     })
   }
 
+  // ---- 写入默认的外贸行业包已安装记录 ----
+  console.log('→ 写入外贸行业包初始已安装记录...')
+  await prisma.industryPackInstallation.create({
+    data: {
+      id: 'inst-foreign-trade-default',
+      installationId: 'ins-default-ft-2026',
+      workspaceId: 'default',
+      packId: 'foreign-trade',
+      packName: '外贸行业包',
+      packVersion: '1.1.0',
+      status: 'installed',
+      installedCapabilities: JSON.stringify([
+        "skill-ft-inquiry-grading",
+        "skill-ft-outreach-email",
+        "skill-ft-cost-accounting",
+        "skill-ft-document-parsing",
+        "skill-ft-quote-generator",
+        "skill-ft-customer-profiling",
+        "skill-ft-follow-up-crm",
+        "skill-ft-competitor-analysis",
+        "skill-ft-inquiry-priority"
+      ]),
+      manifest: {
+        packId: 'foreign-trade',
+        packName: '外贸行业包',
+        packVersion: '1.1.0',
+        description: '外贸行业数字化协同操作系统行业包，提供外贸专属智能体模板及询盘跟进工作流。',
+        author: 'HermesClaw Team',
+        targetIndustry: 'foreign-trade',
+        agents: [
+          { id: 'agent-001', name: 'Leon', role: '开发信写手' },
+          { id: 'agent-002', name: 'Clara', role: '询盘分拣员' },
+          { id: 'agent-003', name: 'Marcus', role: '客户跟进员' },
+          { id: 'agent-004', name: 'Quincy', role: '报价代理' }
+        ],
+        capabilities: [
+          { id: 'skill-ft-inquiry-grading', type: 'skill', displayName: '询盘智能分级' },
+          { id: 'skill-ft-outreach-email', type: 'skill', displayName: '自动开发信生成' },
+          { id: 'skill-ft-cost-accounting', type: 'skill', displayName: '产品参数提取与成本核算' },
+          { id: 'skill-ft-document-parsing', type: 'skill', displayName: '单证解析与合规检查' },
+          { id: 'skill-ft-quote-generator', type: 'skill', displayName: '外贸报价生成与优化' },
+          { id: 'skill-ft-customer-profiling', type: 'skill', displayName: '客户画像提取与开发信多语言生成' },
+          { id: 'skill-ft-follow-up-crm', type: 'skill', displayName: '客户跟进管理与 CRM 同步' },
+          { id: 'skill-ft-competitor-analysis', type: 'skill', displayName: '竞品分析与市场画像' },
+          { id: 'skill-ft-inquiry-priority', type: 'skill', displayName: '询盘优先级智能评估' }
+        ]
+      }
+    }
+  })
+
   console.log('\n✅ 种子数据填充完成！')
   console.log('   - 用户：admin@hermesclaw.ai（密码：hermesclaw2026）')
   console.log(`   - 智能体：${mockAgents.length} 条`)
@@ -263,6 +327,7 @@ async function main() {
   console.log(`   - 项目：${mockProjects.length} 条`)
   console.log(`   - 记忆：${mockMemories.length} 条`)
   console.log(`   - Harness 提案：${seedProposals.length} 条`)
+  console.log('   - 行业包安装记录：1 条 (foreign-trade)')
 }
 
 main()

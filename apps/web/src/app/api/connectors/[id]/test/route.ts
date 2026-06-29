@@ -98,6 +98,15 @@ export const POST = withRBAC(async (req: Request, ctx: any) => {
     };
   }
 
+  // 映射为前端需要的 checks 数组，打通自检链条
+  const checks = [
+    { label: "凭证有效性", key: "credential", status: details.credentialValid ? "pass" : "fail", detail: details.credentialValid ? undefined : "凭证校验失败" },
+    { label: "网络可达性", key: "network", status: details.endpointReachable ? "pass" : "fail", detail: details.endpointReachable ? undefined : "网络连接超时或不可达" },
+    { label: "模板完整性", key: "template", status: details.templateValid ? "pass" : "fail" },
+    { label: "回执正确性", key: "receipt", status: details.receiptValid ? "pass" : "fail", detail: details.receiptValid ? undefined : "回执记录校验失败" },
+    { label: "权限校验", key: "permission", status: details.permissionCheck === "passed" ? "pass" : "fail", detail: details.permissionCheck === "passed" ? undefined : "权限不足或缺失" },
+  ];
+
   // 更新审计日志
   await updateAuditEntry({
     auditId: auditEntry.auditId,
@@ -110,6 +119,7 @@ export const POST = withRBAC(async (req: Request, ctx: any) => {
       latencyMs: Date.now() - start,
       error,
       ...details,
+      checks,
     },
   });
 
@@ -118,6 +128,7 @@ export const POST = withRBAC(async (req: Request, ctx: any) => {
     latencyMs: Date.now() - start,
     error,
     details,
+    checks,
     timestamp: new Date().toISOString(),
     connectorName: connector.name,
   });

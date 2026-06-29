@@ -9,11 +9,17 @@ import * as path from "path"
 
 type RouteParams = { params: Promise<{ id: string }> }
 
-function getSkillDirectory(skillName: string): string | null {
+function getSkillDirectory(skillId: string, skillName: string): string | null {
+  const commandName = skillId.startsWith("skill-") ? skillId.substring(6) : skillId
   const candidates = [
     path.join(process.cwd(), ".agents", "skills", skillName),
     path.join(process.cwd(), "..", ".agents", "skills", skillName),
-    path.join("C:\\Users\\frankfeny\\.gemini\\config\\plugins\\science\\skills", skillName)
+    path.join(process.cwd(), ".agents", "skills", commandName),
+    path.join(process.cwd(), "..", ".agents", "skills", commandName),
+    path.join(process.cwd(), ".claude", "skills", commandName),
+    path.join(process.cwd(), "..", ".claude", "skills", commandName),
+    path.join("C:\\Users\\frankfeny\\.gemini\\config\\plugins\\science\\skills", skillName),
+    path.join("C:\\Users\\frankfeny\\.gemini\\config\\plugins\\science\\skills", commandName)
   ]
   for (const candidate of candidates) {
     if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
@@ -43,7 +49,7 @@ export const GET = withRBAC<RouteParams>(async (request: Request, ctx: Workspace
     return errorResponse("非法的路径参数", 400)
   }
 
-  const skillDir = getSkillDirectory(skill.name)
+  const skillDir = getSkillDirectory(skill.id, skill.name)
   if (skillDir) {
     const fullPath = path.resolve(skillDir, normPath)
     if (fullPath.startsWith(skillDir) && fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {

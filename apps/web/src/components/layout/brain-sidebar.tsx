@@ -11,7 +11,7 @@ const brainNavItems = [
   { href: "/brain/kpi", label: "KPI指标", icon: LineChart },
   { href: "/brain/skills", label: "技能库", icon: Puzzle },
   { href: "/brain/connectors", label: "连接器", icon: Plug },
-  { href: "/settings/industry-packs", label: "行业包", icon: PackageOpen },
+  { href: "/industry-packs", label: "行业包", icon: PackageOpen },
 ];
 
 export function BrainSidebar() {

@@ -135,6 +135,7 @@ function PackCard({
   operating: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showTechDetails, setShowTechDetails] = useState(false);
   const isInstalled = installation?.status === "installed";
   const isTransitioning =
     installation?.status === "installing" ||
@@ -329,30 +330,6 @@ function PackCard({
             </div>
           </div>
 
-          {/* 技能组件 */}
-          <div className="bg-card/50 border border-border/40 rounded-xl p-3 flex flex-col gap-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1px_2px_rgba(255,255,255,0.01)]">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground/80 border-b border-border/30 pb-1.5">
-              <Zap className="size-3.5 text-amber-500" />
-              <span>技能组件</span>
-              <span className="ml-auto text-[10px] bg-amber-500/10 text-amber-500 px-1.5 py-0.2 rounded-full font-mono font-semibold">
-                {installation.manifest.capabilities?.filter((c: any) => c.type === 'skill').length || 0}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-1.5 max-h-[150px] overflow-y-auto pr-1 align-content-start">
-              {installation.manifest.capabilities?.filter((c: any) => c.type === 'skill').length > 0 ? (
-                installation.manifest.capabilities
-                  .filter((c: any) => c.type === 'skill')
-                  .map((cap: any) => (
-                    <span key={cap.id} title={cap.description} className="inline-flex items-center rounded-lg bg-amber-500/5 border border-amber-500/10 text-[10px] text-amber-600 font-medium px-2 py-1 select-none">
-                      {cap.displayName || cap.id}
-                    </span>
-                  ))
-              ) : (
-                <span className="text-[10px] text-hint py-2 w-full text-center">暂无技能</span>
-              )}
-            </div>
-          </div>
-
           {/* 工作流模板 */}
           <div className="bg-card/50 border border-border/40 rounded-xl p-3 flex flex-col gap-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1px_2px_rgba(255,255,255,0.01)]">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground/80 border-b border-border/30 pb-1.5">
@@ -377,29 +354,70 @@ function PackCard({
             </div>
           </div>
 
-          {/* 系统连接器 */}
-          <div className="bg-card/50 border border-border/40 rounded-xl p-3 flex flex-col gap-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1px_2px_rgba(255,255,255,0.01)]">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground/80 border-b border-border/30 pb-1.5">
-              <Package className="size-3.5 text-blue-500" />
-              <span>系统连接器</span>
-              <span className="ml-auto text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.2 rounded-full font-mono font-semibold">
-                {installation.manifest.capabilities?.filter((c: any) => c.type === 'connector').length || 0}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-1.5 max-h-[150px] overflow-y-auto pr-1 align-content-start">
-              {installation.manifest.capabilities?.filter((c: any) => c.type === 'connector').length > 0 ? (
-                installation.manifest.capabilities
-                  .filter((c: any) => c.type === 'connector')
-                  .map((cap: any) => (
-                    <span key={cap.id} title={cap.description} className="inline-flex items-center rounded-lg bg-blue-500/5 border border-blue-500/10 text-[10px] text-blue-600 font-medium px-2 py-1 select-none">
-                      {cap.displayName || cap.id}
-                    </span>
-                  ))
-              ) : (
-                <span className="text-[10px] text-hint py-2 w-full text-center">暂无连接器</span>
-              )}
-            </div>
+          {/* 二级折叠：底层技术组件控制按钮 */}
+          <div className="md:col-span-2 border-t border-border/20 pt-3 flex justify-center mt-1">
+            <button
+              type="button"
+              onClick={() => setShowTechDetails(!showTechDetails)}
+              className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-brand transition-colors focus:outline-none bg-accent/30 hover:bg-accent/50 rounded-full px-4 py-1.5 border border-border/40 font-medium"
+            >
+              <span>{showTechDetails ? "隐藏底层能力组件 (Skills & Connectors)" : "展开底层能力组件 (Skills & Connectors)"}</span>
+              <ChevronDown className={cn("size-3.5 transition-transform duration-200", showTechDetails && "rotate-180")} />
+            </button>
           </div>
+
+          {/* 底层面板：技能组件 + 系统连接器 */}
+          {showTechDetails && (
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 w-full pt-1 animate-in fade-in slide-in-from-top-1 duration-200">
+              {/* 技能组件 */}
+              <div className="bg-card/50 border border-border/40 rounded-xl p-3 flex flex-col gap-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1px_2px_rgba(255,255,255,0.01)]">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground/80 border-b border-border/30 pb-1.5">
+                  <Zap className="size-3.5 text-amber-500" />
+                  <span>技能组件</span>
+                  <span className="ml-auto text-[10px] bg-amber-500/10 text-amber-500 px-1.5 py-0.2 rounded-full font-mono font-semibold">
+                    {installation.manifest.capabilities?.filter((c: any) => c.type === 'skill').length || 0}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-[150px] overflow-y-auto pr-1 align-content-start">
+                  {installation.manifest.capabilities?.filter((c: any) => c.type === 'skill').length > 0 ? (
+                    installation.manifest.capabilities
+                      .filter((c: any) => c.type === 'skill')
+                      .map((cap: any) => (
+                        <span key={cap.id} title={cap.description} className="inline-flex items-center rounded-lg bg-amber-500/5 border border-amber-500/10 text-[10px] text-amber-600 font-medium px-2 py-1 select-none">
+                          {cap.displayName || cap.id}
+                        </span>
+                      ))
+                  ) : (
+                    <span className="text-[10px] text-hint py-2 w-full text-center">暂无技能</span>
+                  )}
+                </div>
+              </div>
+
+              {/* 系统连接器 */}
+              <div className="bg-card/50 border border-border/40 rounded-xl p-3 flex flex-col gap-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1px_2px_rgba(255,255,255,0.01)]">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground/80 border-b border-border/30 pb-1.5">
+                  <Package className="size-3.5 text-blue-500" />
+                  <span>系统连接器</span>
+                  <span className="ml-auto text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.2 rounded-full font-mono font-semibold">
+                    {installation.manifest.capabilities?.filter((c: any) => c.type === 'connector').length || 0}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-[150px] overflow-y-auto pr-1 align-content-start">
+                  {installation.manifest.capabilities?.filter((c: any) => c.type === 'connector').length > 0 ? (
+                    installation.manifest.capabilities
+                      .filter((c: any) => c.type === 'connector')
+                      .map((cap: any) => (
+                        <span key={cap.id} title={cap.description} className="inline-flex items-center rounded-lg bg-blue-500/5 border border-blue-500/10 text-[10px] text-blue-600 font-medium px-2 py-1 select-none">
+                          {cap.displayName || cap.id}
+                        </span>
+                      ))
+                  ) : (
+                    <span className="text-[10px] text-hint py-2 w-full text-center">暂无连接器</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

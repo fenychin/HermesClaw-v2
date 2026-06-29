@@ -47,6 +47,8 @@ export interface ForeignTradeSkillTemplate {
   toolRequirements: string[]
   /** SKILL.md 所在目录名（即命令名，如 ft-inquiry-sorter） */
   commandName: string
+  /** SKILL.md 完整原始文本 */
+  skillMdContent?: string
 }
 
 /** Prisma Skill 表写入记录 */
@@ -61,6 +63,7 @@ export interface SkillDbRecord {
   outputSchema: string
   usedByAgents: string
   scenarios: string
+  skillMdContent?: string
 }
 
 // ============================================================
@@ -92,6 +95,7 @@ export function toSkillDbRecord(tmpl: ForeignTradeSkillTemplate): SkillDbRecord 
     }),
     usedByAgents: stringifyJsonField([]),
     scenarios: stringifyJsonField(tmpl.toolRequirements),
+    skillMdContent: tmpl.skillMdContent,
   }
 }
 
@@ -228,6 +232,7 @@ export function loadForeignTradeSkills(skillsDir?: string): ForeignTradeSkillTem
         constraints,
         toolRequirements,
         commandName: entry.name,
+        skillMdContent: raw,
       })
     }
 

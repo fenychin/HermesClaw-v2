@@ -381,7 +381,6 @@ export function MemoryView({ initialTab }: MemoryViewProps) {
           <PageHeader
             title="记忆体"
             description="短/中/长期三级记忆体系：实时会话 → 项目沉淀 → 企业知识"
-            breadcrumb={[{ label: "智慧大脑", href: "/brain/memory" }, { label: "记忆体" }]}
           />
           <div className="grid grid-cols-2 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -400,7 +399,6 @@ export function MemoryView({ initialTab }: MemoryViewProps) {
           <PageHeader
             title="记忆体"
             description="短/中/长期三级记忆体系：实时会话 → 项目沉淀 → 企业知识"
-            breadcrumb={[{ label: "智慧大脑", href: "/brain/memory" }, { label: "记忆体" }]}
           />
           <div className="flex flex-col items-center justify-center py-20">
             <div className="bg-danger/10 mb-4 flex size-14 items-center justify-center rounded-2xl">
@@ -428,7 +426,6 @@ export function MemoryView({ initialTab }: MemoryViewProps) {
         <PageHeader
           title="记忆体"
           description="短/中/长期三级记忆体系：实时会话 → 项目沉淀 → 企业知识"
-          breadcrumb={[{ label: "智慧大脑", href: "/brain/memory" }, { label: "记忆体" }]}
         />
 
         {/* 统一搜索过滤工具栏 */}

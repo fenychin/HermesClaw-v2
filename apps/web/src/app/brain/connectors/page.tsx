@@ -24,8 +24,7 @@ import {
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { PageTransition } from "@/components/common/PageTransition";
-import { ConnectorCard } from "@/components/common/connector-card";
-import { StatusBadge } from "@/components/common/status-badge";
+import { ConnectorCard, ConnectorIcon } from "@/components/common/connector-card";
 import { useAgentStore } from "@/stores/agent-store";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient, ConfirmationRequiredError } from "@/lib/api-client";
@@ -277,9 +276,7 @@ function ConnectorDrawer({
         {/* Header */}
         <div className="border-border flex items-start justify-between border-b p-5 shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-3xl" role="img">
-              {connector.iconEmoji || "🔌"}
-            </span>
+            <ConnectorIcon name={connector.name} emoji={connector.iconEmoji || "🔌"} />
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-foreground text-base font-semibold">
@@ -1559,10 +1556,6 @@ export default function ConnectorsPage() {
         <PageHeader
           title="连接器"
           description="邮件、IM、CRM、ERP、文档与 API 的统一接入授权管理"
-          breadcrumb={[
-            { label: "智慧大脑", href: "/brain/memory" },
-            { label: "连接器 MCP" },
-          ]}
         />
 
         {/* 顶部工具栏 */}
