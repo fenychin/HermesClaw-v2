@@ -52,6 +52,7 @@ model Workspace {
   reports              Report[]
   settings             WorkspaceSettings?
   skillBindings        SkillBinding[]
+  fileRecords          FileRecord[]
 }
 
 // ============================================================
@@ -242,6 +243,52 @@ model Project {
   @@index([type])
   @@index([workspaceId, createdAt])
   @@index([workspaceId, status])
+}
+
+// ============================================================
+// 文件资料库（PRD §10.7 企业内容供给链）
+// —— 记录上传文件的元数据、解析状态、向量索引状态与版本历史
+// ============================================================
+model FileRecord {
+  id                String    @id @default(cuid())
+  workspaceId       String
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  /// 原始文件名
+  name              String
+  /// 文件扩展名（不含点），如 pdf / xlsx / mp4
+  type              String
+  /// MIME 类型
+  mimeType          String
+  /// 业务分类：customer | product | quotation | contract | image | video | audio | archive
+  category          String    @default("archive")
+  /// 文件大小（字节）
+  size              Int
+  /// 访问路径，如 /uploads/{workspaceId}/filename
+  url               String
+  /// 解析状态：unparsed | parsing | parsed | failed
+  parseStatus       String    @default("unparsed")
+  /// 向量索引状态：unindexed | indexed
+  vectorIndexStatus String    @default("unindexed")
+  /// AI 解析摘要（解析完成后写入）
+  parseSummary      String?
+  /// 标签列表（JSON 数组字符串）
+  tags              String    @default("[]")
+  /// 关联项目 ID（可选）
+  relatedProjectId  String?
+  /// 版本历史（JSON 数组字符串，含 {id, fileName, size, operator, createdAt, note}）
+  versions          String    @default("[]")
+  /// 操作者（用户邮箱/名）
+  operatedBy        String    @default("")
+  /// 逻辑删除标记（遵循 AGENTS.md §3.5 禁止物理删除审计轨迹约定）
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([workspaceId])
+  @@index([workspaceId, category])
+  @@index([workspaceId, parseStatus])
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([deletedAt])
 }
 
 // ============================================================

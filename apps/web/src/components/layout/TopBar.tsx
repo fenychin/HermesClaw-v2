@@ -14,7 +14,7 @@ import {
   CheckCircle2,
   XCircle,
 } from "lucide-react";
-import { mainNav, bottomNav, brainNav } from "@/config/navigation";
+import { mainNav, bottomNav, brainNav, knowledgeNav } from "@/config/navigation";
 import { useUiStore, type Notification } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 
@@ -103,7 +103,18 @@ const ALL_NAV = [...mainNav, ...bottomNav];
 function useBreadcrumb() {
   const pathname = usePathname();
 
-  // 优先匹配更具体的智慧大脑二级页面（如智能体、记忆体等）
+  // 1. 优先匹配具体的“资料库”二级页面，避免被 “/knowledge” 记忆体模糊匹配截胡
+  const knowledgeItem = knowledgeNav.find(
+    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+  );
+  if (knowledgeItem) {
+    return [
+      { label: "资料库", href: "/files" },
+      { label: knowledgeItem.label, href: knowledgeItem.href },
+    ];
+  }
+
+  // 2. 匹配具体的智慧大脑二级页面（如智能体、记忆体等）
   const brainItem = brainNav.find(
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
   );

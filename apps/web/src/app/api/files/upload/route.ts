@@ -11,9 +11,12 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
   const start = Date.now(); const elapsed = () => `${((Date.now() - start) / 1000).toFixed(1)}s`
   try {
     if (!rateLimit(request.headers.get("x-forwarded-for") || "unknown", 20, 60_000)) return Response.json({ success: false, error: "请求过于频繁" }, { status: 429 })
-    const file = (await request.formData()).get("file")
+    const form = await request.formData()
+    const file = form.get("file")
     if (!file || !(file instanceof File)) return errorResponse("缺少上传文件", 400)
-    return successResponse({ file: await uploadFile(file, ctx.workspaceId, elapsed) }, 201)
+    const autoParse = form.get("autoParse") !== "false"
+    const projectId = form.get("projectId") as string | null
+    return successResponse({ file: await uploadFile(file, ctx.workspaceId, elapsed, { autoParse, projectId: projectId || undefined }) }, 201)
   } catch (e) {
     if (e instanceof FileUploadError) return errorResponse(e.message, e.httpStatus)
     logger.error('POST /api/files/upload: 失败')
