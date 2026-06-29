@@ -14,6 +14,11 @@ vi.mock("@/lib/prisma", () => ({
   },
 }))
 
+vi.mock("@/lib/server/check-automation-gate", () => ({
+  isCriticalActionType: vi.fn().mockReturnValue(false),
+  getCriticalActionTypes: vi.fn().mockReturnValue([]),
+}))
+
 vi.mock("@/lib/logger", () => ({
   logger: {
     info: vi.fn(),

@@ -52,10 +52,9 @@ vi.mock("@/lib/server/agent-log", () => ({
 }))
 
 // 核心 mock：在测试中，我们将特定 action 模拟为 critical 高危动作，以此触发拦截路径测试
-vi.mock("@/lib/server/check-automation-gate", async (importOriginal) => {
-  const actual = await importOriginal<any>()
+vi.mock("@/lib/server/check-automation-gate", () => {
   return {
-    ...actual,
+    getCriticalActionTypes: () => ["trade.send-quotation", "trade.sign-contract", "skill.send-quote"],
     isCriticalActionType: (actionType: string, _criticalTypes?: readonly string[]) => {
       return (
         actionType === "trade.send-quotation" ||

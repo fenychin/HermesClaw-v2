@@ -39,12 +39,17 @@ describe("E2E Integration Link 3: Execution Failure, Retry, and Exhaustion Path"
     await cleanWorkspace(workspaceId)
   })
 
+  const originalSetTimeout = global.setTimeout;
+
   beforeEach(() => {
-    vi.useFakeTimers()
+    vi.spyOn(global, 'setTimeout').mockImplementation((cb: any, ms?: number, ...args: any[]) => {
+      const delay = ms === 3000 ? 1 : ms;
+      return originalSetTimeout(cb, delay, ...args);
+    });
   })
 
   afterEach(() => {
-    vi.useRealTimers()
+    vi.restoreAllMocks();
   })
 
   it("场景 A：重试耗尽判定失败", async () => {
@@ -96,11 +101,7 @@ describe("E2E Integration Link 3: Execution Failure, Retry, and Exhaustion Path"
     // 挂接 catch 以规避 Vitest 中计时器异步抛出时的 unhandled rejection
     runPromise.catch(() => {})
 
-    // 因为有 3 次重试，每次重试等待 3000ms
-    // 我们分步推进计时器以顺利穿透 executeStep 的重试 sleep
-    for (let i = 0; i < 4; i++) {
-      await vi.advanceTimersByTimeAsync(3000)
-    }
+    // 不需要手动推进计时器了，因为 3000ms 已被自动拦截并缩减为 1ms
 
     // 等待 WorkflowRun 运行结束并捕获它应该抛出的错误
     await expect(runPromise).rejects.toThrow("CONNECTOR_TIMEOUT")
@@ -182,8 +183,7 @@ describe("E2E Integration Link 3: Execution Failure, Retry, and Exhaustion Path"
       callCapability: mockCallCapabilityRetrySuccess
     })
 
-    // 推进 1 次以跨越重试延迟
-    await vi.advanceTimersByTimeAsync(3000)
+    // 不需要推进计时器，3000ms 已缩短至 1ms
 
     const finalRun = await runPromise
     expect(finalRun.status).toBe("completed")

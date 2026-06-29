@@ -131,8 +131,7 @@ describe("Memory CRUD and Lifecycle Tests", () => {
         take: 20,
         include: {
           revisions: {
-            orderBy: { createdAt: "desc" },
-            take: 1,
+            orderBy: { version: "desc" },
           },
         },
       });

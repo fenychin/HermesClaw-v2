@@ -223,6 +223,10 @@ describe("智慧大脑 (Brain) 模块健康度测试", () => {
             },
           ]),
         },
+        actionReceipt: {
+          groupBy: vi.fn().mockResolvedValue([]),
+          findMany: vi.fn().mockResolvedValue([]),
+        },
       } as unknown as typeof prisma;
 
       const connectors = await getEnrichedConnectors("default", { prisma: mockPrisma });
@@ -253,6 +257,10 @@ describe("智慧大脑 (Brain) 模块健康度测试", () => {
               updatedAt: new Date(),
             },
           ]),
+        },
+        actionReceipt: {
+          groupBy: vi.fn().mockResolvedValue([]),
+          findMany: vi.fn().mockResolvedValue([]),
         },
       } as unknown as typeof prisma;
 

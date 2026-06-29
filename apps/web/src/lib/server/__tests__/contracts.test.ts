@@ -31,7 +31,7 @@ describe('Contracts Layer Tests', () => {
     expect(envelope.taskId).toBeDefined();
     expect(envelope.idempotencyKey).toBeDefined();
     expect(envelope.createdAt).toBeInstanceOf(Date);
-    expect(envelope.version).toBe('1.0');
+    expect(envelope.version).toBe('1.0.0');
     expect(envelope.workflowRunId).toBe('wf-123');
   });
 
