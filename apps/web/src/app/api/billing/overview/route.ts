@@ -2,33 +2,72 @@
  * Billing Overview API — 账户账单总览
  * Phase 2: 真实 Prisma 查询（替换旧 mock）
  */
-import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { getUserPoints } from "@/lib/server/credit-service";
+import { NextRequest } from "next/server";
+import { buildWorkspaceContext } from "@/lib/workspace";
+import { writeAuditLog } from "@/lib/server/audit";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "请先登录" }, { status: 401 });
 
   try {
-    // ★ v3.0 性能优化（CLAUDE.md §11.3 L2）：4 次顺序 await → 并行 Promise.all
-    //   四个查询互不依赖，并行执行消除不必要的顺序等待
-    const [subscription, paymentMethod, totalPoints, invoices] = await Promise.all([
+    const ctx = await buildWorkspaceContext(req);
+
+    // 记录访问账单总览审计日志
+    await writeAuditLog({
+      actor: session.user.email || session.user.id,
+      action: "billing.overview.view",
+      targetType: "workspace",
+      targetId: ctx.workspaceId,
+      detail: `访问工作空间 ${ctx.workspaceId} 的账单与积分总览`,
+      workspaceId: ctx.workspaceId,
+      riskLevel: "low",
+    });
+
+    // ★ v3.0 性能优化：并行执行所有隔离的数据库查询与统计聚合
+    const [
+      subscription,
+      paymentMethod,
+      invoices,
+      totalCreditsSum,
+      usedCreditsSum,
+      subCreditsSum,
+      dailyCreditsSum
+    ] = await Promise.all([
       prisma.subscription.findFirst({
-        where: { userId: session.user.id },
+        where: { userId: session.user.id, workspaceId: ctx.workspaceId },
         orderBy: { createdAt: "desc" },
       }),
       prisma.paymentMethod.findFirst({
         where: { userId: session.user.id, isDefault: true },
       }),
-      getUserPoints(session.user.id),
       prisma.invoice.findMany({
-        where: { userId: session.user.id },
+        where: { userId: session.user.id, workspaceId: ctx.workspaceId },
         orderBy: { invoiceDate: "desc" },
         take: 6,
       }),
+      prisma.creditLedger.aggregate({
+        where: { userId: session.user.id, workspaceId: ctx.workspaceId },
+        _sum: { amount: true },
+      }),
+      prisma.creditLedger.aggregate({
+        where: { userId: session.user.id, workspaceId: ctx.workspaceId, amount: { lt: 0 } },
+        _sum: { amount: true },
+      }),
+      prisma.creditLedger.aggregate({
+        where: { userId: session.user.id, workspaceId: ctx.workspaceId, type: "subscription", amount: { gt: 0 } },
+        _sum: { amount: true },
+      }),
+      prisma.creditLedger.aggregate({
+        where: { userId: session.user.id, workspaceId: ctx.workspaceId, type: "daily_reward", amount: { gt: 0 } },
+        _sum: { amount: true },
+      }),
     ]);
+
+    const totalPoints = totalCreditsSum._sum.amount || 0;
+    const usedPoints = Math.abs(usedCreditsSum._sum.amount || 0);
+    const subPoints = subCreditsSum._sum.amount || 0;
+    const dailyPoints = dailyCreditsSum._sum.amount || 0;
 
     return NextResponse.json({
       plan: {
@@ -42,9 +81,9 @@ export async function GET() {
       },
       credits: {
         total: totalPoints,
-        used: 0, // TODO: 接入真实用量统计
-        subscription: 0,
-        dailyReward: 0,
+        used: usedPoints,
+        subscription: subPoints,
+        dailyReward: dailyPoints,
         resetDate: subscription?.currentPeriodEnd?.toISOString().split("T")[0] || null,
       },
       invoices: invoices.map((inv) => ({

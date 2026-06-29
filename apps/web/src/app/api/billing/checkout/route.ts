@@ -30,29 +30,26 @@ export async function POST(req: NextRequest) {
       riskLevel: "medium",
     });
 
-    try {
-      // 模拟成功生成 Stripe checkout session URL
-      const stripeCheckoutUrl = `https://checkout.stripe.com/c/pay/mock_session_hermesclaw_${planId}_${interval}`;
+    // ======================================================================
+    // P0 安全拦截：Stripe Checkout Session 集成前返回「待接入」状态
+    // —— 原代码返回硬编码假 Stripe URL，用户点击后会导航至无效页面
+    // —— Phase 2b 完成后替换为：
+    //    const session = await stripe.checkout.sessions.create({ ... })
+    //    return NextResponse.json({ stripeCheckoutUrl: session.url })
+    // ======================================================================
 
-      // 2. 更新审计状态为成功
-      await updateAuditEntry({
-        auditId: auditEntry.auditId,
-        status: "success",
-        detail: `成功生成套餐升级支付链接: ${planId} (${interval})` + (idempotencyKey ? ` (IdempKey: ${idempotencyKey})` : ""),
-      });
+    // 更新审计状态为拦截
+    await updateAuditEntry({
+      auditId: auditEntry.auditId,
+      status: "success",
+      detail: `套餐升级请求被安全拦截（Stripe 集成中）: ${planId} (${interval})` +
+        (idempotencyKey ? ` (IdempKey: ${idempotencyKey})` : ""),
+    });
 
-      return NextResponse.json({
-        stripeCheckoutUrl
-      });
-    } catch (err: any) {
-      // 更新审计状态为失败
-      await updateAuditEntry({
-        auditId: auditEntry.auditId,
-        status: "failed",
-        detail: `套餐升级支付链接生成失败: ${err.message || "未知错误"}`
-      });
-      throw err;
-    }
+    return NextResponse.json(
+      { error: "支付系统正在集成中，套餐升级功能即将上线，敬请期待" },
+      { status: 501 },
+    );
   } catch (err) {
     return NextResponse.json({ error: "请求格式错误" }, { status: 400 });
   }

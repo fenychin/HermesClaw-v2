@@ -178,24 +178,23 @@ export default function BillingSettingsPage() {
     fetchData();
   }, []);
 
-  // 2. 跳转 Stripe 门户
   const handleManagePayment = async () => {
     setRedirectingPortal(true);
     try {
       const res = await fetch("/api/billing/portal");
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
         if (data.url) {
           toast.success("正在安全前往支付方式管理中心...");
           window.location.href = data.url;
         } else {
-          throw new Error();
+          throw new Error("无法拉取支付管理入口");
         }
       } else {
-        throw new Error();
+        throw new Error(data.error || "拉取支付管理入口失败");
       }
-    } catch {
-      toast.error("无法拉取支付管理入口，请联系客服");
+    } catch (err: any) {
+      toast.error(err.message || "无法拉取支付管理入口，请联系客服");
       setRedirectingPortal(false);
     }
   };
@@ -227,6 +226,7 @@ export default function BillingSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credits: purchaseAmount, idempotencyKey })
       });
+      const data = await res.json();
       if (res.ok) {
         toast.success(`成功充值了 ${purchaseAmount} 积分！`);
         // 本地更新积分量提供 WOW 级别的即时交互
@@ -240,10 +240,10 @@ export default function BillingSettingsPage() {
           });
         }
       } else {
-        throw new Error();
+        throw new Error(data.error || "充值交易失败");
       }
-    } catch {
-      toast.error("充值交易失败，请核实支付账户");
+    } catch (err: any) {
+      toast.error(err.message || "充值交易失败，请核实支付账户");
     } finally {
       setPurchasing(false);
     }

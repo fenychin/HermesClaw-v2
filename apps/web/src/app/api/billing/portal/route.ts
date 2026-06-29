@@ -23,10 +23,17 @@ export async function GET(req: NextRequest) {
       riskLevel: "low",
     });
 
-    // 模拟 Stripe 客户门户的重定向 URL
-    return NextResponse.json({
-      url: "https://billing.stripe.com/p/session/mock_hermesclaw_stripe_customer_portal"
-    });
+    // ======================================================================
+    // P0 安全拦截：Stripe Portal 集成前返回「待接入」状态
+    // —— 原代码返回硬编码假 Stripe Portal URL
+    // —— Phase 2b 完成后替换为：
+    //    const session = await stripe.billingPortal.sessions.create({ ... })
+    //    return NextResponse.json({ url: session.url })
+    // ======================================================================
+    return NextResponse.json(
+      { error: "支付系统正在集成中，账单管理功能即将上线，敬请期待" },
+      { status: 501 }
+    );
   } catch (err) {
     console.error("Failed to access billing portal:", err);
     return NextResponse.json({ error: "拉取支付管理入口失败，请稍后重试" }, { status: 500 });

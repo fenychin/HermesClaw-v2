@@ -70,7 +70,6 @@ export default function PlansPage() {
     }
     fetchSub();
   }, []);
-
   // 2. 升级订阅套餐逻辑
   const handleUpgrade = async (planId: string) => {
     if (subscription?.planId === planId) return; // 当前套餐
@@ -82,20 +81,19 @@ export default function PlansPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ planId, interval: billingCycle, idempotencyKey })
       });
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
         if (data.stripeCheckoutUrl) {
           toast.success("正在前往 Stripe 支付安全页面...");
-          // 前端重定向
           window.location.href = data.stripeCheckoutUrl;
         } else {
-          throw new Error();
+          throw new Error("未找到 Stripe 支付地址");
         }
       } else {
-        throw new Error();
+        throw new Error(data.error || "套餐升级失败");
       }
-    } catch {
-      toast.error("无法拉取 Stripe 升级入口，请稍后重试");
+    } catch (err: any) {
+      toast.error(err.message || "无法拉取 Stripe 升级入口，请稍后重试");
     } finally {
       setLoadingPlanId(null);
     }
@@ -129,19 +127,19 @@ export default function PlansPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credits: purchaseAmount, idempotencyKey })
       });
+      const data = await res.json();
       if (res.ok) {
         toast.success(`充值成功！已向账户购买并注入了 ${purchaseAmount} 积分！`);
       } else {
-        throw new Error();
+        throw new Error(data.error || "积分充值交易失败");
       }
-    } catch {
-      toast.error("购买充值交易失败，请核实支付状态");
+    } catch (err: any) {
+      toast.error(err.message || "购买充值交易失败，请核实支付状态");
     } finally {
       setPurchasing(false);
     }
   };
 
-  // 购买 4000 积分大礼包逻辑
   const handlePurchaseBulk = async () => {
     setPurchasingBulk(true);
     try {
@@ -151,18 +149,18 @@ export default function PlansPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credits: 4000, idempotencyKey })
       });
+      const data = await res.json();
       if (res.ok) {
         toast.success("充值成功！已向您的账户注入了 4000 积分大礼包！");
       } else {
-        throw new Error();
+        throw new Error(data.error || "充值交易失败");
       }
-    } catch {
-      toast.error("充值交易失败，请重试");
+    } catch (err: any) {
+      toast.error(err.message || "充值交易失败，请重试");
     } finally {
       setPurchasingBulk(false);
     }
   };
-
   if (loading || !subscription) {
     return (
       <div className="min-h-screen bg-[#050505] text-[#F5F5F5] font-sans px-8 py-12 flex flex-col items-center justify-start select-none animate-pulse space-y-12">

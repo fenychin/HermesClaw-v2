@@ -5,15 +5,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { buildWorkspaceContext } from "@/lib/workspace";
+import { writeAuditLog } from "@/lib/server/audit";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "请先登录" }, { status: 401 });
 
   try {
+    const ctx = await buildWorkspaceContext(req);
     const { searchParams } = new URL(req.url);
     const range = searchParams.get("range") || "current_cycle";
     const days = range === "current_cycle" ? 30 : parseInt(range) || 30;
+
+    // 记录访问使用量历史审计日志
+    await writeAuditLog({
+      actor: session.user.email || session.user.id,
+      action: "billing.usage.view",
+      targetType: "workspace",
+      targetId: ctx.workspaceId,
+      detail: `查询工作空间 ${ctx.workspaceId} 最近 ${days} 天的积分用量`,
+      workspaceId: ctx.workspaceId,
+      riskLevel: "low",
+    });
 
     // 查询最近 N 天的积分消费（负数 = 使用）
     const startDate = new Date();
@@ -23,6 +37,7 @@ export async function GET(req: NextRequest) {
     const usages = await prisma.creditLedger.findMany({
       where: {
         userId: session.user.id,
+        workspaceId: ctx.workspaceId,
         amount: { lt: 0 }, // 只查消费记录
         createdAt: { gte: startDate },
       },

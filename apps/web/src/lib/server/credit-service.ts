@@ -195,11 +195,11 @@ export async function creditSubscriptionPoints(
   planId: string
 ): Promise<void> {
   const planPoints: Record<string, number> = {
-    free: 5,
-    pro: 50,
-    pro_plus: 100,
-    max: 300,
-    ultra: 1000,
+    free: 30,
+    pro: 200,
+    pro_plus: 600,
+    max: 2000,
+    ultra: 20000,
   };
 
   const points = planPoints[planId] || 0;

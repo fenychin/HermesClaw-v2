@@ -29,80 +29,34 @@ export async function POST(req: NextRequest) {
 
     const ctx = await buildWorkspaceContext(req);
 
-    // 1. 二阶段审计：创建预记录审计日志
-    const auditEntry = await createAuditEntry({
+    // ======================================================================
+    // P0 安全拦截：Stripe PaymentIntent 集成前禁止直接写入积分
+    // —— 当前版本未接入真实支付网关，若直接写入 CreditLedger 会导致
+    //    用户可无限免费刷积分（资金级漏洞）
+    // —— Phase 2b Stripe 集成后：
+    //    1. 创建 PaymentIntent / CheckoutSession
+    //    2. 等待 Stripe webhook 确认支付成功
+    //    3. 在 webhook handler 中写入 CreditLedger
+    // ======================================================================
+
+    // 记录拦截审计日志
+    await createAuditEntry({
       actor: session.user.email || session.user.id,
-      action: "credits.purchased",
+      action: "credits.purchase.blocked",
       targetType: "credit_ledger",
       targetId: session.user.id,
-      detail: `发起购买 ${credits} 积分`,
+      detail: `积分购买请求被安全拦截（支付系统集成中）: ${credits} 积分` +
+        (idempotencyKey ? ` (IdempKey: ${idempotencyKey})` : ""),
       workspaceId: ctx.workspaceId,
       riskLevel: "medium",
     });
 
-    // 2. 幂等性校验：如果带了 idempotencyKey，查重 referenceId
-    if (idempotencyKey) {
-      const existingPurchase = await prisma.creditLedger.findFirst({
-        where: {
-          userId: session.user.id,
-          workspaceId: ctx.workspaceId,
-          referenceId: idempotencyKey,
-          type: "purchase",
-        },
-      });
-
-      if (existingPurchase) {
-        // 更新审计日志状态为 success
-        await updateAuditEntry({
-          auditId: auditEntry.auditId,
-          status: "success",
-          detail: `购买 ${credits} 积分（幂等命中直接返回）`,
-        });
-
-        return NextResponse.json({
-          success: true,
-          purchasedCredits: credits,
-          message: `成功购买 ${credits} 积分（幂等）`,
-        });
-      }
-    }
-
-    // 3. 真实写入积分流水与更新审计状态
-    try {
-      await prisma.creditLedger.create({
-        data: {
-          userId: session.user.id,
-          workspaceId: ctx.workspaceId,
-          amount: credits,
-          type: "purchase",
-          description: `购买 ${credits} 积分`,
-          referenceId: idempotencyKey || null,
-        },
-      });
-
-      // 更新审计日志为成功
-      await updateAuditEntry({
-        auditId: auditEntry.auditId,
-        status: "success",
-        detail: `成功购买 ${credits} 积分`,
-      });
-
-      return NextResponse.json({
-        success: true,
-        purchasedCredits: credits,
-        message: `成功购买 ${credits} 积分`,
-      });
-    } catch (dbErr: any) {
-      // 更新审计日志为失败
-      await updateAuditEntry({
-        auditId: auditEntry.auditId,
-        status: "failed",
-        detail: `购买积分失败: ${dbErr.message || "未知数据库写入异常"}`,
-      });
-      throw dbErr;
-    }
+    return NextResponse.json(
+      { error: "支付系统正在集成中，积分购买功能即将上线，敬请期待" },
+      { status: 501 },
+    );
   } catch (error) {
-    console.error("Failed to purchase credits:", error);
-    return NextResponse.json({ error: "购买失败，请稍后重试" }, { status: 500 });
+    console.error("Failed to process credits purchase request:", error);
+    return NextResponse.json({ error: "请求处理失败" }, { status: 500 });
   }
 }
