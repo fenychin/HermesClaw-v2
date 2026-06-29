@@ -29,16 +29,27 @@ export default async function ApprovalsPage() {
     role: session?.user?.role || "VIEWER",
   };
 
+  let workspaceId = "default";
+  if (session?.user?.id) {
+    const member = await prisma.workspaceMember.findFirst({
+      where: { userId: session.user.id },
+      select: { workspaceId: true },
+    });
+    if (member) {
+      workspaceId = member.workspaceId;
+    }
+  }
+
   // 1. 服务端先进行过期清洗（对齐 API /api/approvals 行为）
   try {
-    await expireStaleCheckpoints("default");
+    await expireStaleCheckpoints(workspaceId);
   } catch (err) {
     console.error("[ApprovalsPage] expireStaleCheckpoints failed:", err);
   }
 
   // 2. 直取数据库 checkpoints
   const records = await prisma.approvalCheckpoint.findMany({
-    where: { workspaceId: "default" },
+    where: { workspaceId },
     orderBy: { createdAt: "desc" },
     take: 50,
   });
@@ -73,7 +84,7 @@ export default async function ApprovalsPage() {
 
   // 3. 直取 proposals 列表
   const proposalRecords = await prisma.harnessProposal.findMany({
-    where: { workspaceId: "default" },
+    where: { workspaceId },
     orderBy: { createdAt: "desc" },
   });
 

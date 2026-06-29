@@ -3,12 +3,26 @@ import { ArrowLeft, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import ApprovalsDetailClient from "./approvals-detail-client";
 import { DEFAULT_CANARY_THRESHOLDS } from "@hermesclaw/hermes-kernel";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export default async function ApprovalDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const session = await auth();
+  
+  let workspaceId = "default";
+  if (session?.user?.id) {
+    const member = await prisma.workspaceMember.findFirst({
+      where: { userId: session.user.id },
+      select: { workspaceId: true },
+    });
+    if (member) {
+      workspaceId = member.workspaceId;
+    }
+  }
   
   // 服务端直取提案
-  const proposal = await findProposalByIdOrAlias(id, "default");
+  const proposal = await findProposalByIdOrAlias(id, workspaceId);
 
   if (!proposal) {
     return (

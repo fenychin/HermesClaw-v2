@@ -10,6 +10,6 @@ export const GET = withRBAC(async (req: Request, ctx: WorkspaceContext, _routeCt
     const status = new URL(req.url).searchParams.get('status')
     const where = status ? ({ workspaceId: ctx.workspaceId, status } as any) : { workspaceId: ctx.workspaceId }
     const proposals = await prisma.harnessProposal.findMany({ where, orderBy: { createdAt: 'desc' } })
-    return ApiResponse.ok(proposals.map(serializeP))
+    return ApiResponse.ok({ proposals: proposals.map(serializeP) })
   } catch (error) { return ApiResponse.error(error instanceof Error ? error.message : '未知错误', 500) }
 }, 'VIEWER')

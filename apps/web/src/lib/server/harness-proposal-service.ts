@@ -19,6 +19,7 @@ import { createAuditEntry, updateAuditEntry } from "@/lib/server/audit"
 import { writeAgentLog } from "@/lib/server/agent-log"
 import { checkAutomationGate } from "@/lib/server/guardrail"
 import { HarnessProposalSchema, AuditAction } from "@hermesclaw/event-contracts"
+import { rollbackHarnessProposal } from "@hermesclaw/hermes-kernel"
 
 export function serializeProposal(p: any) {
   return HarnessProposalSchema.parse({
@@ -39,8 +40,31 @@ export async function findProposalByIdOrAlias(id: string, workspaceId: string) {
   return prisma.harnessProposal.findFirst({ where })
 }
 
+
+
 export async function decideProposal(opts: { existing: any; action: "approve" | "reject"; reviewedBy: string; confirm: boolean; workspaceId: string }) {
   const propChange = opts.existing.proposedChange as any
+
+  if (opts.action === "reject" && opts.existing.status === "canary") {
+    // 如果在灰度观察期（canary）被拒绝，必须执行回滚逻辑还原快照
+    const rollbackResult = await rollbackHarnessProposal(
+      {
+        proposalId: opts.existing.id,
+        workspaceId: opts.workspaceId,
+        actor: opts.reviewedBy,
+        reason: "Canary 阶段人工手动终止并拒绝提案",
+      },
+      { prisma }
+    );
+    if (!rollbackResult.ok) {
+      return { ok: false as const, response: Response.json({ success: false, error: rollbackResult.message }, { status: 400 }) };
+    }
+    const updatedProposal = await prisma.harnessProposal.findUnique({
+      where: { id: opts.existing.id }
+    });
+    return { ok: true as const, proposal: updatedProposal };
+  }
+
   if (opts.action === "approve") {
     const gate = await checkAutomationGate({ automationLevel: propChange?.automationLevel, riskLevel: propChange?.riskLevel, confirmed: opts.confirm, actionName: "批准" })
     if (!gate.ok) return { ok: false as const, response: gate.response }
