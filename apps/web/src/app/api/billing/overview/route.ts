@@ -2,9 +2,11 @@
  * Billing Overview API — 账户账单总览
  * Phase 2: 真实 Prisma 查询（替换旧 mock）
  */
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { buildWorkspaceContext } from "@/lib/workspace";
 import { writeAuditLog } from "@/lib/server/audit";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   const session = await auth();

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { AgentCard } from "./_components/agent-card";
 import { NewAgentDialog } from "./_components/new-agent-dialog";
 import { cn } from "@/lib/utils";
-import { useWorkspaceMode } from "../layout";
+import { useWorkspaceMode } from "../workspace-provider";
 
 export interface AgentData {
   id: string;

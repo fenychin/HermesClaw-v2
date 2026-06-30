@@ -21,6 +21,7 @@ import {
   ScrollText,
   ShieldAlert,
   Palette,
+  PackageOpen,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,7 @@ const SYSTEM_ITEMS = [
   { label: "团队与权限", href: "/settings/team", icon: Users },
   { label: "模型路由", href: "/settings/system?section=model-routing", icon: Cpu },
   { label: "连接器授权", href: "/settings/system?section=connectors", icon: Plug },
+  { label: "行业包管理", href: "/industry-packs", icon: PackageOpen },
   { label: "Harness 审批", href: "/settings/harness", icon: GitBranch },
   { label: "自动化等级", href: "/settings/automation", icon: ShieldCheck },
   { label: "审计日志", href: "/settings/system?section=audit", icon: ScrollText },

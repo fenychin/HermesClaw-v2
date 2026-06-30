@@ -826,7 +826,7 @@ export default function IndustryPacksPage() {
 
       if (availRes.ok) {
         const data = await availRes.json();
-        setAvailable(data?.available || []);
+        setAvailable(data?.data?.available || data?.available || []);
       }
     } catch (err) {
       console.error("[IndustryPacks] fetchAll error:", err);
@@ -1097,8 +1097,8 @@ export default function IndustryPacksPage() {
         ) : available.length === 0 && installations.length === 0 ? (
           <EmptyState
             icon={Package}
-            title="暂无行业包"
-            description="当前工作空间尚未安装任何行业包。请联系系统管理员部署行业包资产，或检查服务端 industry-packs/ 目录是否配置正确。"
+            title="尚未启用任何数字员工岗位包"
+            description="当前工作空间尚未激活行业包。您可以点击右上角“刷新”重新扫描本地资产，或联系您的系统管理员部署行业包资源。"
           />
         ) : (
           <div className="space-y-4">

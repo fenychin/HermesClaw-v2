@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useWorkspaceMode } from "../layout";
+import { useWorkspaceMode } from "../workspace-provider";
 import NewTopicPageClient from "./page-client";
 
 export default function NewTopicPage() {

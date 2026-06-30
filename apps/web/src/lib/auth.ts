@@ -35,7 +35,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID || "google-oauth-not-configured",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "google-oauth-not-configured",
-      allowDangerousEmailAccountLinking: false, // 禁止自动关联：用户必须显式登录后才关联 OAuth 账户
+      allowDangerousEmailAccountLinking: true, // 允许自动关联：相同邮箱的 Google 登录将与现有凭证账户合并
     }),
     Credentials({
       name: "credentials",
