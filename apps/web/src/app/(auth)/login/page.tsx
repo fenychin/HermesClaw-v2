@@ -34,6 +34,21 @@ export default function LoginPage() {
 
   useEffect(() => {
     setMounted(true);
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const errorParam = params.get("error");
+      if (errorParam) {
+        if (errorParam === "OAuthAccountNotLinked") {
+          setSubmitError("该邮箱已通过密码注册。为了安全关联您的 Google 账号，请先输入密码登录您的账户。");
+        } else {
+          setSubmitError("同步登录会话失败，请重试");
+        }
+        // 清除 URL 中的 error 标志，防止干扰后续的 credentials 登录请求
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, "", newUrl);
+      }
+    }
   }, []);
 
   const {
