@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HermesClaw — 面向中小企业的 AI 数字员工操作系统</title>
+  <style>
+    /* ============================================================
+       RESET & BASE
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:        #0A0A0F;
+      --amber:     #F5A623;
+      --amber-dim: #e8961a;
+      --cyan:      #00B4D8;
+      --purple:    #A78BFA;
+      --red:       #EF4444;
+      --green:     #10B981;
+      --text:      #FFFFFF;
+      --text-muted:#FFFFFF99;
+      --text-dim:  #FFFFFF40;
+      --border:    #FFFFFF18;
+      --card-bg:   #FFFFFF0D;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+                   'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { cursor: pointer; font-family: inherit; border: none; background: none; }
+    input { font-family: inherit; }
+    section { padding: 96px 24px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .section-header { text-align: center; margin-bottom: 56px; }
+    .section-header h2 { font-size: clamp(2rem, 4vw, 3rem); font-weight: 800; margin-bottom: 12px; }
+    .section-header p { font-size: 1.1rem; color: var(--text-muted); }
+
+    /* ============================================================
+       SCROLLBAR
+    ============================================================ */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: #FFFFFF20; border-radius: 3px; }
+
+    /* ============================================================
+       NAV
+    ============================================================ */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      border-bottom: 1px solid var(--border);
+      background: #0A0A0Fcc;
+      backdrop-filter: blur(16px);
+    }
+    .nav-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 24px;
+    }
+    .nav-logo { font-size: 1.2rem; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .nav-logo span { color: var(--amber); font-size: 1.4rem; }
+    .nav-links { display: flex; align-items: center; gap: 32px; }
+    .nav-links a { font-size: 0.875rem; color: var(--text-muted); transition: color .2s; }
+    .nav-links a:hover { color: var(--text); }
+    .btn-nav {
+      background: var(--amber); color: #000; font-weight: 700;
+      padding: 8px 20px; border-radius: 10px; font-size: 0.875rem;
+      transition: background .2s, transform .15s;
+    }
+    .btn-nav:hover { background: var(--amber-dim); transform: scale(1.04); }
+    .nav-mobile-toggle { display: none; font-size: 1.5rem; color: var(--text); background: none; border: none; }
+    .nav-mobile { display: none; padding: 12px 24px 16px; border-top: 1px solid var(--border); }
+    .nav-mobile a { display: block; padding: 10px 0; font-size: 0.9rem; color: var(--text-muted); }
+    .nav-mobile .btn-nav { display: block; text-align: center; margin-top: 12px; padding: 12px; }
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .nav-mobile-toggle { display: block; }
+      .nav-mobile.open { display: block; }
+    }
+
+    /* ============================================================
+       HERO
+    ============================================================ */
+    #hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding-top: 96px; padding-bottom: 48px;
+      position: relative; overflow: hidden;
+      text-align: center;
+    }
+    .hero-grid {
+      position: absolute; inset: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(245,166,35,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(245,166,35,.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+    .hero-glow {
+      position: absolute; top: 40%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(245,166,35,.10) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-content { position: relative; z-index: 2; max-width: 900px; padding: 0 16px; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid rgba(245,166,35,.35);
+      background: rgba(245,166,35,.10);
+      color: var(--amber); font-size: 0.75rem; font-weight: 600;
+      padding: 6px 16px; border-radius: 99px; margin-bottom: 24px;
+      letter-spacing: .04em;
+    }
+    .hero-badge-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--amber);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .hero-title {
+      font-size: clamp(2.4rem, 5.5vw, 4.5rem);
+      font-weight: 900; line-height: 1.15;
+      letter-spacing: -.02em; margin-bottom: 16px;
+    }
+    .hero-title .amber { color: var(--amber); }
+    .hero-tagline {
+      font-size: clamp(1rem, 2vw, 1.4rem);
+      color: var(--text-muted); margin-bottom: 40px;
+      min-height: 2rem;
+      transition: opacity .4s;
+    }
+    .hero-ctas {
+      display: flex; flex-wrap: wrap; gap: 16px;
+      justify-content: center; margin-bottom: 56px;
+    }
+    .btn-primary {
+      background: var(--amber); color: #000; font-weight: 800;
+      padding: 16px 36px; border-radius: 14px; font-size: 1rem;
+      transition: background .2s, transform .15s;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-primary:hover { background: var(--amber-dim); transform: scale(1.04); }
+    .btn-secondary {
+      border: 1px solid rgba(255,255,255,.2); color: rgba(255,255,255,.8);
+      padding: 16px 36px; border-radius: 14px; font-size: 1rem;
+      transition: border-color .2s, color .2s;
+    }
+    .btn-secondary:hover { border-color: rgba(255,255,255,.4); color: #fff; }
+
+    /* Flow animation */
+    .hero-flow {
+      display: flex; flex-wrap: wrap; align-items: center;
+      justify-content: center; gap: 6px; margin-bottom: 48px;
+    }
+    .flow-step {
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      border: 1px solid; border-radius: 10px;
+      padding: 8px 14px; font-size: .75rem;
+      transition: all .5s ease;
+    }
+    .flow-step .step-label { font-weight: 700; }
+    .flow-step .step-domain { font-size: .65rem; opacity: .7; }
+    .flow-arrow { color: rgba(255,255,255,.15); font-size: .9rem; transition: color .5s; }
+    .hero-trust {
+      display: flex; flex-wrap: wrap; justify-content: center;
+      gap: 8px 32px; font-size: .85rem; color: var(--text-dim);
+    }
+    .hero-trust span { white-space: nowrap; }
+
+    /* ============================================================
+       PROBLEM
+    ============================================================ */
+    #problems { background: #0D0D14; }
+    .problems-grid {
+      display: grid; gap: 20px;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+    .problem-card {
+      position: relative; overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      border-radius: 18px; padding: 28px;
+      transition: border-color .3s;
+      min-height: 160px;
+    }
+    .problem-card:hover { border-color: rgba(255,255,255,.2); }
+    .problem-front { transition: opacity .3s; }
+    .problem-front .icon { font-size: 2rem; margin-bottom: 12px; }
+    .problem-front h3 { font-size: 1rem; font-weight: 700; color: #f87171; margin-bottom: 8px; }
+    .problem-front p { font-size: .875rem; color: var(--text-muted); }
+    .problem-back {
+      position: absolute; inset: 0; padding: 28px;
+      border-radius: 18px; opacity: 0;
+      display: flex; flex-direction: column; justify-content: center;
+      transition: opacity .3s;
+    }
+    .problem-card:hover .problem-front { opacity: 0; }
+    .problem-card:hover .problem-back { opacity: 1; }
+    .problem-back .check { font-size: 1.5rem; margin-bottom: 10px; }
+    .problem-back h4 { font-size: .9rem; font-weight: 700; margin-bottom: 8px; }
+    .problem-back p { font-size: .85rem; color: rgba(255,255,255,.75); }
+
+    /* ============================================================
+       ARCHITECTURE
+    ============================================================ */
+    #architecture {}
+    .arch-grid {
+      display: grid; gap: 20px;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      margin-bottom: 40px;
+    }
+    .arch-card {
+      border: 1px solid; border-radius: 18px; padding: 28px;
+    }
+    .arch-card-tag {
+      font-size: .7rem; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; margin-bottom: 4px;
+    }
+    .arch-card h3 { font-size: 1.05rem; font-weight: 800; margin-bottom: 16px; }
+    .arch-card ul { list-style: none; }
+    .arch-card li {
+      display: flex; align-items: flex-start; gap: 8px;
+      font-size: .85rem; color: var(--text-muted); margin-bottom: 8px;
+    }
+    .arch-card li .bullet { margin-top: 2px; font-size: 1rem; }
+    .arch-loop {
+      border: 1px solid var(--border); background: var(--card-bg);
+      border-radius: 18px; padding: 36px 28px; text-align: center;
+    }
+    .arch-loop h3 { font-size: 1.1rem; font-weight: 800; margin-bottom: 24px; }
+    .loop-steps {
+      display: flex; flex-wrap: wrap; align-items: center;
+      justify-content: center; gap: 8px;
+    }
+    .loop-step {
+      border: 1px solid; border-radius: 10px;
+      padding: 8px 18px; font-size: .85rem; font-weight: 600;
+    }
+    .loop-arrow { color: rgba(255,255,255,.25); font-size: .9rem; }
+    .arch-loop-note {
+      margin-top: 20px; font-size: .8rem; color: var(--text-dim);
+    }
+
+    /* ============================================================
+       INDUSTRY PACK
+    ============================================================ */
+    #industry { background: #0D0D14; }
+    .pack-tabs {
+      display: flex; flex-wrap: wrap; justify-content: center;
+      gap: 12px; margin-bottom: 32px;
+    }
+    .pack-tab {
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 12px; padding: 10px 22px;
+      font-size: .875rem; font-weight: 600;
+      color: rgba(255,255,255,.5);
+      transition: all .25s;
+    }
+    .pack-tab.active, .pack-tab:hover { color: #fff; }
+    .pack-detail {
+      border: 1px solid; border-radius: 20px; padding: 36px;
+      display: grid; gap: 24px;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      transition: all .3s;
+    }
+    .pack-col-title {
+      display: flex; align-items: center; gap: 8px;
+      font-size: .75rem; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; margin-bottom: 12px;
+    }
+    .pack-item {
+      border: 1px solid var(--border); background: rgba(255,255,255,.05);
+      border-radius: 8px; padding: 8px 12px;
+      font-size: .85rem; color: var(--text-muted); margin-bottom: 8px;
+    }
+    .pack-note {
+      text-align: center; margin-top: 20px;
+      font-size: .8rem; color: var(--text-dim);
+    }
+
+    /* ============================================================
+       GOVERNANCE
+    ============================================================ */
+    #governance {}
+    .gov-grid {
+      display: grid; gap: 24px;
+      grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+    }
+    @media (max-width: 1040px) { .gov-grid { grid-template-columns: 1fr; } }
+    .gov-card {
+      border: 1px solid var(--border); background: var(--card-bg);
+      border-radius: 20px; padding: 32px;
+    }
+    .gov-card h3 { font-size: 1.1rem; font-weight: 800; margin-bottom: 24px; }
+    /* Level buttons */
+    .level-btns {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 8px; margin-bottom: 20px;
+    }
+    .level-btn {
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 12px; padding: 12px 0;
+      font-size: .875rem; font-weight: 800;
+      color: rgba(255,255,255,.35);
+      transition: all .25s;
+    }
+    .level-detail {
+      border: 1px solid; border-radius: 14px; padding: 20px;
+    }
+    .level-tag {
+      font-size: .7rem; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; margin-bottom: 4px;
+    }
+    .level-desc { font-size: .875rem; color: var(--text-muted); margin-bottom: 14px; }
+    .level-actions li {
+      display: flex; align-items: center; gap: 8px;
+      font-size: .85rem; color: rgba(255,255,255,.7);
+      margin-bottom: 8px; list-style: none;
+    }
+    .level-note { margin-top: 14px; font-size: .75rem; color: var(--text-dim); }
+    /* Audit log */
+    .audit-event {
+      display: flex; align-items: center; gap: 12px;
+      border: 1px solid rgba(255,255,255,.06); background: rgba(0,0,0,.25);
+      border-radius: 10px; padding: 12px 16px; margin-bottom: 10px;
+    }
+    .audit-time { font-size: .75rem; color: var(--text-dim); font-family: monospace; white-space: nowrap; }
+    .audit-label { flex: 1; font-size: .875rem; color: rgba(255,255,255,.8); }
+    .audit-domain {
+      font-size: .7rem; font-weight: 600; padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .audit-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .audit-dot.done { background: #10B981; }
+    .audit-dot.pending { background: #FBBF24; animation: pulse 1.2s infinite; }
+    .audit-note { margin-top: 12px; font-size: .75rem; color: var(--text-dim); }
+
+    /* ============================================================
+       CTA
+    ============================================================ */
+    #cta {
+      position: relative; overflow: hidden; text-align: center;
+      padding: 128px 24px;
+    }
+    .cta-glow {
+      position: absolute; inset: 0; display: flex;
+      align-items: center; justify-content: center; pointer-events: none;
+    }
+    .cta-glow-inner {
+      width: 900px; height: 600px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(245,166,35,.09) 0%, transparent 70%);
+    }
+    .cta-content { position: relative; z-index: 2; max-width: 700px; margin: 0 auto; }
+    .stats-bar {
+      display: flex; flex-wrap: wrap; justify-content: center;
+      gap: 12px 48px; margin-bottom: 48px;
+    }
+    .stat-val { font-size: 2.5rem; font-weight: 900; color: var(--amber); line-height: 1; }
+    .stat-label { font-size: .8rem; color: var(--text-dim); margin-top: 4px; }
+    .cta-title {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 900; line-height: 1.15; margin-bottom: 16px;
+    }
+    .cta-title .amber { color: var(--amber); }
+    .cta-sub { font-size: 1.1rem; color: var(--text-muted); margin-bottom: 40px; }
+    .cta-form {
+      display: flex; flex-wrap: wrap; gap: 12px;
+      justify-content: center; margin-bottom: 0;
+    }
+    .cta-input {
+      flex: 1; min-width: 260px; max-width: 380px;
+      background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18);
+      border-radius: 14px; padding: 16px 20px; font-size: 1rem; color: #fff;
+      outline: none; transition: border-color .25s;
+    }
+    .cta-input::placeholder { color: rgba(255,255,255,.3); }
+    .cta-input:focus { border-color: rgba(245,166,35,.5); }
+    .cta-btn {
+      background: var(--amber); color: #000; font-weight: 800;
+      padding: 16px 32px; border-radius: 14px; font-size: 1rem;
+      transition: background .2s, transform .15s, opacity .2s;
+      white-space: nowrap;
+    }
+    .cta-btn:hover:not(:disabled) { background: var(--amber-dim); transform: scale(1.04); }
+    .cta-btn:disabled { opacity: .55; cursor: not-allowed; }
+    .cta-success {
+      display: none; border: 1px solid rgba(16,185,129,.35);
+      background: rgba(16,185,129,.12); border-radius: 16px;
+      padding: 24px 32px; color: #6ee7b7; font-size: 1rem; font-weight: 600;
+    }
+    .cta-error { margin-top: 12px; font-size: .875rem; color: #f87171; display: none; }
+    .cta-note { margin-top: 20px; font-size: .8rem; color: var(--text-dim); }
+
+    /* ============================================================
+       FOOTER
+    ============================================================ */
+    footer {
+      border-top: 1px solid var(--border);
+      background: var(--bg); padding: 64px 24px 32px;
+    }
+    .footer-inner {
+      max-width: 1200px; margin: 0 auto;
+    }
+    .footer-grid {
+      display: grid; gap: 32px;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+    }
+    @media (max-width: 768px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
+    .footer-brand-name { font-size: 1.1rem; font-weight: 800; margin-bottom: 10px; }
+    .footer-brand-desc { font-size: .875rem; color: var(--text-dim); line-height: 1.6; }
+    .footer-col-title {
+      font-size: .7rem; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--text-dim); margin-bottom: 14px;
+    }
+    .footer-col a {
+      display: block; font-size: .875rem;
+      color: rgba(255,255,255,.55); margin-bottom: 10px;
+      transition: color .2s;
+    }
+    .footer-col a:hover { color: #fff; }
+    .footer-bottom {
+      margin-top: 48px; padding-top: 24px;
+      border-top: 1px solid var(--border);
+      text-align: center; font-size: .75rem; color: var(--text-dim);
+    }
+
+    /* ============================================================
+       FADE-IN ANIMATION
+    ============================================================ */
+    .fade-in { opacity: 0; transform: translateY(24px); transition: opacity .6s ease, transform .6s ease; }
+    .fade-in.visible { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================
+     NAV
+============================================================ -->
+<nav>
+  <div class="nav-inner">
+    <a href="/" class="nav-logo"><span>⚡</span> HermesClaw</a>
+    <div class="nav-links">
+      <a href="#architecture">架构</a>
+      <a href="#industry">行业插件</a>
+      <a href="#governance">治理</a>
+      <a href="/sign-in">登录</a>
+      <a href="#cta" class="btn-nav">申请内测</a>
+    </div>
+    <button class="nav-mobile-toggle" onclick="toggleMobileNav()" aria-label="菜单">☰</button>
+  </div>
+  <div class="nav-mobile" id="navMobile">
+    <a href="#architecture" onclick="closeMobileNav()">架构</a>
+    <a href="#industry" onclick="closeMobileNav()">行业插件</a>
+    <a href="#governance" onclick="closeMobileNav()">治理</a>
+    <a href="#cta" class="btn-nav" onclick="closeMobileNav()">申请内测</a>
+  </div>
+</nav>
+
+<!-- ============================================================
+     HERO
+============================================================ -->
+<section id="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="hero-badge-dot"></span>
+      V2.20.11-beta · 内测中
+    </div>
+
+    <h1 class="hero-title">
+      你的企业不缺 AI，<br/>
+      <span class="amber">缺的是能被治理的 AI 系统。</span>
+    </h1>
+
+    <p class="hero-tagline" id="heroTagline">可规划 · 可执行 · 可记忆</p>
+
+    <div class="hero-ctas">
+      <a href="#cta" class="btn-primary">申请企业内测 →</a>
+      <a href="#architecture" class="btn-secondary">查看三域架构</a>
+    </div>
+
+    <!-- Flow animation -->
+    <div class="hero-flow" id="heroFlow">
+      <div class="flow-step" data-color="#F5A623" data-domain="Hermes">
+        <span class="step-label">意图解析</span>
+        <span class="step-domain">Hermes</span>
+      </div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step" data-color="#F5A623" data-domain="Hermes">
+        <span class="step-label">Workflow 编排</span>
+        <span class="step-domain">Hermes</span>
+      </div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step" data-color="#00B4D8" data-domain="OpenClaw">
+        <span class="step-label">OpenClaw 执行</span>
+        <span class="step-domain">OpenClaw</span>
+      </div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step" data-color="#00B4D8" data-domain="OpenClaw">
+        <span class="step-label">ActionReceipt</span>
+        <span class="step-domain">OpenClaw</span>
+      </div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step" data-color="#A78BFA" data-domain="Governance">
+        <span class="step-label">AuditLog</span>
+        <span class="step-domain">Governance</span>
+      </div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step" data-color="#F5A623" data-domain="Hermes">
+        <span class="step-label">进化提案</span>
+        <span class="step-domain">Hermes</span>
+      </div>
+    </div>
+
+    <div class="hero-trust">
+      <span>三域架构</span>
+      <span>·</span>
+      <span>审计全覆盖</span>
+      <span>·</span>
+      <span>Canary 灰度回滚</span>
+      <span>·</span>
+      <span>Industry Pack 行业装配</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PROBLEM
+============================================================ -->
+<section id="problems">
+  <div class="container">
+    <div class="section-header fade-in">
+      <h2>中小企业用 AI 的 <span style="color:#f87171">5 个核心障碍</span></h2>
+      <p>问题不是模型不够强——而是缺少系统性支撑。</p>
+    </div>
+    <div class="problems-grid">
+
+      <div class="problem-card fade-in">
+        <div class="problem-front">
+          <div class="icon">🔄</div>
+          <h3>没有稳定执行闭环</h3>
+          <p>问答之后谁来执行？执行结果如何沉淀？</p>
+        </div>
+        <div class="problem-back" style="background:rgba(245,166,35,.08)">
+          <div class="check">✅</div>
+          <h4 style="color:#F5A623">HermesClaw 解法</h4>
+          <p>Hermes 编排 WorkflowRun，OpenClaw 回传 ActionReceipt，形成可验证闭环。</p>
+        </div>
+      </div>
+
+      <div class="problem-card fade-in">
+        <div class="problem-front">
+          <div class="icon">🧠</div>
+          <h3>没有组织级记忆</h3>
+          <p>知识散落在微信、文档、邮箱，无法沉淀。</p>
+        </div>
+        <div class="problem-back" style="background:rgba(245,166,35,.08)">
+          <div class="check">✅</div>
+          <h4 style="color:#F5A623">HermesClaw 解法</h4>
+          <p>三层记忆（会话 / 项目 / 组织），自动写入 AuditLog，永久可查。</p>
+        </div>
+      </div>
+
+      <div class="problem-card fade-in">
+        <div class="problem-front">
+          <div class="icon">🏭</div>
+          <h3>没有行业模板</h3>
+          <p>每家企业都要从零配置，成本高昂。</p>
+        </div>
+        <div class="problem-back" style="background:rgba(0,180,216,.08)">
+          <div class="check">✅</div>
+          <h4 style="color:#00B4D8">HermesClaw 解法</h4>
+          <p>Industry Pack 一键装载：外贸 / 医疗 / 教育 / 金融，开箱即用。</p>
+        </div>
+      </div>
+
+      <div class="problem-card fade-in">
+        <div class="problem-front">
+          <div class="icon">🛡️</div>
+          <h3>没有可治理的执行面</h3>
+          <p>AI 执行结果无法追溯，风控和安全无保障。</p>
+        </div>
+        <div class="problem-back" style="background:rgba(167,139,250,.08)">
+          <div class="check">✅</div>
+          <h4 style="color:#A78BFA">HermesClaw 解法</h4>
+          <p>L1-L4 自动化等级 + Approval Gate + Rollback，每步可审计。</p>
+        </div>
+      </div>
+
+      <div class="problem-card fade-in">
+        <div class="problem-front">
+          <div class="icon">📈</div>
+          <h3>没有自进化机制</h3>
+          <p>系统不会从成功与失败中学习，永远需要人工干预。</p>
+        </div>
+        <div class="problem-back" style="background:rgba(245,166,35,.08)">
+          <div class="check">✅</div>
+          <h4 style="color:#F5A623">HermesClaw 解法</h4>
+          <p>Evaluation Engine → Proposal Engine → Canary 灰度，系统持续进化。</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     ARCHITECTURE
+============================================================ -->
+<section id="architecture">
+  <div class="container">
+    <div class="section-header fade-in">
+      <h2>三域架构</h2>
+      <p>每一步都有迹可查，每一次偏差都进入治理流程。</p>
+    </div>
+
+    <div class="arch-grid">
+      <!-- Hermes -->
+      <div class="arch-card fade-in" style="border-color:rgba(245,166,35,.25);background:rgba(245,166,35,.06)">
+        <div class="arch-card-tag" style="color:#F5A623">控制内核</div>
+        <h3>Hermes Control Kernel</h3>
+        <ul>
+          <li><span class="bullet" style="color:#F5A623">›</span>意图解析 → TaskEnvelope</li>
+          <li><span class="bullet" style="color:#F5A623">›</span>DAG Workflow 生成与编排</li>
+          <li><span class="bullet" style="color:#F5A623">›</span>多层记忆管理（会话/项目/组织）</li>
+          <li><span class="bullet" style="color:#F5A623">›</span>Agent Policy 治理与自动化等级</li>
+          <li><span class="bullet" style="color:#F5A623">›</span>Evaluation + Proposal + Rollback</li>
+          <li><span class="bullet" style="color:#F5A623">›</span>AuditLog 写入（治理真相源）</li>
+        </ul>
+      </div>
+
+      <!-- OpenClaw -->
+      <div class="arch-card fade-in" style="border-color:rgba(0,180,216,.25);background:rgba(0,180,216,.06)">
+        <div class="arch-card-tag" style="color:#00B4D8">执行运行时</div>
+        <h3>OpenClaw Execution Runtime</h3>
+        <ul>
+          <li><span class="bullet" style="color:#00B4D8">›</span>渠道会话与设备在线状态</li>
+          <li><span class="bullet" style="color:#00B4D8">›</span>连接器动作执行（Connectors/Tools）</li>
+          <li><span class="bullet" style="color:#00B4D8">›</span>长连接事件流（WebSocket / SSE）</li>
+          <li><span class="bullet" style="color:#00B4D8">›</span>ExecutionEvent 流回传</li>
+          <li><span class="bullet" style="color:#00B4D8">›</span>ActionReceipt 存储</li>
+          <li><span class="bullet" style="color:#00B4D8">›</span>Sandbox 模式与主会话切换</li>
+        </ul>
+      </div>
+
+      <!-- Industry Pack -->
+      <div class="arch-card fade-in" style="border-color:rgba(167,139,250,.25);background:rgba(167,139,250,.06)">
+        <div class="arch-card-tag" style="color:#A78BFA">行业插件层</div>
+        <h3>Industry Pack Layer</h3>
+        <ul>
+          <li><span class="bullet" style="color:#A78BFA">›</span>行业 Agent 模板（岗位化）</li>
+          <li><span class="bullet" style="color:#A78BFA">›</span>行业 Workflow Templates</li>
+          <li><span class="bullet" style="color:#A78BFA">›</span>技能包 + SOP</li>
+          <li><span class="bullet" style="color:#A78BFA">›</span>行业 KPI Schema + Dashboard</li>
+          <li><span class="bullet" style="color:#A78BFA">›</span>行业知识包与字段 schema</li>
+          <li><span class="bullet" style="color:#A78BFA">›</span>行业连接器映射（CRM/ERP/邮件）</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Closed loop -->
+    <div class="arch-loop fade-in">
+      <h3>核心业务闭环</h3>
+      <div class="loop-steps">
+        <div class="loop-step" style="border-color:rgba(245,166,35,.4);background:rgba(245,166,35,.1);color:#F5A623">TaskEnvelope</div>
+        <span class="loop-arrow">→</span>
+        <div class="loop-step" style="border-color:rgba(245,166,35,.4);background:rgba(245,166,35,.1);color:#F5A623">WorkflowRun</div>
+        <span class="loop-arrow">→</span>
+        <div class="loop-step" style="border-color:rgba(0,180,216,.4);background:rgba(0,180,216,.1);color:#00B4D8">ExecutionEvent</div>
+        <span class="loop-arrow">→</span>
+        <div class="loop-step" style="border-color:rgba(0,180,216,.4);background:rgba(0,180,216,.1);color:#00B4D8">ActionReceipt</div>
+        <span class="loop-arrow">→</span>
+        <div class="loop-step" style="border-color:rgba(167,139,250,.4);background:rgba(167,139,250,.1);color:#A78BFA">EvaluationReport</div>
+        <span class="loop-arrow">→</span>
+        <div class="loop-step" style="border-color:rgba(167,139,250,.4);background:rgba(167,139,250,.1);color:#A78BFA">Proposal → Approve</div>
+      </div>
+      <p class="arch-loop-note">
+        每步产生审计事件 · 每次执行绑定 workflowRunId · 每个外部动作可追溯 receipt
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     INDUSTRY PACK
+============================================================ -->
+<section id="industry">
+  <div class="container">
+    <div class="section-header fade-in">
+      <h2>Industry Pack 行业插件</h2>
+      <p>可装载、可停用、可升级、可回滚的行业能力包。</p>
+    </div>
+
+    <div class="pack-tabs" id="packTabs">
+      <button class="pack-tab active" data-pack="foreign-trade" onclick="switchPack('foreign-trade')">🌐 外贸行业包</button>
+      <button class="pack-tab" data-pack="medical" onclick="switchPack('medical')">🏥 医疗行业包</button>
+      <button class="pack-tab" data-pack="education" onclick="switchPack('education')">🎓 教育行业包</button>
+      <button class="pack-tab" data-pack="finance" onclick="switchPack('finance')">📈 金融行业包</button>
+    </div>
+
+    <div class="pack-detail fade-in" id="packDetail"></div>
+    <p class="pack-note">Industry Pack 不会侵入 Hermes / OpenClaw 核心——行业逻辑完全收敛在插件层</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     GOVERNANCE
+============================================================ -->
+<section id="governance">
+  <div class="container">
+    <div class="section-header fade-in">
+      <h2>治理即产品</h2>
+      <p>自动化等级可调，审批可追溯，偏差自动回滚。</p>
+    </div>
+
+    <div class="gov-grid">
+
+      <!-- Automation Level Controller -->
+      <div class="gov-card fade-in">
+        <h3>自动化等级控制器</h3>
+        <div class="level-btns" id="levelBtns">
+          <button class="level-btn" data-level="0" onclick="switchLevel(0)">L1</button>
+          <button class="level-btn" data-level="1" onclick="switchLevel(1)">L2</button>
+          <button class="level-btn" data-level="2" onclick="switchLevel(2)">L3</button>
+          <button class="level-btn" data-level="3" onclick="switchLevel(3)">L4</button>
+        </div>
+        <div class="level-detail" id="levelDetail"></div>
+        <p class="level-note">* 自动化等级由 AgentPolicy 控制，变更需通过 Proposal + Approval 流程</p>
+      </div>
+
+      <!-- Audit Log Timeline -->
+      <div class="gov-card fade-in">
+        <h3>执行审计时间轴</h3>
+        <div id="auditLog"></div>
+        <p class="audit-note">* 每条记录绑定 auditTraceId，可完整回放执行链路</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     CTA
+============================================================ -->
+<section id="cta">
+  <div class="cta-glow"><div class="cta-glow-inner"></div></div>
+  <div class="cta-content">
+
+    <div class="stats-bar">
+      <div><div class="stat-val">4+</div><div class="stat-label">行业 Pack</div></div>
+      <div><div class="stat-val">20+</div><div class="stat-label">连接器</div></div>
+      <div><div class="stat-val">100%</div><div class="stat-label">审计字段覆盖</div></div>
+      <div><div class="stat-val">V2.20</div><div class="stat-label">当前版本</div></div>
+    </div>
+
+    <h2 class="cta-title">
+      现在就建立你的<br/>
+      <span class="amber">AI 数字员工系统</span>
+    </h2>
+    <p class="cta-sub">申请企业内测，获得专属架构咨询 + Industry Pack 配置支持。</p>
+
+    <form class="cta-form" id="ctaForm" onsubmit="handleCTASubmit(event)">
+      <input
+        type="email" required
+        class="cta-input"
+        id="ctaEmail"
+        placeholder="输入企业邮箱"
+      />
+      <button type="submit" class="cta-btn" id="ctaBtn">申请内测 →</button>
+    </form>
+
+    <div class="cta-success" id="ctaSuccess">
+      ✅ 申请成功！我们会在 24 小时内与您联系。
+    </div>
+    <p class="cta-error" id="ctaError"></p>
+
+    <p class="cta-note">
+      所有申请经人工审核后接入 · 数据受 AuditLog 保护 · 不用于任何第三方营销
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================
+     FOOTER
+============================================================ -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand-name"><span style="color:#F5A623">⚡</span> HermesClaw</div>
+        <p class="footer-brand-desc">面向中小企业的 AI 数字员工操作系统。<br/>三域架构，真实闭环，可治理可回滚。</p>
+      </div>
+      <div class="footer-col">
+        <div class="footer-col-title">产品</div>
+        <a href="#architecture">三域架构</a>
+        <a href="#industry">行业插件</a>
+        <a href="#governance">治理中心</a>
+      </div>
+      <div class="footer-col">
+        <div class="footer-col-title">开发者</div>
+        <a href="/docs">文档</a>
+        <a href="/api">API 参考</a>
+        <a href="https://github.com/fenychin/HermesClaw-v2" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <div class="footer-col">
+        <div class="footer-col-title">法律</div>
+        <a href="/privacy">隐私政策</a>
+        <a href="/terms">服务条款</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      © 2026 HermesClaw · 版本 V2.20.11-beta
+    </div>
+  </div>
+</footer>
+
+<!-- ============================================================
+     JAVASCRIPT
+============================================================ -->
+<script>
+/* ---- MOBILE NAV ---- */
+function toggleMobileNav() {
+  document.getElementById('navMobile').classList.toggle('open')
+}
+function closeMobileNav() {
+  document.getElementById('navMobile').classList.remove('open')
+}
+
+/* ---- HERO TAGLINE ROTATOR ---- */
+const TAGLINES = [
+  '可规划 · 可执行 · 可记忆',
+  '可治理 · 可审计 · 可回滚',
+  '可进化 · 可按行业装配',
+]
+let taglineIdx = 0
+const taglineEl = document.getElementById('heroTagline')
+setInterval(() => {
+  taglineEl.style.opacity = '0'
+  setTimeout(() => {
+    taglineIdx = (taglineIdx + 1) % TAGLINES.length
+    taglineEl.textContent = TAGLINES[taglineIdx]
+    taglineEl.style.opacity = '1'
+  }, 400)
+}, 2600)
+
+/* ---- HERO FLOW ANIMATION ---- */
+const flowSteps  = document.querySelectorAll('.flow-step')
+const flowArrows = document.querySelectorAll('.flow-arrow')
+let activeStep = 0
+
+function applyFlowState() {
+  flowSteps.forEach((step, i) => {
+    const color = step.dataset.color
+    if (i <= activeStep) {
+      step.style.borderColor     = color
+      step.style.backgroundColor = color + '1A'
+      step.style.color           = color
+    } else {
+      step.style.borderColor     = 'rgba(255,255,255,0.1)'
+      step.style.backgroundColor = 'transparent'
+      step.style.color           = 'rgba(255,255,255,0.25)'
+    }
+  })
+  flowArrows.forEach((arrow, i) => {
+    arrow.style.color = i < activeStep ? '#F5A623' : 'rgba(255,255,255,0.15)'
+  })
+}
+
+applyFlowState()
+setInterval(() => {
+  activeStep = (activeStep + 1) % flowSteps.length
+  applyFlowState()
+}, 850)
+
+/* ---- INDUSTRY PACK DATA ---- */
+const PACKS = {
+  'foreign-trade': {
+    color: '#F5A623',
+    agents:    ['询盘跟进员','报价生成员','跟单协调员','客户关系员'],
+    workflows: ['询盘自动分级','报价审批流','订单跟踪 SOP','客户复盘报告'],
+    connectors:['WhatsApp','Gmail','Alibaba Trade','SAP ERP'],
+    kpis:      ['询盘转化率','报价响应时效','订单周期','客户满意度'],
+  },
+  medical: {
+    color: '#34D399',
+    agents:    ['预约管理员','病历助理','随访跟进员','费用核算员'],
+    workflows: ['预约→就诊→随访','病历生成审核','医保核销流程'],
+    connectors:['HIS 系统','微信','钉钉','电子病历'],
+    kpis:      ['预约履约率','随访覆盖率','平均就诊时长','医保结算准确率'],
+  },
+  education: {
+    color: '#60A5FA',
+    agents:    ['招生咨询员','学习顾问','作业批改员','家校沟通员'],
+    workflows: ['招生线索培育','课程匹配推荐','作业批改流','家长周报生成'],
+    connectors:['企业微信','腾讯课堂','学籍系统','支付宝'],
+    kpis:      ['线索转化率','课程完成率','家长满意度','续费率'],
+  },
+  finance: {
+    color: '#A78BFA',
+    agents:    ['风控审核员','客户经理 AI','合规审查员','报表生成员'],
+    workflows: ['贷款申请审核','KYC 合规流程','风险预警处置','月度报表生成'],
+    connectors:['银行核心系统','征信平台','Bloomberg','钉钉审批'],
+    kpis:      ['审核通过率','合规覆盖率','坏账率','客户 AUM'],
+  },
+}
+
+function renderPackDetail(packId) {
+  const pack = PACKS[packId]
+  const cols = [
+    { title: '数字员工角色', items: pack.agents,     icon: '👤' },
+    { title: '工作流模板',   items: pack.workflows,  icon: '⚙️' },
+    { title: '连接器',       items: pack.connectors, icon: '🔌' },
+    { title: 'KPI 指标',     items: pack.kpis,       icon: '📊' },
+  ]
+  const detail = document.getElementById('packDetail')
+  detail.style.borderColor     = pack.color + '40'
+  detail.style.backgroundColor = pack.color + '08'
+  detail.innerHTML = cols.map(col => `
+    <div>
+      <div class="pack-col-title" style="color:${pack.color}">
+        <span>${col.icon}</span> ${col.title}
+      </div>
+      ${col.items.map(item => `<div class="pack-item">${item}</div>`).join('')}
+    </div>
+  `).join('')
+}
+
+function switchPack(packId) {
+  document.querySelectorAll('.pack-tab').forEach(tab => {
+    const isActive = tab.dataset.pack === packId
+    const color = PACKS[packId].color
+    tab.classList.toggle('active', isActive)
+    tab.style.borderColor     = isActive ? color + '60' : 'rgba(255,255,255,0.12)'
+    tab.style.backgroundColor = isActive ? color + '15' : 'transparent'
+    tab.style.color           = isActive ? color : 'rgba(255,255,255,0.5)'
+  })
+  renderPackDetail(packId)
+}
+
+// Init first pack tab styling
+renderPackDetail('foreign-trade')
+switchPack('foreign-trade')
+
+/* ---- GOVERNANCE: AUTOMATION LEVELS ---- */
+const LEVELS = [
+  {
+    level: 'L1', label: '完全人工',
+    color: '#EF4444',
+    desc:  'AI 仅生成建议，所有动作由人工确认执行。',
+    actions: ['生成执行计划', '⏸ 等待人工逐步确认', '人工点击执行'],
+  },
+  {
+    level: 'L2', label: '低风险自动',
+    color: '#F59E0B',
+    desc:  '低风险动作自动执行，中高风险触发 Approval Gate。',
+    actions: ['自动执行低风险动作', '⚠️ 中/高风险触发审批', 'Approval Gate 弹出'],
+  },
+  {
+    level: 'L3', label: '高度自动',
+    color: '#10B981',
+    desc:  '仅最高风险动作（资金/数据删除）需要人工审批。',
+    actions: ['批量自动执行', '仅高危动作审批', '审批超时自动降级'],
+  },
+  {
+    level: 'L4', label: '全自动',
+    color: '#00B4D8',
+    desc:  '在预设策略边界内完全自主运行，异常时自动回滚。',
+    actions: ['策略边界内全自动', '异常自动触发 Rollback', 'Canary 灰度验证'],
+  },
+]
+
+let activeLevel = 1
+
+function renderLevelDetail(idx) {
+  const lvl = LEVELS[idx]
+  document.getElementById('levelDetail').innerHTML = `
+    <div class="level-tag" style="color:${lvl.color}">${lvl.level} — ${lvl.label}</div>
+    <p class="level-desc">${lvl.desc}</p>
+    <ul class="level-actions">
+      ${lvl.actions.map(a => `
+        <li>
+          <span style="color:${lvl.color};font-size:1.1rem">›</span>
+          ${a}
+        </li>
+      `).join('')}
+    </ul>
+  `
+  document.getElementById('levelDetail').style.borderColor     = lvl.color + '35'
+  document.getElementById('levelDetail').style.backgroundColor = lvl.color + '10'
+}
+
+function switchLevel(idx) {
+  activeLevel = idx
+  document.querySelectorAll('.level-btn').forEach((btn, i) => {
+    const lvl = LEVELS[i]
+    const isActive = i === idx
+    btn.style.borderColor     = isActive ? lvl.color : 'rgba(255,255,255,0.12)'
+    btn.style.backgroundColor = isActive ? lvl.color + '22' : 'transparent'
+    btn.style.color           = isActive ? lvl.color : 'rgba(255,255,255,0.35)'
+  })
+  renderLevelDetail(idx)
+}
+
+switchLevel(1)
+
+/* ---- GOVERNANCE: AUDIT LOG ---- */
+const AUDIT_EVENTS = [
+  { time: '13:42:01', label: 'TaskEnvelope 创建',     domain: 'Hermes',    color: '#F5A623', done: true  },
+  { time: '13:42:03', label: 'WorkflowRun 启动',       domain: 'Hermes',    color: '#F5A623', done: true  },
+  { time: '13:42:05', label: '发送报价邮件',            domain: 'OpenClaw',  color: '#00B4D8', done: true  },
+  { time: '13:42:06', label: 'ActionReceipt 写入',     domain: 'OpenClaw',  color: '#00B4D8', done: true  },
+  { time: '13:42:08', label: 'AuditLog 记录',          domain: 'Governance',color: '#A78BFA', done: true  },
+  { time: '13:42:30', label: 'EvaluationReport 生成',  domain: 'Hermes',    color: '#F5A623', done: false },
+]
+
+document.getElementById('auditLog').innerHTML = AUDIT_EVENTS.map(ev => `
+  <div class="audit-event">
+    <span class="audit-time">${ev.time}</span>
+    <span class="audit-label">${ev.label}</span>
+    <span class="audit-domain"
+      style="color:${ev.color};background:${ev.color}18">${ev.domain}</span>
+    <span class="audit-dot ${ev.done ? 'done' : 'pending'}"></span>
+  </div>
+`).join('')
+
+/* ---- CTA FORM ---- */
+async function handleCTASubmit(e) {
+  e.preventDefault()
+  const email  = document.getElementById('ctaEmail').value.trim()
+  const btn    = document.getElementById('ctaBtn')
+  const form   = document.getElementById('ctaForm')
+  const success= document.getElementById('ctaSuccess')
+  const errEl  = document.getElementById('ctaError')
+
+  if (!email) return
+  btn.disabled = true
+  btn.textContent = '提交中...'
+  errEl.style.display = 'none'
+
+  try {
+    const res = await fetch('/api/marketing/early-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || `HTTP ${res.status}`)
+    }
+    form.style.display    = 'none'
+    success.style.display = 'block'
+  } catch (err) {
+    errEl.textContent    = err.message || '提交失败，请稍后重试'
+    errEl.style.display  = 'block'
+    btn.disabled         = false
+    btn.textContent      = '申请内测 →'
+  }
+}
+
+/* ---- SCROLL FADE-IN ---- */
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible')
+      observer.unobserve(entry.target)
+    }
+  })
+}, { threshold: 0.12 })
+
+document.querySelectorAll('.fade-in').forEach(el => observer.observe(el))
+</script>
+</body>
+</html>

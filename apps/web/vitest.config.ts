@@ -8,8 +8,13 @@ import { config as loadEnv } from 'dotenv'
 // .env 链路不在生效范围内，会导致 Prisma 适配器拿到空密码并抛 SASL 错误
 // （CLAUDE.md §13.4 洞察 3）。dotenv 默认不覆盖已存在的 env 变量，CI 中
 // 注入的 DATABASE_URL_TEST 仍优先。
+loadEnv({ path: path.resolve(__dirname, '.env.test.local') })
 loadEnv({ path: path.resolve(__dirname, '.env.local') })
 loadEnv({ path: path.resolve(__dirname, '.env') })
+
+// E2E 套件必须使用独立测试库：若 CI/本地显式配置了 DATABASE_URL_TEST，
+// 则覆盖默认的 DATABASE_URL，避免污染生产/开发数据库。
+process.env.DATABASE_URL = process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL
 
 export default defineConfig({
   plugins: [react()],
@@ -18,6 +23,14 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     globals: true,
     include: ['src/**/*.{test,spec}.{ts,tsx}', '../../tests/**/*.{test,spec}.{ts,tsx}'],
+    // 防止 694 个测试集中运行时单个 worker 堆内存耗尽（默认 ~2GB）。
+    // fork 池配合 --max-old-space-size，确保每个 worker 有充足内存且崩溃互不影响。
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        execArgv: ['--max-old-space-size=4096'],
+      },
+    },
   },
   resolve: {
     alias: {

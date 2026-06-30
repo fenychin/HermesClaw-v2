@@ -13,6 +13,11 @@ describe("外贸询盘闭环冒烟测试", () => {
   let mockLlm: ReturnType<typeof vi.fn>
 
   beforeAll(async () => {
+    if (!process.env.DATABASE_URL_TEST) {
+      console.warn('DATABASE_URL_TEST not set, skipping E2E suite')
+      return
+    }
+
     const ws = await prisma.workspace.create({
       data: {
         name: "E2E Smoke WS A",

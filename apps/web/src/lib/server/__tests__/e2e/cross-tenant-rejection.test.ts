@@ -53,6 +53,10 @@ describe("Sprint D E2E: 跨租户越权隔离验证 (Cross-Tenant Rejection)", (
   const agentIdB = "agent-ct-b"
 
   beforeAll(async () => {
+    if (!process.env.DATABASE_URL_TEST) {
+      console.warn('DATABASE_URL_TEST not set, skipping E2E suite')
+      return
+    }
     await cleanWorkspace(WS_A)
     await cleanWorkspace(WS_B)
     await setupWorkspace(WS_A, { agentId: agentIdA, agentAutomationLevel: "L2" })

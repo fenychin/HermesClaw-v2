@@ -126,12 +126,12 @@ OpenClaw Gateway 真实接入
 
 ## MVP Release Checklist
 
-- [ ] FC-1~FC-6 全部通过
-- [ ] harness canary 状态机 11 项转换测试通过
-- [ ] boundary 隔离 11 项测试通过（已通过 ✅）
-- [ ] next-auth E2E 环境 5 项修复通过
-- [ ] `pnpm build` 零 TS 错误
-- [ ] TECH_DEBT.md 无 HIGH 风险未修复项
+- [x] FC-1~FC-6 全部通过
+- [x] harness canary 状态机 11 项转换测试通过
+- [x] boundary 隔离 11 项测试通过（已通过 ✅）
+- [x] next-auth E2E 环境 5 项修复通过
+- [x] `pnpm build` 零 TS 错误
+- [x] TECH_DEBT.md 无 HIGH 风险未修复项
 
 ---
 
@@ -160,6 +160,7 @@ OpenClaw Gateway 真实接入
   - `prisma db push` 同步到 Postgres（注：migration_lock.toml 仍是 sqlite，未走 migrate dev 链路；待迁移历史重建 P2 跟进）
   - agent-runner.ts:246-284 恢复 for 循环 + `prisma.artifact.create`，`workspaceId` 用解构变量
   - 写入失败仍走 `logger.warn` 不阻断主流程
+  - 迁移历史已重建 (2026-06-30, v2.20.12-rc)：migration_lock.toml 切换为 `postgresql`，Artifact 模型已通过 `prisma migrate dev` 生成正式迁移文件。
 
 ### TD-2026-06-29-002 — chat-task-dispatch.ts 孤儿模块 ✅ RESOLVED (2026-06-29, v2.10.21-beta)
 
@@ -209,7 +210,7 @@ OpenClaw Gateway 真实接入
   - `apps/web/vitest.config.ts` 顶部 `loadEnv` 自动加载 `.env.local` 与 `.env`，让 turbo spawn 的 vitest 进程也拿到 `DATABASE_URL`，根治 SASL 空密码错误
 - **遗留**：`apps/web` 测试套件仍有 7 个文件 15 项 fail（contracts/intent-service/scheduler/execution-failure/brain-health/memory-crud/workflows-run），均为 pre-existing 脆性断言（版本号 `1.0` vs `1.0.0`、mock 调用次数等），与本次基础设施修复无关——另立 TD-2026-06-29-004 跟踪。
 
-### TD-2026-06-29-004 — apps/web 单测 15 项 pre-existing fail
+### TD-2026-06-29-004 — apps/web 单测 15 项 pre-existing fail ✅ RESOLVED (2026-06-30, v2.20.12-beta)
 
 - **位置**：
   - `apps/web/src/lib/server/__tests__/contracts.test.ts:34`（断言 `version === '1.0'`，实际是 `'1.0.0'`）
@@ -225,5 +226,8 @@ OpenClaw Gateway 真实接入
   这些用例的失败模式都是「业务实现已演进、测试期望未同步」（如版本号 `1.0` → `1.0.0`、audit 字段名调整、scheduler 路由变化）。
 - **解决方案**：
   - 单测维护任务，按 7 个文件分组，按当前实现修正期望值。
-  - 或对已废弃路径标记 `it.skip` 并在 TD-2026-06-29-005 中跟踪
+  - 保留全部用例执行路径，未使用 `it.skip` 跳过。
 - **目标修复日期**：v2.10.22-beta（每个文件平均 5-15 分钟，预估 1-2 小时清完）
+- **实际修复**：2026-06-30 v2.20.12-beta
+  - 7 个目标文件已逐个运行单文件测试验证通过。
+  - `pnpm test` 全量套件通过，apps/web 套件 0 failed。
