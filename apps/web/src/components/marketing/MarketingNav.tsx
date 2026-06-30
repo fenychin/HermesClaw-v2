@@ -81,7 +81,7 @@ export function MarketingNav() {
             </a>
           ))}
           <a
-            href="/sign-in"
+            href="/login"
             style={{
               fontSize: "0.875rem",
               color: "rgba(255,255,255,.6)",
