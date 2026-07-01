@@ -751,7 +751,8 @@ export function NewAgentDialog() {
       // 刷新智能体列表
       queryClient.invalidateQueries({ queryKey: ["agents"] });
 
-      const agent = json.agent;
+      const agent = json.data?.agent || json.agent;
+      if (!agent) throw new Error("接口返回的智能体数据为空");
       setCreatedAgent({
         id: agent.id,
         name: agent.name,
