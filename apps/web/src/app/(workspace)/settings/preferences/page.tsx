@@ -85,7 +85,7 @@ export default function PreferencesSettingsPage() {
       try {
         const [prefRes, wsRes] = await Promise.all([
           fetch("/api/settings/preferences"),
-          fetch("/api/workspaces"),
+          fetch("/api/workspace"),
         ]);
 
         if (prefRes.ok && wsRes.ok) {

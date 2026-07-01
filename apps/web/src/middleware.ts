@@ -31,7 +31,7 @@ const DEV_BYPASS_ROUTES = [
   "/api/chat",
   "/api/hermes/task",
   "/api/conversations",
-  "/api/intel/skill-test",
+  "/api/intelligence/skill-test",
   "/api/v1/sandbox",
   "/api/v1/runtime/connector-health",
   "/api/v1/industry/knowledge-graph",
