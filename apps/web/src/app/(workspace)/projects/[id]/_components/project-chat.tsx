@@ -10,6 +10,8 @@ import { useUiStore } from "@/stores/ui-store";
 import { ModelSelectorInline } from "@/components/workspace/ModelSelectorInline";
 import { useModelPreference } from "@/hooks/use-model-preference";
 import { useProjectContextStore } from "@/stores/project-context-store";
+import { cn } from "@/lib/utils";
+
 
 
 /**
@@ -130,7 +132,7 @@ function ProjectChatInner() {
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-background">
+    <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto relative bg-background">
       {/* 顶部操作控制栏（常驻） */}
       <div className="sticky top-0 flex justify-between items-center px-4 md:px-8 py-3 bg-background/95 backdrop-blur z-20 shrink-0">
         {/* 左侧：模型选择器 */}
@@ -141,10 +143,10 @@ function ProjectChatInner() {
         />
       </div>
 
-      {/* 对话历史 — 撑满上方空间 */}
+      {/* 对话历史 — 移除内部滚动，改为由外层容器滚动 */}
       {hasMessages && (
-        <div className="flex-1 min-h-0 overflow-hidden px-4 md:px-8 pt-6">
-          <div className="h-full max-w-2xl mx-auto">
+        <div className="flex-1 px-4 md:px-8 pt-6 pb-2">
+          <div className="max-w-2xl mx-auto">
             <ConversationArea
               messages={messages}
               isStreaming={isStreaming}
@@ -176,7 +178,14 @@ function ProjectChatInner() {
       )}
 
       {/* 输入框 — 固定在底部，与 /new 完全一致 */}
-      <div className="shrink-0 px-4 md:px-8 pb-4 pt-2">
+      <div
+        className={cn(
+          "px-4 md:px-8 w-full",
+          hasMessages
+            ? "sticky bottom-0 shrink-0 pb-6 pt-2 bg-background/95 backdrop-blur z-10"
+            : "shrink-0 pb-4 pt-2",
+        )}
+      >
         <div className="max-w-2xl mx-auto">
           <CommandBox
             value={input}
