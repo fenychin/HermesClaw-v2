@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -30,6 +30,9 @@ import {
   Receipt,
   Mail,
   Search,
+  Wand2,
+  TrendingUp,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -165,6 +168,388 @@ const DEFAULT_FORM: AgentFormData = {
   selectedSkills: [],
   selectedConnectors: [],
 };
+
+// ── 外贸行业意图预判引导配置 ─────────────────────────────────
+// 基于关键词匹配，在用户停止输入1.5秒后触发 LLM 预判
+// 同时提供即时关键词联想（无需 LLM，本地匹配）
+
+const INTENT_QUICK_TEMPLATES = [
+  {
+    keyword: ["开发信", "开发客户", "找客户", "新客户", "陌生客户"],
+    icon: "📧",
+    label: "外贸客户开发专家",
+    preview: "帮我用 PAS/AIDA 框架写开发信，自动研究买家背景，A/B 测试主题行",
+    fullDescription: "我需要一个能帮我开发海外新客户的智能体。主要工作包括：根据买家公司名称自动研究背景和痛点，运用 PAS、AIDA 等专业框架生成3套开发信变体，支持英语/德语/西班牙语等多语种，自动A/B测试主题行，并根据回复率数据持续优化模板。"
+  },
+  {
+    keyword: ["询盘", "分拣", "鉴别", "假询盘", "询盘质量"],
+    icon: "🔍",
+    label: "询盘智能路由官",
+    preview: "鉴别询盘真假，S/A/B/C/D 五级评分，自动分配给最合适的跟进同事",
+    fullDescription: "我需要一个能快速鉴别询盘真实性和商业价值的智能体。要能识别虚假询盘的20个特征，对询盘进行S/A/B/C/D五级评分，分析买家意图（首购/比价/套价），并自动路由到最合适的销售人员跟进。"
+  },
+  {
+    keyword: ["报价", "报价单", "定价", "价格策略", "压价", "谈判"],
+    icon: "💰",
+    label: "动态报价策略师",
+    preview: "基于成本+竞品+市场三维定价，生成阶梯报价，面对压价自动生成护盘话术",
+    fullDescription: "我需要一个帮我制定报价策略的智能体。能根据成本、竞品价格和目标市场自动计算最优报价，生成阶梯报价（MOQ梯度），当买家压价时提供保护利润的谈判话术，并支持不同市场（美国/欧洲/中东/东南亚）的差异化定价。"
+  },
+  {
+    keyword: ["跟进", "催单", "复购", "沉默客户", "客户维护", "流失"],
+    icon: "📊",
+    label: "客户生命周期经理",
+    preview: "从首次接触到复购全程管理，识别流失信号，自动生成个性化跟进内容",
+    fullDescription: "我需要一个管理客户跟进全流程的智能体。能规划从首次询盘到复购的跟进序列，识别客户流失信号（突然沉默、缩减采购量），自动生成个性化激活邮件，规划展会前后的跟进节奏。"
+  },
+  {
+    keyword: ["合同", "合规", "制裁", "法务", "条款", "风险"],
+    icon: "⚖️",
+    label: "跨境法务合规官",
+    preview: "审查合同风险条款，查制裁名单，识别出口管制敏感品类，提供谈判修改建议",
+    fullDescription: "我需要一个帮我审查贸易合规风险的智能体。能分析买方合同中的风险条款（付款条件/违约条款/仲裁条款），查询OFAC制裁名单 and BIS实体清单，识别出口管制敏感产品，并给出合同谈判修改建议。"
+  },
+  {
+    keyword: ["物流", "货物", "运输", "延误", "港口", "提单", "清关"],
+    icon: "🚢",
+    label: "供应链可见性官",
+    preview: "监控50+在途订单，港口拥堵预警，延误自动起草客户通知，贸易术语责任分析",
+    fullDescription: "我需要一个监控货物物流全程的智能体。能同时追踪多个在途订单状态，预警港口拥堵和延误风险，自动起草客户延误通知邮件，分析不同贸易术语（FOB/CIF/DDP）的责任边界。"
+  },
+  {
+    keyword: ["竞争", "竞品", "市场", "情报", "分析", "对手"],
+    icon: "🎯",
+    label: "竞争情报分析师",
+    preview: "从海关数据+LinkedIn分析竞品客户，估算市场份额，识别竞品弱点",
+    fullDescription: "我需要一个收集和分析竞争情报的智能体。能通过海关数据分析竞品主要客户和出货量，在LinkedIn追踪竞品动态，估算目标市场的竞争格局，识别竞品的定价弱点和客户服务漏洞。"
+  },
+  {
+    keyword: ["订单", "跟踪", "货款", "回款", "付款", "风险"],
+    icon: "📋",
+    label: "全链路履单监控官",
+    preview: "合同到回款全程监控，付款逾期预警，汇率风险提示，自动催款邮件",
+    fullDescription: "我需要一个从合同签订到货款回收全程监控订单的智能体。能追踪每笔订单的生产/发货/清关/签收状态，在付款临近到期时提前提醒，监控汇率波动风险，在逾期时自动生成催款邮件。"
+  },
+];
+
+// ── 意图匹配函数（本地，无需 LLM）─────────────────────────────
+function matchIntentTemplates(input: string) {
+  if (!input || input.length < 4) return [];
+  const lower = input.toLowerCase();
+  return INTENT_QUICK_TEMPLATES.filter(t =>
+    t.keyword.some(kw => lower.includes(kw))
+  );
+}
+
+// ── AI 深度预判 hook（输入停止1.5s后触发）────────────────────
+function useIntentPredict(description: string, name: string) {
+  const [prediction, setPrediction] = useState<{
+    suggestedName?: string
+    suggestedRole?: string
+    coreNeed?: string
+    conversationStarters?: Array<{ label: string; message: string }>
+    upgradeHints?: Array<{ title: string; impact: string }>
+    confidence?: number
+  } | null>(null)
+  const [isPredicting, setIsPredicting] = useState(false)
+  const timerRef = useRef<NodeJS.Timeout | undefined>(undefined)
+
+  useEffect(() => {
+    if (description.length < 15) {
+      setPrediction(null)
+      return
+    }
+
+    clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(async () => {
+      setIsPredicting(true)
+      try {
+        const res = await fetch("/api/agents/interpret-intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userIntent: description,
+            currentName: name,
+            industryPackId: "foreign-trade",
+          }),
+        })
+        const raw = await res.text()
+        const jsonMatch = raw.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          const data = JSON.parse(jsonMatch[0])
+          setPrediction({
+            suggestedName: data.agentDraft?.suggestedName,
+            suggestedRole: data.agentDraft?.role,
+            coreNeed: data.interpretation?.coreNeed,
+            conversationStarters: data.agentDraft?.conversationStarters?.slice(0, 2),
+            upgradeHints: data.upgradeHints?.slice(0, 2),
+            confidence: data.interpretation?.confidence,
+          })
+        }
+      } catch (e) {
+        console.error("Intent predict error", e)
+      } finally {
+        setIsPredicting(false)
+      }
+    }, 1500)  // 停止输入1.5秒后触发
+
+    return () => clearTimeout(timerRef.current)
+  }, [description, name])
+
+  return { prediction, isPredicting }
+}
+
+interface Step2RoleAndDescProps {
+  formData: AgentFormData;
+  update: <K extends keyof AgentFormData>(key: K, value: AgentFormData[K]) => void;
+}
+
+function Step2RoleAndDesc({ formData, update }: Step2RoleAndDescProps) {
+  // 在 Step2 组件内部添加以下状态
+  const [description, setDescription] = useState(formData.description ?? "")
+  const [name, setName] = useState(formData.name ?? "")
+  const [role, setRole] = useState(formData.role ?? "")
+
+  // 本地关键词匹配（即时，无网络延迟）
+  const matchedTemplates = matchIntentTemplates(description)
+
+  // AI 深度预判（1.5s延迟）
+  const { prediction, isPredicting } = useIntentPredict(description, name)
+
+  // 当内部状态改变时同步给顶层状态
+  useEffect(() => {
+    update("description", description)
+  }, [description, update])
+
+  useEffect(() => {
+    update("name", name)
+  }, [name, update])
+
+  useEffect(() => {
+    update("role", role)
+  }, [role, update])
+
+  return (
+    <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-right-4 duration-300">
+      <h3 className="text-sm font-medium text-foreground">
+        角色与描述
+      </h3>
+      <p className="text-xs text-muted-foreground -mt-2">
+        定义智能体的身份与工作意图，系统将据此匹配技能与连接器
+      </p>
+
+      {/* ── 渲染：名称输入 ── */}
+      <div className="mb-4">
+        <label className="text-sm font-medium text-white/70 mb-1.5 block">
+          名称 <span className="text-red-400">*</span>
+        </label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="例如：高级邮件助理"
+          className="w-full bg-[#1a1a2e] border border-white/10 rounded-lg px-4 py-2.5 text-white placeholder-white/25 focus:outline-none focus:border-indigo-500 transition-colors text-sm"
+        />
+        {/* AI 建议名称（当 prediction 存在且 name 为空时显示）*/}
+        {prediction?.suggestedName && !name && (
+          <button
+            type="button"
+            onClick={() => setName(prediction.suggestedName!)}
+            className="mt-1.5 flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            <Sparkles className="size-3 text-indigo-400" />
+            AI 建议：{prediction.suggestedName}
+            <span className="text-white/30">（点击使用）</span>
+          </button>
+        )}
+      </div>
+
+      {/* ── 渲染：角色输入 ── */}
+      <div className="mb-4">
+        <label className="text-sm font-medium text-white/70 mb-1.5 block">
+          角色 <span className="text-red-400">*</span>
+        </label>
+        <input
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          placeholder="例如：客户开发与跟进"
+          className="w-full bg-[#1a1a2e] border border-white/10 rounded-lg px-4 py-2.5 text-white placeholder-white/25 focus:outline-none focus:border-indigo-500 transition-colors text-sm"
+        />
+        {prediction?.suggestedRole && !role && (
+          <button
+            type="button"
+            onClick={() => setRole(prediction.suggestedRole!)}
+            className="mt-1.5 flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            <Sparkles className="size-3 text-indigo-400" />
+            AI 建议：{prediction.suggestedRole}
+            <span className="text-white/30">（点击使用）</span>
+          </button>
+        )}
+      </div>
+
+      {/* ── 渲染：描述/意图输入框（核心升级区域）────────────────────── */}
+      <div className="mb-2">
+        <label className="text-sm font-medium text-white/70 mb-1.5 block">
+          描述 / 意图
+          <span className="ml-2 text-xs text-white/30 font-normal">
+            越具体，AI 配置得越准
+          </span>
+        </label>
+
+        {/* 快速模板引导卡片（描述为空时显示）*/}
+        {!description && (
+          <div className="mb-3">
+            <div className="text-xs text-white/30 mb-2 flex items-center gap-1">
+              <Wand2 className="size-3 text-white/30" />
+              快速选择场景，自动填入描述：
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {INTENT_QUICK_TEMPLATES.slice(0, 6).map((t) => (
+                <button
+                  key={t.label}
+                  type="button"
+                  onClick={() => {
+                    setDescription(t.fullDescription)
+                    if (!name) setName(t.label)
+                  }}
+                  className="text-left p-2.5 rounded-lg border border-white/10 bg-white/5 hover:border-indigo-500/50 hover:bg-indigo-500/10 transition-all group"
+                >
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="text-base">{t.icon}</span>
+                    <span className="text-xs font-medium text-white/70 group-hover:text-white/90 truncate">
+                      {t.label}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-white/30 leading-relaxed line-clamp-2">
+                    {t.preview}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 描述输入框 */}
+        <div className="relative">
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="描述该智能体的主要职责与工作意图，越详细越有助于系统精确理解...&#10;&#10;例如：我需要一个能帮我分析竞品价格、在买家压价时提供谈判策略的智能体，主要服务欧美工业配件买家..."
+            rows={5}
+            maxLength={500}
+            className="w-full bg-[#0f0f1a] border border-white/10 rounded-xl px-4 py-3 text-white/80 placeholder-white/20 resize-none focus:outline-none focus:border-indigo-500/60 transition-colors text-sm leading-relaxed"
+          />
+
+          {/* 字符计数 + AI 状态 */}
+          <div className="absolute bottom-2.5 right-3 flex items-center gap-2">
+            {isPredicting && (
+              <div className="flex items-center gap-1 text-indigo-400/70 text-xs">
+                <Loader2 className="size-3 text-indigo-400 animate-spin" />
+                AI 分析中
+              </div>
+            )}
+            <span className="text-white/20 text-xs">{description.length}/500</span>
+          </div>
+        </div>
+
+        {/* 关键词即时匹配提示（本地，无延迟）*/}
+        {matchedTemplates.length > 0 && description.length > 4 && (
+          <div className="mt-2 flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-white/30">检测到场景：</span>
+            {matchedTemplates.map((t) => (
+              <button
+                key={t.label}
+                type="button"
+                onClick={() => setDescription(t.fullDescription)}
+                className="text-xs px-2.5 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25 transition-all flex items-center gap-1"
+              >
+                {t.icon} {t.label}
+                <ChevronRight className="size-3 text-indigo-300" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* AI 深度预判结果面板（1.5s后出现）*/}
+      {prediction && description.length > 15 && (
+        <div className="mt-3 p-3.5 bg-gradient-to-br from-indigo-500/10 to-purple-500/5 border border-indigo-500/20 rounded-xl space-y-3">
+          {/* 置信度头部 */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-full bg-indigo-500/30 flex items-center justify-center">
+                <Brain className="size-3 text-indigo-400" />
+              </div>
+              <span className="text-xs font-medium text-indigo-300">
+                AI 理解了你的意图
+              </span>
+              {prediction.confidence && (
+                <span className="text-[10px] bg-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded-full">
+                  置信度 {Math.round(prediction.confidence * 100)}%
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* 核心需求解读 */}
+          {prediction.coreNeed && (
+            <div className="text-xs text-white/60">
+              <span className="text-white/40">核心需求：</span>
+              {prediction.coreNeed}
+            </div>
+          )}
+
+          {/* 对话引导案例预览 */}
+          {prediction.conversationStarters && prediction.conversationStarters.length > 0 && (
+            <div>
+              <div className="text-[10px] text-white/30 mb-1.5 flex items-center gap-1">
+                <Sparkles className="size-2 text-white/30" />
+                将为你生成以下真实案例引导（对话框快捷按钮）：
+              </div>
+              <div className="space-y-1.5">
+                {prediction.conversationStarters.map((cs, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-2 p-2 bg-white/5 rounded-lg"
+                  >
+                    <div className="flex-shrink-0 w-4 h-4 rounded-full bg-indigo-500/20 flex items-center justify-center mt-0.5">
+                      <span className="text-[9px] text-indigo-400">{i + 1}</span>
+                    </div>
+                    <div>
+                      <div className="text-xs text-white/70 font-medium">{cs.label}</div>
+                      <div className="text-[10px] text-white/35 mt-0.5 line-clamp-2">
+                        {cs.message?.slice(0, 80)}...
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 升级建议（及时提出）*/}
+          {prediction.upgradeHints && prediction.upgradeHints.length > 0 && (
+            <div className="pt-2 border-t border-white/5">
+              <div className="flex items-center gap-1 text-amber-400/70 text-[10px] mb-1.5">
+                <TrendingUp className="size-2.5 text-amber-400/70" />
+                创建后可升级的方向：
+              </div>
+              {prediction.upgradeHints.map((hint, i) => (
+                <div key={i} className="text-[10px] text-white/40 flex items-start gap-1.5 mb-1">
+                  <span className="text-amber-400/50 mt-0.5">→</span>
+                  <span>
+                    <span className="text-white/60">{hint.title}：</span>
+                    {hint.impact}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Stepper 指示器 */
 function Stepper({ step }: { step: number }) {
@@ -427,59 +812,7 @@ export function NewAgentDialog() {
 
       // ======================== Step 2: 角色与描述 ========================
       case 2:
-        return (
-          <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-right-4 duration-300">
-            <h3 className="text-sm font-medium text-foreground">
-              角色与描述
-            </h3>
-            <p className="text-xs text-muted-foreground -mt-2">
-              定义智能体的身份与工作意图，系统将据此匹配技能与连接器
-            </p>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-xs text-muted-foreground">
-                名称 <span className="text-danger">*</span>
-              </label>
-              <Input
-                placeholder="例如：高级邮件助理"
-                value={form.name}
-                onChange={(e) => update("name", e.target.value)}
-                maxLength={50}
-                className="h-9 text-sm"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-xs text-muted-foreground">
-                角色 <span className="text-danger">*</span>
-              </label>
-              <Input
-                placeholder="例如：客户开发与跟进"
-                value={form.role}
-                onChange={(e) => update("role", e.target.value)}
-                maxLength={100}
-                className="h-9 text-sm"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-xs text-muted-foreground">
-                描述 / 意图
-              </label>
-              <textarea
-                placeholder="描述该智能体的主要职责与工作意图，越详细越有助于系统精确理解..."
-                value={form.description}
-                onChange={(e) => update("description", e.target.value)}
-                maxLength={500}
-                rows={3}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-hint focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-              />
-              <span className="text-[10px] text-hint self-end">
-                {form.description.length}/500
-              </span>
-            </div>
-          </div>
-        );
+        return <Step2RoleAndDesc formData={form} update={update} />;
 
       // ======================== Step 3: 任务边界 ========================
       case 3:
