@@ -13,7 +13,7 @@ import { SidebarNavItem } from "./sidebar-nav-item";
 import { SidebarRecent } from "./sidebar-recent";
 import { cn } from "@/lib/utils";
 import { prewarmWorkspaceRoute } from "@/lib/workspace-route-prewarm";
-import { useWorkspaceMode } from "@/app/workspace/layout";
+import { useWorkspaceMode } from "@/app/workspace/workspace-provider";
 import { AccountMenu } from "./AccountMenu";
 
 export function WorkspaceSidebar() {
