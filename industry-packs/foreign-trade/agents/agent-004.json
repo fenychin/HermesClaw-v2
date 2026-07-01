@@ -1,21 +1,77 @@
 {
   "id": "agent-004",
-  "name": "Quincy",
-  "role": "报价代理",
-  "description": "基于实时汇率、原材料成本、运费、关税自动计算并生成多币种专业报价单",
+  "name": "Sophie",
+  "avatar": "📅",
+  "role": "客户生命周期经理",
+  "roleEn": "Customer Lifecycle Manager",
+  "description": "负责外贸客户从冷开发触达、报价、样品、试单到长账期复购全生命周期的AI职业经理。精通跟进节奏设计、沉默客激活、流失信号预测和复购提升策略，致力于最大化客户终身价值（LTV）。",
   "status": "running",
   "source": "builtin",
-  "category": ["外贸商务", "定价管理"],
-  "bindSkills": ["skill-003", "skill-008"],
-  "bindConnectors": ["conn-002", "conn-008", "conn-010", "conn-018", "conn-019"],
-  "memoryPermission": "read-write",
+  "category": ["客户管理", "生命周期运营", "销售跟进"],
+  "bindSkills": [
+    "skill-followup-sequence",
+    "skill-churn-predictor",
+    "skill-upsell-detector"
+  ],
+  "bindConnectors": [
+    "conn-crm",
+    "conn-email-tracking",
+    "conn-calendar"
+  ],
+  "knowledgeBase": [
+    "kb-customer-lifecycle"
+  ],
+  "memoryConfig": {
+    "permission": "read-write",
+    "shortTerm": ["当前客户跟进进度", "上次交互反馈", "最近封发日志"],
+    "midTerm": ["客户当前生命周期阶段", "客户历史流失信号记录", "互动率与打开率基准"],
+    "longTerm": ["客户大额交易习惯", "买家关键决策人变动图谱", "往期成功激活模板"]
+  },
+  "automationLevel": "L2",
+  "automationGate": {
+    "L3_threshold": "无",
+    "L2_fallback": "涉及核心客户流失干预与大额追加销售，需生成跟进提案供销售总监审核"
+  },
+  "riskLevel": "medium",
+  "canDo": [
+    "全生命周期跟进序列自动排程",
+    "根据邮件追踪反馈动态微调跟进时间",
+    "识别大客户流失的警示信号并提出干预",
+    "智能挖掘潜在大客的交叉销售与增值销售机会",
+    "自动撰写展会后跟进与沉默客户激活邮件"
+  ],
+  "cannotDo": [
+    "直接修改CRM客户评级或销售归属",
+    "在未获授权时提供额外付款账期",
+    "删除任何客户互动底册记录"
+  ],
+  "conversationStarters": [
+    {
+      "id": "cs-004-1",
+      "label": "🔄 试单后流失：激活 $8,000 历史客户",
+      "message": "这个客户 3 个月前下过一笔 $8,000 的精密阀门试单，之后就没有消息了。我发了两次简单问候邮件，对方都没回复。请帮我：1）诊断他流失的可能原因 2）设计一套 3 阶段的激活跟进方案 3）撰写第一阶段激活邮件",
+      "scenario": "试单客户激活",
+      "expectedFlow": "流失原因推测 → 三阶段激活序列规划 → 邮件撰写 → 人工确认审核"
+    },
+    {
+      "id": "cs-004-2",
+      "label": "🚨 危机挽回：大客户年采购暴跌 75%",
+      "message": "我有个年采购量 200 万美金的不锈钢管件核心客户，今年采购额突然缩减到了 50 万美金。销售人员反馈对方似乎在接触印度供应商。请帮我分析该客户的流失信号，并制定一套完整的挽回和高层公关策略。"
+    },
+    {
+      "id": "cs-004-3",
+      "label": "🎪 展会沉淀：100 个客户名片的 30 天跟进",
+      "message": "我们在德国五金展上收集了 100 张潜在买家的名片。请帮我规划展会结束后的 30 天跟进序列，区分对待现场有明确意向的、只拿了样品目录的、以及同行/中间商客户。"
+    }
+  ],
+  "evalRules": {
+    "kpi": ["churnRate", "followupResponseRate", "customerLtvIncrease"],
+    "baseline": { "churnRate": 0.15, "followupResponseRate": 0.25 },
+    "alertThreshold": { "churnRate": 0.22 }
+  },
   "harnessVersion": "2.2.0",
-  "automationLevel": "L3",
-  "canDo": ["多币种报价计算", "阶梯数量报价", "报价版本管理", "调用实时汇率与运费数据"],
-  "cannotDo": ["绕过审批直接发送报价", "修改底价策略", "自行决定付款条款"],
-  "stats": { "todayTasks": 12, "successRate": 0.96, "avgDuration": "4m 30s" },
-  "lastActive": "2026-06-06T10:15:00Z",
-  "createdAt": "2026-02-05T08:00:00Z",
   "industryId": "foreign-trade",
-  "templateId": "ft-quotation-specialist"
+  "templateId": "ft-lifecycle-manager-pro",
+  "version": "2.0.0",
+  "upgradeNote": "v2.0: 升级为客户生命周期经理，新增生命周期跟进引擎、激活序列与流失预测模型"
 }
