@@ -1,7 +1,5 @@
-/**
- * Auth.js v5 API Route Handler
- * —— 处理 /api/auth/* 全部请求（登录、登出、会话、回调等）
- */
+import { NextRequest } from "next/server";
 import { handlers } from "@/lib/auth";
 
-export const { GET, POST } = handlers;
+export const GET = (req: NextRequest) => handlers.GET(req);
+export const POST = (req: NextRequest) => handlers.POST(req);
