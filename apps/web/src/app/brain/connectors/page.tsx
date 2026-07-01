@@ -1627,7 +1627,12 @@ export default function ConnectorsPage() {
                 onClick={() => setDrawerConnector(connector)}
                 className="cursor-pointer"
               >
-                <ConnectorCard connector={connector} />
+                <ConnectorCard
+                  connector={connector}
+                  onConnect={() => handleToggle(connector.id, "connected")}
+                  onDisconnect={() => handleToggle(connector.id, "available")}
+                  onStatusChange={handleToggle}
+                />
               </div>
             ))}
           </div>
