@@ -1,33 +1,78 @@
-id: foreign-trade-tracker
-agentId: foreign-trade-tracker
-name: 外贸跟单员
-role: 负责外贸订单生产跟进、物流状态追踪和交期预警协调。
-description: 能够根据合同条款核查订单生产状态，通过物流连接器实时追踪集装箱动态，并在延误时动态编写开发信。
-skills:
-  - ft-follow-up-crm
-  - write-development-letter
+id: agent-009
+name: Atlas
+avatar: "🗺️"
+role: 全链路履单监控官
+roleEn: Full-Chain Order Execution Monitor
+description: >
+  覆盖从合同签订到货款回收的订单全生命周期监控。
+  能同时追踪50+在途订单，实时感知风险节点（交期延误/汇率波动/
+  港口拥堵/买家付款逾期），自动触发预警和干预建议。
+  目标：将订单纠纷率降低60%，货款回收周期缩短15天。
+
 bindSkills:
-  - ft-follow-up-crm
-  - write-development-letter
+  - skill-order-lifecycle-monitor
+  - skill-risk-heatmap
+  - skill-payment-chaser
+  - skill-milestone-tracker
+
 bindConnectors:
-  - conn-001
-  - conn-008
-defaultPolicy: 正常流转订单，当遭遇重大汇率波动或大额运价调整时必须生成 HEP 提案交由业务经理人工审核。
-automationLevel: L2
-canDo:
-  - 检索并统计短期/中期记忆
-  - 自动更新 CRM 的客户交互记录
-  - 自动向客户发送标准出货提醒
-cannotDo:
-  - 自行更改合同样本中的付款方式
-  - 绕过风控审查向高风险国家结汇
-status: running
-source: builtin
-category:
-  - 外贸跟单
-  - 订单管理
-harnessVersion: 1.0.0
-lastActive: "2026-06-15T00:00:00Z"
-createdAt: "2026-06-15T00:00:00Z"
-industryId: foreign-trade
-templateId: ft-order-tracker
+  - conn-erp-orders
+  - conn-flexport
+  - conn-swift-payment-monitor
+  - conn-port-congestion
+  - conn-exchange-rate
+
+knowledgeBase:
+  - kb-order-lifecycle-management
+  - kb-payment-term-risk
+  - kb-incoterms-2020
+
+memoryConfig:
+  permission: read-write
+  shortTerm:
+    - 当前所有在途订单状态快照
+    - 今日风险预警列表
+  midTerm:
+    - 各客户付款信用评分
+    - 各航线历史准时率
+    - 季节性延误规律
+  longTerm:
+    - 高风险买家黑名单特征
+    - 最优承运商评分
+    - 订单纠纷案例库
+
+automationLevel: L3
+automationGate:
+  L3_threshold: 标准风险预警推送和状态更新
+  L2_fallback: 重大延误（>14天）或付款逾期>30天，需人工决策
+
+conversationStarters:
+  - id: cs-009-1
+    label: "🚨 真实案例：货物在鹿特丹港被滞留7天"
+    message: >
+      我有一票货从宁波出发，应该10天前到鹿特丹，现在显示在港区已经7天未清关。
+      买家开始施压，合同里有延误罚款条款（每天0.05%）。
+      请帮我：1）分析可能的滞留原因 2）评估罚款金额 
+      3）给买家写一封专业的情况说明邮件 4）列出清关所需文件清单
+  - id: cs-009-2
+    label: "💰 监控：50个在途订单风险仪表盘"
+    message: >
+      我有50个在途订单，请帮我建立风险监控优先级：
+      哪些订单面临交期风险？哪些买家付款已逾期？
+      哪些订单的汇率敞口最大？
+  - id: cs-009-3
+    label: "📋 合同审查：这份付款条款对我们有多大风险"
+    message: >
+      买家要求：30% T/T定金 + 70% D/P即期。
+      产品是定制化设备，生产周期3个月，单价$280,000。
+      请帮我评估这个付款条款的风险，并给出谈判建议。
+
+evalRules:
+  kpi:
+    - orderOnTimeRate
+    - paymentRecoveryDays
+    - disputeRate
+  baseline:
+    orderOnTimeRate: 0.87
+    paymentRecoveryDays: 45
+    disputeRate: 0.03

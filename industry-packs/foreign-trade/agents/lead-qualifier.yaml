@@ -1,29 +1,86 @@
-id: lead-qualifier
-agentId: lead-qualifier
-name: 线索筛选专员
-role: 负责海量询盘过滤、虚假询盘判定与高价值线索分类。
-description: 自动分析通过电商平台或展会提交的询盘。根据发信人背景、HS 编码所处国家及需求急迫度进行打分与真伪判断。
-skills:
-  - ft-inquiry-grading
+id: agent-010
+name: Hunter
+avatar: "🎯"
+role: 精准客开情报官
+roleEn: Precision Lead Intelligence Officer
+description: >
+  将原始线索转化为有完整情报的高价值目标客户。
+  融合海关数据、LinkedIn图谱、网站分析和行业数据库，
+  在接触客户前完成360°买家画像，让每次开发都有的放矢。
+  核心能力：从数百个线索中精准识别最有可能成交的前10%。
+
 bindSkills:
-  - ft-inquiry-grading
+  - skill-lead-enrichment
+  - skill-icp-matcher
+  - skill-propensity-scoring
+  - skill-contact-finder
+
 bindConnectors:
-  - conn-017
-defaultPolicy: 中低风险意向自动录入工作空间，高危欺诈线索标记为 spam 并不予跟进。
-automationLevel: L2
-canDo:
-  - 分析询盘意图及评分
-  - 自动将合格线索录入 CRM
-cannotDo:
-  - 直接发送报价给客户
-  - 删除任何历史询盘底表数据
-status: running
-source: builtin
-category:
-  - 询盘管理
-  - 线索初筛
-harnessVersion: 1.0.0
-lastActive: "2026-06-15T00:00:00Z"
-createdAt: "2026-06-15T00:00:00Z"
-industryId: foreign-trade
-templateId: ft-lead-qualifier
+  - conn-hunter-io
+  - conn-clearbit
+  - conn-linkedin-sales-nav
+  - conn-customs-data
+  - conn-apollo-io
+
+knowledgeBase:
+  - kb-icp-definition-framework
+  - kb-buyer-signal-library
+  - kb-market-entry-indicators
+
+memoryConfig:
+  permission: read-write
+  shortTerm:
+    - 当前正在研究的目标公司
+    - 本次线索评分参数
+  midTerm:
+    - 历史成单客户特征画像
+    - 各行业ICP（理想客户画像）定义
+    - 高意向信号触发记录
+  longTerm:
+    - 成交客户共性特征模型
+    - 市场渗透白图（已覆盖vs未覆盖）
+    - 竞品客户渗透图谱
+
+automationLevel: L3
+automationGate:
+  L3_threshold: 线索评分<80分的自动进入培育序列
+  L2_fallback: 评分>=80分的S级线索，触发销售优先跟进提醒
+
+conversationStarters:
+  - id: cs-010-1
+    label: "🎯 真实案例：从展会名片到完整买家情报"
+    message: >
+      我在广交会拿到一张名片：
+      John Williams, Procurement Director, Williams Hardware LLC, Atlanta GA USA
+      邮箱：j.williams@williamshardware.com
+      
+      请帮我在5分钟内完成这个买家的360°情报：
+      1）公司规模/年营收/采购规模估算
+      2）决策链（谁是真正的决策人）
+      3）他们目前在从哪里采购（海关数据）
+      4）我们的切入点 and 差异化话术
+      5）综合评分和建议行动
+  - id: cs-010-2
+    label: "🗺️ 市场开发：找出美国五金市场前50个目标客户"
+    message: >
+      我要开发美国五金分销市场，产品是工具收纳系统。
+      请帮我定义这个市场的ICP（理想客户画像），
+      然后基于海关数据和LinkedIn，给出前50个最值得开发的目标公司清单，
+      按开发优先级排序。
+  - id: cs-010-3
+    label: "📊 诊断：为什么我们的线索转化率只有0.3%"
+    message: >
+      我们每月从阿里巴巴、展会、LinkedIn收到约500条线索，
+      最终成交只有1-2单（转化率约0.3-0.4%）。
+      行业平均是2-3%。请帮我诊断问题根源，
+      并给出ICP重新定义和线索评分系统的建议。
+
+evalRules:
+  kpi:
+    - leadToMQLRate
+    - mqlToSQLRate
+    - qualificationAccuracy
+  baseline:
+    leadToMQLRate: 0.15
+    mqlToSQLRate: 0.25
+    qualificationAccuracy: 0.82
