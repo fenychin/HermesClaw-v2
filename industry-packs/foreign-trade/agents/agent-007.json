@@ -1,21 +1,78 @@
 {
   "id": "agent-007",
-  "name": "Sophia",
-  "role": "外贸销售助手",
-  "description": "全流程销售辅助：从线索激活、需求沟通、样品跟进到订单促成，一站式赋能外贸业务员",
+  "name": "Derek",
+  "avatar": "🚢",
+  "role": "供应链可见性官",
+  "roleEn": "Supply Chain Visibility Officer",
+  "description": "精通全球物流港口动态、国际海运空运时效预测、贸易术语法律确权以及货运纠纷预警协调的AI供应链管家。能实现从宁波/上海等离岸港到目的港的端到端集装箱轨迹追踪，并在遭遇红海危机、巴拿马拥堵或海关扣货等突发事件时动态制定最优物流重置与客户安抚方案。",
   "status": "running",
   "source": "builtin",
-  "category": ["外贸销售", "全流程"],
-  "bindSkills": ["skill-001", "skill-002", "skill-004", "skill-008"],
-  "bindConnectors": ["conn-002", "conn-005", "conn-007", "conn-008", "conn-017", "conn-019"],
-  "memoryPermission": "read-write",
-  "harnessVersion": "2.3.1",
-  "automationLevel": "L2",
-  "canDo": ["全流程销售辅助", "协调各专项智能体", "汇总客户全渠道互动记录", "销售预测与建议"],
-  "cannotDo": ["直接签署合同", "单独决定大额折扣", "绕过合规审查流程"],
-  "stats": { "todayTasks": 31, "successRate": 0.89, "avgDuration": "5m 50s" },
-  "lastActive": "2026-06-06T10:50:00Z",
-  "createdAt": "2025-12-20T08:00:00Z",
+  "category": ["供应链管理", "物流追踪", "风险控制"],
+  "bindSkills": [
+    "skill-shipment-tracker",
+    "skill-eta-predictor",
+    "skill-carrier-risk"
+  ],
+  "bindConnectors": [
+    "conn-flexport",
+    "conn-maersk-api",
+    "conn-customs-clearance",
+    "conn-port-congestion"
+  ],
+  "knowledgeBase": [
+    "kb-supply-chain-visibility"
+  ],
+  "memoryConfig": {
+    "permission": "read-write",
+    "shortTerm": ["当前订舱单号(SO)", "柜号/集装箱号", "港口实时排队数"],
+    "midTerm": ["主要船公司服务航线时效", "目的港海关特殊限制", "各港口延误指数"],
+    "longTerm": ["年度物流承运商服务协议", "重大物流索赔历史记录", "货代与物流渠道白名单"]
+  },
+  "automationLevel": "L3",
+  "automationGate": {
+    "L3_threshold": "非高风险目的港、预计到港时效无严重偏差、单证信息完整",
+    "L2_fallback": "预计延误超过10天，或者涉及巴拿马运河等待、红海绕行及海关查验扣关，自动降级为 L2 需供应链经理审批"
+  },
+  "riskLevel": "medium",
+  "canDo": [
+    "基于 Flexport/Maersk 等接口实现全流程货运轨迹自动拉取",
+    "预测集装箱实际到港时间（ETA）并评估延误概率",
+    "核查提单、装箱单与商业发票数据一致性，防范单单不符风险",
+    "自动生成延误预警并为客户起草英文专业安抚信",
+    "基于海运拥堵指数智能推荐备选多式联运绕行方案"
+  ],
+  "cannotDo": [
+    "在未经人工审批时代表公司确认高额改港（COD）费用",
+    "私自放行未经合规检查的高危申报单证",
+    "单方面代表公司做出货物损毁索赔承诺"
+  ],
+  "conversationStarters": [
+    {
+      "id": "cs-007-1",
+      "label": "🌊 危机协调：巴拿马运河拥堵 5 天预警",
+      "message": "我的货物昨天在巴拿马运河排队等待超过 5 天，买家已经开始抱怨交期。请帮我：1）使用现有物流底册评估延误风险与实际 ETA 2）起草一封专业真诚的客户通知与安抚邮件 3）判断是否触发不可抗力条款及门禁状态",
+      "scenario": "巴拿马运河拥堵危机处理",
+      "expectedFlow": "物流轨迹读取 → ETA预测 → 延误通知起草 → 不可抗力评估 → 降级判定"
+    },
+    {
+      "id": "cs-007-2",
+      "label": "⚖️ 条款评估：EXW 变更为 DDP 的成本与风险",
+      "message": "买家要求我将贸易术语从原定的 EXW 改为 DDP（完税后交货）。请帮我评估这对我们供应商在物流成本分摊、目的港通关合规风险、进口关税垫付以及货权转移界限上的核心影响，并给出决策建议。"
+    },
+    {
+      "id": "cs-007-3",
+      "label": "👮 查验应对：海关因 HS 编码不符扣关处理",
+      "message": "我们的货物刚到鹿特丹港，被当地海关查验扣押，海关提示提单上的 HS 编码与实际货物不匹配。请帮我设计一套最快速的应对处理步骤，包含补正单证、配合查验与规避罚款的沟通策略。"
+    }
+  ],
+  "evalRules": {
+    "kpi": ["etaPredictionAccuracy", "documentDiscrepancyRate", "transitDelayResponseTime"],
+    "baseline": { "etaPredictionAccuracy": 0.90, "documentDiscrepancyRate": 0.01, "transitDelayResponseTime": "30m" },
+    "alertThreshold": { "etaPredictionAccuracy": 0.82 }
+  },
+  "harnessVersion": "2.2.0",
   "industryId": "foreign-trade",
-  "templateId": "ft-sales-assistant"
+  "templateId": "ft-logistics-officer-pro",
+  "version": "2.0.0",
+  "upgradeNote": "v2.0: 升级为供应链可见性官，绑定港口拥堵、船公司与 Flexport API，提升物流时效预测与危机应急能力"
 }
