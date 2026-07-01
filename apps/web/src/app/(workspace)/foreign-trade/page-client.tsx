@@ -37,11 +37,7 @@ import { WorkflowHealthMonitor } from "./_components/workflow-health-monitor";
 import { useForeignTradeCapabilities } from "@/hooks/use-foreign-trade-capabilities";
 import { useDashboardStats, countUrgentInquiries } from "@/hooks/use-dashboard-stats";
 import { useIntelligence, filterRiskItems } from "@/hooks/use-intelligence";
-import {
-  AgentSection,
-  SkillSection,
-  ConnectorSection,
-} from "./_components/trade-resource-cards";
+import { RecommendedResourcesCard } from "./_components/trade-resource-cards";
 import type { MarketIntelligence } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import dynamic from "next/dynamic";
@@ -1175,20 +1171,13 @@ export default function ForeignTradePage() {
             </div>
           </section>
 
-          {/* ---- 外贸专属智能体推荐 ---- */}
-          <div>
-            <AgentSection agents={tradeAgents} isLoading={capabilitiesLoading} />
-          </div>
-
-          {/* ---- 外贸知识与Skill模板 ---- */}
-          <div>
-            <SkillSection skills={tradeSkills} isLoading={capabilitiesLoading} />
-          </div>
-
-          {/* ---- 连接器推荐 ---- */}
-          <div>
-            <ConnectorSection connectors={tradeConnectors} isLoading={capabilitiesLoading} />
-          </div>
+          {/* ---- 外贸推荐资源（智能体、知识模板、连接器三合一） ---- */}
+          <RecommendedResourcesCard
+            agents={tradeAgents}
+            skills={tradeSkills}
+            connectors={tradeConnectors}
+            isLoading={capabilitiesLoading}
+          />
         </div>
 
         {/* ================================================ */}

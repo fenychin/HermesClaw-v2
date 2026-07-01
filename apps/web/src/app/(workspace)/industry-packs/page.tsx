@@ -284,12 +284,43 @@ function PackTimeline({ packId }: { packId: string }) {
 }
 
 /** 展开能力明细面板 */
-function CapabilityPanel({ manifest }: { manifest: any }) {
+function CapabilityPanel({ manifest, packId }: { manifest: any; packId: string }) {
   const agents = manifest?.agents || [];
   const capabilities = manifest?.capabilities || [];
   const skills = capabilities.filter((c: any) => c.type === "skill");
   const workflows = capabilities.filter((c: any) => c.type === "workflow");
   const connectors = capabilities.filter((c: any) => c.type === "connector");
+
+  // 降级策略：如果 manifest 数据为空，从 SDK API 实时拉取
+  const [sdkData, setSdkData] = useState<{
+    workflows?: any[]
+    agents?: any[]
+    skills?: any[]
+    connectors?: any[]
+  } | null>(null)
+  const needsFallback = capabilities.length === 0 && agents.length === 0
+
+  useEffect(() => {
+    if (!needsFallback || !packId) return
+    let active = true
+    fetch(`/api/industry-packs/${packId}/capabilities`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (active && data) setSdkData(data) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [needsFallback, packId])
+
+  // 降级数据优先使用 SDK 实时结果
+  const displayAgents = (agents.length > 0 ? agents : sdkData?.agents) || []
+  const displaySkills = skills.length > 0
+    ? skills
+    : (sdkData?.skills || []).map((s: any) => ({ ...s, type: 'skill', displayName: s.name || s.title }))
+  const displayWorkflows = workflows.length > 0
+    ? workflows
+    : (sdkData?.workflows || []).map((w: any) => ({ ...w, type: 'workflow', displayName: w.name || w.title }))
+  const displayConnectors = connectors.length > 0
+    ? connectors
+    : (sdkData?.connectors || []).flat().map((c: any) => ({ ...c, type: 'connector', displayName: c.name || c.title }))
 
   return (
     <div className="border-t border-border/30 pt-3 mt-1 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
@@ -299,12 +330,12 @@ function CapabilityPanel({ manifest }: { manifest: any }) {
           <Sparkles className="size-3.5 text-purple-500" />
           <span>数字员工模板</span>
           <span className="ml-auto text-[10px] bg-purple-500/10 text-purple-500 px-1.5 py-0.2 rounded-full font-mono font-semibold">
-            {agents.length}
+            {displayAgents.length}
           </span>
         </div>
         <div className="flex flex-col gap-1.5 max-h-[150px] overflow-y-auto pr-1">
-          {agents.length > 0 ? (
-            agents.map((agent: any) => (
+          {displayAgents.length > 0 ? (
+            displayAgents.map((agent: any) => (
               <div
                 key={agent.id}
                 className="flex flex-col gap-0.5 rounded-lg bg-accent/30 px-2.5 py-1.5 border border-border/20"
@@ -332,12 +363,12 @@ function CapabilityPanel({ manifest }: { manifest: any }) {
           <Zap className="size-3.5 text-amber-500" />
           <span>技能组件</span>
           <span className="ml-auto text-[10px] bg-amber-500/10 text-amber-500 px-1.5 py-0.2 rounded-full font-mono font-semibold">
-            {skills.length}
+            {displaySkills.length}
           </span>
         </div>
         <div className="flex flex-wrap gap-1.5 max-h-[150px] overflow-y-auto pr-1">
-          {skills.length > 0 ? (
-            skills.map((cap: any) => (
+          {displaySkills.length > 0 ? (
+            displaySkills.map((cap: any) => (
               <span
                 key={cap.id}
                 title={`${cap.id}@v${cap.version} — ${cap.description || ""}`}
@@ -359,12 +390,12 @@ function CapabilityPanel({ manifest }: { manifest: any }) {
           <Boxes className="size-3.5 text-emerald-500" />
           <span>工作流模板</span>
           <span className="ml-auto text-[10px] bg-emerald-500/10 text-emerald-500 px-1.5 py-0.2 rounded-full font-mono font-semibold">
-            {workflows.length}
+            {displayWorkflows.length}
           </span>
         </div>
         <div className="flex flex-wrap gap-1.5 max-h-[150px] overflow-y-auto pr-1">
-          {workflows.length > 0 ? (
-            workflows.map((cap: any) => (
+          {displayWorkflows.length > 0 ? (
+            displayWorkflows.map((cap: any) => (
               <span
                 key={cap.id}
                 title={`${cap.id}@v${cap.version} — ${cap.description || ""}`}
@@ -386,12 +417,12 @@ function CapabilityPanel({ manifest }: { manifest: any }) {
           <Package className="size-3.5 text-blue-500" />
           <span>系统连接器</span>
           <span className="ml-auto text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.2 rounded-full font-mono font-semibold">
-            {connectors.length}
+            {displayConnectors.length}
           </span>
         </div>
         <div className="flex flex-wrap gap-1.5 max-h-[150px] overflow-y-auto pr-1">
-          {connectors.length > 0 ? (
-            connectors.map((cap: any) => (
+          {displayConnectors.length > 0 ? (
+            displayConnectors.map((cap: any) => (
               <span
                 key={cap.id}
                 title={`${cap.id}@v${cap.version} — ${cap.description || ""}`}
@@ -768,7 +799,7 @@ function PackCard({
 
       {/* 能力明细面板 */}
       {expanded && isInstalled && installation?.manifest && (
-        <CapabilityPanel manifest={installation.manifest} />
+        <CapabilityPanel manifest={installation.manifest} packId={available.packId} />
       )}
 
       {/* 错误消息 */}

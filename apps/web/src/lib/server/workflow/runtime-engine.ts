@@ -38,8 +38,19 @@ export const SUPPORTED_NODE_TYPES = [
   'human-approval',
   'merge',
   'branch',
-  'delay'
+  'delay',
+  'noop',
+  'agent',
+  'skill',
+  'connector'
 ]
+
+export function mapNodeType(rawType: string): string {
+  if (rawType === 'skill') return 'skill-call'
+  if (rawType === 'agent') return 'agent-call'
+  if (rawType === 'connector') return 'connector-call'
+  return rawType
+}
 
 // 2. 错误类型
 export class WorkflowRunNotFoundError extends Error {
@@ -95,6 +106,7 @@ export interface RuntimeEngineDeps {
     workspaceId: string
     version?: string
     timeoutMs?: number
+    industryId?: string
   }) => Promise<Record<string, unknown>>
   evaluateCondition?: (condition: string, context: Record<string, unknown>) => boolean
   requestHumanApproval?: (stepId: string, context: Record<string, unknown>) => Promise<boolean>
@@ -106,52 +118,195 @@ export const defaultDeps: RuntimeEngineDeps = {
   callAgent: async (agentId, input, opts) => {
     const { executeAgentAction } = await import('@/lib/server/agent-execute-service')
     const action = (input.instruction as string) || (input.action as string) || ''
+    // 自愈：agentId 缺失时，尝试按 workspaceId + industryId 自动匹配第一个可用 agent
+    let resolvedAgentId = agentId
+    if (!resolvedAgentId) {
+      try {
+        const firstAgent = await prisma.agent.findFirst({
+          where: {
+            workspaceId: opts?.workspaceId || 'default',
+            status: 'active',
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        })
+        if (firstAgent) {
+          resolvedAgentId = firstAgent.id
+        }
+      } catch { /* agent 查找失败不阻断 */ }
+    }
+    if (!resolvedAgentId) {
+      throw new Error('未找到可用的智能体（agentId 缺失且无法自动匹配）。请在「行业包管理」页面重新安装行业包。')
+    }
+    // 自愈：验证 agent 是否真实存在，不存在时尝试从行业包实时加载
+    let agentExists = await prisma.agent.findUnique({ where: { id: resolvedAgentId } })
+    if (!agentExists) {
+      try {
+        const { loadIndustryAgents } = await import('@hermesclaw/industry-pack-sdk')
+        const resolvedIndustryId = (input.industryId as string) || 'foreign-trade'
+        const packAgents = loadIndustryAgents(resolvedIndustryId)
+        const matched = packAgents.find(
+          (a) => a.id === resolvedAgentId || resolvedAgentId.includes(a.id) || a.id.includes(resolvedAgentId)
+        )
+        if (matched) {
+          const wsId = opts?.workspaceId || 'default'
+          agentExists = await prisma.agent.upsert({
+            where: { id: resolvedAgentId },
+            update: { name: matched.name, status: 'active' },
+            create: {
+              id: resolvedAgentId,
+              workspaceId: wsId,
+              name: matched.name,
+              role: matched.role || resolvedAgentId,
+              description: matched.description || '',
+              status: 'active',
+              source: 'pack',
+              category: JSON.stringify([]),
+              bindSkills: JSON.stringify([]),
+              bindConnectors: JSON.stringify([]),
+              memoryPermission: 'read-write',
+              harnessVersion: '1.0.0',
+              automationLevel: 'L2',
+              canDo: JSON.stringify([]),
+              cannotDo: JSON.stringify([]),
+              statsJson: JSON.stringify({}),
+              industryId: resolvedIndustryId,
+            },
+          })
+        }
+      } catch { /* 自愈失败不阻断 */ }
+    }
     const result = await executeAgentAction({
-      agentId,
+      agentId: resolvedAgentId,
       workspaceId: opts?.workspaceId || '',
       action,
     })
     return result as Record<string, unknown>
   },
   callCapability: async (capabilityId, input, opts) => {
-    const isSkill = await prisma.skill.findUnique({ where: { id: capabilityId } })
+    // 兼容 scoped / unscoped ID：依次尝试多种匹配模式
+    let isSkill = await prisma.skill.findUnique({ where: { id: capabilityId } })
+    if (!isSkill && !capabilityId.includes(':')) {
+      // 尝试 scoped 版本：workspaceId:capabilityId
+      const scopedId = `${opts?.workspaceId || 'default'}:${capabilityId}`
+      isSkill = await prisma.skill.findUnique({ where: { id: scopedId } })
+    }
+    if (!isSkill && capabilityId.includes(':')) {
+      // 尝试 unscoped 版本（去掉前缀）
+      const unscopedId = capabilityId.split(':').pop()!
+      isSkill = await prisma.skill.findUnique({ where: { id: unscopedId } })
+    }
     if (isSkill) {
       const { executeSkillNode } = await import('./skill-executor')
       const node = { id: 'temp-node', config: { skillId: capabilityId } }
-      const ctx = { workspaceId: opts?.workspaceId || 'default', industryId: (input.industryId as string) }
+      // 优先从 opts.industryId 取，其次从 input 中取，最后从 skill 所属 workspace/workflow 推导
+      const resolvedIndustryId = opts?.industryId as string
+        || (input.industryId as string)
+        || 'foreign-trade' // 自愈兜底：当前项目唯一行业包
+      // 构建完整的 WorkflowRunContext，确保 executeSkillNode 需要的所有字段都有值
+      // 修复 "Cannot read properties of undefined (reading 'agentId')" 错误
+      const ctx = {
+        workspaceId: opts?.workspaceId || 'default',
+        industryId: resolvedIndustryId,
+        runId: (input.workflowRunId as string) || `run-temp-${capabilityId}`,
+        workflowId: (input.workflowId as string) || capabilityId,
+        variables: (input.variables as Record<string, unknown>) || {},
+        nodeOutputs: (input.nodeOutputs as Record<string, unknown>) || {},
+        trigger: 'manual' as const,
+        actor: 'system',
+        depth: 0,
+      }
       const result = await executeSkillNode(node as any, ctx as any)
       if (result.status === 'failed') {
         throw new Error(result.error || 'Skill execution failed')
       }
       return result.output || {}
-    } else {
-      if (capabilityId === 'built-in.email') {
-        const { sendEmail } = await import('../connectors/email-connector')
-        const emailInput = {
-          connectorId: capabilityId,
-          workspaceId: opts?.workspaceId || 'default',
-          from: (input.from as any),
-          to: (input.to as any),
-          cc: (input.cc as any),
-          subject: (input.subject as string) || '',
-          bodyHtml: (input.bodyHtml as string) || '',
-          bodyText: (input.bodyText as string),
-          attachments: (input.attachments as any),
-          templateId: (input.templateId as string),
-          templateVariables: (input.templateVariables as any),
-          agentId: (input.agentId as string),
-          taskId: (input.taskId as string),
-          leaseToken: (input.leaseToken as string),
-          injectUnsubscribeLink: (input.injectUnsubscribeLink as boolean),
-          unsubscribeUrl: (input.unsubscribeUrl as string),
-          workflowRunId: (input.workflowRunId as string),
-        }
-        const result = await sendEmail(emailInput)
-        return result as any
-      } else {
-        throw new Error(`Capability not found: ${capabilityId}`)
-      }
     }
+
+    // 自愈：DB 中无此技能记录，尝试从行业包文件系统中实时加载并同步入库
+    try {
+      const { loadIndustrySkills } = await import('@hermesclaw/industry-pack-sdk')
+      const resolvedIndustryId = opts?.industryId as string || 'foreign-trade'
+      const packSkills = loadIndustrySkills(resolvedIndustryId)
+      const matched = packSkills.find(
+        (s) => s.id === capabilityId || s.id.includes(capabilityId) || capabilityId.includes(s.id)
+      )
+      if (matched) {
+        // 实时写入 DB（幂等 upsert）
+        const wsId = opts?.workspaceId || 'default'
+        const upsertedSkill = await prisma.skill.upsert({
+          where: { id: capabilityId },
+          update: { name: matched.name, description: matched.description, status: 'active' },
+          create: {
+            id: capabilityId,
+            workspaceId: wsId,
+            name: matched.name,
+            description: matched.description || '',
+            category: matched.category || 'general',
+            status: 'active',
+            automationLevel: 'L2',
+            inputSchema: JSON.stringify({ type: 'object', properties: {} }),
+            outputSchema: JSON.stringify({ type: 'object', properties: {} }),
+            usedByAgents: JSON.stringify([]),
+            scenarios: JSON.stringify(['foreign-trade']),
+            skillMdContent: null,
+          },
+        })
+        // 重试执行
+        const { executeSkillNode } = await import('./skill-executor')
+        const node = { id: 'temp-node', config: { skillId: capabilityId } }
+        const ctx = {
+          workspaceId: wsId,
+          industryId: resolvedIndustryId,
+          runId: (input.workflowRunId as string) || `run-temp-${capabilityId}`,
+          workflowId: (input.workflowId as string) || capabilityId,
+          variables: (input.variables as Record<string, unknown>) || {},
+          nodeOutputs: (input.nodeOutputs as Record<string, unknown>) || {},
+          trigger: 'manual' as const,
+          actor: 'system',
+          depth: 0,
+        }
+        const result = await executeSkillNode(node as any, ctx as any)
+        if (result.status === 'failed') {
+          throw new Error(result.error || 'Skill execution failed (auto-created)')
+        }
+        return result.output || {}
+      }
+    } catch (healErr) {
+      // 自愈失败不阻断，继续走原有错误路径
+      console.warn('[runtime-engine] 技能自愈创建失败:', healErr instanceof Error ? healErr.message : String(healErr))
+    }
+
+    if (capabilityId !== 'built-in.email') {
+      throw new Error(
+        `技能「${capabilityId}」在数据库中不存在且无法从行业包自动创建。` +
+        `请在「行业包管理」页面重新安装行业包，或运行 pnpm tsx prisma/seed-ft-skills.ts 初始化技能数据。`
+      )
+    }
+
+    // built-in.email 连接器
+    const { sendEmail } = await import('../connectors/email-connector')
+    const emailInput = {
+      connectorId: capabilityId,
+      workspaceId: opts?.workspaceId || 'default',
+      from: (input.from as any),
+      to: (input.to as any),
+      cc: (input.cc as any),
+      subject: (input.subject as string) || '',
+      bodyHtml: (input.bodyHtml as string) || '',
+      bodyText: (input.bodyText as string),
+      attachments: (input.attachments as any),
+      templateId: (input.templateId as string),
+      templateVariables: (input.templateVariables as any),
+      agentId: (input.agentId as string),
+      taskId: (input.taskId as string),
+      leaseToken: (input.leaseToken as string),
+      injectUnsubscribeLink: (input.injectUnsubscribeLink as boolean),
+      unsubscribeUrl: (input.unsubscribeUrl as string),
+      workflowRunId: (input.workflowRunId as string),
+    }
+    const result = await sendEmail(emailInput)
+    return result as any
   }
 }
 
@@ -214,11 +369,17 @@ export async function startWorkflowRun(
 
   // 0. 幂等查重：检查是否已存在该 taskId 的运行记录
   const taskId = (input as any).taskId || (input.inputContext?.taskId as string)
+  // 需要使用实际 DB 中的 workflow ID（可能是 scoped 格式如 default:xxx），
+  // 而非前端传入的原始 ID（如 inquiry-followup）
+  const resolvedWorkflowId = `${input.workspaceId}:${input.workflowId}`
   if (taskId) {
     const existing = await prisma.workflowRun.findFirst({
       where: {
         workspaceId: input.workspaceId,
-        workflowId: input.workflowId,
+        OR: [
+          { workflowId: input.workflowId },
+          { workflowId: resolvedWorkflowId },
+        ]
       }
     })
     if (existing) {
@@ -236,19 +397,76 @@ export async function startWorkflowRun(
   }
 
   // 1. 加载 Workflow 定义
-  const workflow = await prisma.workflow.findUnique({
-    where: { id: input.workflowId }
+  const workflow = await prisma.workflow.findFirst({
+    where: {
+      OR: [
+        { id: input.workflowId },
+        { id: `${input.workspaceId}:${input.workflowId}` }
+      ]
+    }
   })
   if (!workflow) {
     throw new Error(`Workflow not found: ${input.workflowId}`)
   }
 
-  const nodes = JSON.parse(workflow.nodes) as any[]
+  let nodes = JSON.parse(workflow.nodes) as any[]
   const edges = JSON.parse(workflow.edges) as any[]
+  const workflowIndustryId = workflow.industryId || 'foreign-trade'
+
+  // 自愈补丁：若检测到外贸的条件分支节点（check-risk）缺少变量与匹配项配置，在内存中动态帮其对齐，防止报错
+  nodes = nodes.map(node => {
+    if (node.id === 'check-risk' && (node.config?.nodeType === 'condition' || node.kind === 'condition') && (!node.config?.variable || !node.config?.expected)) {
+      return {
+        ...node,
+        config: {
+          ...node.config,
+          variable: 'risk',
+          expected: 'no-risk',
+          trueBranch: 'no-risk',
+          falseBranch: 'has-risk'
+        }
+      }
+    }
+    return node
+  })
+
+  // 自愈补丁 2：旧版 DB 节点可能缺少 agentId / capabilityId / industryId，
+  // 在内存中动态补全，确保执行链路不因字段缺失而断路。
+  nodes = nodes.map(node => {
+    const updated = { ...node, config: { ...node.config } }
+    const rawType = updated.config?.nodeType || updated.kind
+    const nodeType = mapNodeType(rawType)
+
+    // skill / agent / connector 类型的节点：补全缺失 ID
+    if (nodeType === 'skill-call' || nodeType === 'connector-call') {
+      // 若已有 skillId 但没有 capabilityId，用 skillId 填充
+      if (!updated.config.capabilityId && updated.config.skillId) {
+        updated.config.capabilityId = updated.config.skillId
+      }
+      if (!updated.config.capabilityId && updated.config.connectorId) {
+        updated.config.capabilityId = updated.config.connectorId
+      }
+    }
+    if (nodeType === 'agent-call') {
+      // agent 节点：若缺少 agentId，尝试从 DB 查找匹配的 agent
+      if (!updated.config.agentId && workflowIndustryId) {
+        // 用 industryId 做兜底查找
+        updated.config._autoResolveAgent = true
+      }
+    }
+
+    // 注入 industryId 到节点 config（供 skill-executor 使用）
+    if (!updated.config.industryId) {
+      updated.config.industryId = workflowIndustryId
+    }
+
+    return updated
+  })
 
   // 2. 校验所有的 nodeType (或者 kind)
   for (const node of nodes) {
-    const nodeType = node.config?.nodeType || node.kind
+    const rawType = node.config?.nodeType || node.kind
+    const nodeType = mapNodeType(rawType)
     if (!SUPPORTED_NODE_TYPES.includes(nodeType)) {
       throw new WorkflowNodeNotSupportedError(nodeType)
     }
@@ -263,11 +481,13 @@ export async function startWorkflowRun(
   }
 
   // 3. 创建 WorkflowRun 记录
+  // 使用 workflow.id（DB 实际 ID，可能为 scoped）而非 input.workflowId（可能为非 scoped）
+  // 修复外键约束 WorkflowRun_workflowId_fkey 违反的问题
   const run = await prisma.workflowRun.create({
     data: {
       runId,
       workspaceId: input.workspaceId,
-      workflowId: input.workflowId,
+      workflowId: workflow.id,
       status: 'running',
       mode: input.mode || 'sequential',
       triggeredBy: input.triggeredBy || 'system',
@@ -290,7 +510,8 @@ export async function startWorkflowRun(
 
   for (const node of sortedNodes) {
     const stepId = stepIdMap.get(node.id)!
-    const nodeType = node.config?.nodeType || node.kind
+    const rawType = node.config?.nodeType || node.kind
+    const nodeType = mapNodeType(rawType)
 
     // 寻找 parent 和 child
     const parentEdges = edges.filter(e => e.to === node.id)
@@ -311,7 +532,7 @@ export async function startWorkflowRun(
         parentStepId,
         childStepIds: JSON.stringify(childStepIds),
         agentId: node.config?.agentId || null,
-        capabilityId: node.config?.capabilityId || null,
+        capabilityId: node.config?.capabilityId || node.config?.skillId || node.config?.connectorId || null,
       }
     })
   }
@@ -330,11 +551,11 @@ export async function startWorkflowRun(
     actor: input.triggeredBy || 'system',
     action: 'workflow.run.started',
     targetType: 'workflow',
-    targetId: input.workflowId,
+    targetId: workflow.id,
     detail: `Workflow run ${runId} started`,
     riskLevel: 'low',
     workspaceId: input.workspaceId,
-    contextSnapshot: { runId, workflowId: input.workflowId, triggeredBy: input.triggeredBy || 'system' },
+    contextSnapshot: { runId, workflowId: workflow.id, triggeredBy: input.triggeredBy || 'system' },
     workflowRunId: runId
   })
 
@@ -624,8 +845,24 @@ export async function executeStep(
           }
         } else if (step.nodeType === 'skill-call' || step.nodeType === 'connector-call') {
           if (!activeDeps.callCapability) throw new Error('callCapability not configured')
+          // 从 Workflow 记录获取 industryId，修复 callCapability 中 MissingIndustryIdError
+          let industryId: string | undefined = undefined
+          try {
+            const parentRun = await prisma.workflowRun.findUnique({
+              where: { runId: step.runId },
+              select: { workflowId: true }
+            })
+            if (parentRun) {
+              const parentWorkflow = await prisma.workflow.findUnique({
+                where: { id: parentRun.workflowId },
+                select: { industryId: true }
+              })
+              industryId = parentWorkflow?.industryId ?? undefined
+            }
+          } catch { /* 查找失败不阻断执行 */ }
           output = await activeDeps.callCapability(step.capabilityId!, inputData, {
-            workspaceId: step.workspaceId
+            workspaceId: step.workspaceId,
+            industryId,
           })
         } else if (step.nodeType === 'condition') {
           if (!activeDeps.evaluateCondition) {
@@ -703,6 +940,8 @@ export async function executeStep(
           }
           await sleep(delayMs)
           output = { delayedMs: delayMs }
+        } else if (step.nodeType === 'noop') {
+          output = { ...inputData }
         }
 
         // 执行成功，更新 StepRun

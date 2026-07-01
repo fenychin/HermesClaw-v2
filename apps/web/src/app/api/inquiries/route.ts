@@ -13,6 +13,8 @@ import { actorFromSession } from "@/lib/server/audit"
 import { auditedWrite } from "@/lib/server/audited-write"
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
+import { WorkflowSchedulerService } from "@/lib/server/workflow/scheduler"
+import { executeWorkflowRun } from "@/lib/server/workflow/runtime-engine"
 
 async function loadInquiryHandlers() {
   try {
@@ -88,7 +90,58 @@ export const POST = withRBAC(async (request: Request, ctx: WorkspaceContext) => 
       },
       () => Promise.resolve(result),  // 数据已写入，仅补审计日志
     )
-    return successResponse(result, 201)
+
+    let workflowRunId: string | undefined
+    let workflowStatus: string = "pending"
+    let workflowOutput: any = null
+    let finalPriority = result.priority || "mid"
+
+    try {
+      logger.info("[InquiryRoute] 自动启动询盘分级工作流...", {
+        inquiryId: result.id,
+        workspaceId: ctx.workspaceId,
+      })
+
+      // 1. 运行 inquiry-grade 工作流
+      const runResult = await WorkflowSchedulerService.runWorkflow({
+        workflowId: "inquiry-grade",
+        workspaceId: ctx.workspaceId,
+        inputs: {
+          inquiry_text: parsed.content,
+          customer_country: parsed.countryCode,
+          inquiryId: result.id, // 传入 inquiryId 供数据写入使用
+        },
+      })
+      workflowRunId = runResult.runId
+
+      // 2. 同步等待工作流执行结束
+      const finalRun = await executeWorkflowRun(runResult.runId, ctx.workspaceId)
+      workflowStatus = finalRun.status
+      workflowOutput = finalRun.outputContext
+
+      // 3. 重新获取更新后的等级
+      const updatedInquiry = await prisma.inquiry.findUnique({
+        where: { id: result.id },
+      })
+      if (updatedInquiry) {
+        finalPriority = updatedInquiry.priority || "mid"
+      }
+    } catch (wfError: any) {
+      logger.error("[InquiryRoute] 自动运行询盘分级工作流失败", {
+        inquiryId: result.id,
+        error: wfError.message,
+      })
+    }
+
+    const responseData = {
+      ...result,
+      priority: finalPriority,
+      workflowRunId,
+      workflowStatus,
+      workflowOutput,
+    }
+
+    return successResponse(responseData, 201)
   } catch {
     return errorResponse("创建询盘失败", 500)
   }

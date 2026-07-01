@@ -476,6 +476,19 @@ export async function installPack(
             if (updatedNode.config.connectorId && packConnectorIds.has(updatedNode.config.connectorId)) {
               updatedNode.config.connectorId = toScopedId(updatedNode.config.connectorId)
             }
+            // 自愈补丁：condition 节点缺少 variable/expected 时自动补全
+            if (updatedNode.kind === 'condition' || updatedNode.config?.nodeType === 'condition') {
+              if (!updatedNode.config.variable) updatedNode.config.variable = 'risk'
+              if (!updatedNode.config.expected) updatedNode.config.expected = 'no-risk'
+            }
+            // 自愈补丁：注入 industryId
+            if (!updatedNode.config.industryId) {
+              updatedNode.config.industryId = manifest.packId
+            }
+            // 自愈补丁：skill/connector 节点确保 capabilityId 字段存在
+            if ((updatedNode.kind === 'skill' || updatedNode.config?.nodeType === 'skill') && updatedNode.config.skillId && !updatedNode.config.capabilityId) {
+              updatedNode.config.capabilityId = updatedNode.config.skillId
+            }
           }
           if (updatedNode.skillId && (packSkillIds.has(updatedNode.skillId) || packSkillIds.has(updatedNode.skillId.replace(/^skill-/, '')))) {
             updatedNode.skillId = toScopedId(updatedNode.skillId)

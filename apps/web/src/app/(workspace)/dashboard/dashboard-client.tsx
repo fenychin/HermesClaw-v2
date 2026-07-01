@@ -21,22 +21,14 @@ import { PageHeader } from "@/components/common/page-header";
 import { PageTransition } from "@/components/common/PageTransition";
 import { cn } from "@/lib/utils";
 import { PackUpgradeModal } from "@/components/common/pack-upgrade-modal";
-import {
-  PanelErrorBoundary,
-  AiSuggestionsPanel,
-  RecommendedWorkflowsPanel,
-  ActiveAgentsPanel,
-} from "./_components/panels";
+
 
 // 动态懒加载 Recharts 图表，防止 SSR 报错并提升性能
 const TaskLineChart = dynamic(() => import("./_components/task-line-chart"), {
   ssr: false,
   loading: () => <div className="h-[220px] flex items-center justify-center text-hint text-xs">图表加载中...</div>,
 });
-const FunnelBarChart = dynamic(() => import("./_components/funnel-bar-chart"), {
-  ssr: false,
-  loading: () => <div className="h-[220px] flex items-center justify-center text-hint text-xs">图表加载中...</div>,
-});
+
 const WorkflowDonutChart = dynamic(() => import("./_components/workflow-donut-chart"), {
   ssr: false,
   loading: () => <div className="h-[220px] flex items-center justify-center text-hint text-xs">图表加载中...</div>,
@@ -256,23 +248,7 @@ export default function DashboardClient({
     retry: 2,
   });
 
-  // Funnel 数据：独立 query（独立缓存，降低 API 调用频率）
-  const {
-    data: funnelData,
-    isLoading: isFunnelLoading,
-    refetch: refetchFunnel,
-  } = useQuery<FunnelDatum[]>({
-    queryKey: ["foreign-trade", "funnel"],
-    queryFn: async () => {
-      const res = await fetch("/api/foreign-trade/funnel");
-      if (!res.ok) throw new Error("获取漏斗失败");
-      const json = await res.json();
-      return json.data || [];
-    },
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    retry: 2,
-  });
+
 
   // 切换 period
   const handlePeriodChange = useCallback((newPeriod: string) => {
@@ -429,51 +405,11 @@ export default function DashboardClient({
           </div>
         </div>
 
-        {/* 底部：条形图 - 外贸转化漏斗 */}
-        <div className="bg-card/45 border border-border backdrop-blur-md rounded-2xl p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-foreground font-semibold text-sm">外贸转化漏斗</h3>
-              <p className="text-[10px] text-hint mt-0.5">反映客户从询盘 (Inquiry) → 报价 (Quote) → 成交订单 (Order) 的流转效率</p>
-            </div>
-            <button
-              onClick={() => refetchFunnel()}
-              className="text-muted-foreground hover:text-foreground text-xs flex items-center gap-1 bg-accent/30 p-1.5 rounded-lg transition-colors border border-border/40"
-              disabled={isFunnelLoading}
-            >
-              {isFunnelLoading ? <Loader2 className="size-3 animate-spin" /> : <RefreshIcon className="size-3" />}
-              刷新漏斗
-            </button>
-          </div>
-          {isFunnelLoading && !funnelData ? (
-            <div className="h-[220px] flex items-center justify-center text-hint text-xs">
-              外贸漏斗聚合分析中...
-            </div>
-          ) : funnelData && funnelData.length > 0 ? (
-            <FunnelBarChart data={funnelData} />
-          ) : (
-            <div className="h-[220px] flex items-center justify-center text-hint text-xs">
-              当前暂无询盘和报价流转记录
-            </div>
-          )}
-        </div>
+
         {/* ═══════════════ 主内容区结束 ═══════════════ */}
         </div>
 
-        {/* ═══════════════ 右侧面板区 ═══════════════ */}
-        <aside className="hidden xl:flex w-[320px] shrink-0 flex-col gap-5 sticky top-6">
-          <PanelErrorBoundary title="今日 AI 建议">
-            <AiSuggestionsPanel />
-          </PanelErrorBoundary>
 
-          <PanelErrorBoundary title="推荐工作流">
-            <RecommendedWorkflowsPanel industryId={activeIndustryId} />
-          </PanelErrorBoundary>
-
-          <PanelErrorBoundary title="活跃智能体">
-            <ActiveAgentsPanel />
-          </PanelErrorBoundary>
-        </aside>
 
         {/* ═══════════════ 双栏容器结束 ═══════════════ */}
         </div>

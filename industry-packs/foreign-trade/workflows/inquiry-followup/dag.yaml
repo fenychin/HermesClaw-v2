@@ -18,8 +18,10 @@ nodes:
     kind: condition
     name: 贸易风险评估
     config:
-      trueBranch: auto-reply
-      falseBranch: manual-review
+      variable: risk
+      expected: no-risk
+      trueBranch: no-risk
+      falseBranch: has-risk
   - id: auto-reply
     kind: skill
     name: AI 自动起草回复

@@ -103,23 +103,24 @@ class OpenClawClient {
     const isSkill = envelope.actionType.startsWith('skill.')
 
     let rawResult: OpenClawTaskResult
-    try {
-      const req: OpenClawExecuteTaskRequest = {
-        taskId: envelope.taskId,
-        inputs: {
-          ...envelope.input,
-          workflowRunId: envelope.workflowRunId,
-          workspaceId: envelope.workspaceId,
-          agentId: envelope.agentId,
-          actionType: envelope.actionType,
-        },
-      }
-      rawResult = await this.request<OpenClawTaskResult>('/tasks/execute', req)
-    } catch (error) {
-      if (isSkill) {
-        logger.warn(`[OpenClawClient] 外部服务不可达或报错，技能任务退化至本地大模型执行引擎: ${error instanceof Error ? error.message : String(error)}`)
-        rawResult = await this.executeTaskLocally(envelope)
-      } else {
+    // 技能任务：直接走本地执行器，不经过 OpenClaw Gateway（HTTP/mock）
+    // — 本地执行器有完整的 SKILL.md 加载、治理规则注入、LLM 调用（或 Mock 降级）
+    if (isSkill) {
+      rawResult = await this.executeTaskLocally(envelope)
+    } else {
+      try {
+        const req: OpenClawExecuteTaskRequest = {
+          taskId: envelope.taskId,
+          inputs: {
+            ...envelope.input,
+            workflowRunId: envelope.workflowRunId,
+            workspaceId: envelope.workspaceId,
+            agentId: envelope.agentId,
+            actionType: envelope.actionType,
+          },
+        }
+        rawResult = await this.request<OpenClawTaskResult>('/tasks/execute', req)
+      } catch (error) {
         throw error
       }
     }

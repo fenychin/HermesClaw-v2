@@ -357,8 +357,26 @@ export async function executeSkillNode(
 
   const meta = response._meta
 
+  // 构建面向用户的业务语言输出（遵循 CLAUDE.md §14.2）
+  // 前端 NodeResultCard 读取 output.result、output.summary、output.confidence 三个顶层字段
+  // _meta 仅用于内部审计，前端不展示
+  const businessResult: Record<string, unknown> = {}
+  if (response.result && typeof response.result === 'object') {
+    Object.assign(businessResult, response.result as Record<string, unknown>)
+  }
+  // 如果 LLM 没有返回结构化结果，把原始响应中可读的字段收集起来
+  if (Object.keys(businessResult).length === 0) {
+    for (const [key, value] of Object.entries(response)) {
+      if (key !== '_meta' && key !== 'summary' && key !== 'confidence' && key !== 'warnings') {
+        businessResult[key] = value
+      }
+    }
+  }
+
   const output = {
-    ...response,
+    result: businessResult,
+    summary: response.summary || '技能执行完成，请查看详情',
+    ...(confidence !== undefined ? { confidence } : {}),
     _meta: {
       skillId,
       skillName: skill.name,

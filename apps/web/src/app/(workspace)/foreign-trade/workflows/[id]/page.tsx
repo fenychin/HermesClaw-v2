@@ -22,6 +22,23 @@ interface DbWorkflow {
   edges: Array<{ from: string; to: string; when?: string }>
 }
 
+/** 安全解析 DB 工作流的 nodes/edges 字段，兼容 JSON 字符串 / 已解析对象 */
+function safeParseNodes(raw: unknown): DbWorkflow["nodes"] {
+  if (Array.isArray(raw)) return raw as DbWorkflow["nodes"]
+  if (typeof raw === "string") {
+    try { return JSON.parse(raw) } catch { return [] }
+  }
+  return []
+}
+
+function safeParseEdges(raw: unknown): DbWorkflow["edges"] {
+  if (Array.isArray(raw)) return raw as DbWorkflow["edges"]
+  if (typeof raw === "string") {
+    try { return JSON.parse(raw) } catch { return [] }
+  }
+  return []
+}
+
 /**
  * 将 DB 中的 DAG 节点映射到用户可见的步骤
  * —— 每种 kind 生成一个步骤，按节点顺序排列
@@ -66,7 +83,16 @@ export default function WorkflowDetailPage({ params }: PageProps) {
         if (res.ok) {
           const json = await res.json()
           if (json.success) {
-            if (!cancelled) setDbWorkflow(json.data as DbWorkflow)
+            if (!cancelled) {
+              const rawData = json.data as Record<string, unknown>
+              setDbWorkflow({
+                id: rawData.id as string,
+                name: rawData.name as string,
+                description: rawData.description as string,
+                nodes: safeParseNodes(rawData.nodes),
+                edges: safeParseEdges(rawData.edges),
+              })
+            }
             return
           }
         } else if (res.status !== 404) {

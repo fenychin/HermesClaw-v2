@@ -46,7 +46,7 @@ function readAssetFile(basePathWithoutExt: string): any {
   return null;
 }
 
-function compilePackManifest(packId: string): IndustryPackManifest {
+export function compilePackManifest(packId: string): IndustryPackManifest {
   const sdkManifest = loadIndustryManifest(packId)
   const packsDir = resolvePacksDir()
 
@@ -82,22 +82,25 @@ function compilePackManifest(packId: string): IndustryPackManifest {
 
   // 2. 加载 Connectors
   const mappingPath = path.join(packsDir, packId, "connectors", "mapping")
-  const mappings = readAssetFile(mappingPath)
-  if (Array.isArray(mappings)) {
-    for (const conn of mappings) {
-      capabilities.push({
-        id: conn.id,
-        type: 'connector',
-        displayName: conn.name || conn.id,
-        description: conn.description || "",
-        version: conn.version || "1.0.0",
-        inputSchema: {},
-        outputSchema: {},
-        tags: [conn.category || "general"],
-        changelog: "init",
-        configTemplate: conn
-      })
-    }
+  const mappingRaw = readAssetFile(mappingPath)
+  const mappings: any[] = Array.isArray(mappingRaw)
+    ? mappingRaw
+    : mappingRaw?.connectors && Array.isArray(mappingRaw.connectors)
+      ? mappingRaw.connectors
+      : []  // 兼容 mapping.yaml 顶层 `connectors:` 键包装
+  for (const conn of mappings) {
+    capabilities.push({
+      id: conn.id,
+      type: 'connector',
+      displayName: conn.name || conn.id,
+      description: conn.description || "",
+      version: conn.version || "1.0.0",
+      inputSchema: {},
+      outputSchema: {},
+      tags: [conn.category || "general"],
+      changelog: "init",
+      configTemplate: conn
+    })
   }
 
   // 3. 加载 Workflows

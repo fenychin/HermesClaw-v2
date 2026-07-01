@@ -13,7 +13,13 @@ export async function GET(
     const ctx = await buildWorkspaceContext(request)
 
     const workflow = await prisma.workflow.findFirst({
-      where: { id, workspaceId: ctx.workspaceId },
+      where: {
+        workspaceId: ctx.workspaceId,
+        OR: [
+          { id },
+          { id: `${ctx.workspaceId}:${id}` }
+        ]
+      },
     })
 
     if (!workflow) {
