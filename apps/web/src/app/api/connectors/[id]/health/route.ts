@@ -7,9 +7,10 @@ import type { WorkspaceContext } from "@/lib/workspace"
 export const GET = withRBAC(async (
   req: Request,
   ctx: WorkspaceContext,
-  routeCtx: RouteContext<{ connectorId: string }>
+  routeCtx: RouteContext<{ id: string }>
 ) => {
-  const { connectorId } = await routeCtx.params
+  const { id } = await routeCtx.params
+  const connectorId = id
   const actor = await actorFromSession()
   const startTime = Date.now()
 
