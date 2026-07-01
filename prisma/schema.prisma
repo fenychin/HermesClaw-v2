@@ -1647,3 +1647,19 @@ model AgentTaskEvaluation {
   @@index([agentId, executedAt])
   @@index([workflowRunId])
 }
+
+model ConnectorSetup {
+  id                   String    @id @default(cuid())
+  workspaceId          String
+  connectorId          String
+  encryptedCredentials String
+  status               String    @default("active")
+  configuredBy         String
+  riskLevel            String
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([workspaceId, connectorId])
+  @@index([workspaceId])
+}
+
