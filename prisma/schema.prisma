@@ -513,16 +513,16 @@ model HarnessProposal {
   signalSnapshot        String                @default("") // JSON：EvaluationSignal 快照
   workspaceId           String                @default("default")
   workspace             Workspace             @relation(fields: [workspaceId], references: [id])
-  triggeredBy           String // "auto" | "manual" | "cron.evaluation"
-  triggerReason         String
-  problemStatement      String
+  triggeredBy           String? // "auto" | "manual" | "cron.evaluation"
+  triggerReason         String?
+  problemStatement      String?
   evidence              Json                  @default(dbgenerated("'[]'"))
-  proposedChange        Json // { targetComponent, description, riskLevel, automationLevel }
+  proposedChange        Json? // { targetComponent, description, riskLevel, automationLevel }
   targetSkillId         String? // 关联具体 Skill（L3 审批门禁据此匹配；null 表示非 skill 类提案）
   requiresHumanApproval Boolean               @default(true)
   estimatedImpact       String
   affectedAgents        Json                  @default(dbgenerated("'[]'"))
-  rollbackPlan          String
+  rollbackPlan          String?
   status                HarnessProposalStatus @default(pending)
   reviewedBy            String?
   reviewedAt            DateTime?
@@ -541,6 +541,18 @@ model HarnessProposal {
   canaryCompletedAt     DateTime?
   canaryRollbackReason  String?
   previousSnapshot      Json?
+  
+  // 外贸行业包自进化引擎追加字段（可选，保持兼容）
+  agentId               String?
+  triggerData           Json?
+  currentHarnessVersion String?
+  proposedChanges       Json?
+  reasoning             String?
+  riskAssessment        String?
+  approvalStatus        String?               @default("pending")
+  rejectionReason       String?
+  newHarnessVersion     String?
+  
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
 
@@ -551,6 +563,7 @@ model HarnessProposal {
   @@index([canaryStartedAt])
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, createdAt])
+  @@index([agentId, approvalStatus])
 }
 
 // ============================================================
@@ -1597,4 +1610,40 @@ model IndustryPackInstallation {
   @@unique([workspaceId, packId, packVersion])
   @@index([workspaceId, status])
   @@index([packId])
+}
+
+model AgentMemoryEntry {
+  id          String   @id @default(cuid())
+  patchId     String   @unique
+  agentId     String
+  sourceTaskId String
+  patchLayer  String   // shortTerm | midTerm | longTerm
+  operation   String   // append | update | deprecate
+  content     Json
+  confidence  Float
+  ttl         Int      // 秒，-1 表示永久
+  writtenAt   DateTime @default(now())
+  auditTraceId String
+  
+  @@index([agentId, patchLayer])
+  @@index([auditTraceId])
+}
+
+model AgentTaskEvaluation {
+  id              String   @id @default(cuid())
+  agentId         String
+  taskId          String
+  workflowRunId   String
+  executedAt      DateTime
+  durationMs      Int
+  kpiSnapshot     Json
+  baselineSnapshot Json
+  outcomeLabel    String
+  failureReason   String?
+  memoryPatchSuggestion Json
+  humanFeedback   Json?
+  createdAt       DateTime @default(now())
+  
+  @@index([agentId, executedAt])
+  @@index([workflowRunId])
 }
