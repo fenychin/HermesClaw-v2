@@ -103,6 +103,8 @@ export interface UpdateAuditEntryInput {
   detail?: string
   /** 可选：执行后补充/更新 contextSnapshot */
   contextSnapshot?: Record<string, unknown>
+  /** 可选：执行后补充/更新所属的 workspaceId */
+  workspaceId?: string
 }
 
 // ==============================
@@ -267,6 +269,7 @@ export async function updateAuditEntry(
     const data: Record<string, unknown> = { status: input.status }
     if (input.detail !== undefined) data.detail = input.detail
     if (input.contextSnapshot !== undefined) data.contextSnapshot = input.contextSnapshot
+    if (input.workspaceId !== undefined) data.workspaceId = input.workspaceId
 
     await prisma.auditLog.update({
       where: { id: input.auditId },
