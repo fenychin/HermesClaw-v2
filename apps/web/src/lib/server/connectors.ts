@@ -142,6 +142,44 @@ function resolveAutomationLevel(
   return inferRequiredAutomationLevel(category, source);
 }
 
+/**
+ * 根据连接器 category + name 推断认证类型。
+ * 当 DB config.authType 为 null 时作为 fallback。
+ */
+function inferAuthType(
+  category: string,
+  name: string,
+): 'none' | 'apikey' | 'oauth2' | 'basic' | 'webhook-secret' {
+  const n = name.toLowerCase();
+  // OAuth2：常见需要授权的云服务
+  if (
+    n.includes('gmail') || n.includes('outlook') || n.includes('google') ||
+    n.includes('notion') || n.includes('hubspot') || n.includes('github') ||
+    n.includes('discord') || n.includes('slack')
+  ) return 'oauth2';
+  // Webhook secret：消息推送类
+  if (n.includes('webhook') || n.includes('whatsapp') || n.includes('群发')) return 'webhook-secret';
+  // API Key：其余 API/数据/ERP 连接器
+  if (category === 'api' || category === 'erp' || category === 'data') return 'apikey';
+  // CRM/IM 多数使用 oauth2
+  if (category === 'crm' || category === 'im') return 'oauth2';
+  // email 类 fallback
+  if (category === 'email') return 'apikey';
+  return 'none';
+}
+
+/**
+ * 根据 requiredAutomationLevel 推断风险等级。
+ * L1 → low, L2 → medium, L3/L4 → high
+ */
+function inferRiskLevel(
+  automationLevel: string | null | undefined,
+): 'low' | 'medium' | 'high' {
+  if (automationLevel === 'L3' || automationLevel === 'L4') return 'high';
+  if (automationLevel === 'L2') return 'medium';
+  return 'low';
+}
+
 /** 根据 DB 中真实 ConnectorLease 记录 + health 字段推导线上的 lease 状态 */
 async function inferLeaseStatus(
   connectorId: string,
@@ -394,6 +432,8 @@ export async function getEnrichedConnectors(
     const serialized = serializeConnector(c as unknown as Record<string, unknown>);
     const permissions = (serialized.permissions || []) as string[];
     const stats = statsMap.get(c.id);
+    // 解析 config JSON（可能为 null）
+    const configObj = (c.config as Record<string, unknown> | null) ?? null;
 
     // 1. 授权范围推断
     const isReadWrite = permissions.some((p) =>
@@ -447,7 +487,11 @@ export async function getEnrichedConnectors(
       requiredAutomationLevel,
       leaseStatus,
       lastHeartbeatAt: c.lastHeartbeatAt?.toISOString(),
-    };
+      // ── 安全状态层字段：优先从 config JSON 读取，config=null 时启发式推断 ──
+      authType: (configObj?.authType as Connector['authType']) ?? inferAuthType(c.category, c.name),
+      riskLevel: (configObj?.riskLevel as Connector['riskLevel']) ?? inferRiskLevel(requiredAutomationLevel),
+      requiresApproval: (configObj?.requiresApproval as boolean | undefined) ?? (requiredAutomationLevel === 'L3' || requiredAutomationLevel === 'L4'),
+    } as Connector;
   }));
 }
 

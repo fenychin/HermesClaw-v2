@@ -72,6 +72,21 @@ export interface Connector {
   lastHeartbeatAt?: string
   /** 总调用次数（所有时间） */
   totalCalls?: number
+  /**
+   * 认证类型（由 config.authType 或启发式推断填充）
+   * ConnectorCard 安全状态层徽章所需字段
+   */
+  authType?: 'none' | 'apikey' | 'oauth2' | 'basic' | 'webhook-secret'
+  /**
+   * 风险等级（由 config.riskLevel 或 requiredAutomationLevel 推断填充）
+   * ConnectorCard 安全状态层徽章所需字段
+   */
+  riskLevel?: 'low' | 'medium' | 'high'
+  /**
+   * 是否需要管理员审批（L3/L4 级别连接器）
+   * ConnectorCard 审批门禁指示器所需字段
+   */
+  requiresApproval?: boolean
 }
 
 /** 连接器测试结果 */
