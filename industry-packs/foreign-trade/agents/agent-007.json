@@ -74,5 +74,65 @@
   "industryId": "foreign-trade",
   "templateId": "ft-logistics-officer-pro",
   "version": "2.0.0",
+  "harnessConfig": {
+    "currentVersion": "2.2.0",
+    "evolutionEnabled": true,
+    "evaluationWindow": 20,
+    "evaluationWindowUnit": "tasks",
+    "kpiDeviationThresholds": {
+      "degradation": -0.15,
+      "breakthrough": 0.2
+    },
+    "autoMemoryPatch": {
+      "shortTerm": true,
+      "midTerm": true,
+      "longTerm": false
+    },
+    "proposalTriggers": [
+      "kpi_degradation",
+      "failure_pattern",
+      "human_override_spike",
+      "kpi_breakthrough"
+    ],
+    "maxAutoLevelUpgrade": "L3",
+    "requireApprovalFor": [
+      "upgrade_automation_level",
+      "update_automationGate",
+      "longTerm_memory_write"
+    ]
+  },
+  "evolutionHistory": [
+    {
+      "version": "1.0.0",
+      "activatedAt": "2025-11-15T08:00:00Z",
+      "activatedBy": "system_init",
+      "changeLog": ["初始版本，基础开发信能力"]
+    },
+    {
+      "version": "2.0.0",
+      "activatedAt": "2026-07-01T06:00:00Z",
+      "activatedBy": "admin_upgrade",
+      "changeLog": [
+        "升级为增长黑客定位",
+        "新增A/B测试引擎、LinkedIn爬虫",
+        "新增三层记忆结构",
+        "新增职业级 conversationStarters"
+      ]
+    },
+    {
+      "version": "2.2.0",
+      "activatedAt": "2026-07-01T15:00:00Z",
+      "activatedBy": "admin_upgrade",
+      "changeLog": [
+        "注入动态 harness 进化引擎",
+        "启用 evolutionEnabled=true",
+        "配置 KPI 偏差触发器",
+        "注入 harnessConfig 自进化控制"
+      ]
+    }
+  ],
+  "lastEvaluationAt": null,
+  "pendingProposalId": null,
+  "evolutionStatus": "active",
   "upgradeNote": "v2.0: 升级为供应链可见性官，绑定港口拥堵、船公司与 Flexport API，提升物流时效预测与危机应急能力"
 }
