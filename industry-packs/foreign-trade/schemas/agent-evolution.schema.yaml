@@ -1,0 +1,160 @@
+# Agent 自进化契约 Schema v1.0
+# 所有外贸行业 Agent 的动态 Harness 进化数据结构
+
+schemaId: agent-evolution-schema
+version: "1.0.0"
+domain: industry-pack/foreign-trade
+runtimeContract: true
+
+# ─────────────────────────────────────────────
+# 1. 执行后评估记录（每次任务结束必须产出）
+# ─────────────────────────────────────────────
+AgentTaskEvaluation:
+  required:
+    - agentId
+    - taskId
+    - workflowRunId
+    - executedAt
+    - kpiSnapshot
+    - outcomeLabel
+    - memoryPatchSuggestion
+  fields:
+    agentId: string           # agent-001 ~ agent-010
+    taskId: string
+    workflowRunId: string     # 必须是真实 DB workflowRunId，禁止随机生成
+    executedAt: datetime
+    durationMs: number
+    kpiSnapshot:              # 本次任务的实际 KPI 值
+      type: object
+      additionalProperties: number
+    baselineSnapshot:         # 执行时的当前基线（快照，不可篡改）
+      type: object
+      additionalProperties: number
+    outcomeLabel:             # success | partial_success | failure | human_override
+      enum: [success, partial_success, failure, human_override]
+    failureReason: string     # outcomeLabel=failure 时必填
+    memoryPatchSuggestion:    # Agent 自评：本次执行应写入记忆的经验
+      shortTermUpdates: string[]
+      midTermUpdates: string[]
+      longTermCandidates: string[]  # 候选项，需 harnessEvolution 触发才写入 longTerm
+    humanFeedback:            # 可选，人工追加反馈
+      rating: number          # 1-5
+      comment: string
+      feedbackAt: datetime
+
+# ─────────────────────────────────────────────
+# 2. KPI 偏差检测与进化触发器
+# ─────────────────────────────────────────────
+HarnessEvolutionTrigger:
+  description: >
+    当某个 KPI 持续偏低或偏高超过阈值时，
+    Hermes 自动生成 HarnessProposal，进入人工审批流程
+  required:
+    - agentId
+    - triggerType
+    - detectedAt
+    - kpiName
+    - currentValue
+    - baselineValue
+    - deviationPct
+    - windowTaskCount
+  fields:
+    agentId: string
+    triggerType:
+      enum:
+        - kpi_degradation       # KPI 持续低于基线
+        - kpi_breakthrough      # KPI 持续超越基线（可提升自动化等级）
+        - failure_pattern       # 连续失败3次以上
+        - human_override_spike  # 人工干预频率异常升高
+        - new_pattern_detected  # 发现训练数据中没有的新场景
+    detectedAt: datetime
+    kpiName: string
+    currentValue: number
+    baselineValue: number
+    deviationPct: number        # (current - baseline) / baseline
+    windowTaskCount: number     # 检测窗口内任务数（最小20次才触发）
+    evidenceSampleIds: string[] # 支撑此判断的 taskId 列表（最多5个）
+
+# ─────────────────────────────────────────────
+# 3. Harness 进化提案（需人工审批）
+# ─────────────────────────────────────────────
+HarnessProposal:
+  required:
+    - proposalId
+    - agentId
+    - triggeredBy
+    - proposalType
+    - currentHarnessVersion
+    - proposedChanges
+    - approvalStatus
+  fields:
+    proposalId: string          # hp-{agentId}-{timestamp}
+    agentId: string
+    triggeredBy: HarnessEvolutionTrigger
+    proposalType:
+      enum:
+        - upgrade_automation_level  # L2→L3 等
+        - update_baseline           # 更新 KPI 基线
+        - add_skill                 # 建议新增 skill 绑定
+        - remove_skill              # 建议移除低效 skill
+        - update_knowledge          # 建议更新知识库
+        - update_canDo              # 扩展能力边界
+        - update_automationGate     # 调整审批门禁阈值
+    currentHarnessVersion: string
+    proposedChanges:
+      type: object              # JSON diff，描述具体变更内容
+    reasoning: string           # AI 解释为什么提出这个变更
+    expectedImpact: string      # 预期效果
+    riskAssessment: string      # 变更风险评估
+    approvalStatus:
+      enum: [pending, approved, rejected, rollback]
+    approvedBy: string          # ADMIN userId
+    approvedAt: datetime
+    rejectionReason: string
+    newHarnessVersion: string   # 审批通过后的新版本号（格式：x.y.z）
+
+# ─────────────────────────────────────────────
+# 4. Agent 记忆补丁（自动写入，无需审批）
+# ─────────────────────────────────────────────
+AgentMemoryPatch:
+  required:
+    - patchId
+    - agentId
+    - sourceTaskId
+    - patchLayer
+    - operation
+    - content
+  fields:
+    patchId: string             # mp-{agentId}-{taskId}
+    agentId: string
+    sourceTaskId: string
+    patchLayer:
+      enum: [shortTerm, midTerm, longTerm]
+      note: longTerm 写入必须经过 HarnessProposal 审批
+    operation:
+      enum: [append, update, deprecate]
+    content: object             # 写入的具体内容
+    confidence: number          # 0-1，AI 对这条记忆的置信度
+    ttl: number                 # shortTerm 的过期时间（秒），longTerm 为 -1（永久）
+    writtenAt: datetime
+    auditTraceId: string        # 必须可追溯到原始 workflowRunId
+
+# ─────────────────────────────────────────────
+# 5. Harness 版本历史（不可删除，只可追加）
+# ─────────────────────────────────────────────
+HarnessVersionHistory:
+  required:
+    - agentId
+    - version
+    - activatedAt
+    - activatedBy
+    - changeLog
+  fields:
+    agentId: string
+    version: string             # x.y.z
+    activatedAt: datetime
+    activatedBy: string         # ADMIN userId 或 "system_auto"（仅低风险变更）
+    proposalId: string          # 关联的 HarnessProposal
+    changeLog: string[]         # 本版本的变更列表
+    isActive: boolean
+    deprecatedAt: datetime      # 被新版本替代的时间
