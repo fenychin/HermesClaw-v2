@@ -521,7 +521,15 @@ export function loadIndustryConnectors(packId: string): any[] {
       const nameWithoutExt = file.slice(0, -ext.length)
       try {
         const { parsed } = readAssetFile(join(dirPath, nameWithoutExt))
-        connectors.push(parsed)
+        if (parsed && typeof parsed === "object") {
+          if (Array.isArray(parsed)) {
+            connectors.push(...parsed)
+          } else if (Array.isArray(parsed.connectors)) {
+            connectors.push(...parsed.connectors)
+          } else {
+            connectors.push(parsed)
+          }
+        }
       } catch (err) {
         console.error(`Failed to load connector ${file}:`, err)
       }
