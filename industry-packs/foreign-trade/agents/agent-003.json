@@ -1,21 +1,77 @@
 {
   "id": "agent-003",
-  "name": "Marcus",
-  "role": "客户跟进员",
-  "description": "管理客户跟进节奏，根据阶段自动生成跟进内容，预警客户流失并推荐挽回策略",
-  "status": "idle",
+  "name": "Max",
+  "avatar": "💵",
+  "role": "动态报价策略师",
+  "roleEn": "Dynamic Pricing Strategist",
+  "description": "精通外贸定价策略、汇率风险对冲与全球关税计算的AI报价策略师。能基于供应链成本、实时汇率与竞品报价进行动态定价，设计合理的阶梯报价与有效期机制。",
+  "status": "running",
   "source": "builtin",
-  "category": ["客户管理", "销售跟进"],
-  "bindSkills": ["skill-004", "skill-011"],
-  "bindConnectors": ["conn-001", "conn-005", "conn-007", "conn-008"],
-  "memoryPermission": "read-write",
-  "harnessVersion": "2.0.5",
-  "automationLevel": "L2",
-  "canDo": ["管理客户跟进周期", "生成个性化跟进内容", "客户流失预警", "同步跟进记录至 CRM"],
-  "cannotDo": ["修改合同条款", "自行决定报价折扣", "删除客户记录"],
-  "stats": { "todayTasks": 18, "successRate": 0.88, "avgDuration": "3m 05s" },
-  "lastActive": "2026-06-06T09:58:00Z",
-  "createdAt": "2026-01-10T08:00:00Z",
+  "category": ["外贸报价", "定价策略", "成本核算"],
+  "bindSkills": [
+    "skill-price-strategy",
+    "skill-margin-calculator",
+    "skill-competitor-price-tracker"
+  ],
+  "bindConnectors": [
+    "conn-erp-products",
+    "conn-exchange-rate",
+    "conn-customs-duty-api"
+  ],
+  "knowledgeBase": [
+    "kb-pricing-strategy"
+  ],
+  "memoryConfig": {
+    "permission": "read-write",
+    "shortTerm": ["当前询盘详情", "即时汇率", "原材料最新价格"],
+    "midTerm": ["阶梯折扣基准", "竞品历史价位", "目标毛利率要求"],
+    "longTerm": ["年度框架协议条款", "汇率波动应对历史", "重要国家关税基准"]
+  },
+  "automationLevel": "L3",
+  "automationGate": {
+    "L3_threshold": "报价波动在毛利率基线以上且无大额风险",
+    "L2_fallback": "毛利率低于基线，或要求固定价格合同期超过2年，需销售总监审批"
+  },
+  "riskLevel": "medium",
+  "canDo": [
+    "多贸易术语成本核算（FOB/CIF/DDP等）",
+    "动态阶梯报价设计与MOQ配置",
+    "汇率波动风险评估与加成定价",
+    "全球关税自动查询（HTS/TARIC）",
+    "基于竞品价格调整报价溢价策略"
+  ],
+  "cannotDo": [
+    "直接向客户做出长期价格承诺",
+    "修改ERP财务核心定价",
+    "未经审批给予低于最低毛利的折扣"
+  ],
+  "conversationStarters": [
+    {
+      "id": "cs-003-1",
+      "label": "🎯 真实案例：设计 5 年期液压缸报价",
+      "message": "我需要给一个德国买家报价 500 套液压缸，他要求 5 年框架协议 + 年度价格调整机制，请帮我设计这份报价结构。我们需要考虑：1）初期原材料成本与利润空间 2）合理的年度调价指标及公式 3）汇率变动对冲方案 4）是否需要触发审批门禁",
+      "scenario": "长期大额订单结构报价",
+      "expectedFlow": "成本核算 → 价格联动机制设计 → 汇率对冲 → 门禁判定"
+    },
+    {
+      "id": "cs-003-2",
+      "label": "⚖️ 对比：美欧与土耳其买家定价差异",
+      "message": "同一个精密金属加工件，我准备报给美国买家和土耳其买家。请问我们在定价策略、贸易术语选择（FOB vs CIF）、汇率避险系数以及报价有效期上应该有什么不同？"
+    },
+    {
+      "id": "cs-003-3",
+      "label": "🛡️ 谈判：应对“价格比竞品高15%”",
+      "message": "买家说我们的报价比竞争对手高 15%，请帮我分析他是真有低价竞品还是在压价套路。同时请为我设计一套在保护基本利润空间的前提下，能够打消买家顾虑并促成交易的报价与沟通方案。"
+    }
+  ],
+  "evalRules": {
+    "kpi": ["quoteAcceptanceRate", "marginProtectionRate", "quoteResponseTime"],
+    "baseline": { "quoteAcceptanceRate": 0.32, "marginProtectionRate": 0.18, "quoteResponseTime": "15m" },
+    "alertThreshold": { "quoteAcceptanceRate": 0.22 }
+  },
+  "harnessVersion": "2.2.0",
   "industryId": "foreign-trade",
-  "templateId": "ft-followup-manager"
+  "templateId": "ft-pricing-strategist-pro",
+  "version": "2.0.0",
+  "upgradeNote": "v2.0: 升级为动态报价策略师，新增定价策略引擎、关税查询、汇率风险对冲知识绑定"
 }
