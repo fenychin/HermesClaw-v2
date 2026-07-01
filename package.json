@@ -22,6 +22,9 @@
     "check:boundaries": "pnpm -w lint:domains && echo '✅ 三域边界检查通过'"
   },
   "devDependencies": {
+    "@types/cookiejar": "^2.1.5",
+    "@types/methods": "^1.1.4",
+    "@types/superagent": "^8.1.10",
     "@typescript-eslint/eslint-plugin": "^8.61.1",
     "@typescript-eslint/parser": "^8.61.1",
     "concurrently": "^10.0.3",
