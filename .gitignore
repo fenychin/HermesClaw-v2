@@ -78,10 +78,11 @@ dev.db*
 prisma/*.db
 prisma/.db-
 
-# AI agent artifacts & temp files
+# HermesClaw — AI agent artifacts & temp files (auto-generated, do not commit)
 .claude-test-output.log
 *.log
 tmp-*.ts
 tmp-*.js
 *.bak
 *.tmp
+scripts/migrate-once/
