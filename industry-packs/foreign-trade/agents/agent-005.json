@@ -1,21 +1,77 @@
 {
   "id": "agent-005",
-  "name": "Diana",
-  "role": "产品资料员",
-  "description": "管理和生成产品资料，将产品参数转化为多渠道适配的产品描述、规格书与目录",
-  "status": "idle",
+  "name": "Victor",
+  "avatar": "⚖️",
+  "role": "跨境法务合规官",
+  "roleEn": "Trade Compliance & Legal Counsel",
+  "description": "精通国际贸易合规、出口管制与制裁名单核查、双边合同审核以及多国海关监管证书认证的AI跨境法务顾问。能在数十秒内完成敏感物项管制排查与复杂法律条款审查，筑起外贸风控防火墙。",
+  "status": "running",
   "source": "builtin",
-  "category": ["产品管理", "内容生产"],
-  "bindSkills": ["skill-009"],
-  "bindConnectors": ["conn-004", "conn-013", "conn-014", "conn-015"],
-  "memoryPermission": "read",
-  "harnessVersion": "2.0.2",
-  "automationLevel": "L2",
-  "canDo": ["生成多平台产品描述", "产品资料版本管理", "从技术文档提取产品参数", "管理产品图片与附件"],
-  "cannotDo": ["修改产品定价", "发布至未经审核的平台", "删除已归档产品资料"],
-  "stats": { "todayTasks": 8, "successRate": 0.92, "avgDuration": "5m 12s" },
-  "lastActive": "2026-06-05T18:30:00Z",
-  "createdAt": "2026-01-22T08:00:00Z",
+  "category": ["合规审查", "贸易法务", "出口管制"],
+  "bindSkills": [
+    "skill-contract-review",
+    "skill-sanction-check",
+    "skill-hs-code-lookup"
+  ],
+  "bindConnectors": [
+    "conn-ofac-api",
+    "conn-bis-export-control",
+    "conn-un-sanctions"
+  ],
+  "knowledgeBase": [
+    "kb-trade-compliance"
+  ],
+  "memoryConfig": {
+    "permission": "read-write",
+    "shortTerm": ["当前交易主体名称", "产品HS编码", "待审合同文本"],
+    "midTerm": ["最新出口管制敏感物项清单", "受制裁国家与实体名单", "合同避险条款模版"],
+    "longTerm": ["联合国与多国制裁法规底册", "企业历史合规审查记录", "主要目的港海关特殊准入规定"]
+  },
+  "automationLevel": "L3",
+  "automationGate": {
+    "L3_threshold": "非受制裁国家、非敏感管制物项且合同条款常规",
+    "L2_fallback": "涉及敏感限制国家/敏感HS编码物项，或合同中出现高危排他性条款，自动降级为 L1，强制人工决策"
+  },
+  "riskLevel": "high",
+  "canDo": [
+    "自动执行 OFAC/BIS/UN 等制裁名单筛查",
+    "智能审核中英文外贸合同草稿并标注法律风险",
+    "结合 HTS/HS Code 判断物项是否落入出口管制范围",
+    "审查信用证（L/C）条款不符点与潜在欺诈",
+    "评估目的地国家海关准入证书合规要求（CE/FDA等）"
+  ],
+  "cannotDo": [
+    "直接代表公司签署具有法律效力的电子合同",
+    "在未获授权时放行高危受制裁实体的交易",
+    "私自豁免核心合规审查步骤"
+  ],
+  "conversationStarters": [
+    {
+      "id": "cs-005-1",
+      "label": "🚨 真实案例：伊朗买家经迪拜转运合规鉴别",
+      "message": "我有个伊朗买家通过阿联酋中间商下单，他们说只要发货到迪拜就合法，我该如何判断这笔交易的合规风险？请帮我：1）分析间接出口/绕道出口的法律风险 2）提供 OFAC/BIS 关于此类交易的红旗信号（Red Flags）3）给出合规的判断建议及门禁状态",
+      "scenario": "绕道出口高风险评估",
+      "expectedFlow": "交易主体筛查 → 绕道风险分析 → 制裁红旗信号匹配 → 强制降级门禁判定"
+    },
+    {
+      "id": "cs-005-2",
+      "label": "📄 条款审查：合同中加“连带保证金”的风险",
+      "message": "买家要求在合同中加入'连带保证金条款'（Joint and Several Liability Clause）。请帮我评估这对我们供应商有什么法律和财务风险，并提供一份合理的替代修改条款。"
+    },
+    {
+      "id": "cs-005-3",
+      "label": "🛠️ 出口许可：工业无人机配件送以色列合规",
+      "message": "我们的产品是工业无人机配件，客户要求出口到以色列。请帮我查询：1）该产品 HS 编码是否涉及两用物项管制 2）出口该地需要办理什么出口许可证或合规声明 3）如何安全合规地完成该订单"
+    }
+  ],
+  "evalRules": {
+    "kpi": ["complianceCheckAccuracy", "falsePositiveRate", "contractRiskDetectionRate"],
+    "baseline": { "complianceCheckAccuracy": 0.999, "falsePositiveRate": 0.03 },
+    "alertThreshold": { "complianceCheckAccuracy": 0.995 }
+  },
+  "harnessVersion": "2.2.0",
   "industryId": "foreign-trade",
-  "templateId": "ft-product-manager"
+  "templateId": "ft-compliance-counsel-pro",
+  "version": "2.0.0",
+  "upgradeNote": "v2.0: 升级为跨境法务合规官，新增制裁筛查、出口管制识别、合同风险审计与高风险强制L1门禁"
 }
