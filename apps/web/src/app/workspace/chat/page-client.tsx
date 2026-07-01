@@ -94,6 +94,30 @@ function NewTopicPageInner() {
     }
   }, [searchParams, loadConversation]);
 
+  // 从其他页面（如智能体仓库）点击对话跳转时通过 ?agent=agentId 自动在输入框最前面引入智能体名称
+  useEffect(() => {
+    const agentId = searchParams.get("agent");
+    if (agentId) {
+      fetch(`/api/agents/${agentId}`)
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.success) {
+            const agent = json.data?.agent || json.agent;
+            if (agent && agent.name) {
+              const prefix = `@${agent.name} `;
+              setInput((prev) => {
+                if (!prev.startsWith(prefix)) {
+                  return prefix + prev;
+                }
+                return prev;
+              });
+            }
+          }
+        })
+        .catch((err) => console.error("获取智能体详情失败", err));
+    }
+  }, [searchParams, setInput]);
+
   const hasMessages = messages.length > 0;
 
   // 快捷任务面板折叠态（仅空态展示）
