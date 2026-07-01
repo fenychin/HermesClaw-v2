@@ -1,14 +1,27 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 
 export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
-    const workspaces = await prisma.workspace.findMany({
+    const memberWorkspaces = await prisma.workspaceMember.findMany({
+      where: { userId: session.user.id },
       select: {
-        id: true,
-        name: true,
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
+
+    const workspaces = memberWorkspaces.map((m) => m.workspace);
 
     if (workspaces.length === 0) {
       return NextResponse.json([{ id: "default", name: "默认工作区" }]);
