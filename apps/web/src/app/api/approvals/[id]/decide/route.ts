@@ -87,5 +87,23 @@ export const POST = withRBAC(async (request: any, ctx: any, routeContext: RouteC
     },
   });
 
+  if (checkpoint.riskLevel === "high" || checkpoint.riskLevel === "critical") {
+    await prisma.auditLog.create({
+      data: {
+        workspaceId: ctx.workspaceId,
+        actor: ctx.userId || decidedBy || "system",
+        action: "approval.decision",
+        targetType: "approval",
+        targetId: checkpoint.checkpointId,
+        detail: `管理员决策高危审批点 (${checkpoint.riskLevel}) -> [${decision}]. 审批摘要: ${checkpoint.actionSummary}`,
+        riskLevel: checkpoint.riskLevel === "critical" ? "high" : (checkpoint.riskLevel as any),
+        automationLevel: checkpoint.automationLevel,
+        triggeredBy: "user",
+        status: "success",
+        workflowRunId: checkpoint.workflowRunId || undefined
+      }
+    });
+  }
+
   return Response.json({ success: true, data: checkpoint });
-}, "MEMBER");
+}, "ADMIN");
