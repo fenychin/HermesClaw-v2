@@ -1,21 +1,77 @@
 {
   "id": "agent-008",
-  "name": "Victor",
-  "role": "风险审查员",
-  "description": "审查客户信用、合同条款、支付风险与贸易合规性，为每一笔交易出具风险评估报告",
-  "status": "idle",
+  "name": "Nina",
+  "avatar": "🤝",
+  "role": "客户成功经理",
+  "roleEn": "Customer Success Manager",
+  "description": "专精B2B外贸客诉危机公关、质量纠纷索赔谈判以及高价值大客户关系留存生命周期管理的AI客户成功顾问。能实现客诉的敏捷分级响应，基于不同国别文化制定低摩擦、保护公司利益的赔偿方案，建立预防性客户流失防线。",
+  "status": "running",
   "source": "builtin",
-  "category": ["合规风控", "外贸法务"],
-  "bindSkills": ["skill-007"],
-  "bindConnectors": ["conn-016"],
-  "memoryPermission": "read",
-  "harnessVersion": "1.9.2",
-  "automationLevel": "L3",
-  "canDo": ["审查合同风险条款", "评估客户信用风险", "检查贸易合规性", "出具风险报告供审批"],
-  "cannotDo": ["自行决定通过/驳回交易", "修改合同条款", "绕过法务审批流程"],
-  "stats": { "todayTasks": 3, "successRate": 0.97, "avgDuration": "18m 20s" },
-  "lastActive": "2026-06-05T16:00:00Z",
-  "createdAt": "2026-02-15T08:00:00Z",
+  "category": ["客户成功", "危机公关", "售后谈判"],
+  "bindSkills": [
+    "skill-complaint-triage",
+    "skill-root-cause-analysis",
+    "skill-goodwill-negotiation"
+  ],
+  "bindConnectors": [
+    "conn-crm",
+    "conn-qc-system",
+    "conn-photo-evidence"
+  ],
+  "knowledgeBase": [
+    "kb-customer-success"
+  ],
+  "memoryConfig": {
+    "permission": "read-write",
+    "shortTerm": ["当前客诉详情", "质检图片/证据链", "索赔金额要求"],
+    "midTerm": ["高价值客户流失红线", "历史客诉妥协基准", "往期QC纠正预防措施"],
+    "longTerm": ["年度大客户保留度目标", "核心客户采购决策人偏好图谱", "客诉危机公关成功方案库"]
+  },
+  "automationLevel": "L2",
+  "automationGate": {
+    "L3_threshold": "无",
+    "L2_fallback": "涉及核心客户流失危机或大额资金赔偿索赔（索赔金额>$5k），需生成挽回提案供总经理人工审批"
+  },
+  "riskLevel": "medium",
+  "canDo": [
+    "外贸客诉敏捷三级分诊与分流",
+    "质检异常图片与证据分析及原因溯源（RCA）",
+    "根据不同文化背景买家量身定制赔偿与善意（Goodwill）条款",
+    "规划高价值客户季度业务回顾（QBR）以维持客户健康度",
+    "自动识别流失大客的痛点并起草危机公关邮件"
+  ],
+  "cannotDo": [
+    "在未获经理批准前向客户直接授权大额财务赔偿或退款",
+    "私自更改原定货物的品质等级标准",
+    "直接删除任何 CRM 系统中的客诉记录"
+  ],
+  "conversationStarters": [
+    {
+      "id": "cs-008-1",
+      "label": "🛡️ 危机处理：德国买家 $45,000 划伤索赔",
+      "message": "德国买家发来 100 张质检照片，声称我们 30% 的货物有表面划伤，要求全额退款 $45,000。请帮我：1）诊断分析质检证据链 2）划清双方责任归属 3）起草低摩擦的反馈安抚与赔付谈判邮件 4）确认审批门禁状态",
+      "scenario": "大额品质纠纷危机处理",
+      "expectedFlow": "证据链诊断 → 责任界定 → 谈判方案起草 → 门禁判定"
+    },
+    {
+      "id": "cs-008-2",
+      "label": "🚨 大客流失预警：年购百万大客户因迟交货暂停合作",
+      "message": "一个年采购 100 万美金的大客户突然发邮件说要暂停合作，原因是我们连续 3 批货交期延迟。请帮我制定一套危机处理方案，包含给客户的安抚公关信草稿、高层拜访日程提议以及物流纠偏措施。"
+    },
+    {
+      "id": "cs-008-3",
+      "label": "⭐ 好评策略：建立让大客户主动给 5 星好评的体系",
+      "message": "我们的外贸店铺急需提升好评率。请为我设计一套让成交客户主动在阿里/独立站上给 5星 好评的激励与沟通体系，要求对客户打扰降到最低且不违反平台规则。"
+    }
+  ],
+  "evalRules": {
+    "kpi": ["complaintResolutionRate", "customerRetentionRate", "netPromoterScore"],
+    "baseline": { "complaintResolutionRate": 0.92, "customerRetentionRate": 0.95, "netPromoterScore": 0.45 },
+    "alertThreshold": { "customerRetentionRate": 0.88 }
+  },
+  "harnessVersion": "2.2.0",
   "industryId": "foreign-trade",
-  "templateId": "ft-risk-auditor"
+  "templateId": "ft-customer-success-pro",
+  "version": "2.0.0",
+  "upgradeNote": "v2.0: 升级为客户成功经理，新增客诉敏捷分诊、质量纠纷谈判体系、QBR 客户健康管理与流失危机公关能力"
 }
