@@ -9,7 +9,6 @@ import { logger } from "@/lib/logger"
 import { createReadStream, existsSync } from "fs"
 import { join, basename } from "path"
 import { Readable } from "stream"
-import { ReadableStream as WebReadableStream } from "stream/web"
 
 export const runtime = "nodejs"
 
@@ -40,7 +39,7 @@ export async function GET(
     const nodeStream = createReadStream(diskPath)
     const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>
 
-    return new Response(webStream as WebReadableStream, {
+    return new Response(webStream, {
       status: 200,
       headers: {
         "Content-Type": mimeType,
