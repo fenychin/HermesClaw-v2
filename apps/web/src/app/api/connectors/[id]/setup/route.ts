@@ -29,10 +29,36 @@ export const POST = withRBAC(async (
   const actor = (await actorFromSession()) as string
   const workspaceId = ctx.workspaceId as string
 
-  // 1. 读取连接器配置
-  const config = await getConnectorConfig(connectorId, workspaceId)
+  // 1. 读取连接器配置（优先从 connector-registry 读取，config=null 时启发式构造 fallback）
+  let config = await getConnectorConfig(connectorId, workspaceId)
   if (!config) {
-    return NextResponse.json({ error: "Connector not found" }, { status: 404 })
+    // config 字段为 null 的历史连接器：直接从 DB 读取基础信息，构造最小配置
+    const row = await prisma.connector.findFirst({
+      where: {
+        OR: [
+          { id: connectorId },
+          { id: `${workspaceId}:${connectorId}` },
+        ]
+      },
+      select: { id: true, name: true, description: true, category: true, requiredAutomationLevel: true }
+    })
+    if (!row) {
+      return NextResponse.json({ error: "Connector not found" }, { status: 404 })
+    }
+    const lvl = row.requiredAutomationLevel ?? "L1"
+    config = {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      category: row.category,
+      provider: "unknown",
+      authType: "none",
+      riskLevel: (lvl === "L3" || lvl === "L4") ? "high" : lvl === "L2" ? "medium" : "low",
+      automationLevel: lvl,
+      requiresApproval: lvl === "L3" || lvl === "L4",
+      healthCheckUrl: null,
+      requiredEnvVars: [],
+    }
   }
 
   // 2. 高风险连接器检查 ADMIN 权限
