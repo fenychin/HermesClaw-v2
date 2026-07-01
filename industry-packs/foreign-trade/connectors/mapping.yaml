@@ -1,18 +1,270 @@
-# TD-SPRINT-C-001: Updated to use real OpenClaw Gateway connector
-- id: email
-  name: 外贸邮件连接器
-  description: 通过 OpenClaw IM Gateway email 频道发送外贸询盘跟进邮件
-  category: trade
-  status: connected
-  provider: openclaw-gateway
-  channel: email
-  endpointEnvVar: OPENCLAW_GATEWAY_BASE_URL   # resolved at runtime
+# WARNING: 本文件是 OpenClaw 执行层的连接器注册契约。
+# 每次修改必须：1) 写 AuditLog 2) 重新健康检测 3) 通知依赖该连接器的 agent
 
-- id: crm
-  name: 客户关系管理(CRM)连接器
-  description: 通过 OpenClaw webhook 频道同步客户画像与报价历史至外部 CRM
-  category: trade
-  status: connected
-  provider: openclaw-gateway
-  channel: webhook
-  endpointEnvVar: OPENCLAW_GATEWAY_BASE_URL
+connectors:
+
+  - id: conn-crm
+    name: 客户关系管理(CRM)连接器
+    description: 通过 OpenClaw webhook 同步客户画像与报价历史至外部 CRM
+    category: CRM
+    provider: openclaw-gateway
+    channel: webhook
+    authType: webhook-secret
+    riskLevel: medium
+    automationLevel: L2
+    requiresApproval: false
+    healthCheckUrl: null   # webhook 模式无主动 ping，依赖事件回调
+    endpointEnvVar: OPENCLAW_GATEWAY_BASE_URL
+    requiredEnvVars:
+      - OPENCLAW_GATEWAY_BASE_URL
+      - CRM_WEBHOOK_SECRET
+    dataAccess:
+      read: ["customer.profile", "quote.history"]
+      write: ["crm.contact", "crm.deal"]
+    auditFields:
+      - customerId
+      - syncType
+
+  - id: conn-email
+    name: 外贸邮件连接器
+    description: 通过 OpenClaw IM Gateway email 频道发送外贸询盘跟进邮件
+    category: 邮件
+    provider: openclaw-gateway
+    channel: email
+    authType: apikey
+    riskLevel: low
+    automationLevel: L1
+    requiresApproval: false
+    healthCheckUrl: "${OPENCLAW_GATEWAY_BASE_URL}/health"
+    endpointEnvVar: OPENCLAW_GATEWAY_BASE_URL
+    requiredEnvVars:
+      - OPENCLAW_GATEWAY_BASE_URL
+      - EMAIL_API_KEY
+    dataAccess:
+      read: ["email.template"]
+      write: ["email.send"]
+    auditFields:
+      - recipientEmail
+      - templateId
+
+  - id: conn-customs-data
+    name: 外贸海关关税计算器
+    description: 各国海关关税 API 连接器，实时计算外贸进出口目标国税率与关税成本
+    category: 数据
+    provider: customs-api
+    authType: apikey
+    riskLevel: low
+    automationLevel: L1
+    requiresApproval: false
+    healthCheckUrl: "${CUSTOMS_API_BASE_URL}/v1/ping"
+    endpointEnvVar: CUSTOMS_API_BASE_URL
+    requiredEnvVars:
+      - CUSTOMS_API_BASE_URL
+      - CUSTOMS_API_KEY
+    dataAccess:
+      read: ["tariff.rate", "hs.code", "trade.restriction"]
+      write: []
+    auditFields:
+      - hsCode
+      - destinationCountry
+
+  - id: conn-contract-parser
+    name: 外贸多语种合同解析器
+    description: 外贸英文、西语、俄语等多语种商业合同 OCR 识别与解析连接器
+    category: 文档
+    provider: document-ai
+    authType: apikey
+    riskLevel: medium
+    automationLevel: L2
+    requiresApproval: false
+    healthCheckUrl: "${DOC_AI_BASE_URL}/health"
+    endpointEnvVar: DOC_AI_BASE_URL
+    requiredEnvVars:
+      - DOC_AI_BASE_URL
+      - DOC_AI_API_KEY
+    dataAccess:
+      read: ["document.raw"]
+      write: ["contract.parsed", "risk.clause"]
+    auditFields:
+      - documentId
+      - sourceLanguage
+
+  - id: conn-logistics-tracker
+    name: 外贸物流运费跟踪器
+    description: 国际物流运费 API 连接器，跟踪船期和集装箱运力变动
+    category: API
+    provider: flexport-api
+    authType: apikey
+    riskLevel: low
+    automationLevel: L2
+    requiresApproval: false
+    healthCheckUrl: "https://api.flexport.com/v2/ping"
+    endpointEnvVar: FLEXPORT_BASE_URL
+    requiredEnvVars:
+      - FLEXPORT_BASE_URL
+      - FLEXPORT_API_KEY
+    dataAccess:
+      read: ["shipment.status", "vessel.eta", "container.load"]
+      write: []
+    auditFields:
+      - shipmentId
+      - trackingNumber
+
+  - id: conn-erp-factory
+    name: 外贸工厂 ERP 同步器
+    description: 外贸工厂专用 ERP 生产与订单排产同步，实时把控交货期
+    category: ERP
+    provider: custom-erp-adapter
+    authType: oauth2
+    riskLevel: high
+    automationLevel: L3
+    requiresApproval: true        # ← 高风险：需 ADMIN 审批激活
+    approvalReason: "ERP 直接读写生产订单与交货期数据，错误操作影响真实排产"
+    healthCheckUrl: "${ERP_BASE_URL}/api/health"
+    endpointEnvVar: ERP_BASE_URL
+    requiredEnvVars:
+      - ERP_BASE_URL
+      - ERP_OAUTH_CLIENT_ID
+      - ERP_OAUTH_CLIENT_SECRET
+      - ERP_OAUTH_REDIRECT_URI
+    dataAccess:
+      read: ["production.order", "delivery.date", "inventory.stock"]
+      write: ["order.status", "delivery.date"]   # 注意：写权限范围必须在审批时确认
+    auditFields:
+      - orderId
+      - erpUserId
+      - changeType
+
+  - id: conn-crm-customer
+    name: 外贸客户管理(CRM)连接器
+    description: 通过 OpenClaw webhook 同步客户画像与报价历史至外部 CRM（客户管理专用）
+    category: CRM
+    provider: salesforce-adapter
+    authType: oauth2
+    riskLevel: medium
+    automationLevel: L2
+    requiresApproval: false
+    healthCheckUrl: "${SALESFORCE_BASE_URL}/services/oauth2/ping"
+    endpointEnvVar: SALESFORCE_BASE_URL
+    requiredEnvVars:
+      - SALESFORCE_BASE_URL
+      - SALESFORCE_CLIENT_ID
+      - SALESFORCE_CLIENT_SECRET
+    dataAccess:
+      read: ["contact.profile", "opportunity.stage"]
+      write: ["contact.update", "opportunity.create"]
+    auditFields:
+      - contactId
+      - opportunityId
+
+  - id: conn-alibaba-rfq
+    name: Alibaba RFQ 同步器
+    description: 阿里巴巴国际站 RFQ 数据连接器，实时捕获并推送采购意向
+    category: 数据
+    provider: alibaba-intl-api
+    authType: apikey
+    riskLevel: medium
+    automationLevel: L2
+    requiresApproval: false
+    healthCheckUrl: "https://gw.api.alibaba.com/openapi/health"
+    endpointEnvVar: ALIBABA_API_BASE_URL
+    requiredEnvVars:
+      - ALIBABA_APP_KEY
+      - ALIBABA_APP_SECRET
+      - ALIBABA_ACCESS_TOKEN
+    dataAccess:
+      read: ["rfq.inquiry", "buyer.profile"]
+      write: ["rfq.response"]
+    auditFields:
+      - rfqId
+      - buyerMemberId
+
+  - id: conn-customs-analytics
+    name: 海关数据分析器
+    description: 海关进出口数据同步连接器，提取贸易流向与 HS 编码数据
+    category: 数据
+    provider: customs-analytics-api
+    authType: apikey
+    riskLevel: low
+    automationLevel: L1
+    requiresApproval: false
+    healthCheckUrl: "${CUSTOMS_ANALYTICS_BASE_URL}/ping"
+    endpointEnvVar: CUSTOMS_ANALYTICS_BASE_URL
+    requiredEnvVars:
+      - CUSTOMS_ANALYTICS_BASE_URL
+      - CUSTOMS_ANALYTICS_API_KEY
+    dataAccess:
+      read: ["trade.flow", "hs.code.stats", "competitor.export"]
+      write: []
+    auditFields:
+      - hsCode
+      - tradeDirection
+
+  - id: conn-whatsapp
+    name: WhatsApp Bulk Sender
+    description: 外贸 WhatsApp 消息批量发送连接器，用于快速触达海外客户
+    category: 即时通讯
+    provider: whatsapp-business-api
+    authType: oauth2
+    riskLevel: medium
+    automationLevel: L2
+    requiresApproval: false
+    healthCheckUrl: "https://graph.facebook.com/v18.0/health"
+    endpointEnvVar: WHATSAPP_BASE_URL
+    requiredEnvVars:
+      - WHATSAPP_ACCESS_TOKEN
+      - WHATSAPP_PHONE_NUMBER_ID
+      - WHATSAPP_BUSINESS_ACCOUNT_ID
+    dataAccess:
+      read: ["contact.phone"]
+      write: ["message.send", "template.send"]
+    auditFields:
+      - recipientPhone
+      - templateName
+      - messageCount  # 防止批量滥发
+
+  - id: conn-email-blast
+    name: 外贸邮件群发器
+    description: 外贸开发信群发连接器，支持批量高发信率和模板变量替换
+    category: 邮件
+    provider: sendgrid-adapter
+    authType: apikey
+    riskLevel: medium
+    automationLevel: L2
+    requiresApproval: false
+    healthCheckUrl: "https://api.sendgrid.com/v3/mail/batch"
+    endpointEnvVar: SENDGRID_BASE_URL
+    requiredEnvVars:
+      - SENDGRID_API_KEY
+      - SENDGRID_FROM_EMAIL
+      - SENDGRID_FROM_NAME
+    dataAccess:
+      read: ["email.template", "recipient.list"]
+      write: ["email.send.batch"]
+    auditFields:
+      - campaignId
+      - recipientCount
+      - templateId
+
+  - id: conn-price-calculator
+    name: 外贸报价计算引擎
+    description: 外贸报价 API 连接器，实时汇率、原材料价格、运费、关税综合计算
+    category: API
+    provider: price-engine-api
+    authType: apikey
+    riskLevel: low
+    automationLevel: L2
+    requiresApproval: false
+    healthCheckUrl: "${PRICE_ENGINE_BASE_URL}/health"
+    endpointEnvVar: PRICE_ENGINE_BASE_URL
+    requiredEnvVars:
+      - PRICE_ENGINE_BASE_URL
+      - PRICE_ENGINE_API_KEY
+      - EXCHANGE_RATE_API_KEY
+    dataAccess:
+      read: ["exchange.rate", "commodity.price", "freight.cost"]
+      write: ["quote.draft"]
+    auditFields:
+      - quoteId
+      - targetCurrency
+      - productId

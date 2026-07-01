@@ -57,8 +57,18 @@ directory:
     - agent-dispatch
     - result-first-delivery
   connectors:
-    - email
-    - crm
+    - conn-crm
+    - conn-email
+    - conn-customs-data
+    - conn-contract-parser
+    - conn-logistics-tracker
+    - conn-erp-factory
+    - conn-crm-customer
+    - conn-alibaba-rfq
+    - conn-customs-analytics
+    - conn-whatsapp
+    - conn-email-blast
+    - conn-price-calculator
   prompts:
     - workflow-templates
     - hermes
