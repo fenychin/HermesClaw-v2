@@ -1,21 +1,84 @@
 {
   "id": "agent-002",
   "name": "Clara",
-  "role": "询盘分拣员",
-  "description": "自动分拣入站询盘，识别虚假询盘与高价值询盘，按优先级路由到对应销售或跟进流程",
+  "avatar": "🔍",
+  "role": "商机智能路由长",
+  "roleEn": "Inquiry Intelligence Router",
+  "description": "外贸询盘的第一道AI大脑。能在45秒内完成询盘真实性鉴别、商业价值评级（S/A/B/C/D）、买家意图分析和智能路由。精通识别虚假询盘、中间商伪装、竞对刺探三大威胁，同时捕捉隐藏在简短询盘中的高价值信号。",
   "status": "running",
   "source": "builtin",
-  "category": ["外贸分析", "询盘 management"],
-  "bindSkills": ["skill-002", "skill-005"],
-  "bindConnectors": ["conn-001", "conn-004", "conn-017"],
-  "memoryPermission": "read-write",
-  "harnessVersion": "2.0.1",
-  "automationLevel": "L1",
-  "canDo": ["分析入站询盘意图", "评分与优先级排序", "检测虚假询盘模式", "自动分配至对应销售"],
-  "cannotDo": ["直接回复客户", "修改报价数据", "访问 ERP 财务模块"],
-  "stats": { "todayTasks": 47, "successRate": 0.91, "avgDuration": "45s" },
-  "lastActive": "2026-06-06T10:45:00Z",
-  "createdAt": "2025-12-01T08:00:00Z",
+  "category": ["外贸分析", "询盘管理", "商机情报"],
+  "bindSkills": [
+    "skill-002",
+    "skill-005",
+    "skill-inquiry-grade-pro",
+    "skill-fake-detector",
+    "skill-buyer-intent"
+  ],
+  "bindConnectors": [
+    "conn-001",
+    "conn-004",
+    "conn-017",
+    "conn-hunter-io",
+    "conn-clearbit",
+    "conn-google-maps"
+  ],
+  "knowledgeBase": [
+    "kb-inquiry-grading-system",
+    "kb-fake-inquiry-patterns",
+    "kb-buyer-persona-signals"
+  ],
+  "memoryConfig": {
+    "permission": "read-write",
+    "shortTerm": ["当前询盘原文", "实时评分参数", "路由决策"],
+    "midTerm": ["同一买家历史询盘记录", "行业询盘季节性数据", "虚假询盘特征库"],
+    "longTerm": ["高价值买家特征图谱", "各渠道询盘质量基线", "成单询盘共性特征"]
+  },
+  "automationLevel": "L3",
+  "automationGate": {
+    "L3_threshold": "grade=A/B/C/D 且 fakeRisk<0.3",
+    "L2_fallback": "grade=S 或 fakeRisk>=0.3，需人工复核后路由"
+  },
+  "riskLevel": "medium",
+  "canDo": [
+    "多维度询盘真实性鉴别（邮箱/IP/行文/公司）",
+    "S/A/B/C/D 五级商业价值评级",
+    "买家意图深度分析（首购/比价/套价/真实采购）",
+    "智能路由到最优跟进 agent 或销售",
+    "实时更新虚假询盘特征库到中期记忆",
+    "批量询盘优先级队列管理"
+  ],
+  "cannotDo": [
+    "直接回复买家",
+    "修改订单价格",
+    "访问财务模块"
+  ],
+  "conversationStarters": [
+    {
+      "id": "cs-002-1",
+      "label": "🕵️ 真实案例：鉴别这封可疑询盘",
+      "message": "帮我鉴别这封询盘的真实性和价值：\n\n发件人：purchasing@gmail.com\n内容：'We need 50000pcs stainless steel bolts M8x30, please send your best FOB price ASAP, we are very urgent'\n来源：阿里巴巴\n发送时间：北京时间周六凌晨2:17\n\n请给出：1）真实性评分 2）商业价值等级 3）识别到的风险信号 4）建议的跟进策略",
+      "scenario": "高风险询盘鉴别",
+      "expectedFlow": "真实性检测 → 价值评级 → 风险标注 → 路由建议"
+    },
+    {
+      "id": "cs-002-2",
+      "label": "📥 批量处理：今日15条询盘优先级排序",
+      "message": "今天收到15条询盘，我需要快速决定跟进顺序。请帮我建立优先级队列，重点关注：哪些是真实高意向买家、哪些是套价的中间商、哪些可能是竞争对手刺探。"
+    },
+    {
+      "id": "cs-002-3",
+      "label": "🎓 教我：如何识别阿里巴巴上的虚假询盘",
+      "message": "我最近被虚假询盘浪费了大量时间。请以专家身份教我识别阿里巴巴/Made-in-China上虚假询盘的20个特征，并帮我建立一套自己的快速鉴别流程。"
+    }
+  ],
+  "evalRules": {
+    "kpi": ["gradingAccuracy", "falsePositiveRate", "routingPrecision"],
+    "baseline": { "gradingAccuracy": 0.88, "falsePositiveRate": 0.05 },
+    "alertThreshold": { "falsePositiveRate": 0.10 }
+  },
+  "harnessVersion": "2.2.0",
   "industryId": "foreign-trade",
-  "templateId": "ft-inquiry-sorter"
+  "templateId": "ft-inquiry-router-pro",
+  "version": "2.0.0"
 }
