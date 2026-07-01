@@ -77,3 +77,11 @@ apps/*/dist/
 dev.db*
 prisma/*.db
 prisma/.db-
+
+# AI agent artifacts & temp files
+.claude-test-output.log
+*.log
+tmp-*.ts
+tmp-*.js
+*.bak
+*.tmp
