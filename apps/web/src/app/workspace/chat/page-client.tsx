@@ -25,6 +25,7 @@ import { useAgentStore } from "@/stores/agent-store";
 import { ModelSelectorInline } from "@/components/workspace/ModelSelectorInline";
 import { useModelPreference } from "@/hooks/use-model-preference";
 import { toast } from "sonner";
+import { NewAgentDialog } from "@/app/workspace/agents/_components/new-agent-dialog";
 
 // 翻译用的能力常量映射
 const AVAILABLE_SKILLS = [
@@ -124,43 +125,18 @@ function NewTopicPageInner() {
   // 手动关闭 banner 后隐藏
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
+  // 弹出智能体自进化向导 Dialog 状态
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [wizardDescription, setWizardDescription] = useState("");
+
   const handleStartWizard = useCallback((prompt: string) => {
     // 自动抓取当前输入内容，若为空则提供一个贴近外贸核算场景的默认需求描述
     const trimmed = prompt.trim();
     const reqText = trimmed || "帮我自动分析入站询盘，计算FOB成本，然后自动生成开发信草稿";
     
-    // 自动清理会话并切换到对话状态
-    clearMessages();
-    
-    // 构造用户端发送的消息
-    const userPrompt = `🤖 [智能体自进化] 申请创建专属智能体，核心业务需求为：\n"${reqText}"`;
-    
-    // 构造指令以让大模型按规范在聊天中流式输出规划并附带配置数据载荷
-    const skillsListText = AVAILABLE_SKILLS.map(s => `- ${s.id} (${s.label})`).join("\n");
-    const connectorsListText = AVAILABLE_CONNECTORS.map(c => `- ${c.id} (${c.label})`).join("\n");
-
-    const systemPrompt = `你现在是 Hermes 智能体进化架构专家（Agent Architect）。
-用户正向你申请利用 AI-first 的演化逻辑创建一个专属的外贸数字员工（智能体）。
-
-请你针对用户的核心需求进行业务诊断与架构规划，并直接在对话框中流式输出你的回复。
-你的回复必须为 Markdown 格式，且包含以下结构：
-1. **【名称与角色推荐】**：根据需求，为新智能体取一个简短亮眼的名字（Name，如“开发信专家 Leon”），并定义其扮演角色（Role，如“多语种营销文案师”）和工作描述（Description）。
-2. **【能力绑定建议】**：分析系统支持的 Skills 和 Connectors 列表，给出最适合当前场景的组件绑定建议和合理理由。
-3. **【实操运行方案预览】**：针对该需求，现场进行一次模拟执行，为用户生成一份高保真且有代表性的业务方案样例（如 FOB 核算明细表，或一份外贸开发信模板）。
-4. **【数据载荷载入（核心关键）**】：你必须在你的输出正文的最尾端（不要有任何 markdown 块包裹，单独成行），输出一行隐藏的 HTML 数据载荷，其内容必须包含根据你规划得出的智能体完整配置 JSON。格式必须严格如下：
-   <!-- AGENT_SPEC_JSON: {"name": "推荐名称", "role": "推荐角色", "description": "推荐描述", "bindSkills": ["技能ID"], "bindConnectors": ["连接器ID"]} -->
-
-系统支持的 Skills 技能列表：
-${skillsListText}
-
-系统支持的 Connectors 连接器列表：
-${connectorsListText}
-
-请注意：隐藏注释的数据载荷（AGENT_SPEC_JSON）格式必须完全合法且字段齐全，以便前端系统自动解析出配置并在消息气泡底部渲染出一键部署卡片。`;
-
-    const apiModelId = getApiModelId();
-    sendMessage(userPrompt, systemPrompt, apiModelId);
-  }, [clearMessages, sendMessage, getApiModelId]);
+    setWizardDescription(reqText);
+    setIsWizardOpen(true);
+  }, []);
 
   const handleDirectActivateAgent = useCallback(async (
     spec: { name: string; role: string; description: string; bindSkills: string[]; bindConnectors: string[] },
@@ -552,6 +528,13 @@ ${connectorsListText}
           onCancel={handleCancelConfirmation}
         />
       )}
+
+      {/* 智能体自进化向导弹窗 */}
+      <NewAgentDialog
+        open={isWizardOpen}
+        onOpenChange={setIsWizardOpen}
+        defaultDescription={wizardDescription}
+      />
     </PageTransition>
   );
 }

@@ -683,9 +683,25 @@ function StringListEditor({
   );
 }
 
-export function NewAgentDialog() {
+interface NewAgentDialogProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  defaultDescription?: string;
+  trigger?: React.ReactElement;
+}
+
+export function NewAgentDialog({
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  defaultDescription,
+  trigger,
+}: NewAgentDialogProps = {}) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? (controlledOnOpenChange ?? (() => {})) : setInternalOpen;
+
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<AgentFormData>(DEFAULT_FORM);
   const [submitting, setSubmitting] = useState(false);
@@ -700,6 +716,12 @@ export function NewAgentDialog() {
     },
     [],
   );
+
+  useEffect(() => {
+    if (open && defaultDescription && !form.description) {
+      update("description", defaultDescription);
+    }
+  }, [open, defaultDescription, form.description, update]);
 
   /** 关闭并重置 */
   const resetAndClose = useCallback(() => {
@@ -1321,13 +1343,15 @@ export function NewAgentDialog() {
         if (!val) resetAndClose();
       }}
     >
-      <DialogTrigger
-        render={
-          <Button className="bg-primary text-primary-foreground hover:bg-primary/90" />
-        }
-      >
-        + 新建智能体
-      </DialogTrigger>
+      {!isControlled && (
+        <DialogTrigger
+          render={
+            trigger ?? <Button className="bg-primary text-primary-foreground hover:bg-primary/90" />
+          }
+        >
+          + 新建智能体
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[520px] max-h-[85vh] overflow-y-auto">
         {step < 6 && (
           <DialogHeader>
