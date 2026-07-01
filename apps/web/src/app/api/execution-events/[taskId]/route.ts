@@ -24,21 +24,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     console.error(`[execution-events] Failed to query workflowRun for taskId ${taskId}:`, err)
   }
 
-  const resolvedId = workflowRun?.runId ?? workflowRun?.id
-  const workflowRunId = resolvedId ?? `pending-${taskId}`
+  const resolvedWorkflowRunId = workflowRun?.runId ?? workflowRun?.id ?? `pending-${taskId}`
+  const workflowRunResolved = !!(workflowRun?.runId ?? workflowRun?.id)
   
   const encoder = new TextEncoder(); let unsubscribe: (() => void) | null = null
   const stream = new ReadableStream({
     start(controller) {
       const created = ExecutionEventSchema.parse(createExecutionEvent({
         taskId,
-        workflowRunId,
+        workflowRunId: resolvedWorkflowRunId,
         runtimeId: "openclaw-runtime",
         eventType: "run.created",
         status: "started",
         payload: {
           message: "SSE connected",
-          workflowRunResolved: !!resolvedId
+          workflowRunResolved
         }
       }))
       controller.enqueue(encoder.encode(`data: ${JSON.stringify(created)}\n\n`))
