@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -302,9 +303,10 @@ function useIntentPredict(description: string, name: string) {
 interface Step2RoleAndDescProps {
   formData: AgentFormData;
   update: <K extends keyof AgentFormData>(key: K, value: AgentFormData[K]) => void;
+  onPredictionChange: (prediction: any) => void;
 }
 
-function Step2RoleAndDesc({ formData, update }: Step2RoleAndDescProps) {
+function Step2RoleAndDesc({ formData, update, onPredictionChange }: Step2RoleAndDescProps) {
   // 在 Step2 组件内部添加以下状态
   const [description, setDescription] = useState(formData.description ?? "")
   const [name, setName] = useState(formData.name ?? "")
@@ -315,6 +317,10 @@ function Step2RoleAndDesc({ formData, update }: Step2RoleAndDescProps) {
 
   // AI 深度预判（1.5s延迟）
   const { prediction, isPredicting } = useIntentPredict(description, name)
+
+  useEffect(() => {
+    onPredictionChange(prediction)
+  }, [prediction, onPredictionChange])
 
   // 当内部状态改变时同步给顶层状态
   useEffect(() => {
@@ -678,10 +684,13 @@ function StringListEditor({
 }
 
 export function NewAgentDialog() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<AgentFormData>(DEFAULT_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const [createdAgent, setCreatedAgent] = useState<any>(null);
+  const [prediction, setPrediction] = useState<any>(null);
   const queryClient = useQueryClient();
 
   /** 更新表单字段 */
@@ -699,6 +708,8 @@ export function NewAgentDialog() {
       setStep(1);
       setForm(DEFAULT_FORM);
       setSubmitting(false);
+      setCreatedAgent(null);
+      setPrediction(null);
     }, 300);
   }, []);
 
@@ -739,7 +750,25 @@ export function NewAgentDialog() {
 
       // 刷新智能体列表
       queryClient.invalidateQueries({ queryKey: ["agents"] });
-      resetAndClose();
+
+      const agent = json.agent;
+      setCreatedAgent({
+        id: agent.id,
+        name: agent.name,
+        role: agent.role,
+        avatar: "🤖",
+        userIntentSnapshot: form.description,
+        bindSkills: form.selectedSkills,
+        bindConnectors: form.selectedConnectors,
+        automationLevel: form.automationLevel,
+        conversationStarters: prediction?.conversationStarters ?? [],
+        upgradeHints: prediction?.upgradeHints?.map((h: any) => ({
+          title: h.title,
+          description: h.impact,
+          impact: h.impact,
+        })) ?? [],
+      });
+      setStep(6);
     } catch (err) {
       toast.error("创建智能体失败", {
         description: err instanceof Error ? err.message : "请稍后重试",
@@ -747,7 +776,7 @@ export function NewAgentDialog() {
     } finally {
       setSubmitting(false);
     }
-  }, [form, submitting, queryClient, resetAndClose]);
+  }, [form, submitting, queryClient, prediction]);
 
   /** 渲染当前步骤内容 */
   const renderStepContent = () => {
@@ -812,7 +841,7 @@ export function NewAgentDialog() {
 
       // ======================== Step 2: 角色与描述 ========================
       case 2:
-        return <Step2RoleAndDesc formData={form} update={update} />;
+        return <Step2RoleAndDesc formData={form} update={update} onPredictionChange={setPrediction} />;
 
       // ======================== Step 3: 任务边界 ========================
       case 3:
@@ -1090,6 +1119,176 @@ export function NewAgentDialog() {
           </div>
         );
 
+      case 6:
+        if (!createdAgent) return null;
+        return (
+          <div className="p-6 space-y-5">
+            {/* 成功标题 */}
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 flex items-center justify-center text-3xl mx-auto mb-3">
+                {createdAgent.avatar}
+              </div>
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                  <Check className="size-3 text-white" />
+                </div>
+                <span className="text-emerald-400 font-semibold">智能体创建成功</span>
+              </div>
+              <div className="text-white text-xl font-bold">{createdAgent.name}</div>
+              <div className="text-white/40 text-sm mt-0.5">{createdAgent.role}</div>
+            </div>
+
+            {/* 4维验收矩阵 */}
+            <div className="grid grid-cols-2 gap-2.5">
+              {/* 当前输入 */}
+              <div className="p-3 bg-white/5 border border-white/10 rounded-xl">
+                <div className="text-[10px] text-white/30 mb-1.5 uppercase tracking-wide">
+                  📥 创建意图
+                </div>
+                <div className="text-xs text-white/60 line-clamp-3">
+                  {createdAgent.userIntentSnapshot}
+                </div>
+              </div>
+
+              {/* AI 决策 */}
+              <div className="p-3 bg-white/5 border border-white/10 rounded-xl">
+                <div className="text-[10px] text-white/30 mb-1.5 uppercase tracking-wide">
+                  🧠 AI 配置决策
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-white/60">
+                    <span className="text-white/30">技能：</span>
+                    {createdAgent.bindSkills?.length ?? 0} 个
+                  </div>
+                  <div className="text-xs text-white/60">
+                    <span className="text-white/30">连接器：</span>
+                    {createdAgent.bindConnectors?.length ?? 0} 个
+                  </div>
+                  <div className="text-xs text-white/60">
+                    <span className="text-white/30">自动化：</span>
+                    <span className={
+                      createdAgent.automationLevel === "L3"
+                        ? "text-amber-400"
+                        : createdAgent.automationLevel === "L2"
+                        ? "text-blue-400"
+                        : "text-white/50"
+                    }>
+                      {createdAgent.automationLevel}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 执行证据 */}
+              <div className="p-3 bg-white/5 border border-white/10 rounded-xl">
+                <div className="text-[10px] text-white/30 mb-1.5 uppercase tracking-wide">
+                  ✅ 验收状态
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-400">
+                    <Check className="size-3" />
+                    配置已保存
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-400">
+                    <Check className="size-3" />
+                    进化引擎已激活
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-400">
+                    <Check className="size-3" />
+                    {createdAgent.conversationStarters?.length ?? 0} 个案例引导已生成
+                  </div>
+                </div>
+              </div>
+
+              {/* 人工控制点 */}
+              <div className="p-3 bg-white/5 border border-white/10 rounded-xl">
+                <div className="text-[10px] text-white/30 mb-1.5 uppercase tracking-wide">
+                  🛡️ 审批门禁
+                </div>
+                <div className="text-xs text-white/60">
+                  {createdAgent.automationLevel === "L3"
+                    ? <>
+                        <div className="text-amber-400 mb-1">L3 需管理员激活</div>
+                        <div className="text-white/30">高价值操作需人工确认</div>
+                      </>
+                    : createdAgent.automationLevel === "L2"
+                    ? <div>所有执行操作需人工确认后发送</div>
+                    : <div>仅提供建议，所有动作由人工执行</div>
+                  }
+                </div>
+              </div>
+            </div>
+
+            {/* 对话引导预览 */}
+            {createdAgent.conversationStarters?.length > 0 && (
+              <div className="p-3.5 bg-white/5 border border-white/10 rounded-xl">
+                <div className="text-xs text-white/40 mb-2.5 flex items-center gap-1.5">
+                  <Sparkles className="size-3 text-indigo-400" />
+                  对话框将显示以下案例引导按钮：
+                </div>
+                <div className="space-y-2">
+                  {createdAgent.conversationStarters.slice(0, 3).map((cs: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2.5 p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+                      <div className="text-base">{cs.label?.match(/^\S+/)?.[0] ?? "🎯"}</div>
+                      <div>
+                        <div className="text-xs text-white/70">{cs.label}</div>
+                        <div className="text-[10px] text-white/30 mt-0.5 line-clamp-1">
+                          {cs.message?.slice(0, 60)}...
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 升级建议（及时提出）*/}
+            {createdAgent.upgradeHints?.length > 0 && (
+              <div className="p-3.5 bg-amber-500/8 border border-amber-500/20 rounded-xl">
+                <div className="flex items-center gap-1.5 text-amber-400 text-xs font-medium mb-2">
+                  <TrendingUp className="size-3" />
+                  用了一段时间后，AI 建议你这样升级：
+                </div>
+                {createdAgent.upgradeHints.map((hint: any, i: number) => (
+                  <div key={i} className="text-[11px] text-white/40 mb-1 flex items-start gap-1.5">
+                    <span className="text-amber-500/50 flex-shrink-0">{i + 1}.</span>
+                    <span>
+                      <span className="text-white/60">{hint.title}</span>
+                      {hint.description && <span> — {hint.description}</span>}
+                      {hint.impact && <span className="text-amber-400/60"> → {hint.impact}</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 行动按钮 */}
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  resetAndClose();
+                  router.push(`/industry-packs?tab=agents&highlight=${createdAgent.id}`);
+                }}
+                className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl text-sm font-medium transition-all"
+              >
+                <Sparkles className="size-3.5" />
+                开始与 {createdAgent.name} 对话
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  resetAndClose();
+                  router.push(`/industry-packs?tab=agents`);
+                }}
+                className="px-4 flex items-center justify-center bg-white/8 hover:bg-white/12 text-white/60 rounded-xl text-sm transition-all"
+              >
+                返回列表
+              </button>
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -1129,54 +1328,58 @@ export function NewAgentDialog() {
         + 新建智能体
       </DialogTrigger>
       <DialogContent className="sm:max-w-[520px] max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>新建智能体</DialogTitle>
-        </DialogHeader>
+        {step < 6 && (
+          <DialogHeader>
+            <DialogTitle>新建智能体</DialogTitle>
+          </DialogHeader>
+        )}
 
         <div className="py-2">
-          <Stepper step={step} />
+          {step < 6 && <Stepper step={step} />}
           {renderStepContent()}
         </div>
 
         {/* 底部导航 */}
-        <div className="flex justify-between mt-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setStep(Math.max(1, step - 1))}
-            disabled={step === 1 || submitting}
-          >
-            <ChevronLeft className="size-4 mr-1" />
-            上一步
-          </Button>
+        {step < 6 && (
+          <div className="flex justify-between mt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setStep(Math.max(1, step - 1))}
+              disabled={step === 1 || submitting}
+            >
+              <ChevronLeft className="size-4 mr-1" />
+              上一步
+            </Button>
 
-          {step < TOTAL_STEPS ? (
-            <Button
-              size="sm"
-              onClick={() => setStep(step + 1)}
-              disabled={!canNext()}
-            >
-              下一步
-              <ChevronRight className="size-4 ml-1" />
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="size-4 mr-1.5 animate-spin" />
-                  创建中...
-                </>
-              ) : (
-                "完成创建"
-              )}
-            </Button>
-          )}
-        </div>
+            {step < TOTAL_STEPS ? (
+              <Button
+                size="sm"
+                onClick={() => setStep(step + 1)}
+                disabled={!canNext()}
+              >
+                下一步
+                <ChevronRight className="size-4 ml-1" />
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="size-4 mr-1.5 animate-spin" />
+                    创建中...
+                  </>
+                ) : (
+                  "完成创建"
+                )}
+              </Button>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
