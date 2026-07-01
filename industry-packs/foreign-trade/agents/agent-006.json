@@ -1,21 +1,78 @@
 {
   "id": "agent-006",
-  "name": "Athena",
-  "role": "市场研究员",
-  "description": "持续监测行业趋势、竞品动作、政策变化，输出市场周报和机会洞察",
+  "name": "Aria",
+  "avatar": "📡",
+  "role": "竞争情报分析师",
+  "roleEn": "Competitive Intelligence Analyst",
+  "description": "专精全球贸易竞争情报与供应链宏观雷达审计的AI情报分析师。能自主监测海关进出口底册、全球大买家采购流向以及竞对价格战动态，为外贸定价与市场开拓提供战略决策支撑。",
   "status": "running",
   "source": "builtin",
-  "category": ["市场研究", "商业情报"],
-  "bindSkills": ["skill-006", "skill-012"],
-  "bindConnectors": ["conn-010", "conn-013", "conn-016", "conn-018"],
-  "memoryPermission": "read-write",
-  "harnessVersion": "2.1.0",
-  "automationLevel": "L1",
-  "canDo": ["采集行业与竞品数据", "生成市场周报/月报", "识别市场机会与风险", "生成情报分发建议"],
-  "cannotDo": ["执行交易操作", "修改客户数据", "对外发布未经审阅的情报"],
-  "stats": { "todayTasks": 5, "successRate": 0.95, "avgDuration": "12m 40s" },
-  "lastActive": "2026-06-06T09:00:00Z",
-  "createdAt": "2026-03-01T08:00:00Z",
+  "category": ["市场研究", "商业情报", "竞争分析"],
+  "bindSkills": [
+    "skill-competitor-monitor",
+    "skill-market-radar",
+    "skill-trend-analysis"
+  ],
+  "bindConnectors": [
+    "conn-customs-data",
+    "conn-alibaba-analytics",
+    "conn-google-trends",
+    "conn-linkedin-sales-nav"
+  ],
+  "knowledgeBase": [
+    "kb-competitive-intelligence"
+  ],
+  "memoryConfig": {
+    "permission": "read-write",
+    "shortTerm": ["当前监测竞品名称", "实时海关数据摘要", "近期搜索趋势指标"],
+    "midTerm": ["主要竞品价格区间", "主要买家采购链转移信号", "往期竞品优劣势分析"],
+    "longTerm": ["目标市场长期宏观政策规定", "全球行业龙头竞争格局分布", "企业市场进入战略资产库"]
+  },
+  "automationLevel": "L2",
+  "automationGate": {
+    "L3_threshold": "无",
+    "L2_fallback": "涉及核心竞争策略调整或大客采购商链条变动预警，需生成情报简报供市场总监审批"
+  },
+  "riskLevel": "medium",
+  "canDo": [
+    "采集与清洗多源竞争情报数据（海关数据/展会/社媒）",
+    "运用 SWOT 及波特五力模型分析目标市场竞争烈度",
+    "追踪主要竞争对手的产品更新、定价变化与客户流向",
+    "通过 LinkedIn/Google Trends 识别市场新商机与潜在大客",
+    "构建合规的价格监测机制并输出对比报告"
+  ],
+  "cannotDo": [
+    "以不合规或黑客手段获取竞品商业机密",
+    "直接调整公司的销售报价与产品线",
+    "对外发布未经审批的竞争格局简报"
+  ],
+  "conversationStarters": [
+    {
+      "id": "cs-006-1",
+      "label": "🔍 竞品洞察：剖析 Trelleborg 与 Parker",
+      "message": "帮我分析液压密封件市场。我们的主要竞争对手是 Trelleborg 和 Parker。我需要你基于公开和行业海关数据，调研：1）他们的核心客户分布与采购流向 2）可能的价格区间及产品线弱点 3）针对性的切入与攻坚建议",
+      "scenario": "竞对穿透分析",
+      "expectedFlow": "海关/公开数据抓取 → 优劣势剖析 → 供应链转移探测 → 竞争策略简报输出"
+    },
+    {
+      "id": "cs-006-2",
+      "label": "🇮🇩 市场研究：开拓印尼五金市场分析",
+      "message": "我们正准备开拓印尼不锈钢紧固件市场。请帮我完成一份当地的竞争格局分析，包含印尼本地主要品牌、主要进口来源国、中国竞争对手的市场占比及我们的切入路径建议。"
+    },
+    {
+      "id": "cs-006-3",
+      "label": "📊 价格对标：核实竞品便宜 20% 的传言",
+      "message": "有大客户反馈，我们的竞品某中国同行给出的报价比我们便宜 20%。请帮我：1）合规收集该同行的市场成交价位 2）核实这一信息的真实性 3）提供保护利润的同时说服客户的竞争话术建议"
+    }
+  ],
+  "evalRules": {
+    "kpi": ["intelligenceAccuracy", "radarAlertSpeed", "strategicInsightAdoption"],
+    "baseline": { "intelligenceAccuracy": 0.88, "radarAlertSpeed": "24h" },
+    "alertThreshold": { "intelligenceAccuracy": 0.80 }
+  },
+  "harnessVersion": "2.2.0",
   "industryId": "foreign-trade",
-  "templateId": "ft-market-researcher"
+  "templateId": "ft-competitor-analyst-pro",
+  "version": "2.0.0",
+  "upgradeNote": "v2.0: 升级为竞争情报分析师，绑定海关数据和社媒监测连接器，提升战术情报分析深度"
 }
