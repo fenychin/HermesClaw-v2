@@ -1170,7 +1170,6 @@ export default function ForeignTradePage() {
                 <WorkflowCard
                   key={wf.id}
                   workflow={wf}
-                  selectedInquiryId={selectedInquiry?.id}
                   workspaceId={user.workspaceId ?? "default"}
                   industryPackId={user.industryId ?? undefined}
                 />
