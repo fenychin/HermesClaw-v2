@@ -1,270 +1,56 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
-import { GitBranch, Loader2 } from "lucide-react";
-import { PageTransition } from "@/components/common/PageTransition";
-import { EmptyState } from "@/components/common/empty-state";
-import { WorkflowStepNav } from "../../_components/workflow-step-nav";
-import { WorkflowExecutor } from "../../_components/workflow-executor";
-import { WorkflowContextPanel } from "../../_components/workflow-context-panel";
-import { buildStepInputs } from "../../_helpers/step-input-builder";
-import type { Workflow, WorkflowRunStatus } from "@/types/workflow";
-
-// ============================================================
-// 从 DB Workflow 定义中提取步骤结构
-// ============================================================
-
-interface DbWorkflow {
-  id: string
-  name: string
-  description: string
-  nodes: Array<{ id: string; name: string; kind: string; config: Record<string, unknown> }>
-  edges: Array<{ from: string; to: string; when?: string }>
-}
-
-/** 安全解析 DB 工作流的 nodes/edges 字段，兼容 JSON 字符串 / 已解析对象 */
-function safeParseNodes(raw: unknown): DbWorkflow["nodes"] {
-  if (Array.isArray(raw)) return raw as DbWorkflow["nodes"]
-  if (typeof raw === "string") {
-    try { return JSON.parse(raw) } catch { return [] }
-  }
-  return []
-}
-
-function safeParseEdges(raw: unknown): DbWorkflow["edges"] {
-  if (Array.isArray(raw)) return raw as DbWorkflow["edges"]
-  if (typeof raw === "string") {
-    try { return JSON.parse(raw) } catch { return [] }
-  }
-  return []
-}
+import { useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 /**
- * 将 DB 中的 DAG 节点映射到用户可见的步骤
- * —— 每种 kind 生成一个步骤，按节点顺序排列
+ * 工作流详情页 — 重定向入口
+ *
+ * 由于工作流执行已全部迁移至 /workspace/chat（对话即结果原则），
+ * 此路由不再承担执行功能，仅作为重定向跳板：
+ * - 有 runId 参数 → 跳转 /workspace/chat?workflowRunId={runId}
+ * - 无 runId 参数 → 跳转 /workspace/foreign-trade（返回工作台）
+ *
+ * WorkflowExecutor 组件文件保留，供将来审计面板复用。
  */
-function mapNodesToSteps(nodes: DbWorkflow["nodes"]) {
-  return nodes
-    .filter((n) => n.kind !== "condition" && n.kind !== "noop") // 条件/noop 节点不显示为步骤
-    .map((n, i) => ({
-      id: `step-${n.id}`,
-      title: n.name,
-      description: "",
-      status: "pending" as const,
-      inputs: buildStepInputs(n, i),
-    }))
-}
-
-// buildStepInputs 已抽出至 ../../_helpers/step-input-builder.ts
-
-// ============================================================
-// 客户端页面主体
-// ============================================================
-
-interface PageProps {
-  params: Promise<{ id: string }>
-}
-
-export default function WorkflowDetailPage({ params }: PageProps) {
-  const { id } = use(params)
-  const [dbWorkflow, setDbWorkflow] = useState<DbWorkflow | null>(null)
-  const [packWorkflow, setPackWorkflow] = useState<Workflow | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-
-  // 1) 先尝试 DB；2) DB 无记录时回退到 pack 资产（CLAUDE.md §3.2 SoT）
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      setIsLoading(true)
-      setLoadError(null)
-      try {
-        const res = await fetch(`/api/workflows/${id}`)
-        if (res.ok) {
-          const json = await res.json()
-          if (json.success) {
-            if (!cancelled) {
-              const rawData = json.data as Record<string, unknown>
-              setDbWorkflow({
-                id: rawData.id as string,
-                name: rawData.name as string,
-                description: rawData.description as string,
-                nodes: safeParseNodes(rawData.nodes),
-                edges: safeParseEdges(rawData.edges),
-              })
-            }
-            return
-          }
-        } else if (res.status !== 404) {
-          throw new Error("加载工作流失败")
-        }
-
-        // 回退到 pack（v2 dir 形态：meta + dag + steps）
-        const packRes = await fetch(`/api/industry-packs/foreign-trade/workflows/${id}`)
-        if (packRes.ok) {
-          const pack = await packRes.json() as {
-            meta: { id: string; title: string; description: string }
-            steps: { id: string; title: string; description: string; steps: Workflow["steps"] } | null
-          }
-          if (!cancelled) {
-            setPackWorkflow({
-              id: pack.meta.id,
-              title: pack.meta.title,
-              description: pack.meta.description,
-              runStatus: "idle",
-              steps: pack.steps?.steps ?? [],
-            })
-          }
-        } else if (packRes.status !== 404) {
-          throw new Error("加载行业包工作流失败")
-        }
-      } catch (err) {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : "加载失败")
-      } finally {
-        if (!cancelled) setIsLoading(false)
-      }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [id])
-
-  // 加载中状态
-  if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          <span className="text-sm">加载工作流...</span>
+export default function WorkflowDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center">
+          <div className="flex flex-col items-center gap-3 text-muted-foreground">
+            <Loader2 className="size-6 animate-spin" />
+            <span className="text-sm">正在进入对话执行模式...</span>
+          </div>
         </div>
-      </div>
-    )
-  }
+      }
+    >
+      <WorkflowRedirect />
+    </Suspense>
+  );
+}
 
-  // 加载失败
-  if (loadError) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <EmptyState
-          icon={GitBranch}
-          title="加载失败"
-          description={loadError}
-        />
-      </div>
-    )
-  }
+function WorkflowRedirect() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  // 优先 DB
-  if (dbWorkflow) {
-    return <DbWorkflowPage dbWorkflow={dbWorkflow} workflowId={id} />
-  }
+  useEffect(() => {
+    const runId = searchParams.get("runId");
 
-  // 回退：pack 资产驱动（既不在 DB 也不在 pack 才报"工作流不存在"）
-  if (packWorkflow) {
-    return <StaticWorkflowPage workflow={packWorkflow} />
-  }
+    if (runId) {
+      router.replace(`/workspace/chat?workflowRunId=${encodeURIComponent(runId)}`);
+    } else {
+      router.replace("/workspace/foreign-trade");
+    }
+  }, [searchParams, router]);
 
   return (
     <div className="flex h-full items-center justify-center">
-      <EmptyState
-        icon={GitBranch}
-        title="工作流不存在"
-        description={`未找到 ID 为「${id}」的工作流，请返回外贸工作台重新选择。`}
-      />
+      <div className="flex flex-col items-center gap-3 text-muted-foreground">
+        <Loader2 className="size-6 animate-spin" />
+        <span className="text-sm">正在进入对话执行模式...</span>
+      </div>
     </div>
-  )
-}
-
-// ============================================================
-// DB 驱动的工作流页面（真实后端执行）
-// ============================================================
-
-function DbWorkflowPage({
-  dbWorkflow,
-  workflowId,
-}: {
-  dbWorkflow: DbWorkflow
-  workflowId: string
-}) {
-  const [runStatus, setRunStatus] = useState<WorkflowRunStatus>("idle")
-  const dagNodes = dbWorkflow.nodes.filter((n) => n.kind !== "condition" && n.kind !== "noop")
-
-  // 将 DB 节点映射为 Workflow 类型（供 executor 使用）
-  const steps = mapNodesToSteps(dbWorkflow.nodes)
-  const workflow: Workflow = {
-    id: workflowId,
-    title: dbWorkflow.name,
-    description: dbWorkflow.description,
-    runStatus,
-    steps,
-  }
-
-  // 轮询：当 runStatus 为 running 时，超时 fallback（执行在 WorkflowExecutor 内部完成）
-  useEffect(() => {
-    if (runStatus === "running") {
-      // 给一个小延迟让 executor 内的 API 调用先完成
-      // executor 成功后会通过 onRun 回调通知
-      // 这里作为 fallback，3s 后自动重置
-      const timer = setTimeout(() => {
-        setRunStatus((prev) => (prev === "running" ? "idle" : prev))
-      }, 30000)
-      return () => clearTimeout(timer)
-    }
-  }, [runStatus])
-
-  // 暴露 setRunStatus 给子组件
-  const handleWorkflowComplete = () => {
-    setRunStatus("completed")
-  }
-
-  return (
-    <PageTransition>
-      <div className="flex h-[calc(100vh-3rem)] w-full overflow-hidden bg-background">
-        {/* 左栏：步骤导航 */}
-        <WorkflowStepNav workflow={workflow} onRestart={() => setRunStatus("idle")} />
-
-        {/* 中栏：工作流执行区 */}
-        <main className="flex-1 min-w-0 h-full overflow-hidden">
-          <WorkflowExecutor
-            workflow={workflow}
-            runStatus={runStatus}
-            dagNodes={dagNodes}
-            onRun={handleWorkflowComplete}
-          />
-        </main>
-
-        {/* 右栏：上下文配置面板 */}
-        <WorkflowContextPanel />
-      </div>
-    </PageTransition>
-  )
-}
-
-// ============================================================
-// 静态工作流页面（兼容无 DB 记录的旧工作流）
-// ============================================================
-
-function StaticWorkflowPage({ workflow }: { workflow: Workflow }) {
-  const [runStatus, setRunStatus] = useState<WorkflowRunStatus>("idle")
-
-  return (
-    <PageTransition>
-      <div className="flex h-[calc(100vh-3rem)] w-full overflow-hidden bg-background">
-        {/* 左栏 */}
-        <WorkflowStepNav workflow={workflow} onRestart={() => setRunStatus("idle")} />
-
-        {/* 中栏：使用真实 API 执行，传递空 DAG */}
-        <main className="flex-1 min-w-0 h-full overflow-hidden">
-          <WorkflowExecutor
-            workflow={workflow}
-            runStatus={runStatus}
-            dagNodes={[]}
-            onRun={() => setRunStatus("completed")}
-          />
-        </main>
-
-        {/* 右栏 */}
-        <WorkflowContextPanel />
-      </div>
-    </PageTransition>
-  )
+  );
 }

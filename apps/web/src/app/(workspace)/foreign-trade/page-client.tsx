@@ -1,5 +1,8 @@
 "use client";
 
+// [Hermes] 工作台数据链路说明：
+// WorkflowCard → useWorkflowChatBridge → /api/workflows/run → TaskEnvelope → /workspace/chat
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
@@ -32,7 +35,6 @@ import { PageHeader } from "@/components/common/page-header";
 import { StatCard } from "@/components/common/stat-card";
 import { PageTransition } from "@/components/common/PageTransition";
 import { WorkflowCard } from "./_components/workflow-card";
-import { InquiryQuickEntry } from "./_components/inquiry-quick-entry";
 import { WorkflowHealthMonitor } from "./_components/workflow-health-monitor";
 import { useForeignTradeCapabilities } from "@/hooks/use-foreign-trade-capabilities";
 import { useDashboardStats, countUrgentInquiries } from "@/hooks/use-dashboard-stats";
@@ -40,6 +42,7 @@ import { useIntelligence, filterRiskItems } from "@/hooks/use-intelligence";
 import { RecommendedResourcesCard } from "./_components/trade-resource-cards";
 import type { MarketIntelligence } from "@/types/trade";
 import { cn } from "@/lib/utils";
+import { useUser } from "@/hooks/use-user";
 import dynamic from "next/dynamic";
 
 // Recharts 漏斗图表懒加载（~500KB gzipped，仅数据就绪后渲染）
@@ -215,6 +218,7 @@ function IndustryDynamicsCard() {
 // ============================================================
 export default function ForeignTradePage() {
   const router = useRouter();
+  const user = useUser();
 
   // 1. 获取健康与资产状态 (来自 Hook)
   const {
@@ -1155,9 +1159,6 @@ export default function ForeignTradePage() {
             )}
           </section>
 
-          {/* ---- 询盘快速录入与自动分级处理 ---- */}
-          <InquiryQuickEntry />
-
           {/* ---- 常用工作流 ---- */}
           <section>
             <div className="flex items-center justify-between mb-4">
@@ -1166,7 +1167,13 @@ export default function ForeignTradePage() {
             </div>
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
               {workflows.map((wf) => (
-                <WorkflowCard key={wf.id} workflow={wf} />
+                <WorkflowCard
+                  key={wf.id}
+                  workflow={wf}
+                  selectedInquiryId={selectedInquiry?.id}
+                  workspaceId={user.workspaceId ?? "default"}
+                  industryPackId={user.industryId ?? undefined}
+                />
               ))}
             </div>
           </section>

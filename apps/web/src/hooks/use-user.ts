@@ -5,11 +5,17 @@
 import { create } from "zustand";
 
 interface UserState {
+  /** 当前工作空间 ID（由 WorkspaceProvider 注入） */
+  workspaceId: string;
+  /** 当前激活的行业包 ID（由 WorkspaceProvider 注入） */
+  industryId: string | null;
   points: number;
   subscriptionPoints: number;
   dailyRewardPoints: number;
   maxDailyRewardPoints: number;
   plan: "free" | "pro" | "enterprise";
+  setWorkspaceId: (workspaceId: string) => void;
+  setIndustryId: (industryId: string | null) => void;
   setPoints: (points: number) => void;
   setSubscriptionPoints: (points: number) => void;
   setDailyRewardPoints: (points: number) => void;
@@ -20,13 +26,17 @@ interface UserState {
 }
 
 export const useUser = create<UserState>((set, get) => ({
-  // 默认值（服务端数据加载前使用）
+  // 默认值（由 WorkspaceProvider 在客户端 mount 后同步真实值）
+  workspaceId: "default",
+  industryId: null,
   points: 0,
   subscriptionPoints: 0,
   dailyRewardPoints: 0,
   maxDailyRewardPoints: 5,
   plan: "free",
 
+  setWorkspaceId: (workspaceId) => set({ workspaceId }),
+  setIndustryId: (industryId) => set({ industryId }),
   setPoints: (points) => set({ points }),
   setSubscriptionPoints: (subscriptionPoints) => set({ subscriptionPoints }),
   setDailyRewardPoints: (dailyRewardPoints) => set({ dailyRewardPoints }),

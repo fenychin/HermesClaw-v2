@@ -29,5 +29,5 @@ export default async function WorkspaceLayout({ children }: { children: ReactNod
     redirect("/onboarding");
   }
 
-  return <WorkspaceProvider>{children}</WorkspaceProvider>;
+  return <WorkspaceProvider workspaceId={member.workspaceId}>{children}</WorkspaceProvider>;
 }

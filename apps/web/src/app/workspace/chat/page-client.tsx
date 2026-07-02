@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ import { RiskConfirmDialog } from "@/components/pages/new/risk-confirm-dialog";
 import { TaskDispatchBanner } from "@/components/pages/new/task-dispatch-banner";
 import { IndustryPackReminder } from "@/components/pages/new/industry-pack-reminder";
 import { IndustryPackBadge } from "@/components/pages/new/industry-pack-badge";
+import { WorkflowContextConfirmCard } from "@/components/pages/new/workflow-context-confirm-card";
 import { useChat } from "@/hooks/useChat";
 import { SELECTABLE_MODELS } from "@/config/models";
 import { useUiStore } from "@/stores/ui-store";
@@ -59,6 +60,7 @@ export default function NewTopicPage() {
 }
 
 function NewTopicPageInner() {
+  const router = useRouter();
   const {
     messages,
     isStreaming,
@@ -283,7 +285,7 @@ function NewTopicPageInner() {
       const dispatchRes = await fetch("/api/tasks/dispatch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: trimmedInput }),
+        body: JSON.stringify({ inputText: trimmedInput }),
       });
 
       if (dispatchRes.ok) {
@@ -332,6 +334,9 @@ function NewTopicPageInner() {
     // ═══ 阶段 2: 发送对话消息 ═══
     sendMessage(trimmedInput, enhancedSystemPrompt, apiModelId, taskId, workflowRunId);
     clearNewTopicInput();
+
+    // 关闭工作流上下文确认卡片
+    setWorkflowContextCard(null);
   }, [input, isStreaming, sendMessage, pendingSystemPrompt, getApiModelId, clearNewTopicInput]);
 
   // L3 确认后重试 dispatch
@@ -347,7 +352,7 @@ function NewTopicPageInner() {
       const dispatchRes = await fetch("/api/tasks/dispatch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: pendingInput, confirmed: true }),
+        body: JSON.stringify({ inputText: pendingInput, confirmed: true }),
       });
 
       if (dispatchRes.ok) {
@@ -378,6 +383,52 @@ function NewTopicPageInner() {
     sendMessage(pendingInput, pendingSystemPrompt, pendingModelId, taskId, workflowRunId);
     clearNewTopicInput();
   }, [confirmationDialog, sendMessage, clearNewTopicInput]);
+
+  // ═══════════════════════════════════════════════════════════════
+  // [Hermes] 工作流聊天桥接：从 URL 参数 ?workflowRunId=&intent=
+  // 预填提示词到输入框 → 清除 URL 参数 → 等待用户确认并手动发送
+  //
+  // 设计原则：绝不自动发送！必须等用户确认上下文并手动点击发送。
+  // ═══════════════════════════════════════════════════════════════
+  const workflowAutoTriggeredRef = useRef(false);
+
+  // 上下文确认卡片状态（URL 参数已清除，从 ref 读取持久化值）
+  const [workflowContextCard, setWorkflowContextCard] = useState<{
+    intent: string;
+    workflowRunId: string;
+  } | null>(null);
+
+  // Effect: 读取 URL 参数 → 预填提示词 → 展示确认卡片 → 清除 URL
+  useEffect(() => {
+    const workflowRunId = searchParams.get("workflowRunId");
+    const intent = searchParams.get("intent");
+
+    if (!workflowRunId || workflowAutoTriggeredRef.current) return;
+
+    workflowAutoTriggeredRef.current = true;
+
+    // 构建预填提示词 — 不包含"请直接开始"，用户可编辑
+    const autoPrompt = `请执行工作流 [${
+      intent ?? "未指定"
+    }]。工作流运行实例：${workflowRunId}`;
+
+    setInput(autoPrompt);
+
+    // 展示上下文确认卡片
+    setWorkflowContextCard({
+      intent: intent ?? "未指定",
+      workflowRunId,
+    });
+
+    // 清除 URL 参数防止刷新重新预填
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete("workflowRunId");
+    nextParams.delete("intent");
+    const qs = nextParams.toString();
+    router.replace(`/workspace/chat${qs ? `?${qs}` : ""}`);
+  }, [searchParams, setInput, router]);
+
+  // 用户手动发送后关闭确认卡片（在 handleSend 内部 setWorkflowContextCard(null)）
 
   // L3 确认取消 — 保留输入
   const handleCancelConfirmation = useCallback(() => {
@@ -431,6 +482,14 @@ function NewTopicPageInner() {
 
           {/* 行业包未安装提醒 — 仅在未安装任何行业包时展示 */}
           <IndustryPackReminder />
+
+          {/* 工作流上下文确认卡片 — 预填模式下展示 */}
+          {workflowContextCard && (
+            <WorkflowContextConfirmCard
+              intent={workflowContextCard.intent}
+              workflowRunId={workflowContextCard.workflowRunId}
+            />
+          )}
 
           {/* 对话历史 — 移除内部滚动，改为由外层容器滚动 */}
           {hasMessages && (
